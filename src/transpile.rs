@@ -1,9 +1,26 @@
 use anyhow::{Result, Context};
 
-use crate::ast::{Expr, Statement};
+use crate::ast::{Expr, Program, Statement};
 
 pub trait Transpile {
     fn transpile(&self) -> Result<String>;
+}
+impl Transpile for Program {
+    fn transpile(&self) -> Result<String> {
+        let cosy_lib = std::fs::read_to_string("assets/cosy_lib/cosy.cpp")
+        .context("Failed to read cosy_lib.cpp!")?;
+        let mut output = cosy_lib + "\n\n\n\n/// Automatically generated\n";
+
+        // Transpile the AST to C++
+        for statement in &self.statements {
+            let statement_st: String = statement.transpile()
+                .context("Failed to convert statement to string!")?;
+            output.push_str(&statement_st);
+            output.push('\n');
+        }
+
+        Ok(output)
+    }
 }
 impl Transpile for Expr {
     fn transpile(&self) -> Result<String> {

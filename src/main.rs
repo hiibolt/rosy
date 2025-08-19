@@ -2,10 +2,11 @@ mod transpile;
 mod parsing;
 mod ast;
 
-use std::io::Write;
+use std::{fs::write, io::Write, process::{Command, Stdio}};
 
 use pest::Parser;
 use anyhow::{Context, Result};
+use colored::Colorize;
 
 use crate::{ast::build_ast, parsing::{CosyParser, Rule}, transpile::Transpile};
 
@@ -14,51 +15,53 @@ fn main() -> Result<()> {
         .context("Failed to read script file!")?;
 
     // Stage 1 - Parsing
+    println!("{}", "Stage 1 - Parsing".bright_blue());
     let program = CosyParser::parse(Rule::program, &script)
         .context("Couldn't parse!")?
         .next()
         .context("Expected a program")?;
 
     // Stage 2 - AST Generation
-    // Generate AST
-    let ast = build_ast(program).context("Failed to build AST!")?;
-
-    // Write to file
-    let ast_output_file = std::fs::File::create("outputs/main.ast")
-        .context("Failed to create AST output file!")?;
-    let mut ast_writer = std::io::BufWriter::new(ast_output_file);
-    ast_writer.write_all(format!("{:#?}", ast).as_bytes())
-        .context("Failed to write AST to output file!")?;
-    ast_writer.flush()
-        .context("Failed to flush AST output file!")?;
-
-    println!("Generated AST:\n{:#?}", ast);
-
+    println!("{}", "Stage 2 - AST Generation".bright_green());
+    let ast = build_ast(program)
+        .context("Failed to build AST!")?;
 
     // Stage 3 - Transpilation
-    // Load cosy_lib
-    let cosy_lib = std::fs::read_to_string("assets/cosy_lib/cosy.cpp")
-        .context("Failed to read cosy_lib.cpp!")?;
-    let mut output = cosy_lib + "\n\n\n\n/// Automatically generated\n";
+    println!("{}", "Stage 3 - Transpilation".bright_yellow());
+    let cpp = ast.transpile()
+        .context("Failed to transpile AST to C++!")?;
 
-    // Transpile the AST to C++
-    for statement in ast.statements {
-        let statement_st: String = statement.transpile()
-            .context("Failed to convert statement to string!")?;
-        output.push_str(&statement_st);
-        output.push('\n');
-    }
+    // Stage 4 - Compilation
+    println!("{}", "Stage 4 - Compilation".bright_magenta());
+    let mut child = Command::new("g++")
+        .args(&["-x", "c++", "-", "-o", "outputs/main"])
+        .stdin(Stdio::piped())
+        .spawn()?;
+    child.stdin.as_mut()
+        .context("Failed to open stdin")?
+        .write_all(cpp.as_bytes())
+        .context("Failed to write to stdin")?;
+    child.wait()
+        .context("Failed to wait for child process")?;
 
-    // Write to file
-    let cpp_output_file = std::fs::File::create("outputs/main.cpp")
-        .context("Failed to create output file!")?;
-    let mut cpp_writer = std::io::BufWriter::new(cpp_output_file);
-    cpp_writer.write_all(output.as_bytes())
-        .context("Failed to write to output file!")?;
-    cpp_writer.flush()
-        .context("Failed to flush output file!")?;
+    // Stage 5 - Execution
+    println!("{}", "Stage 5 - Execution".bright_red());
+    let exit_status = Command::new("outputs/main")
+        .status()
+        .context("Failed to execute generated binary")?;
 
-    println!("Generated C++\n{}", output);
+
+
+    // Write intermediaries to files for inspection
+    write("outputs/main.ast", &format!("{:#?}", ast))
+        .context("Failed to write AST output file!")?;
+    write("outputs/main.cpp", &cpp)
+        .context("Failed to write C++ output file!")?;
+
+    // Debug printing
+    println!("{}", format!("Exit code: {:?}", exit_status.code()).bright_cyan());
+    println!("{}", "Generated AST written to `outputs/main.ast`".bright_cyan());
+    println!("{}", "Generated C++ written to `outputs/main.cpp`".bright_cyan());
 
     Ok(())
 }
