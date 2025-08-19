@@ -1,10 +1,12 @@
 WHITESPACE = _{ " " | "\t" | NEWLINE }
 
 program = { SOI ~ begin ~ statement* ~ end ~ EOI }
-statement   = _{ var_decl 
+statement   = _{ 
+  var_decl 
   | write
   | assignment 
-  | procedure }
+  | procedure
+  | procedure_call }
 
 /// BEGIN and END
 begin = { "BEGIN" ~ semicolon }
@@ -15,16 +17,21 @@ write = { "WRITE" ~ expr+ ~ semicolon }
 
 /// VARIABLE
 var_decl = { "VARIABLE" ~ variable_name ~ variable_length ~ semicolon }
-variable_name = @{ ASCII_ALPHANUMERIC+ }
+variable_name = @{ !keyword ~ ASCII_ALPHANUMERIC+ }
 variable_length = @{ ASCII_DIGIT+ }
+
+/// Keywords - define all reserved words
+keyword = { "BEGIN" | "END" | "WRITE" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" }
 
 /// [ PROCEDURES ]
   /// Container
   procedure = { start_procedure ~ statement+ ~ end_procedure }
+  /// Calling - ensure the name is not a keyword
+  procedure_call = { procedure_name ~ expr* ~ semicolon }
   /// PROCEDURE
   start_procedure = { "PROCEDURE" ~ procedure_name ~ procedure_argument_name* ~ semicolon }
-  procedure_name = @{ ASCII_ALPHANUMERIC+ }
-  procedure_argument_name = @{ ASCII_ALPHANUMERIC+ }
+  procedure_name = @{ !keyword ~ ASCII_ALPHANUMERIC+ }
+  procedure_argument_name = @{ !keyword ~ ASCII_ALPHANUMERIC+ }
   /// ENDPROCEDURE
   end_procedure = { "ENDPROCEDURE" ~ semicolon }
 
@@ -46,6 +53,6 @@ term = _{ exp |
 infix_op    = _{ add }
 add         = { "+" }
 
-identifier  = @{ ASCII_ALPHANUMERIC+ }
+identifier  = @{ !keyword ~ ASCII_ALPHANUMERIC+ }
 number      = @{ "-"? ~ ASCII_DIGIT+ }
 semicolon   = { ";" }

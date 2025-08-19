@@ -1,4 +1,9 @@
 BEGIN ;
+    PROCEDURE PRINTSEVEN ;
+        VARIABLE X 1 ;
+        X := 7 ;
+        WRITE X ;
+    ENDPROCEDURE ;
     PROCEDURE RUN ;
         VARIABLE X 1 ;
         VARIABLE Y 1 ;
@@ -7,5 +12,7 @@ BEGIN ;
         X := X + Y ;
         WRITE X ;
         WRITE Y ;
+
+        PRINTSEVEN ;
     ENDPROCEDURE ;
 END ;
