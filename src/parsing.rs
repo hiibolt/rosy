@@ -13,5 +13,6 @@ lazy_static::lazy_static! {
 
         PrattParser::new()
             .op(Op::infix(add, Left))
+            .op(Op::infix(concat, Left))
     };
 }

@@ -28,11 +28,19 @@ impl Transpile for Expr {
             Expr::Number(n) => {
                 format!("Cosy({})", n)
             },
+            Expr::String(s) => {
+                format!("Cosy(\"{}\")", s)
+            },
             Expr::Var(name) => name.to_string(),
             Expr::Exp { expr } => {
                 let sub_expr: String = (*expr).transpile()
                     .context("Failed to convert sub-expression to string!")?;
                 format!("Cosy(e^({}))", sub_expr)
+            },
+            Expr::Complex { expr } => {
+                let sub_expr: String = (*expr).transpile()
+                    .context("Failed to convert complex expression to string!")?;
+                format!("{}.into_complex()", sub_expr)
             },
             Expr::Add { left, right } => {
                 let left_str: String = (*left).transpile()
@@ -40,6 +48,15 @@ impl Transpile for Expr {
                 let right_str: String = (*right).transpile()
                     .context("Failed to convert right expression to string!")?;
                 format!("({} + {})", left_str, right_str)
+            },
+            Expr::Concat { terms } => {
+                format!(
+                    "Cosy(std::vector<Cosy>{{{}}})",
+                    terms.iter()
+                        .map(|term| term.transpile().unwrap_or_else(|_| "Cosy(0)".into()))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             }
         };
 

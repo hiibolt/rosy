@@ -48,6 +48,12 @@ fn main() -> Result<()> {
     let cpp = ast.transpile()
         .context("Failed to transpile AST to C++!")?;
 
+    // Stage 4.5 - Write intermediaries to files for inspection
+    write("outputs/main.ast", &format!("{:#?}", ast))
+        .context("Failed to write AST output file!")?;
+    write("outputs/main.cpp", &cpp)
+        .context("Failed to write C++ output file!")?;
+
     // Stage 5 - Compilation
     println!("{}", "Stage 5 - Compilation".bright_magenta());
     let mut child = Command::new("g++")
@@ -67,12 +73,6 @@ fn main() -> Result<()> {
     let exit_status = Command::new("outputs/main")
         .status()
         .context("Failed to execute generated binary")?;
-
-    // Write intermediaries to files for inspection
-    write("outputs/main.ast", &format!("{:#?}", ast))
-        .context("Failed to write AST output file!")?;
-    write("outputs/main.cpp", &cpp)
-        .context("Failed to write C++ output file!")?;
 
     // Debug printing
     println!("{}", format!("Exit code: {:?}", exit_status.code()).bright_cyan());

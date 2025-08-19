@@ -125,18 +125,29 @@ impl StaticAnalyzer {
         match expr {
             Expr::Number(_) => {
                 // Numbers are always valid
-            }
+            },
+            Expr::String(_) => {
+                // Strings are always valid
+            },
             Expr::Var(name) => {
                 if !self.is_variable_defined(name) {
                     self.add_error(format!("Variable '{}' is not defined", name));
                 }
-            }
+            },
             Expr::Exp { expr } => {
                 self.analyze_expression(expr);
-            }
+            },
+            Expr::Complex { expr } => {
+                self.analyze_expression(expr);
+            },
             Expr::Add { left, right } => {
                 self.analyze_expression(left);
                 self.analyze_expression(right);
+            },
+            Expr::Concat { terms } => {
+                for term in terms {
+                    self.analyze_expression(term);
+                }
             }
         }
     }

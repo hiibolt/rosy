@@ -19,9 +19,12 @@ pub enum Statement {
 #[derive(Debug)]
 pub enum Expr {
     Number(i32),
+    String(String),
     Var(String),
     Exp { expr: Box<Expr> },
+    Complex { expr: Box<Expr> },
     Add { left: Box<Expr>, right: Box<Expr> },
+    Concat { terms: Vec<Box<Expr>> },
 }
 
 pub fn build_ast(pair: pest::iterators::Pair<Rule>) -> Result<Program> {
@@ -156,6 +159,12 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                 let n = primary.as_str().parse::<i32>()?;
                 Ok(Expr::Number(n))
             }
+            Rule::string => {
+                let s = primary.as_str();
+                // Remove the surrounding quotes
+                let s = &s[1..s.len()-1];
+                Ok(Expr::String(s.to_string()))
+            }
             Rule::identifier => Ok(Expr::Var(primary.as_str().to_string())),
             Rule::exp => {
                 let mut inner = primary.into_inner();
@@ -163,15 +172,39 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                     .context("Missing inner expression for `EXP`!")?;
                 let expr = Box::new(build_expr(expr_pair)?);
                 Ok(Expr::Exp { expr })
-            }
+            },
+            Rule::cm => {
+                let mut inner = primary.into_inner();
+                let expr_pair = inner.next()
+                    .context("Missing inner expression for `CM`!")?;
+                let expr = Box::new(build_expr(expr_pair)?);
+                Ok(Expr::Complex { expr })
+            },
             Rule::expr => build_expr(primary),
             _ => bail!("Unexpected primary expr: {:?}", primary.as_rule()),
         })
-        .map_infix(|left, op, right| match op.as_rule() {
+        .map_infix(|
+            left,
+            op,
+            right
+        | match op.as_rule() {
             Rule::add => Ok(Expr::Add {
                 left: Box::new(left?),
                 right: Box::new(right?),
             }),
+            Rule::concat => {
+                let left = left?;
+                let right = right?;
+
+                let terms = if let Expr::Concat{ mut terms } = left {
+                    terms.push(Box::new(right));
+                    terms
+                } else {
+                    vec![Box::new(left), Box::new(right)]
+                };
+
+                Ok(Expr::Concat { terms })
+            },
             _ => bail!("Unexpected infix operator: {:?}", op.as_rule()),
         })
         .parse(pair.into_inner())

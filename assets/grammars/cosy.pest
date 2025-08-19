@@ -36,23 +36,30 @@ keyword = { "BEGIN" | "END" | "WRITE" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE
   end_procedure = { "ENDPROCEDURE" ~ semicolon }
 
 /// [ FUNCTIONS ]
+  builtin_function = _{ exp | cm }
   /// EXP
   exp = { "EXP(" ~ expr ~ ")" }
+  /// CM
+  cm = { "CM(" ~ expr ~ ")" }
 
 /// Assignment
 assignment  = { identifier ~ ":=" ~ expr ~ semicolon }
 
 // Expression parsing using Pratt parser
 expr = { term ~ (infix_op ~ term)* }
-term = _{ exp | 
+term = _{ 
+    builtin_function | 
     number | 
+    string |
     identifier |
     "(" ~ expr ~ ")" }
 
 // Infix operators
-infix_op    = _{ add }
+infix_op    = _{ add | concat }
 add         = { "+" }
+concat      = { "&" }
 
 identifier  = @{ !keyword ~ ASCII_ALPHANUMERIC+ }
 number      = @{ "-"? ~ ASCII_DIGIT+ }
+string      = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 semicolon   = { ";" }
