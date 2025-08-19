@@ -1,6 +1,7 @@
 mod transpile;
 mod parsing;
 mod ast;
+mod analysis;
 
 use std::{fs::write, io::Write, process::{Command, Stdio}};
 
@@ -8,7 +9,7 @@ use pest::Parser;
 use anyhow::{ensure, Context, Result};
 use colored::Colorize;
 
-use crate::{ast::build_ast, parsing::{CosyParser, Rule}, transpile::Transpile};
+use crate::{ast::build_ast, parsing::{CosyParser, Rule}, transpile::Transpile, analysis::analyze_program};
 
 fn main() -> Result<()> {
     // Stage 0 - Load script and clean outputs directory
@@ -37,13 +38,18 @@ fn main() -> Result<()> {
     let ast = build_ast(program)
         .context("Failed to build AST!")?;
 
-    // Stage 3 - Transpilation
-    println!("{}", "Stage 3 - Transpilation".bright_yellow());
+    // Stage 3 - Static Analysis
+    println!("{}", "Stage 3 - Static Analysis".bright_cyan());
+    analyze_program(&ast)
+        .context("Static analysis failed!")?;
+
+    // Stage 4 - Transpilation
+    println!("{}", "Stage 4 - Transpilation".bright_yellow());
     let cpp = ast.transpile()
         .context("Failed to transpile AST to C++!")?;
 
-    // Stage 4 - Compilation
-    println!("{}", "Stage 4 - Compilation".bright_magenta());
+    // Stage 5 - Compilation
+    println!("{}", "Stage 5 - Compilation".bright_magenta());
     let mut child = Command::new("g++")
         .args(&["-x", "c++", "-", "-o", "outputs/main"])
         .stdin(Stdio::piped())
@@ -56,8 +62,8 @@ fn main() -> Result<()> {
         .context("Failed to wait for child process")?;
     ensure!(exit_status.success(), "Compilation failed with exit code: {:?}", exit_status.code());
 
-    // Stage 5 - Execution
-    println!("{}", "Stage 5 - Execution".bright_red());
+    // Stage 6 - Execution
+    println!("{}", "Stage 6 - Execution".bright_red());
     let exit_status = Command::new("outputs/main")
         .status()
         .context("Failed to execute generated binary")?;
