@@ -1,0 +1,10 @@
+BEGIN ;
+    PROCEDURE RUN ;
+        VARIABLE X 1 ;
+        VARIABLE Y 1 ;
+        X := 1 ;
+        Y := 2 ;
+        X := X + Y ;
+        WRITE X ;
+    ENDPROCEDURE ;
+END ;

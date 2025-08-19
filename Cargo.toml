@@ -1,0 +1,9 @@
+[package]
+name = "cosyrs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.99"
+pest = "2.7"
+pest_derive = "2.7"

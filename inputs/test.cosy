@@ -1,0 +1,13 @@
+BEGIN ;
+    VARIABLE XY 1 ;
+    VARIABLE Y 1 ;
+    X := 1 ;
+    Y := EXP(X) ;
+    WRITE X ;
+
+    PROCEDURE test meow meowagain meowthird ;
+        PROCEDURE test meow meowagain meowthird ;
+            VARIABLE Z 1 ;
+        ENDPROCEDURE ;
+    ENDPROCEDURE ;
+END ;

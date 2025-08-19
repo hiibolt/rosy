@@ -1,0 +1,44 @@
+WHITESPACE = _{ " " | "\t" | NEWLINE }
+
+program = { SOI ~ begin ~ statement* ~ end ~ EOI }
+statement   = _{ var_decl 
+  | write
+  | assignment 
+  | procedure }
+
+/// BEGIN and END
+begin = { "BEGIN" ~ semicolon }
+end = { "END" ~ semicolon }
+
+/// WRITE
+write = { "WRITE" ~ expr+ ~ semicolon }
+
+/// VARIABLE
+var_decl = { "VARIABLE" ~ variable_name ~ variable_length ~ semicolon }
+variable_name = @{ ASCII_ALPHANUMERIC+ }
+variable_length = @{ ASCII_DIGIT+ }
+
+/// [ PROCEDURES ]
+  /// Container
+  procedure = { start_procedure ~ statement+ ~ end_procedure }
+  /// PROCEDURE
+  start_procedure = { "PROCEDURE" ~ procedure_name ~ procedure_argument_name* ~ semicolon }
+  procedure_name = @{ ASCII_ALPHANUMERIC+ }
+  procedure_argument_name = @{ ASCII_ALPHANUMERIC+ }
+  /// ENDPROCEDURE
+  end_procedure = { "ENDPROCEDURE" ~ semicolon }
+
+/// [ FUNCTIONS ]
+  /// EXP
+  exp = { "EXP(" ~ expr ~ ")" }
+
+/// Assignment
+assignment  = { identifier ~ ":=" ~ expr ~ semicolon }
+
+expr        = _{
+    exp | 
+    number | 
+    identifier }
+identifier  = @{ ASCII_ALPHANUMERIC+ }
+number      = @{ "-"? ~ ASCII_DIGIT+ }
+semicolon   = { ";" }
