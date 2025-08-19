@@ -5,14 +5,25 @@ mod ast;
 use std::{fs::write, io::Write, process::{Command, Stdio}};
 
 use pest::Parser;
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use colored::Colorize;
 
 use crate::{ast::build_ast, parsing::{CosyParser, Rule}, transpile::Transpile};
 
 fn main() -> Result<()> {
+    // Stage 0 - Load script and clean outputs directory
     let script = std::fs::read_to_string("inputs/basic.cosy")
         .context("Failed to read script file!")?;
+    for entry in std::fs::read_dir("outputs")? {
+        let entry = entry.context("Couldn't view directory entry!")?;
+        if entry.file_type()
+            .context("Couldn't check filetype!")?
+            .is_file()
+        {
+            std::fs::remove_file(entry.path())
+                .context("Couldn't remove file!")?;
+        }
+    }
 
     // Stage 1 - Parsing
     println!("{}", "Stage 1 - Parsing".bright_blue());
@@ -41,16 +52,15 @@ fn main() -> Result<()> {
         .context("Failed to open stdin")?
         .write_all(cpp.as_bytes())
         .context("Failed to write to stdin")?;
-    child.wait()
+    let exit_status = child.wait()
         .context("Failed to wait for child process")?;
+    ensure!(exit_status.success(), "Compilation failed with exit code: {:?}", exit_status.code());
 
     // Stage 5 - Execution
     println!("{}", "Stage 5 - Execution".bright_red());
     let exit_status = Command::new("outputs/main")
         .status()
         .context("Failed to execute generated binary")?;
-
-
 
     // Write intermediaries to files for inspection
     write("outputs/main.ast", &format!("{:#?}", ast))
