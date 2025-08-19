@@ -35,10 +35,17 @@ variable_length = @{ ASCII_DIGIT+ }
 /// Assignment
 assignment  = { identifier ~ ":=" ~ expr ~ semicolon }
 
-expr        = _{
-    exp | 
+// Expression parsing using Pratt parser
+expr = { term ~ (infix_op ~ term)* }
+term = _{ exp | 
     number | 
-    identifier }
+    identifier |
+    "(" ~ expr ~ ")" }
+
+// Infix operators
+infix_op    = _{ add }
+add         = { "+" }
+
 identifier  = @{ ASCII_ALPHANUMERIC+ }
 number      = @{ "-"? ~ ASCII_DIGIT+ }
 semicolon   = { ";" }

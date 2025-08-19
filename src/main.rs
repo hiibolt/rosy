@@ -1,12 +1,24 @@
 use std::io::Write;
 
 use pest::Parser;
+use pest::pratt_parser::PrattParser;
 use pest_derive::Parser;
 use anyhow::{bail, Context, Result};
 
 #[derive(Parser)]
 #[grammar = "assets/grammars/cosy.pest"]
 struct CosyParser;
+
+// Create a static PrattParser for expressions
+lazy_static::lazy_static! {
+    static ref PRATT_PARSER: PrattParser<Rule> = {
+        use pest::pratt_parser::{Assoc::*, Op};
+        use Rule::*;
+
+        PrattParser::new()
+            .op(Op::infix(add, Left))
+    };
+}
 
 #[derive(Debug)]
 struct Program {
@@ -15,7 +27,7 @@ struct Program {
 
 #[derive(Debug)]
 enum Statement {
-    VarDecl { name: String, length: u8 },
+    VarDecl { name: String, _length: u8 },
     Write { exprs: Vec<Expr> },
     Assign { name: String, value: Expr },
     Procedure { name: String, args: Vec<String>, body: Vec<Statement> },
@@ -68,6 +80,7 @@ enum Expr {
     Number(i32),
     Var(String),
     Exp { expr: Box<Expr> },
+    Add { left: Box<Expr>, right: Box<Expr> },
 }
 impl TryFrom<Expr> for String {
     type Error = anyhow::Error;
@@ -81,6 +94,11 @@ impl TryFrom<Expr> for String {
             Expr::Exp { expr } => {
                 let sub_expr: String = (*expr).try_into()?;
                 format!("Cosy(e^({}))", sub_expr)
+            },
+            Expr::Add { left, right } => {
+                let left_str: String = (*left).try_into()?;
+                let right_str: String = (*right).try_into()?;
+                format!("({} + {})", left_str, right_str)
             }
         };
 
@@ -133,10 +151,10 @@ fn build_statement (
             let name = inner.next()
                 .context("Missing first token `variable_name`!")?
                 .as_str().to_string();
-            let length = inner.next()
+            let _length = inner.next()
                 .context("Missing second token `variable_length`!")?
                 .as_str().parse::<u8>()?;
-            Ok(Some(Statement::VarDecl { name, length }))
+            Ok(Some(Statement::VarDecl { name, _length }))
         }
         Rule::write => {
             let mut inner = pair.into_inner();
@@ -229,19 +247,29 @@ fn build_ast(pair: pest::iterators::Pair<Rule>) -> Result<Program> {
     Ok(Program { statements })
 }
 fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
-    match pair.as_rule() {
-        Rule::number => {
-            let n = pair.as_str().parse::<i32>()?;
-            Ok(Expr::Number(n))
-        }
-        Rule::identifier => Ok(Expr::Var(pair.as_str().to_string())),
-        Rule::exp => {
-            let mut inner = pair.into_inner();
-            let expr_pair = inner.next()
-                .context("Missing inner expression for `EXP`!")?;
-            let expr = Box::new(build_expr(expr_pair)?);
-            Ok(Expr::Exp { expr })
-        }
-        _ => anyhow::bail!("Unexpected expr: {:?}", pair.as_rule()),
-    }
+    PRATT_PARSER
+        .map_primary(|primary| match primary.as_rule() {
+            Rule::number => {
+                let n = primary.as_str().parse::<i32>()?;
+                Ok(Expr::Number(n))
+            }
+            Rule::identifier => Ok(Expr::Var(primary.as_str().to_string())),
+            Rule::exp => {
+                let mut inner = primary.into_inner();
+                let expr_pair = inner.next()
+                    .context("Missing inner expression for `EXP`!")?;
+                let expr = Box::new(build_expr(expr_pair)?);
+                Ok(Expr::Exp { expr })
+            }
+            Rule::expr => build_expr(primary),
+            _ => bail!("Unexpected primary expr: {:?}", primary.as_rule()),
+        })
+        .map_infix(|left, op, right| match op.as_rule() {
+            Rule::add => Ok(Expr::Add {
+                left: Box::new(left?),
+                right: Box::new(right?),
+            }),
+            _ => bail!("Unexpected infix operator: {:?}", op.as_rule()),
+        })
+        .parse(pair.into_inner())
 }

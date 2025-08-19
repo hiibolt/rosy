@@ -2,3 +2,6 @@
 
 /.direnv
 .envrc
+
+/outputs/*
+!/outputs/makefile

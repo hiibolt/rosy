@@ -6,5 +6,6 @@ BEGIN ;
         Y := 2 ;
         X := X + Y ;
         WRITE X ;
+        WRITE Y ;
     ENDPROCEDURE ;
 END ;
