@@ -1,0 +1,13 @@
+BEGIN ;
+    PROCEDURE OUTER_PROC ARG1 ;
+        PROCEDURE INNER_PROC ARG2 ;
+            ARG2 := 42 ;
+        ENDPROCEDURE ;
+        
+        ARG1 := 10 ;
+    ENDPROCEDURE ;
+
+    PROCEDURE RUN ;
+        OUTER_PROC 5 ;
+    ENDPROCEDURE ;
+END ;

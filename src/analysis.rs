@@ -7,6 +7,8 @@ struct Scope {
     variables:  HashSet<String>,
     procedures: HashMap<String, ProcedureInfo>,
     functions:  HashMap<String, FunctionInfo>,
+    // Track function/procedure arguments that cannot be modified
+    immutable_arguments: HashSet<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -104,6 +106,12 @@ impl StaticAnalyzer {
                 if !self.is_variable_defined(name) {
                     self.add_error(format!("Variable '{}' is not defined", name));
                 }
+                
+                // Check if trying to modify an immutable argument
+                if self.is_immutable_argument(name) {
+                    self.add_error(format!("Cannot modify argument '{}' - arguments are immutable in functions and procedures", name));
+                }
+                
                 self.analyze_expression(value);
             },
             Statement::Procedure { args, body, .. } |
@@ -112,7 +120,9 @@ impl StaticAnalyzer {
                 
                 if let Some(scope_mut) = self.current_scope_mut() {
                     for arg in args {
+                        // Arguments are both variables and immutable
                         scope_mut.variables.insert(arg.clone());
+                        scope_mut.immutable_arguments.insert(arg.clone());
                     }
                 }
                 
@@ -191,6 +201,15 @@ impl StaticAnalyzer {
     fn is_variable_defined(&self, name: &str) -> bool {
         for scope in self.scope_stack.iter().rev() {
             if scope.variables.contains(name) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn is_immutable_argument(&self, name: &str) -> bool {
+        for scope in self.scope_stack.iter().rev() {
+            if scope.immutable_arguments.contains(name) {
                 return true;
             }
         }

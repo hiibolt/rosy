@@ -1,0 +1,11 @@
+BEGIN ;
+    PROCEDURE TEST_PROC input_arg ;
+        VARIABLE local_var 1 ;
+        local_var := input_arg ;
+        WRITE local_var ;
+    ENDPROCEDURE ;
+
+    PROCEDURE RUN ;
+        TEST_PROC 5 ;
+    ENDPROCEDURE ;
+END ;

@@ -19,7 +19,7 @@ write = { "WRITE" ~ expr+ ~ semicolon }
 
 /// VARIABLE
 var_decl = { "VARIABLE" ~ variable_name ~ variable_length ~ semicolon }
-variable_name = @{ !keyword ~ ASCII_ALPHANUMERIC+ }
+variable_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
 variable_length = @{ ASCII_DIGIT+ }
 
 /// Keywords - define all reserved words
@@ -34,8 +34,8 @@ keyword = { "BEGIN" | "END" | "WRITE" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE
   procedure_call = { procedure_name ~ expr* ~ semicolon }
   /// PROCEDURE
   start_procedure = { "PROCEDURE" ~ procedure_name ~ procedure_argument_name* ~ semicolon }
-  procedure_name = @{ !keyword ~ ASCII_ALPHANUMERIC+ }
-  procedure_argument_name = @{ !keyword ~ ASCII_ALPHANUMERIC+ }
+  procedure_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
+  procedure_argument_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
   /// ENDPROCEDURE
   end_procedure = { "ENDPROCEDURE" ~ semicolon }
   ///
@@ -46,8 +46,8 @@ keyword = { "BEGIN" | "END" | "WRITE" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE
   function_call = { function_name ~ "(" ~ ("," ~ expr)+ ~ ")"  }
   /// FUNCTION
   start_function = { "FUNCTION" ~ function_name ~ function_argument_name+ ~ semicolon }
-  function_name = @{ !keyword ~ ASCII_ALPHANUMERIC+ }
-  function_argument_name = @{ !keyword ~ ASCII_ALPHANUMERIC+ }
+  function_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
+  function_argument_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
   /// ENDFUNCTION
   end_function = { "ENDFUNCTION" ~ semicolon }
 
@@ -75,7 +75,7 @@ infix_op    = _{ add | concat }
 add         = { "+" }
 concat      = { "&" }
 
-identifier  = @{ !keyword ~ ASCII_ALPHANUMERIC+ }
+identifier  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
 number      = @{ "-"? ~ ASCII_DIGIT+ }
 string      = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 semicolon   = { ";" }
