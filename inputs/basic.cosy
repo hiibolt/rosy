@@ -1,7 +1,5 @@
 BEGIN ;
     FUNCTION ADDTWONUMS X Y ;
-        X := 1 ;
-        Y := 2 ;
         WRITE "X: " X ;
         WRITE "Y: " Y ;
         ADDTWONUMS := ( X + Y ) ;
@@ -22,6 +20,12 @@ BEGIN ;
     ENDPROCEDURE ;
 
     PROCEDURE RUN ;
+        VARIABLE X 8 ;
+        VARIABLE Y 8 ;
+        X := 3 ;
+        Y := 4 ;
+        WRITE "Summation of 3 and 4: " ADDTWONUMS(X,Y) ;
+        
         PRINTSEVENNUMS ;
         PRINTACOMPLEXNUM ;
     ENDPROCEDURE ;

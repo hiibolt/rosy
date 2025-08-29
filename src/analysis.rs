@@ -104,7 +104,7 @@ impl StaticAnalyzer {
             }
             Statement::Assign { name, value } => {
                 if !self.is_variable_defined(name) {
-                    self.add_error(format!("Variable '{}' is not defined", name));
+                    self.add_error(format!("Variable '{}' is not defined during assignment", name));
                 }
                 
                 // Check if trying to modify an immutable argument
@@ -169,15 +169,11 @@ impl StaticAnalyzer {
 
     fn analyze_expression(&mut self, expr: &Expr) {
         match expr {
-            Expr::Number(_) => {
-                // Numbers are always valid
-            },
-            Expr::String(_) => {
-                // Strings are always valid
-            },
+            Expr::Number(_) => { },
+            Expr::String(_) => { },
             Expr::Var(name) => {
                 if !self.is_variable_defined(name) {
-                    self.add_error(format!("Variable '{}' is not defined", name));
+                    self.add_error(format!("Variable '{}' is not defined in expression `{expr:?}`", name));
                 }
             },
             Expr::Exp { expr } => {
@@ -194,7 +190,23 @@ impl StaticAnalyzer {
                 for term in terms {
                     self.analyze_expression(term);
                 }
-            }
+            },
+            Expr::FunctionCall { name, args } => {
+                if let Some(func_info) = self.find_function(name) {
+                    if args.len() != func_info.arg_count {
+                        self.add_error(
+                            format!("Function '{}' expects {} argument(s), but {} were provided", 
+                                   name, func_info.arg_count, args.len())
+                        );
+                    }
+                    
+                    for arg in args {
+                        self.analyze_expression(arg);
+                    }
+                } else {
+                    self.add_error(format!("Function '{}' is not defined", name));
+                }
+            },
         }
     }
 

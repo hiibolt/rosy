@@ -6,7 +6,6 @@ statement   = _{
   | write
   | assignment 
   | function
-  | function_call
   | procedure
   | procedure_call }
 
@@ -43,7 +42,7 @@ keyword = { "BEGIN" | "END" | "WRITE" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE
   /// Container
   function = { start_function ~ statement+ ~ end_function }
   /// Calling - ensure the name is not a keyword
-  function_call = { function_name ~ "(" ~ ("," ~ expr)+ ~ ")"  }
+  function_call = ${ function_name ~ "(" ~ expr ~ ("," ~ expr)* ~ ")"  }
   /// FUNCTION
   start_function = { "FUNCTION" ~ function_name ~ function_argument_name+ ~ semicolon }
   function_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
@@ -65,6 +64,7 @@ assignment  = { identifier ~ ":=" ~ expr ~ semicolon }
 expr = { term ~ (infix_op ~ term)* }
 term = _{ 
     builtin_function | 
+    function_call |
     number | 
     string |
     identifier |

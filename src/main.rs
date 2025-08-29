@@ -13,7 +13,7 @@ use crate::{ast::build_ast, parsing::{CosyParser, Rule}, transpile::Transpile, a
 
 fn main() -> Result<()> {
     // Stage 0 - Load script and clean outputs directory
-    let script = std::fs::read_to_string("inputs/correct_underscore_test.cosy")
+    let script = std::fs::read_to_string("inputs/basic.cosy")
         .context("Failed to read script file!")?;
     for entry in std::fs::read_dir("outputs")? {
         let entry = entry.context("Couldn't view directory entry!")?;

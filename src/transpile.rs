@@ -1,17 +1,44 @@
 use anyhow::{Result, Context};
+use std::collections::HashSet;
 
 use crate::ast::{Expr, Program, Statement};
 
+#[derive(Debug, Default, Clone)]
+pub struct TranspileContext {
+    /// Variables that are function/procedure arguments (already references)
+    function_args: HashSet<String>,
+}
+
+impl TranspileContext {
+    fn new() -> Self {
+        Self::default()
+    }
+    
+    fn with_args(args: &[String]) -> Self {
+        Self {
+            function_args: args.iter().cloned().collect(),
+        }
+    }
+    
+    fn is_function_arg(&self, name: &str) -> bool {
+        self.function_args.contains(name)
+    }
+}
+
 pub trait Transpile {
-    fn transpile(&self) -> Result<String>;
+    fn transpile(&self) -> Result<String> {
+        self.transpile_with_context(&TranspileContext::new())
+    }
+    
+    fn transpile_with_context(&self, context: &TranspileContext) -> Result<String>;
 }
 impl Transpile for Program {
-    fn transpile(&self) -> Result<String> {
+    fn transpile_with_context(&self, _context: &TranspileContext) -> Result<String> {
         let mainfile = std::fs::read_to_string("assets/rust/src/main.rs")
             .context("Failed to read main.rs template file!")?;
         let mut output = mainfile + "\n\n\n\n/// Automatically generated\n";
 
-        // Transpile the AST to C++
+        // Transpile the AST to Rust
         for statement in &self.statements {
             let statement_st: String = statement.transpile()
                 .context("Failed to convert statement to string!")?;
@@ -23,7 +50,7 @@ impl Transpile for Program {
     }
 }
 impl Transpile for Expr {
-    fn transpile(&self) -> Result<String> {
+    fn transpile_with_context(&self, context: &TranspileContext) -> Result<String> {
         let res = match self {
             Expr::Number(n) => {
                 format!("Cosy::Real({}f64)", n)
@@ -31,32 +58,83 @@ impl Transpile for Expr {
             Expr::String(s) => {
                 format!("Cosy::String(String::from(\"{}\"))", s)
             },
-            Expr::Var(name) => name.to_string(),
+            Expr::Var(name) => {
+                // If it's a function argument, it's already a reference, so just use the name
+                // If it's a regular variable, we'll add the reference when needed in operations
+                name.to_string()
+            },
             Expr::Exp { expr } => {
-                let sub_expr: String = (*expr).transpile()
+                let sub_expr: String = (*expr).transpile_with_context(context)
                     .context("Failed to convert sub-expression to string!")?;
                 format!("Cosy::Real(todo!({}))", sub_expr)
             },
             Expr::Complex { expr } => {
-                let sub_expr: String = (*expr).transpile()
+                let sub_expr: String = (*expr).transpile_with_context(context)
                     .context("Failed to convert complex expression to string!")?;
                 format!("{}.into_complex()", sub_expr)
             },
             Expr::Add { left, right } => {
-                let left_str: String = (*left).transpile()
+                let left_str: String = (*left).transpile_with_context(context)
                     .context("Failed to convert left expression to string!")?;
-                let right_str: String = (*right).transpile()
+                let right_str: String = (*right).transpile_with_context(context)
                     .context("Failed to convert right expression to string!")?;
-                format!("(&{} + &{})", left_str, right_str)
+                
+                // Add reference prefix only if the operand is not already a function argument
+                let left_ref = if let Expr::Var(name) = left.as_ref() {
+                    if context.is_function_arg(name) {
+                        left_str
+                    } else {
+                        format!("&{}", left_str)
+                    }
+                } else {
+                    format!("&{}", left_str)
+                };
+                
+                let right_ref = if let Expr::Var(name) = right.as_ref() {
+                    if context.is_function_arg(name) {
+                        right_str
+                    } else {
+                        format!("&{}", right_str)
+                    }
+                } else {
+                    format!("&{}", right_str)
+                };
+                
+                format!("({} + {})", left_ref, right_ref)
             },
             Expr::Concat { terms } => {
+                let term_strs: Result<Vec<String>> = terms.iter()
+                    .map(|term| {
+                        let term_str = term.transpile_with_context(context)?;
+                        // Apply same reference logic as in Add
+                        if let Expr::Var(name) = term.as_ref() {
+                            if context.is_function_arg(name) {
+                                Ok(term_str)
+                            } else {
+                                Ok(format!("&{}", term_str))
+                            }
+                        } else {
+                            Ok(format!("&{}", term_str))
+                        }
+                    })
+                    .collect();
+                
+                let term_strs = term_strs?;
                 format!(
-                    "(&({}))",
-                    terms.iter()
-                        .map(|term| term.transpile().unwrap_or_else(|_| "Cosy::Real(0f64)".into()))
-                        .collect::<Vec<_>>()
-                        .join(").concat(&")
+                    "({})",
+                    term_strs.join(").concat(")
                 )
+            },
+            Expr::FunctionCall { name, args } => {
+                let mut arg_strs = Vec::new();
+                for arg in args {
+                    let arg_st: String = arg.transpile_with_context(context)
+                        .context("Failed to convert argument expression to string!")?;
+                    // Add reference for function call arguments since functions expect &Cosy
+                    arg_strs.push(format!("&{}", arg_st));
+                }
+                
+                format!("{}({})", name, arg_strs.join(", "))
             }
         };
 
@@ -64,7 +142,7 @@ impl Transpile for Expr {
     }
 }
 impl Transpile for Statement {
-    fn transpile( &self ) -> Result<String> {
+    fn transpile_with_context(&self, context: &TranspileContext) -> Result<String> {
         match self {
             Statement::VarDecl { name, .. } => {
                 Ok(format!("let mut {} = Cosy::Real(0f64);", name))
@@ -72,7 +150,7 @@ impl Transpile for Statement {
             Statement::Write { exprs } => {
                 let mut exprs_sts = Vec::new();
                 for expr in exprs {
-                    let expr_st: String = expr.transpile()
+                    let expr_st: String = expr.transpile_with_context(context)
                         .context("Failed to convert expression to string!")?;
                     exprs_sts.push(expr_st);
                 }
@@ -84,7 +162,7 @@ impl Transpile for Statement {
                 ))
             }
             Statement::Assign { name, value } => {
-                let value_st: String = value.transpile()
+                let value_st: String = value.transpile_with_context(context)
                     .context("Failed to convert value expression to string!")?;
                 Ok(format!("{} = {}.to_owned();", name, value_st))
             },
@@ -95,22 +173,36 @@ impl Transpile for Statement {
             } => {
                 let fn_name = if name == "RUN" { "main" } else { &name };
 
+                // Create context for procedure body that knows about the arguments
+                let body_context = TranspileContext::with_args(args);
+                
                 let mut body_sts = Vec::new();
                 for stmt in body {
-                    let mut stmt_st: String = stmt.transpile()
+                    let mut stmt_st: String = stmt.transpile_with_context(&body_context)
                         .context("Failed to convert statement to string!")?;
                     stmt_st.insert(0, '\t'); // Indent the body statements
                     body_sts.push(stmt_st);
                 }
 
-                Ok(format!("fn {} ( {} ) {{\n{}\n}}", fn_name, args.join(", "), body_sts.join("\n")))
+                // Add type annotations for procedure arguments just like functions
+                let args_with_types: Vec<String> = if fn_name == "main" {
+                    // main function should have no parameters
+                    Vec::new()
+                } else {
+                    args.iter()
+                        .map(|arg| format!("{}: &Cosy", arg))
+                        .collect()
+                };
+
+                Ok(format!("fn {} ( {} ) {{\n{}\n}}", fn_name, args_with_types.join(", "), body_sts.join("\n")))
             },
             Statement::ProcedureCall { name, args } => {
                 let mut arg_strs = Vec::new();
                 for arg in args {
-                    let arg_st: String = arg.transpile()
+                    let arg_st: String = arg.transpile_with_context(context)
                         .context("Failed to convert argument expression to string!")?;
-                    arg_strs.push(arg_st);
+                    // Add reference for procedure call arguments since procedures expect &Cosy
+                    arg_strs.push(format!("&{}", arg_st));
                 }
                 
                 Ok(format!("{}({});", name, arg_strs.join(", ")))
@@ -122,9 +214,12 @@ impl Transpile for Statement {
             } => {
                 let fn_name = if name == "RUN" { "main" } else { &name };
 
+                // Create context for function body that knows about the arguments
+                let body_context = TranspileContext::with_args(args);
+
                 let mut body_sts = Vec::new();
                 for stmt in body {
-                    let mut stmt_st: String = stmt.transpile()
+                    let mut stmt_st: String = stmt.transpile_with_context(&body_context)
                         .context("Failed to convert statement to string!")?;
                     stmt_st.insert(0, '\t'); // Indent the body statements
                     body_sts.push(stmt_st);
@@ -143,9 +238,10 @@ impl Transpile for Statement {
             Statement::FunctionCall { name, args } => {
                 let mut arg_strs = Vec::new();
                 for arg in args {
-                    let arg_st: String = arg.transpile()
+                    let arg_st: String = arg.transpile_with_context(context)
                         .context("Failed to convert argument expression to string!")?;
-                    arg_strs.push(arg_st);
+                    // Add reference for function call arguments since functions expect &Cosy
+                    arg_strs.push(format!("&{}", arg_st));
                 }
                 
                 Ok(format!("{}({})", name, arg_strs.join(", ")))

@@ -27,6 +27,7 @@ pub enum Expr {
     Complex { expr: Box<Expr> },
     Add { left: Box<Expr>, right: Box<Expr> },
     Concat { terms: Vec<Box<Expr>> },
+    FunctionCall { name: String, args: Vec<Expr> },
 }
 
 pub fn build_ast(pair: pest::iterators::Pair<Rule>) -> Result<Program> {
@@ -226,6 +227,26 @@ fn build_statement (
 fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
+            Rule::function_call => {
+                let mut inner = primary.into_inner();
+                let name = inner.next()
+                    .context("Missing function name in function call!")?
+                    .as_str().to_string();
+                
+                let mut args = Vec::new();
+                // Collect all remaining arguments (expressions)
+                while let Some(arg_pair) = inner.next() {
+                    if arg_pair.as_rule() == Rule::semicolon {
+                        break;
+                    }
+                    
+                    let expr = build_expr(arg_pair)
+                        .context("Failed to build expression in function call!")?;
+                    args.push(expr);
+                }
+
+                Ok(Expr::FunctionCall { name, args })
+            },
             Rule::number => {
                 let n = primary.as_str().parse::<i32>()?;
                 Ok(Expr::Number(n))
