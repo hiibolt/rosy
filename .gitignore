@@ -1,4 +1,5 @@
 /target
+/assets/rust/target
 
 /.direnv
 .envrc

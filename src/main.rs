@@ -3,7 +3,7 @@ mod parsing;
 mod ast;
 mod analysis;
 
-use std::{fs::write, io::Write, process::{Command, Stdio}};
+use std::{fs::write, process::Command};
 
 use pest::Parser;
 use anyhow::{ensure, Context, Result};
@@ -37,6 +37,8 @@ fn main() -> Result<()> {
     println!("{}", "Stage 2 - AST Generation".bright_green());
     let ast = build_ast(program)
         .context("Failed to build AST!")?;
+    write("outputs/main.ast", &format!("{:#?}", ast))
+        .context("Failed to write AST output file!")?;
 
     // Stage 3 - Static Analysis
     println!("{}", "Stage 3 - Static Analysis".bright_cyan());
@@ -45,39 +47,43 @@ fn main() -> Result<()> {
 
     // Stage 4 - Transpilation
     println!("{}", "Stage 4 - Transpilation".bright_yellow());
-    let cpp = ast.transpile()
+    let rust = ast.transpile()
         .context("Failed to transpile AST to C++!")?;
 
     // Stage 4.5 - Write intermediaries to files for inspection
-    write("outputs/main.ast", &format!("{:#?}", ast))
-        .context("Failed to write AST output file!")?;
-    write("outputs/main.cpp", &cpp)
-        .context("Failed to write C++ output file!")?;
+    std::fs::remove_dir_all("outputs")
+        .context("Failed to remove outputs directory")?;
+    let mut child = Command::new("cp")
+        .args(&["-r", "assets/rust", "outputs"])
+        .spawn()
+        .context("Failed to spawn child process")?;
+    let exit_status = child.wait()
+        .context("Failed to wait for child process")?;
+    ensure!(exit_status.success(), "Copying assets failed with exit code: {:?}", exit_status.code());
+    write("outputs/src/main.rs", &rust)
+        .context("Failed to write Rust output file!")?;
 
     // Stage 5 - Compilation
     println!("{}", "Stage 5 - Compilation".bright_magenta());
-    let mut child = Command::new("g++")
-        .args(&["-x", "c++", "-", "-o", "outputs/main"])
-        .stdin(Stdio::piped())
+    let mut child = Command::new("cargo")
+        .args(&["build", "--release"])
+        .current_dir("outputs")
         .spawn()?;
-    child.stdin.as_mut()
-        .context("Failed to open stdin")?
-        .write_all(cpp.as_bytes())
-        .context("Failed to write to stdin")?;
     let exit_status = child.wait()
         .context("Failed to wait for child process")?;
     ensure!(exit_status.success(), "Compilation failed with exit code: {:?}", exit_status.code());
 
     // Stage 6 - Execution
     println!("{}", "Stage 6 - Execution".bright_red());
-    let exit_status = Command::new("outputs/main")
+    let exit_status = Command::new("outputs/target/release/rust")
         .status()
         .context("Failed to execute generated binary")?;
 
     // Debug printing
     println!("{}", format!("Exit code: {:?}", exit_status.code()).bright_cyan());
     println!("{}", "Generated AST written to `outputs/main.ast`".bright_cyan());
-    println!("{}", "Generated C++ written to `outputs/main.cpp`".bright_cyan());
+    println!("{}", "Generated C++ written to `outputs/src/main.rs`".bright_cyan());
+    println!("{}", "Generated binary written to `outputs/target/release/rust`".bright_cyan());
 
     Ok(())
 }

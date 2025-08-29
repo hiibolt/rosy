@@ -1,14 +1,11 @@
 BEGIN ;
-    PROCEDURE ADDTWONUMS ;
-        VARIABLE X 1 ;
-        VARIABLE Y 1 ;
-        VARIABLE Z 1 ;
+    FUNCTION ADDTWONUMS X Y ;
         X := 1 ;
         Y := 2 ;
         WRITE "X: " X ;
         WRITE "Y: " Y ;
-        WRITE "X + Y = " ( X + Y ) ;
-    ENDPROCEDURE ;
+        ADDTWONUMS := ( X + Y ) ;
+    ENDFUNCTION ;
 
     PROCEDURE PRINTSEVENNUMS ;
         VARIABLE X 2 ;
@@ -25,7 +22,6 @@ BEGIN ;
     ENDPROCEDURE ;
 
     PROCEDURE RUN ;
-        ADDTWONUMS ;
         PRINTSEVENNUMS ;
         PRINTACOMPLEXNUM ;
     ENDPROCEDURE ;

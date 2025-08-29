@@ -4,12 +4,17 @@ use crate::ast::{Program, Statement, Expr};
 
 #[derive(Debug, Default)]
 struct Scope {
-    variables: HashSet<String>,
+    variables:  HashSet<String>,
     procedures: HashMap<String, ProcedureInfo>,
+    functions:  HashMap<String, FunctionInfo>,
 }
 
 #[derive(Debug, Clone)]
 struct ProcedureInfo {
+    arg_count: usize,
+}
+#[derive(Debug, Clone)]
+struct FunctionInfo {
     arg_count: usize,
 }
 
@@ -29,6 +34,7 @@ impl StaticAnalyzer {
 
     fn analyze(&mut self, program: &Program) -> Result<()> {
         self.collect_procedures(program);
+        self.collect_functions(program);
         
         for statement in &program.statements {
             self.analyze_statement(statement);
@@ -60,6 +66,23 @@ impl StaticAnalyzer {
             }
         }
     }
+    fn collect_functions(&mut self, program: &Program) {
+        for statement in &program.statements {
+            if let Statement::Function { name, args, .. } = statement {
+                let func_info = FunctionInfo {
+                    arg_count: args.len(),
+                };
+                
+                if let Some(scope) = self.current_scope() {
+                    if scope.functions.contains_key(name) {
+                        self.add_error(format!("Function '{}' is already defined", name));
+                    } else if let Some(scope_mut) = self.current_scope_mut() {
+                        scope_mut.functions.insert(name.clone(), func_info);
+                    }
+                }
+            }
+        }
+    }
 
     fn analyze_statement(&mut self, statement: &Statement) {
         match statement {
@@ -72,21 +95,19 @@ impl StaticAnalyzer {
                     }
                 }
             }
-            
             Statement::Write { exprs } => {
                 for expr in exprs {
                     self.analyze_expression(expr);
                 }
             }
-            
             Statement::Assign { name, value } => {
                 if !self.is_variable_defined(name) {
                     self.add_error(format!("Variable '{}' is not defined", name));
                 }
                 self.analyze_expression(value);
-            }
-            
-            Statement::Procedure { args, body, .. } => {
+            },
+            Statement::Procedure { args, body, .. } |
+            Statement::Function { args, body, .. } => {
                 self.push_scope();
                 
                 if let Some(scope_mut) = self.current_scope_mut() {
@@ -100,13 +121,28 @@ impl StaticAnalyzer {
                 }
                 
                 self.pop_scope();
-            }
-            
+            },
             Statement::ProcedureCall { name, args } => {
                 if let Some(proc_info) = self.find_procedure(name) {
                     if args.len() != proc_info.arg_count {
                         self.add_error(
                             format!("Procedure '{}' expects {} argument(s), but {} were provided", 
+                                   name, proc_info.arg_count, args.len())
+                        );
+                    }
+                    
+                    for arg in args {
+                        self.analyze_expression(arg);
+                    }
+                } else {
+                    self.add_error(format!("Procedure '{}' is not defined", name));
+                }
+            },
+            Statement::FunctionCall { name, args }=> {
+                if let Some(proc_info) = self.find_function(name) {
+                    if args.len() != proc_info.arg_count {
+                        self.add_error(
+                            format!("Function '{}' expects {} argument(s), but {} were provided", 
                                    name, proc_info.arg_count, args.len())
                         );
                     }
@@ -165,6 +201,14 @@ impl StaticAnalyzer {
         for scope in self.scope_stack.iter().rev() {
             if let Some(proc_info) = scope.procedures.get(name) {
                 return Some(proc_info);
+            }
+        }
+        None
+    }
+    fn find_function(&self, name: &str) -> Option<&FunctionInfo> {
+        for scope in self.scope_stack.iter().rev() {
+            if let Some(func_info) = scope.functions.get(name) {
+                return Some(func_info);
             }
         }
         None

@@ -13,6 +13,8 @@ pub enum Statement {
     Assign { name: String, value: Expr },
     Procedure { name: String, args: Vec<String>, body: Vec<Statement> },
     ProcedureCall { name: String, args: Vec<Expr> },
+    Function { name: String, args: Vec<String>, body: Vec<Statement> },
+    FunctionCall { name: String, args: Vec<Expr> },
 }
 
 
@@ -125,7 +127,7 @@ fn build_statement (
             };
 
             Ok(Some(Statement::Procedure { name, args, body }))
-        }
+        },
         Rule::procedure_call => {
             let mut inner = pair.into_inner();
             let name = inner.next()
@@ -145,9 +147,78 @@ fn build_statement (
             }
             
             Ok(Some(Statement::ProcedureCall { name, args }))
-        }
+        },
+        Rule::function => {
+            let mut inner = pair.into_inner();
+            let (name, args) = {
+                let mut start_function_inner = inner
+                    .next()
+                    .context("Missing first token `start_function`!")?
+                    .into_inner();
+
+                let name = start_function_inner.next()
+                    .context("Missing function name!")?
+                    .as_str().to_string();
+
+                let mut args = Vec::new();
+                // Collect all remaining arguments (function_argument_name tokens)
+                while let Some(arg) = start_function_inner.next() {
+                    if arg.as_rule() == Rule::semicolon {
+                        break;
+                    }
+
+                    args.push(arg.as_str().to_string());
+                }
+
+                (name, args)
+            };
+
+            let body = {
+                let mut statements = vec!(
+                    Statement::VarDecl { name: name.clone(), _length: 8 }
+                );
+
+                // Process remaining elements (statements and end_function)
+                while let Some(element) = inner.next() {
+                    // Skip the end_function element
+                    if element.as_rule() == Rule::end_function {
+                        break;
+                    }
+
+                    let pair_input = element.as_str();
+                    if let Some(stmt) = build_statement(element)
+                        .with_context(|| format!("Failed to build statement from:\n{}", pair_input))? {
+                        statements.push(stmt);
+                    }
+                }
+
+                statements
+            };
+
+            Ok(Some(Statement::Function { name, args, body }))
+        },
+        Rule::function_call => {
+            let mut inner = pair.into_inner();
+            let name = inner.next()
+                .context("Missing function name in function call!")?
+                .as_str().to_string();
+            
+            let mut args = Vec::new();
+            // Collect all remaining arguments (expressions)
+            while let Some(arg_pair) = inner.next() {
+                if arg_pair.as_rule() == Rule::semicolon {
+                    break;
+                }
+                
+                let expr = build_expr(arg_pair)
+                    .context("Failed to build expression in function call!")?;
+                args.push(expr);
+            }
+
+            Ok(Some(Statement::FunctionCall { name, args }))
+        },
         // Ignored
-        Rule::begin | Rule::end | Rule::EOI | Rule::end_procedure => Ok(None),
+        Rule::begin | Rule::end | Rule::EOI | Rule::end_procedure | Rule::end_function => Ok(None),
         other => bail!("Unexpected statement: {:?}", other),
     }
 }

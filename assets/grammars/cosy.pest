@@ -5,6 +5,8 @@ statement   = _{
   var_decl 
   | write
   | assignment 
+  | function
+  | function_call
   | procedure
   | procedure_call }
 
@@ -23,7 +25,9 @@ variable_length = @{ ASCII_DIGIT+ }
 /// Keywords - define all reserved words
 keyword = { "BEGIN" | "END" | "WRITE" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" }
 
-/// [ PROCEDURES ]
+/// [ PROCEDURES / FUNCTIONS ]
+  ///
+  /// [ PROCEDURES ]
   /// Container
   procedure = { start_procedure ~ statement+ ~ end_procedure }
   /// Calling - ensure the name is not a keyword
@@ -34,8 +38,20 @@ keyword = { "BEGIN" | "END" | "WRITE" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE
   procedure_argument_name = @{ !keyword ~ ASCII_ALPHANUMERIC+ }
   /// ENDPROCEDURE
   end_procedure = { "ENDPROCEDURE" ~ semicolon }
+  ///
+  /// [ FUNCTIONS ]
+  /// Container
+  function = { start_function ~ statement+ ~ end_function }
+  /// Calling - ensure the name is not a keyword
+  function_call = { function_name ~ "(" ~ ("," ~ expr)+ ~ ")"  }
+  /// FUNCTION
+  start_function = { "FUNCTION" ~ function_name ~ function_argument_name+ ~ semicolon }
+  function_name = @{ !keyword ~ ASCII_ALPHANUMERIC+ }
+  function_argument_name = @{ !keyword ~ ASCII_ALPHANUMERIC+ }
+  /// ENDFUNCTION
+  end_function = { "ENDFUNCTION" ~ semicolon }
 
-/// [ FUNCTIONS ]
+/// [ INTRINSIC FUNCTIONS ]
   builtin_function = _{ exp | cm }
   /// EXP
   exp = { "EXP(" ~ expr ~ ")" }
