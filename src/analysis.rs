@@ -88,6 +88,26 @@ impl StaticAnalyzer {
 
     fn analyze_statement(&mut self, statement: &Statement) {
         match statement {
+            Statement::Loop { iterator, start, end, step, body } => {
+                self.analyze_expression(start);
+                self.analyze_expression(end);
+                if let Some(step_expr) = step {
+                    self.analyze_expression(step_expr);
+                }
+                
+                self.push_scope();
+                
+                // The loop iterator is a variable in the new scope
+                if let Some(scope_mut) = self.current_scope_mut() {
+                    scope_mut.variables.insert(iterator.clone());
+                }
+                
+                for stmt in body {
+                    self.analyze_statement(stmt);
+                }
+                
+                self.pop_scope();
+            }
             Statement::VarDecl { name, .. } => {
                 if let Some(scope) = self.current_scope() {
                     if scope.variables.contains(name) {

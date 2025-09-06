@@ -6,6 +6,7 @@ statement   = _{
   | write
   | assignment 
   | function
+  | loop
   | procedure
   | procedure_call }
 
@@ -49,6 +50,13 @@ keyword = { "BEGIN" | "END" | "WRITE" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE
   function_argument_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
   /// ENDFUNCTION
   end_function = { "ENDFUNCTION" ~ semicolon }
+
+/// [ LOOPS / WHILES ]
+  ///
+  /// [ LOOPS ]
+  loop = { start_loop ~ statement+ ~ end_loop }
+  start_loop = { "LOOP" ~ identifier ~ expr ~ expr ~ expr? ~ semicolon }
+  end_loop = { "ENDLOOP" ~ semicolon }
 
 /// [ INTRINSIC FUNCTIONS ]
   builtin_function = _{ exp | cm }

@@ -39,6 +39,17 @@ impl Cosy {
             _ => panic!("Fundamentally impossible to convert {} to CM (complex)!", self.r#type())
         }
     }
+    pub fn into_usize ( self ) -> usize {
+        match self {
+            Cosy::Real(r) => {
+                assert!(r.fract() == 0.0, "Cannot convert non-integer RE (real) value {} to usize!", r);
+                assert!(r >= 0.0, "Cannot convert negative RE (real) value {} to usize!", r);
+
+                r as usize
+            },
+            _ => panic!("Fundamentally impossible to convert {} to usize!", self.r#type())
+        }
+    }
 }
 impl std::fmt::Display for Cosy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

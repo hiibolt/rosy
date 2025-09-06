@@ -28,5 +28,10 @@ BEGIN ;
         
         PRINTSEVENNUMS ;
         PRINTACOMPLEXNUM ;
+
+        VARIABLE I 8;
+        LOOP I 0 4 2 ;
+            WRITE I ;
+        ENDLOOP ;
     ENDPROCEDURE ;
 END ;

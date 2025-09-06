@@ -144,6 +144,43 @@ impl Transpile for Expr {
 impl Transpile for Statement {
     fn transpile_with_context(&self, context: &TranspileContext) -> Result<String> {
         match self {
+            Statement::Loop { 
+                iterator, start, end, step,
+                body 
+            } => {
+                let loop_iterator = {
+                    let start = start.transpile_with_context(context)
+                        .context("Failed to convert loop start expression to string!")?;
+                    let end = end.transpile_with_context(context)
+                        .context("Failed to convert loop end expression to string!")?;
+                    let mut body = format!("{start}.into_usize()..={end}.into_usize()");
+
+                    if let Some(step_expr) = step {
+                        let step = step_expr.transpile_with_context(context)
+                            .context("Failed to convert loop step expression to string!")?;
+                        body = format!("({}).step_by({}.into_usize())", body, step);
+                    }
+
+                    body
+                };
+                let body_stmts = {
+                    let mut stmts = Vec::new();
+                    for stmt in body {
+                        let mut stmt_st: String = stmt.transpile_with_context(context)
+                            .context("Failed to convert loop body statement to string!")?;
+                        stmt_st.insert(0, '\t');
+                        stmts.push(stmt_st);
+                    }
+                    stmts
+                };
+                
+                Ok(format!(
+                    "for {} in {} {{\n{}\n}}",
+                    iterator,
+                    loop_iterator,
+                    body_stmts.join("\n")
+                ))
+            },
             Statement::VarDecl { name, .. } => {
                 Ok(format!("let mut {} = Cosy::Real(0f64);", name))
             },
