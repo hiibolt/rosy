@@ -9,7 +9,8 @@ pub struct Program {
 #[derive(Debug)]
 pub enum Statement {
     VarDecl { name: String, _length: u8 },
-    Write { exprs: Vec<Expr> },
+    Write { unit: u8, exprs: Vec<Expr> },
+    Read { unit: u8, name: String },
     Assign { name: String, value: Expr },
     Procedure { name: String, args: Vec<String>, body: Vec<Statement> },
     ProcedureCall { name: String, args: Vec<Expr> },
@@ -58,21 +59,48 @@ fn build_statement (
                 .context("Missing second token `variable_length`!")?
                 .as_str().parse::<u8>()?;
             Ok(Some(Statement::VarDecl { name, _length }))
-        }
+        },
         Rule::write => {
             let mut inner = pair.into_inner();
-            let mut exprs = Vec::new();
-            while let Some(expr_pair) = inner.next() {
-                if expr_pair.as_rule() == Rule::semicolon {
-                    break;
-                }
 
-                let expr = build_expr(expr_pair)
-                    .context("Failed to build expression in `write` statement!")?;
-                exprs.push(expr);
-            }
-            Ok(Some(Statement::Write { exprs }))
-        }
+            let unit = inner.next()
+                .context("Missing first token `unit`!")?
+                .as_str()
+                .parse::<u8>()
+                .context("Failed to parse `unit` as u8 in `write` statement!")?;
+
+            let exprs = {
+                let mut exprs = Vec::new();
+                while let Some(expr_pair) = inner.next() {
+                    if expr_pair.as_rule() == Rule::semicolon {
+                        break;
+                    }
+
+                    let expr = build_expr(expr_pair)
+                        .context("Failed to build expression in `write` statement!")?;
+                    exprs.push(expr);
+                }
+                exprs
+            };
+
+            Ok(Some(Statement::Write { unit, exprs }))
+        },
+        Rule::read => {
+            let mut inner = pair.into_inner();
+
+            let unit = inner.next()
+                .context("Missing first token `unit`!")?
+                .as_str()
+                .parse::<u8>()
+                .context("Failed to parse `unit` as u8 in `read` statement!")?;
+
+            let name = inner.next()
+                .context("Missing second token `variable_name`!")?
+                .as_str()
+                .to_string();
+
+            Ok(Some(Statement::Read { unit, name }))
+        },
         Rule::assignment => {
             let mut inner = pair.into_inner();
             let name = inner.next()
@@ -287,25 +315,29 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                     .context("Missing function name in function call!")?
                     .as_str().to_string();
                 
-                let mut args = Vec::new();
-                // Collect all remaining arguments (expressions)
-                while let Some(arg_pair) = inner.next() {
-                    if arg_pair.as_rule() == Rule::semicolon {
-                        break;
+                let args = {
+                    let mut args = Vec::new();
+                    while let Some(arg_pair) = inner.next() {
+                        if arg_pair.as_rule() == Rule::semicolon {
+                            break;
+                        }
+                        
+                        let expr = build_expr(arg_pair)
+                            .context("Failed to build expression in function call!")?;
+                        args.push(expr);
                     }
-                    
-                    let expr = build_expr(arg_pair)
-                        .context("Failed to build expression in function call!")?;
-                    args.push(expr);
-                }
+                    args
+                };
 
                 Ok(Expr::FunctionCall { name, args })
             },
             Rule::number => {
+                
                 let n = primary.as_str().parse::<i32>()?;
                 Ok(Expr::Number(n))
             }
             Rule::string => {
+                
                 let s = primary.as_str();
                 // Remove the surrounding quotes
                 let s = &s[1..s.len()-1];
@@ -313,6 +345,7 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
             }
             Rule::identifier => Ok(Expr::Var(primary.as_str().to_string())),
             Rule::exp => {
+                
                 let mut inner = primary.into_inner();
                 let expr_pair = inner.next()
                     .context("Missing inner expression for `EXP`!")?;
@@ -320,6 +353,7 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                 Ok(Expr::Exp { expr })
             },
             Rule::cm => {
+                
                 let mut inner = primary.into_inner();
                 let expr_pair = inner.next()
                     .context("Missing inner expression for `CM`!")?;

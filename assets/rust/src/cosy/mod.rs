@@ -50,6 +50,26 @@ impl Cosy {
             _ => panic!("Fundamentally impossible to convert {} to usize!", self.r#type())
         }
     }
+    pub fn from_stdin () -> Self {
+        use std::io::{self, Write};
+
+        io::stdout().flush().expect("Failed to flush stdout!");
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).expect("Failed to read line from stdin!");
+
+        let input = input.trim();
+
+        if let Ok(r) = input.parse::<f64>() {
+            Cosy::Real(r)
+        } else if let Ok(b) = input.parse::<bool>() {
+            Cosy::Logical(b)
+        } else if input.starts_with('"') && input.ends_with('"') && input.len() >= 2 {
+            Cosy::String(input[1..input.len()-1].to_string())
+        } else {
+            panic!("Failed to parse input: {}", input);
+        }
+    }
 }
 impl std::fmt::Display for Cosy {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -107,7 +107,7 @@ impl StaticAnalyzer {
                 }
                 
                 self.pop_scope();
-            }
+            },
             Statement::VarDecl { name, .. } => {
                 if let Some(scope) = self.current_scope() {
                     if scope.variables.contains(name) {
@@ -116,12 +116,17 @@ impl StaticAnalyzer {
                         scope_mut.variables.insert(name.clone());
                     }
                 }
-            }
-            Statement::Write { exprs } => {
+            },
+            Statement::Write { exprs, .. } => {
                 for expr in exprs {
                     self.analyze_expression(expr);
                 }
-            }
+            },
+            Statement::Read { name, .. } => {
+                if !self.is_variable_defined(name) {
+                    self.add_error(format!("Variable '{}' is not defined during READ", name));
+                }
+            },
             Statement::Assign { name, value } => {
                 if !self.is_variable_defined(name) {
                     self.add_error(format!("Variable '{}' is not defined during assignment", name));

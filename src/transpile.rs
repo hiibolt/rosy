@@ -1,4 +1,4 @@
-use anyhow::{Result, Context};
+use anyhow::{ensure, Context, Result};
 use std::collections::HashSet;
 
 use crate::ast::{Expr, Program, Statement};
@@ -184,8 +184,11 @@ impl Transpile for Statement {
             Statement::VarDecl { name, .. } => {
                 Ok(format!("let mut {} = Cosy::Real(0f64);", name))
             },
-            Statement::Write { exprs } => {
+            Statement::Write { unit, exprs } => {
                 let mut exprs_sts = Vec::new();
+
+                ensure!(*unit == 6, "Only WRITE with unit 6 (console) is supported so far!");
+
                 for expr in exprs {
                     let expr_st: String = expr.transpile_with_context(context)
                         .context("Failed to convert expression to string!")?;
@@ -197,7 +200,11 @@ impl Transpile for Statement {
                     exprs_sts.iter().map(|_| "{}").collect::<Vec<_>>().join(""),
                     exprs_sts.join(", ")
                 ))
-            }
+            },
+            Statement::Read { unit, name } => {
+                ensure!(*unit == 5, "Only READ with unit 5 (stdin) is supported so far!");
+                Ok(format!("{} = Cosy::from_stdin();", name))
+            },
             Statement::Assign { name, value } => {
                 let value_st: String = value.transpile_with_context(context)
                     .context("Failed to convert value expression to string!")?;

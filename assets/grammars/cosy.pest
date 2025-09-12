@@ -4,6 +4,7 @@ program = { SOI ~ begin ~ statement* ~ end ~ EOI }
 statement   = _{ 
   var_decl 
   | write
+  | read
   | assignment 
   | function
   | loop
@@ -15,7 +16,8 @@ begin = { "BEGIN" ~ semicolon }
 end = { "END" ~ semicolon }
 
 /// WRITE
-write = { "WRITE" ~ expr+ ~ semicolon }
+write = { "WRITE" ~ unit ~ expr+ ~ semicolon }
+read = { "READ" ~ unit ~ identifier ~ semicolon }
 
 /// VARIABLE
 var_decl = { "VARIABLE" ~ variable_name ~ variable_length ~ semicolon }
@@ -23,7 +25,7 @@ variable_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
 variable_length = @{ ASCII_DIGIT+ }
 
 /// Keywords - define all reserved words
-keyword = { "BEGIN" | "END" | "WRITE" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" }
+keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" }
 
 /// [ PROCEDURES / FUNCTIONS ]
   ///
@@ -85,5 +87,6 @@ concat      = { "&" }
 
 identifier  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
 number      = @{ "-"? ~ ASCII_DIGIT+ }
+unit        = @{ ASCII_DIGIT+ }
 string      = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 semicolon   = { ";" }
