@@ -283,13 +283,13 @@ impl StaticAnalyzer {
                 }
             },
             Expr::Complex { expr: inner } => {
-                // CM function can take VE and returns CM
                 if let Some(inner_type) = self.get_expression_type(inner) {
                     match inner_type {
+                        RosyType::RE => Some(RosyType::CM),
+                        RosyType::CM => Some(RosyType::CM),
                         RosyType::VE => Some(RosyType::CM),
-                        RosyType::RE => Some(RosyType::CM), // Single real can become complex
                         _ => {
-                            self.add_error(format!("CM function requires VE or RE argument, found {:?}", inner_type));
+                            self.add_error(format!("CM function requires RE, CM, or VE argument, found {:?}", inner_type));
                             None
                         }
                     }
