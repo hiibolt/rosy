@@ -1,5 +1,5 @@
 BEGIN ;
-    FUNCTION ADDTWONUMS X (RE) Y (RE) ;
+    FUNCTION (RE) ADDTWONUMS X (RE) Y (RE) ;
         WRITE 6 "X: " X ;
         WRITE 6 "Y: " Y ;
         ADDTWONUMS := ( X + Y ) ;

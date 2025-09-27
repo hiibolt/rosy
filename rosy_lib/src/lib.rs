@@ -43,6 +43,26 @@ impl TryFrom<&str> for RosyType {
     }
 }
 
+use anyhow::{Result, Context};
+pub fn from_stdin<T: std::str::FromStr> ( ) -> Result<T>
+where
+    <T as std::str::FromStr>::Err: std::error::Error + Send + Sync + 'static,
+{
+    use std::io;
+
+    let mut input = String::new();
+    io::stdin()
+        .read_line(&mut input)
+        .context("Failed to read line from stdin!")?;
+
+    let input = input.trim();
+    let value = input
+        .parse::<T>()
+        .map_err(|e| anyhow::anyhow!("Failed to parse input '{}': {}", input, e))?;
+
+    Ok(value)
+}
+
 /*
 #[cfg(test)]
 mod tests {

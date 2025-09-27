@@ -69,7 +69,7 @@ impl Transpile for Expr {
             Expr::Complex { expr } => {
                 let sub_expr: String = (*expr).transpile_with_context(context)
                     .context("Failed to convert complex expression to string!")?;
-                format!("{}.cm()", sub_expr)
+                format!("{}.cm().context(\"...while trying to convert to a CM!\")?", sub_expr)
             },
             Expr::Add { left, right } => {
                 let left_str: String = (*left).transpile_with_context(context)
@@ -98,7 +98,7 @@ impl Transpile for Expr {
                     format!("&{}", right_str)
                 };
                 
-                format!("({}.cosy_add({}))", left_ref, right_ref)
+                format!("({}.rosy_add({}))", left_ref, right_ref)
             },
             Expr::Concat { terms } => {
                 let term_strs: Result<Vec<String>> = terms.iter()
@@ -151,7 +151,7 @@ impl Transpile for Statement {
                         .context("Failed to convert loop start expression to string!")?;
                     let end = end.transpile_with_context(context)
                         .context("Failed to convert loop end expression to string!")?;
-                    let mut body = format!("{start}.into_usize()..={end}.into_usize()");
+                    let mut body = format!("({start} as usize)..=({end} as usize)");
 
                     if let Some(step_expr) = step {
                         let step = step_expr.transpile_with_context(context)
@@ -164,9 +164,12 @@ impl Transpile for Statement {
                 let body_stmts = {
                     let mut stmts = Vec::new();
                     for stmt in body {
-                        let mut stmt_st: String = stmt.transpile_with_context(context)
-                            .context("Failed to convert loop body statement to string!")?;
-                        stmt_st.insert(0, '\t');
+                        let stmt_st: String = stmt.transpile_with_context(context)
+                            .context("Failed to convert loop body statement to string!")?
+                            .lines()
+                            .map(|line| format!("\t{}", line))
+                            .collect::<Vec<String>>()
+                            .join("\n");
                         stmts.push(stmt_st);
                     }
                     stmts
@@ -197,13 +200,13 @@ impl Transpile for Statement {
 
                 Ok(format!(
                     "println!(\"{}\", {});",
-                    exprs_sts.iter().map(|_| "{}").collect::<Vec<_>>().join(""),
+                    exprs_sts.iter().map(|_| "{:?}").collect::<Vec<_>>().join(""),
                     exprs_sts.join(", ")
                 ))
             },
             Statement::Read { unit, name } => {
                 ensure!(*unit == 5, "Only READ with unit 5 (stdin) is supported so far!");
-                Ok(format!("{} = Cosy::from_stdin();", name))
+                Ok(format!("{} = from_stdin().context(\"...while trying to read from stdin!\")?;", name))
             },
             Statement::Assign { name, value } => {
                 let value_st: String = value.transpile_with_context(context)
@@ -215,21 +218,24 @@ impl Transpile for Statement {
                 args,
                 body
             } => {
-                let fn_name = if name == "RUN" { "main" } else { &name };
+                let fn_name = if name == "RUN" { "run" } else { &name };
 
                 // Create context for procedure body that knows about the arguments
                 let body_context = TranspileContext::with_args(args);
                 
                 let mut body_sts = Vec::new();
                 for stmt in body {
-                    let mut stmt_st: String = stmt.transpile_with_context(&body_context)
-                        .context("Failed to convert statement to string!")?;
-                    stmt_st.insert(0, '\t'); // Indent the body statements
+                    let stmt_st: String = stmt.transpile_with_context(&body_context)
+                        .context("Failed to convert statement to string!")?
+                        .lines()
+                        .map(|line| format!("\t{}", line))
+                        .collect::<Vec<String>>()
+                        .join("\n");
                     body_sts.push(stmt_st);
                 }
 
                 // Add type annotations for procedure arguments just like functions
-                let args_with_types: Vec<String> = if fn_name == "main" {
+                let args_with_types: Vec<String> = if fn_name == "run" {
                     // main function should have no parameters
                     Vec::new()
                 } else {
@@ -241,7 +247,12 @@ impl Transpile for Statement {
                         .collect()
                 };
 
-                Ok(format!("fn {} ( {} ) {{\n{}\n}}", fn_name, args_with_types.join(", "), body_sts.join("\n")))
+                Ok(format!(
+                    "fn {} ( {} ) -> Result<()> {{\n{}\n\tOk(())\n}}",
+                    fn_name,
+                    args_with_types.join(", "),
+                    body_sts.join("\n")
+                ))
             },
             Statement::ProcedureCall { name, args } => {
                 let mut arg_strs = Vec::new();
@@ -252,28 +263,30 @@ impl Transpile for Statement {
                     arg_strs.push(format!("&{}", arg_st));
                 }
                 
-                Ok(format!("{}({});", name, arg_strs.join(", ")))
+                Ok(format!("{}({}).with_context(|| format!(\"...while trying to call procedure {}!\"))?;", name, arg_strs.join(", "), name))
             },
             Statement::Function {
                 name,
                 args,
+                return_type,
                 body
             } => {
-                let fn_name = if name == "RUN" { "main" } else { &name };
-
                 // Create context for function body that knows about the arguments
                 let body_context = TranspileContext::with_args(args);
 
                 let mut body_sts = Vec::new();
                 for stmt in body {
-                    let mut stmt_st: String = stmt.transpile_with_context(&body_context)
-                        .context("Failed to convert statement to string!")?;
-                    stmt_st.insert(0, '\t'); // Indent the body statements
+                    let stmt_st: String = stmt.transpile_with_context(&body_context)
+                        .context("Failed to convert statement to string!")?
+                        .lines()
+                        .map(|line| format!("\t{}", line))
+                        .collect::<Vec<String>>()
+                        .join("\n");
                     body_sts.push(stmt_st);
                 }
 
-                Ok(format!("fn {} ( {} ) -> Cosy {{\n{}\n\t{}\n}}",
-                    fn_name,
+                Ok(format!("fn {} ( {} ) -> Result<{}> {{\n{}\n\tOk({})\n}}",
+                    name,
                     args.into_iter()
                         .map(|var_data| {
                             let rust_type = var_data.r#type.as_rust_type();
@@ -281,6 +294,7 @@ impl Transpile for Statement {
                         })
                         .collect::<Vec<String>>()
                         .join(", "),
+                    return_type.as_rust_type(),
                     body_sts.join("\n"),
                     name
                 ))
@@ -294,7 +308,7 @@ impl Transpile for Statement {
                     arg_strs.push(format!("&{}", arg_st));
                 }
                 
-                Ok(format!("{}({})", name, arg_strs.join(", ")))
+                Ok(format!("{}({}).with_context(|| format!(\"...while trying to call function {}!\"))?", name, arg_strs.join(", "), name))
             }
         }
     }

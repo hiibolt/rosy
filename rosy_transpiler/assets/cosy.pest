@@ -47,7 +47,7 @@ keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "END
   /// Calling - ensure the name is not a keyword
   function_call = ${ function_name ~ "(" ~ expr ~ ("," ~ expr)* ~ ")"  }
   /// FUNCTION
-  start_function = { "FUNCTION" ~ function_name ~ function_argument_name_and_type+ ~ semicolon }
+  start_function = { "FUNCTION" ~ type ~ function_name ~ function_argument_name_and_type+ ~ semicolon }
   function_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
   function_argument_name_and_type = _{ function_argument_name ~ type }
   function_argument_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }

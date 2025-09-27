@@ -20,7 +20,7 @@ pub enum Statement {
     Assign { name: String, value: Expr },
     Procedure { name: String, args: Vec<VariableData>, body: Vec<Statement> },
     ProcedureCall { name: String, args: Vec<Expr> },
-    Function { name: String, args: Vec<VariableData>, body: Vec<Statement> },
+    Function { name: String, args: Vec<VariableData>, return_type: RosyType, body: Vec<Statement> },
     FunctionCall { name: String, args: Vec<Expr> },
     Loop { iterator: String, start: Expr, end: Expr, step: Option<Expr>, body: Vec<Statement> },
 }
@@ -61,7 +61,6 @@ fn build_statement (
             let type_str = inner.next()
                 .context("Missing first token `type` when building var decl!")?
                 .as_str().to_string();
-            println!("Type: {}", type_str);
             let name = inner.next()
                 .context("Missing second token `variable_name`!")?
                 .as_str().to_string();
@@ -192,23 +191,25 @@ fn build_statement (
                     .as_str().to_string();
                 
                 let mut args = Vec::new();
-                // Collect all remaining arguments as `VariableData`
+                // Collect all remaining argument names and types
                 while let Some(arg_pair) = start_procedure_inner.next() {
                     if arg_pair.as_rule() == Rule::semicolon {
                         break;
                     }
 
-                    let mut arg_inner = arg_pair.into_inner();
-                    let type_str = arg_inner.next()
-                        .context("Missing first token `type` in procedure argument!")?
-                        .as_str().to_string();
-                    let name = arg_inner.next()
-                        .context("Missing second token `variable_name` in procedure argument!")?
-                        .as_str().to_string();
+                    ensure!(arg_pair.as_rule() == Rule::function_argument_name, 
+                        "Expected function argument name, found: {:?}", arg_pair.as_rule());
+                    let name = arg_pair.as_str();
+
+                    let next_arg_pair = start_procedure_inner.next()
+                        .context(format!("Missing type for function argument: {}", name))?;
+                    ensure!(next_arg_pair.as_rule() == Rule::r#type, 
+                        "Expected type for function argument, found: {:?}", next_arg_pair.as_rule());
+                    let type_str = next_arg_pair.as_str();
 
                     let variable_data = VariableData {
-                        name,
-                        r#type: type_str.as_str().try_into()
+                        name: name.to_string(),
+                        r#type: type_str.try_into()
                             .with_context(|| format!("Unknown type: {type_str}"))?
                     };
                     args.push(variable_data);
@@ -261,11 +262,17 @@ fn build_statement (
         },
         Rule::function => {
             let mut inner = pair.into_inner();
-            let (name, args) = {
+            let (return_type, name, args) = {
                 let mut start_function_inner = inner
                     .next()
                     .context("Missing first token `start_function`!")?
                     .into_inner();
+
+                let type_str = start_function_inner.next()
+                    .context("Missing return type in function declaration!")?
+                    .as_str().to_string();
+                let return_type = type_str.as_str().try_into()
+                    .with_context(|| format!("Unknown type: {type_str}"))?;
 
                 let name = start_function_inner.next()
                     .context("Missing function name!")?
@@ -296,7 +303,7 @@ fn build_statement (
                     args.push(variable_data);
                 }
 
-                (name, args)
+                (return_type, name, args)
             };
 
             let body = {
@@ -324,7 +331,7 @@ fn build_statement (
                 statements
             };
 
-            Ok(Some(Statement::Function { name, args, body }))
+            Ok(Some(Statement::Function { name, args, return_type, body }))
         },
         Rule::function_call => {
             let mut inner = pair.into_inner();
