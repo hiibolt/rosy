@@ -10,15 +10,15 @@ use anyhow::{Result, Context};
 // <INJECT_START>
 	fn ADDTWONUMS ( X: &f64, Y: &f64 ) -> Result<f64> {
 		let mut ADDTWONUMS: f64;
-		println!("{:?}{:?}", String::from("X: "), X);
-		println!("{:?}{:?}", String::from("Y: "), Y);
+		println!("{}{}", String::from("X: ").rosy_display(), X.rosy_display());
+		println!("{}{}", String::from("Y: ").rosy_display(), Y.rosy_display());
 		ADDTWONUMS = (X.rosy_add(Y)).to_owned();
 		Ok(ADDTWONUMS)
 	}
 	fn PRINTSEVENNUMS (  ) -> Result<()> {
 		let mut X: Vec<f64>;
 		X = (&(&0f64.rosy_add(&1f64))).concat(&2f64).concat(&3f64).concat(&4f64).concat(&5f64).concat(&6f64).concat(&7f64).to_owned();
-		println!("{:?}", X);
+		println!("{}", X.rosy_display());
 		Ok(())
 	}
 	fn PRINTACOMPLEXNUM (  ) -> Result<()> {
@@ -26,13 +26,14 @@ use anyhow::{Result, Context};
 		let mut Y: (f64, f64);
 		X = (&2f64).concat(&1f64).to_owned();
 		Y = X.cm().context("...while trying to convert to a CM!")?.to_owned();
-		println!("{:?}", Y);
+		println!("{}", Y.rosy_display());
 		Ok(())
 	}
 	fn PRINTYOURNUMBER (  ) -> Result<()> {
 		let mut I: f64;
+		println!("{}", String::from("Enter what you'd like I to be: ").rosy_display());
 		I = from_stdin().context("...while trying to read from stdin!")?;
-		println!("{:?}{:?}", String::from("I = "), I);
+		println!("{}{}", String::from("I = ").rosy_display(), I.rosy_display());
 		Ok(())
 	}
 	fn run (  ) -> Result<()> {
@@ -40,13 +41,13 @@ use anyhow::{Result, Context};
 		let mut Y: f64;
 		X = 3f64.to_owned();
 		Y = 4f64.to_owned();
-		println!("{:?}{:?}", String::from("Summation of 3 and 4: "), ADDTWONUMS(&X, &Y));
+		println!("{}{}", String::from("Summation of 3 and 4: ").rosy_display(), ADDTWONUMS(&X, &Y).with_context(|| format!("...while trying to call function ADDTWONUMS!"))?.rosy_display());
 		PRINTSEVENNUMS().with_context(|| format!("...while trying to call procedure PRINTSEVENNUMS!"))?;
 		PRINTACOMPLEXNUM().with_context(|| format!("...while trying to call procedure PRINTACOMPLEXNUM!"))?;
 		PRINTYOURNUMBER().with_context(|| format!("...while trying to call procedure PRINTYOURNUMBER!"))?;
 		let mut I: f64;
 		for I in ((0f64 as usize)..=(4f64 as usize)).step_by(2f64 as usize) {
-			println!("{:?}", I);
+			println!("{}", I.rosy_display());
 		}
 		Ok(())
 	}

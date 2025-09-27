@@ -1,8 +1,10 @@
 mod operators;
 mod intrinsics;
+mod core;
 
 pub use operators::*;
 pub use intrinsics::*;
+pub use core::*;
 
 pub type RE = f64;
 pub type ST = String;

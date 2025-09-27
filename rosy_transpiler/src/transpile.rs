@@ -132,7 +132,7 @@ impl Transpile for Expr {
                     arg_strs.push(format!("&{}", arg_st));
                 }
                 
-                format!("{}({})", name, arg_strs.join(", "))
+                format!("{}({}).with_context(|| format!(\"...while trying to call function {}!\"))?", name, arg_strs.join(", "), name)
             }
         };
 
@@ -193,14 +193,15 @@ impl Transpile for Statement {
                 ensure!(*unit == 6, "Only WRITE with unit 6 (console) is supported so far!");
 
                 for expr in exprs {
-                    let expr_st: String = expr.transpile_with_context(context)
+                    let mut expr_st: String = expr.transpile_with_context(context)
                         .context("Failed to convert expression to string!")?;
+                    expr_st = format!("{expr_st}.rosy_display()");
                     exprs_sts.push(expr_st);
                 }
 
                 Ok(format!(
                     "println!(\"{}\", {});",
-                    exprs_sts.iter().map(|_| "{:?}").collect::<Vec<_>>().join(""),
+                    exprs_sts.iter().map(|_| "{}").collect::<Vec<_>>().join(""),
                     exprs_sts.join(", ")
                 ))
             },

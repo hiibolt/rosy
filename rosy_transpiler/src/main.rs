@@ -83,8 +83,7 @@ fn main() -> Result<()> {
     // Stage 5 - Compilation
     println!("{}", "Stage 5 - Compilation".bright_magenta());
     let mut child = Command::new("cargo")
-        .args(&["build", "--release"])
-        .current_dir("rosy_output")
+        .args(&["build", "--release", "--bin", "rosy_output"])
         .spawn()?;
     let exit_status = child.wait()
         .context("Failed to wait for child process")?;
@@ -92,7 +91,7 @@ fn main() -> Result<()> {
 
     // Stage 6 - Execution
     println!("{}", "Stage 6 - Execution".bright_red());
-    let exit_status = Command::new("outputs/target/release/rust")
+    let exit_status = Command::new("target/release/rosy_output")
         .status()
         .context("Failed to execute generated binary")?;
 
@@ -100,7 +99,7 @@ fn main() -> Result<()> {
     println!("{}", format!("Exit code: {:?}", exit_status.code()).bright_cyan());
     println!("{}", "Generated AST written to `outputs/main.ast`".bright_cyan());
     println!("{}", "Generated C++ written to `outputs/src/main.rs`".bright_cyan());
-    println!("{}", "Generated binary written to `outputs/target/release/rust`".bright_cyan());
+    println!("{}", "Generated binary written to `target/release/rosy_output`".bright_cyan());
 
     Ok(())
 }
