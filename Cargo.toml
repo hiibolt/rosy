@@ -3,7 +3,8 @@ resolver = "3"
 members = [ "rosy_lib",
     "rosy_transpiler",
     "rosy_lib",
-    "rosy_output"
+    "rosy_output",
+    "rosy_ide_tools/vscode_extension_generator"
 ]
 
 [workspace.dependencies]
