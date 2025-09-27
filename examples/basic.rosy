@@ -22,13 +22,6 @@ BEGIN ;
         WRITE 6 Y ;
     ENDPROCEDURE ;
 
-    PROCEDURE PRINTYOURNUMBER ;
-        VARIABLE (RE) I ;
-        WRITE 6 "Enter what you'd like I to be: " ;
-        READ 5 I ;
-        WRITE 6 "I = " I ;
-    ENDPROCEDURE ;
-
     PROCEDURE RUN ;
         VARIABLE (RE) X ;
         VARIABLE (RE) Y ;
@@ -38,7 +31,6 @@ BEGIN ;
         
         PRINTSEVENNUMS ;
         PRINTACOMPLEXNUM ;
-        PRINTYOURNUMBER ;
 
         VARIABLE (RE) I ;
         LOOP I 0 4 2 ;

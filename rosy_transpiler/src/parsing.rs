@@ -2,7 +2,7 @@ use pest::pratt_parser::PrattParser;
 use pest_derive::Parser;
 
 #[derive(Parser)]
-#[grammar = "assets/cosy.pest"]
+#[grammar = "../rosy.pest"]
 pub struct CosyParser;
 
 // Create a static PrattParser for expressions

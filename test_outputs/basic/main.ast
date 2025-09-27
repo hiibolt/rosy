@@ -1,0 +1,313 @@
+Program {
+    statements: [
+        Function {
+            name: "ADDTWONUMS",
+            args: [
+                VariableData {
+                    name: "X",
+                    type: RE,
+                },
+                VariableData {
+                    name: "Y",
+                    type: RE,
+                },
+            ],
+            return_type: RE,
+            body: [
+                VarDecl {
+                    data: VariableData {
+                        name: "ADDTWONUMS",
+                        type: RE,
+                    },
+                },
+                Write {
+                    unit: 6,
+                    exprs: [
+                        String(
+                            "X: ",
+                        ),
+                        Var(
+                            "X",
+                        ),
+                    ],
+                },
+                Write {
+                    unit: 6,
+                    exprs: [
+                        String(
+                            "Y: ",
+                        ),
+                        Var(
+                            "Y",
+                        ),
+                    ],
+                },
+                VarDecl {
+                    data: VariableData {
+                        name: "Z",
+                        type: VE,
+                    },
+                },
+                Assign {
+                    name: "ADDTWONUMS",
+                    value: Add {
+                        left: Var(
+                            "X",
+                        ),
+                        right: Var(
+                            "Y",
+                        ),
+                    },
+                },
+            ],
+        },
+        Procedure {
+            name: "PRINTSEVENNUMS",
+            args: [],
+            body: [
+                VarDecl {
+                    data: VariableData {
+                        name: "X",
+                        type: VE,
+                    },
+                },
+                VarDecl {
+                    data: VariableData {
+                        name: "Y",
+                        type: VE,
+                    },
+                },
+                Assign {
+                    name: "Y",
+                    value: Concat {
+                        terms: [
+                            Var(
+                                "Y",
+                            ),
+                            Number(
+                                8,
+                            ),
+                        ],
+                    },
+                },
+                Assign {
+                    name: "X",
+                    value: Concat {
+                        terms: [
+                            Add {
+                                left: Number(
+                                    0,
+                                ),
+                                right: Number(
+                                    1,
+                                ),
+                            },
+                            Number(
+                                2,
+                            ),
+                            Number(
+                                3,
+                            ),
+                            Number(
+                                4,
+                            ),
+                            Number(
+                                5,
+                            ),
+                            Number(
+                                6,
+                            ),
+                            Number(
+                                7,
+                            ),
+                            Var(
+                                "Y",
+                            ),
+                        ],
+                    },
+                },
+                Write {
+                    unit: 6,
+                    exprs: [
+                        Var(
+                            "X",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Procedure {
+            name: "PRINTACOMPLEXNUM",
+            args: [],
+            body: [
+                VarDecl {
+                    data: VariableData {
+                        name: "X",
+                        type: VE,
+                    },
+                },
+                VarDecl {
+                    data: VariableData {
+                        name: "Y",
+                        type: CM,
+                    },
+                },
+                Assign {
+                    name: "X",
+                    value: Concat {
+                        terms: [
+                            Number(
+                                2,
+                            ),
+                            Number(
+                                1,
+                            ),
+                        ],
+                    },
+                },
+                Assign {
+                    name: "Y",
+                    value: Complex {
+                        expr: Var(
+                            "X",
+                        ),
+                    },
+                },
+                Write {
+                    unit: 6,
+                    exprs: [
+                        Var(
+                            "Y",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Procedure {
+            name: "PRINTYOURNUMBER",
+            args: [],
+            body: [
+                VarDecl {
+                    data: VariableData {
+                        name: "I",
+                        type: RE,
+                    },
+                },
+                Write {
+                    unit: 6,
+                    exprs: [
+                        String(
+                            "Enter what you'd like I to be: ",
+                        ),
+                    ],
+                },
+                Read {
+                    unit: 5,
+                    name: "I",
+                },
+                Write {
+                    unit: 6,
+                    exprs: [
+                        String(
+                            "I = ",
+                        ),
+                        Var(
+                            "I",
+                        ),
+                    ],
+                },
+            ],
+        },
+        Procedure {
+            name: "RUN",
+            args: [],
+            body: [
+                VarDecl {
+                    data: VariableData {
+                        name: "X",
+                        type: RE,
+                    },
+                },
+                VarDecl {
+                    data: VariableData {
+                        name: "Y",
+                        type: RE,
+                    },
+                },
+                Assign {
+                    name: "X",
+                    value: Number(
+                        3,
+                    ),
+                },
+                Assign {
+                    name: "Y",
+                    value: Number(
+                        4,
+                    ),
+                },
+                Write {
+                    unit: 6,
+                    exprs: [
+                        String(
+                            "Summation of 3 and 4: ",
+                        ),
+                        FunctionCall {
+                            name: "ADDTWONUMS",
+                            args: [
+                                Var(
+                                    "X",
+                                ),
+                                Var(
+                                    "Y",
+                                ),
+                            ],
+                        },
+                    ],
+                },
+                ProcedureCall {
+                    name: "PRINTSEVENNUMS",
+                    args: [],
+                },
+                ProcedureCall {
+                    name: "PRINTACOMPLEXNUM",
+                    args: [],
+                },
+                ProcedureCall {
+                    name: "PRINTYOURNUMBER",
+                    args: [],
+                },
+                VarDecl {
+                    data: VariableData {
+                        name: "I",
+                        type: RE,
+                    },
+                },
+                Loop {
+                    iterator: "I",
+                    start: Number(
+                        0,
+                    ),
+                    end: Number(
+                        4,
+                    ),
+                    step: Some(
+                        Number(
+                            2,
+                        ),
+                    ),
+                    body: [
+                        Write {
+                            unit: 6,
+                            exprs: [
+                                Var(
+                                    "I",
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
+    ],
+}

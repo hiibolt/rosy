@@ -32,13 +32,6 @@ use anyhow::{Result, Context};
 		println!("{}", Y.rosy_display());
 		Ok(())
 	}
-	fn PRINTYOURNUMBER (  ) -> Result<()> {
-		let mut I: f64;
-		println!("{}", String::from("Enter what you'd like I to be: ").rosy_display());
-		I = from_stdin().context("...while trying to read from stdin!")?;
-		println!("{}{}", String::from("I = ").rosy_display(), I.rosy_display());
-		Ok(())
-	}
 	fn run (  ) -> Result<()> {
 		let mut X: f64;
 		let mut Y: f64;
@@ -47,7 +40,6 @@ use anyhow::{Result, Context};
 		println!("{}{}", String::from("Summation of 3 and 4: ").rosy_display(), ADDTWONUMS(&X, &Y).with_context(|| format!("...while trying to call function ADDTWONUMS!"))?.rosy_display());
 		PRINTSEVENNUMS().with_context(|| format!("...while trying to call procedure PRINTSEVENNUMS!"))?;
 		PRINTACOMPLEXNUM().with_context(|| format!("...while trying to call procedure PRINTACOMPLEXNUM!"))?;
-		PRINTYOURNUMBER().with_context(|| format!("...while trying to call procedure PRINTYOURNUMBER!"))?;
 		let mut I: f64;
 		for I in ((0f64 as usize)..=(4f64 as usize)).step_by(2f64 as usize) {
 			println!("{}", I.rosy_display());

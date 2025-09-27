@@ -38,7 +38,7 @@ impl RosyType {
             _ => None,
         }
     }
-    
+
     pub fn add_operation_result ( &self, other: &RosyType ) -> Option<RosyType> {
         match (self, other) {
             (RosyType::RE, RosyType::RE) => Some(RosyType::RE),
@@ -96,16 +96,3 @@ where
 
     Ok(value)
 }
-
-/*
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
- */
