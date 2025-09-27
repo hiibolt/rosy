@@ -124,7 +124,22 @@ mod tests {
         let root_path = PathBuf::from("..");
         let script_path = PathBuf::from("../examples/basic.rosy");
 
-        rosy(&root_path, &script_path)?;
+        let output = rosy(&root_path, &script_path)?;
+
+        assert_eq!(
+            output,
+            concat!(
+                "X: 3\n",
+                "Y: 4\n",
+                "Summation of 3 and 4: 7\n",
+                "[1, 2, 3, 4, 5, 6, 7, 8]\n",
+                "(2 + 1i)\n",
+                "0\n",
+                "2\n",
+                "4\n",
+                ""
+            )
+        );
 
         Ok(())
     }
