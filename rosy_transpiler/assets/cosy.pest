@@ -20,9 +20,8 @@ write = { "WRITE" ~ unit ~ expr+ ~ semicolon }
 read = { "READ" ~ unit ~ identifier ~ semicolon }
 
 /// VARIABLE
-var_decl = { "VARIABLE" ~ type ~ variable_name ~ variable_length ~ semicolon }
+var_decl = { "VARIABLE" ~ type ~ variable_name ~ semicolon }
 variable_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
-variable_length = @{ ASCII_DIGIT+ }
 
 /// Keywords - define all reserved words
 keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" }
@@ -35,8 +34,9 @@ keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "END
   /// Calling - ensure the name is not a keyword
   procedure_call = { procedure_name ~ expr* ~ semicolon }
   /// PROCEDURE
-  start_procedure = { "PROCEDURE" ~ procedure_name ~ procedure_argument_name* ~ semicolon }
+  start_procedure = { "PROCEDURE" ~ procedure_name ~ procedure_argument_name_and_type* ~ semicolon }
   procedure_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
+  procedure_argument_name_and_type = { procedure_argument_name ~ type }
   procedure_argument_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
   /// ENDPROCEDURE
   end_procedure = { "ENDPROCEDURE" ~ semicolon }
@@ -47,8 +47,9 @@ keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "END
   /// Calling - ensure the name is not a keyword
   function_call = ${ function_name ~ "(" ~ expr ~ ("," ~ expr)* ~ ")"  }
   /// FUNCTION
-  start_function = { "FUNCTION" ~ function_name ~ function_argument_name+ ~ semicolon }
+  start_function = { "FUNCTION" ~ function_name ~ function_argument_name_and_type+ ~ semicolon }
   function_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
+  function_argument_name_and_type = _{ function_argument_name ~ type }
   function_argument_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
   /// ENDFUNCTION
   end_function = { "ENDFUNCTION" ~ semicolon }
@@ -67,7 +68,8 @@ keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "END
   /// CM
   cm = { "CM(" ~ expr ~ ")" }
 /// [ INTRINSIC TYPES ]
-  type = _{
+  type = @{ "(" ~ inner_type ~ ")"}
+  inner_type = _{
     "RE" |
     "LO" |
     "VE" |

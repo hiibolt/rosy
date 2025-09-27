@@ -108,12 +108,12 @@ impl StaticAnalyzer {
                 
                 self.pop_scope();
             },
-            Statement::VarDecl { name, .. } => {
+            Statement::VarDecl { data, .. } => {
                 if let Some(scope) = self.current_scope() {
-                    if scope.variables.contains(name) {
-                        self.add_error(format!("Variable '{}' is already declared", name));
+                    if scope.variables.contains(&data.name) {
+                        self.add_error(format!("Variable '{}' is already declared", data.name));
                     } else if let Some(scope_mut) = self.current_scope_mut() {
-                        scope_mut.variables.insert(name.clone());
+                        scope_mut.variables.insert(data.name.clone());
                     }
                 }
             },
@@ -146,8 +146,8 @@ impl StaticAnalyzer {
                 if let Some(scope_mut) = self.current_scope_mut() {
                     for arg in args {
                         // Arguments are both variables and immutable
-                        scope_mut.variables.insert(arg.clone());
-                        scope_mut.immutable_arguments.insert(arg.clone());
+                        scope_mut.variables.insert(arg.name.clone());
+                        scope_mut.immutable_arguments.insert(arg.name.clone());
                     }
                 }
                 

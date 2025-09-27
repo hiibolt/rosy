@@ -175,6 +175,7 @@ dependencies = [
  "lazy_static",
  "pest",
  "pest_derive",
+ "rosy_lib",
 ]
 
 [[package]]

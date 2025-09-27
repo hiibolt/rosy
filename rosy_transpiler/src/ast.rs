@@ -1,20 +1,26 @@
 use crate::parsing::{Rule, PRATT_PARSER};
-use anyhow::{Result, Context, bail};
+use anyhow::{bail, ensure, Context, Result};
+use rosy_lib::RosyType;
 
 #[derive(Debug)]
 pub struct Program {
     pub statements: Vec<Statement>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct VariableData {
+    pub name: String,
+    pub r#type: RosyType
+}
 #[derive(Debug)]
 pub enum Statement {
-    VarDecl { name: String, _length: u8 },
+    VarDecl { data: VariableData },
     Write { unit: u8, exprs: Vec<Expr> },
     Read { unit: u8, name: String },
     Assign { name: String, value: Expr },
-    Procedure { name: String, args: Vec<String>, body: Vec<Statement> },
+    Procedure { name: String, args: Vec<VariableData>, body: Vec<Statement> },
     ProcedureCall { name: String, args: Vec<Expr> },
-    Function { name: String, args: Vec<String>, body: Vec<Statement> },
+    Function { name: String, args: Vec<VariableData>, body: Vec<Statement> },
     FunctionCall { name: String, args: Vec<Expr> },
     Loop { iterator: String, start: Expr, end: Expr, step: Option<Expr>, body: Vec<Statement> },
 }
@@ -52,13 +58,23 @@ fn build_statement (
     match pair.as_rule() {
         Rule::var_decl => {
             let mut inner = pair.into_inner();
-            let name = inner.next()
-                .context("Missing first token `variable_name`!")?
+            let type_str = inner.next()
+                .context("Missing first token `type` when building var decl!")?
                 .as_str().to_string();
-            let _length = inner.next()
-                .context("Missing second token `variable_length`!")?
-                .as_str().parse::<u8>()?;
-            Ok(Some(Statement::VarDecl { name, _length }))
+            println!("Type: {}", type_str);
+            let name = inner.next()
+                .context("Missing second token `variable_name`!")?
+                .as_str().to_string();
+
+            let variable_data = VariableData {
+                name,
+                r#type: type_str.as_str().try_into()
+                    .with_context(|| format!("Unknown type: {type_str}"))?
+            };
+
+            Ok(Some(Statement::VarDecl {
+                data: variable_data
+            }))
         },
         Rule::write => {
             let mut inner = pair.into_inner();
@@ -176,13 +192,26 @@ fn build_statement (
                     .as_str().to_string();
                 
                 let mut args = Vec::new();
-                // Collect all remaining arguments (procedure_argument_name tokens)
-                while let Some(arg) = start_procedure_inner.next() {
-                    if arg.as_rule() == Rule::semicolon {
+                // Collect all remaining arguments as `VariableData`
+                while let Some(arg_pair) = start_procedure_inner.next() {
+                    if arg_pair.as_rule() == Rule::semicolon {
                         break;
                     }
 
-                    args.push(arg.as_str().to_string());
+                    let mut arg_inner = arg_pair.into_inner();
+                    let type_str = arg_inner.next()
+                        .context("Missing first token `type` in procedure argument!")?
+                        .as_str().to_string();
+                    let name = arg_inner.next()
+                        .context("Missing second token `variable_name` in procedure argument!")?
+                        .as_str().to_string();
+
+                    let variable_data = VariableData {
+                        name,
+                        r#type: type_str.as_str().try_into()
+                            .with_context(|| format!("Unknown type: {type_str}"))?
+                    };
+                    args.push(variable_data);
                 }
 
                 (name, args)
@@ -243,13 +272,28 @@ fn build_statement (
                     .as_str().to_string();
 
                 let mut args = Vec::new();
-                // Collect all remaining arguments (function_argument_name tokens)
-                while let Some(arg) = start_function_inner.next() {
-                    if arg.as_rule() == Rule::semicolon {
+                // Collect all remaining argument names and types
+                while let Some(arg_pair) = start_function_inner.next() {
+                    if arg_pair.as_rule() == Rule::semicolon {
                         break;
                     }
 
-                    args.push(arg.as_str().to_string());
+                    ensure!(arg_pair.as_rule() == Rule::function_argument_name, 
+                        "Expected function argument name, found: {:?}", arg_pair.as_rule());
+                    let name = arg_pair.as_str();
+
+                    let next_arg_pair = start_function_inner.next()
+                        .context(format!("Missing type for function argument: {}", name))?;
+                    ensure!(next_arg_pair.as_rule() == Rule::r#type, 
+                        "Expected type for function argument, found: {:?}", next_arg_pair.as_rule());
+                    let type_str = next_arg_pair.as_str();
+
+                    let variable_data = VariableData {
+                        name: name.to_string(),
+                        r#type: type_str.try_into()
+                            .with_context(|| format!("Unknown type: {type_str}"))?
+                    };
+                    args.push(variable_data);
                 }
 
                 (name, args)
@@ -257,7 +301,10 @@ fn build_statement (
 
             let body = {
                 let mut statements = vec!(
-                    Statement::VarDecl { name: name.clone(), _length: 8 }
+                    Statement::VarDecl { data: VariableData {
+                        name: name.clone(),
+                        r#type: RosyType::RE
+                    } }
                 );
 
                 // Process remaining elements (statements and end_function)

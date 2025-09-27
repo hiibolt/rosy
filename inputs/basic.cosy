@@ -1,33 +1,33 @@
 BEGIN ;
-    FUNCTION ADDTWONUMS X Y ;
+    FUNCTION ADDTWONUMS X (RE) Y (RE) ;
         WRITE 6 "X: " X ;
         WRITE 6 "Y: " Y ;
         ADDTWONUMS := ( X + Y ) ;
     ENDFUNCTION ;
 
     PROCEDURE PRINTSEVENNUMS ;
-        VARIABLE VE X 2 ;
+        VARIABLE (VE) X ;
         X := (0 + 1) & 2 & 3 & 4 & 5 & 6 & 7 ;
         WRITE 6 X ;
     ENDPROCEDURE ;
 
     PROCEDURE PRINTACOMPLEXNUM ;
-        VARIABLE VE X 2 ;
-        VARIABLE CM Y 2 ;
+        VARIABLE (VE) X ;
+        VARIABLE (CM) Y ;
         X := 2 & 1 ;
         Y := CM(X) ;
         WRITE 6 Y ;
     ENDPROCEDURE ;
 
     PROCEDURE PRINTYOURNUMBER ;
-        VARIABLE RE I 2 ;
+        VARIABLE (RE) I ;
         READ 5 I ;
         WRITE 6 "I = " I ;
     ENDPROCEDURE ;
 
     PROCEDURE RUN ;
-        VARIABLE RE X 8 ;
-        VARIABLE RE Y 8 ;
+        VARIABLE (RE) X ;
+        VARIABLE (RE) Y ;
         X := 3 ;
         Y := 4 ;
         WRITE 6 "Summation of 3 and 4: " ADDTWONUMS(X,Y) ;
@@ -36,7 +36,7 @@ BEGIN ;
         PRINTACOMPLEXNUM ;
         PRINTYOURNUMBER ;
 
-        VARIABLE RE I 8;
+        VARIABLE (RE) I ;
         LOOP I 0 4 2 ;
             WRITE 6 I ;
         ENDLOOP ;

@@ -1,12 +1,12 @@
 use anyhow::{ensure, Context, Result};
 use std::collections::HashSet;
 
-use crate::ast::{Expr, Program, Statement};
+use crate::ast::{Expr, Program, Statement, VariableData};
 
 #[derive(Debug, Default, Clone)]
 pub struct TranspileContext {
     /// Variables that are function/procedure arguments (already references)
-    function_args: HashSet<String>,
+    function_args: HashSet<VariableData>,
 }
 
 impl TranspileContext {
@@ -14,14 +14,14 @@ impl TranspileContext {
         Self::default()
     }
     
-    fn with_args(args: &[String]) -> Self {
+    fn with_args(args: &[VariableData]) -> Self {
         Self {
             function_args: args.iter().cloned().collect(),
         }
     }
     
     fn is_function_arg(&self, name: &str) -> bool {
-        self.function_args.contains(name)
+        self.function_args.iter().any(|arg| arg.name == name)
     }
 }
 
@@ -179,8 +179,10 @@ impl Transpile for Statement {
                     body_stmts.join("\n")
                 ))
             },
-            Statement::VarDecl { name, .. } => {
-                Ok(format!("let mut {} = 0f64;", name))
+            Statement::VarDecl { data, .. } => {
+                let rust_type = data.r#type.as_rust_type();
+
+                Ok(format!("let mut {}: {};", data.name, rust_type))
             },
             Statement::Write { unit, exprs } => {
                 let mut exprs_sts = Vec::new();
@@ -232,7 +234,10 @@ impl Transpile for Statement {
                     Vec::new()
                 } else {
                     args.iter()
-                        .map(|arg| format!("{}: &Cosy", arg))
+                        .map(|arg| {
+                            let rust_type = arg.r#type.as_rust_type();
+                            format!("{}: &{}", arg.name, rust_type)
+                        })
                         .collect()
                 };
 
@@ -270,7 +275,10 @@ impl Transpile for Statement {
                 Ok(format!("fn {} ( {} ) -> Cosy {{\n{}\n\t{}\n}}",
                     fn_name,
                     args.into_iter()
-                        .map(|st| format!("{st}: &Cosy"))
+                        .map(|var_data| {
+                            let rust_type = var_data.r#type.as_rust_type();
+                            format!("{}: &{rust_type}", var_data.name)
+                        })
                         .collect::<Vec<String>>()
                         .join(", "),
                     body_sts.join("\n"),
