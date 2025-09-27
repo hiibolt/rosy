@@ -2,7 +2,8 @@ BEGIN ;
     FUNCTION (RE) ADDTWONUMS X (RE) Y (RE) ;
         WRITE 6 "X: " X ;
         WRITE 6 "Y: " Y ;
-        ADDTWONUMS := ( X + Y ) ;
+        VARIABLE (VE) Z ;
+        ADDTWONUMS := Z ;
     ENDFUNCTION ;
 
     PROCEDURE PRINTSEVENNUMS ;

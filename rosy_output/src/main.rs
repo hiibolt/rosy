@@ -7,12 +7,13 @@
 use rosy_lib::*;
 use anyhow::{Result, Context};
 
-// <INJECT_START>
+	// <INJECT_START>
 	fn ADDTWONUMS ( X: &f64, Y: &f64 ) -> Result<f64> {
 		let mut ADDTWONUMS: f64;
 		println!("{}{}", String::from("X: ").rosy_display(), X.rosy_display());
 		println!("{}{}", String::from("Y: ").rosy_display(), Y.rosy_display());
-		ADDTWONUMS = (X.rosy_add(Y)).to_owned();
+		let mut Z: Vec<f64>;
+		ADDTWONUMS = Z.to_owned();
 		Ok(ADDTWONUMS)
 	}
 	fn PRINTSEVENNUMS (  ) -> Result<()> {
