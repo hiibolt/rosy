@@ -13,3 +13,4 @@ pest_derive = "2.7"
 lazy_static = "1.4"
 colored = "3.0"
 rosy_lib = { path = "rosy_lib" }
+impls = "1.0"

@@ -7,7 +7,7 @@
 use rosy_lib::*;
 use anyhow::{Result, Context};
 
-		// <INJECT_START>
+				// <INJECT_START>
 	fn ADDTWONUMS ( X: &f64, Y: &f64 ) -> Result<f64> {
 		let mut ADDTWONUMS: f64;
 		println!("{}{}", String::from("X: ").rosy_display(), X.rosy_display());

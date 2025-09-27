@@ -30,6 +30,38 @@ impl RosyType {
             RosyType::VE => "Vec<f64>",
         }
     }
+    pub fn cm_intrinsic_result ( &self ) -> Option<RosyType> {
+        match self {
+            RosyType::RE => Some(RosyType::CM),
+            RosyType::CM => Some(RosyType::CM),
+            RosyType::VE => Some(RosyType::CM),
+            _ => None,
+        }
+    }
+    
+    pub fn add_operation_result ( &self, other: &RosyType ) -> Option<RosyType> {
+        match (self, other) {
+            (RosyType::RE, RosyType::RE) => Some(RosyType::RE),
+            (RosyType::RE, RosyType::CM) => Some(RosyType::CM),
+            (RosyType::RE, RosyType::VE) => Some(RosyType::VE),
+            (RosyType::CM, RosyType::RE) => Some(RosyType::CM),
+            (RosyType::CM, RosyType::CM) => Some(RosyType::CM),
+            (RosyType::CM, RosyType::VE) => Some(RosyType::VE),
+            (RosyType::VE, RosyType::RE) => Some(RosyType::VE),
+            (RosyType::VE, RosyType::VE) => Some(RosyType::VE),
+            _ => None,
+        }
+    }
+    pub fn concat_operation_result ( &self, other: &RosyType ) -> Option<RosyType> {
+        match (self, other) {
+            (RosyType::RE, RosyType::RE) => Some(RosyType::VE),
+            (RosyType::RE, RosyType::VE) => Some(RosyType::VE),
+            (RosyType::ST, RosyType::ST) => Some(RosyType::ST),
+            (RosyType::VE, RosyType::RE) => Some(RosyType::VE),
+            (RosyType::VE, RosyType::VE) => Some(RosyType::VE),
+            _ => None,
+        }
+    }
 }
 impl TryFrom<&str> for RosyType {
     type Error = anyhow::Error;

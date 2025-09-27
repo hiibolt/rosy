@@ -269,75 +269,78 @@ impl StaticAnalyzer {
             Expr::Number(_) => Some(RosyType::RE),
             Expr::String(_) => Some(RosyType::ST),
             Expr::Var(name) => self.get_variable_type(name),
-            Expr::Exp { expr: inner } => {
-                // EXP function takes RE and returns RE
-                if let Some(inner_type) = self.get_expression_type(inner) {
-                    if inner_type != RosyType::RE {
-                        self.add_error(format!("EXP function requires RE argument, found {:?}", inner_type));
-                        return None;
-                    }
-                    Some(RosyType::RE)
-                } else {
-                    self.analyze_expression(inner);
-                    None
-                }
+            Expr::Exp { expr: _inner } => {
+                todo!();
             },
             Expr::Complex { expr: inner } => {
-                if let Some(inner_type) = self.get_expression_type(inner) {
-                    match inner_type {
-                        RosyType::RE => Some(RosyType::CM),
-                        RosyType::CM => Some(RosyType::CM),
-                        RosyType::VE => Some(RosyType::CM),
-                        _ => {
-                            self.add_error(format!("CM function requires RE, CM, or VE argument, found {:?}", inner_type));
-                            None
-                        }
-                    }
+                let inner_type = if let Some(inner_type) = self.get_expression_type(inner) {
+                    inner_type
                 } else {
                     self.analyze_expression(inner);
-                    None
+                    return None;
+                };
+
+                match inner_type.cm_intrinsic_result() {
+                    Some(result_type) => Some(result_type),
+                    None => {
+                        self.add_error(format!("Cannot apply EXP to type {:?}", inner_type));
+                        None
+                    }
                 }
             },
             Expr::Add { left, right } => {
-                let left_type = self.get_expression_type(left);
-                let right_type = self.get_expression_type(right);
+                let left_type = if let Some(left_type) = self.get_expression_type(left) {
+                    left_type
+                } else {
+                    self.analyze_expression(left);
+                    return None;
+                };
+                let right_type = if let Some(right_type) = self.get_expression_type(right) {
+                    right_type
+                } else {
+                    self.analyze_expression(right);
+                    return None;
+                };
                 
-                match (left_type, right_type) {
-                    (Some(RosyType::RE), Some(RosyType::RE)) => Some(RosyType::RE),
-                    (Some(RosyType::CM), Some(RosyType::CM)) => Some(RosyType::CM),
-                    (Some(RosyType::VE), Some(RosyType::VE)) => Some(RosyType::VE),
-                    (Some(left_t), Some(right_t)) if left_t != right_t => {
-                        self.add_error(format!("Addition type mismatch: {:?} + {:?}", left_t, right_t));
-                        None
-                    },
-                    _ => {
-                        // Analyze sub-expressions for other errors
-                        if left_type.is_none() { self.analyze_expression(left); }
-                        if right_type.is_none() { self.analyze_expression(right); }
-                        None
-                    }
+                if let Some(result_type) = left_type.add_operation_result(&right_type) {
+                    Some(result_type)
+                } else {
+                    self.add_error(format!("Invalid addition operation between {:?} and {:?}", left_type, right_type));
+                    None
                 }
             },
             Expr::Concat { terms } => {
                 if terms.is_empty() {
-                    return Some(RosyType::VE); // Empty concat becomes empty vector
+                    self.add_error("Concatenation requires at least one term".to_string());
+                    return None;
                 }
                 
-                // Check all terms are RE type
-                let mut all_re = true;
-                for term in terms {
-                    if let Some(term_type) = self.get_expression_type(term) {
-                        if term_type != RosyType::RE {
-                            self.add_error(format!("Concatenation requires all elements to be RE type, found {:?}", term_type));
-                            all_re = false;
-                        }
+                let first_type = if let Some(first_type) = self.get_expression_type(&terms[0]) {
+                    first_type
+                } else {
+                    self.analyze_expression(&terms[0]);
+                    return None;
+                };
+                
+                let mut current_type = first_type;
+                
+                for term in &terms[1..] {
+                    let term_type = if let Some(term_type) = self.get_expression_type(term) {
+                        term_type
                     } else {
                         self.analyze_expression(term);
-                        all_re = false;
+                        return None;
+                    };
+                    
+                    if let Some(result_type) = current_type.concat_operation_result(&term_type) {
+                        current_type = result_type;
+                    } else {
+                        self.add_error(format!("Invalid concatenation operation between {:?} and {:?}", current_type, term_type));
+                        return None;
                     }
                 }
                 
-                if all_re { Some(RosyType::VE) } else { None }
+                Some(current_type)
             },
             Expr::FunctionCall { name, args } => {
                 // First collect expected types and return type

@@ -10,3 +10,4 @@ pest_derive.workspace = true
 lazy_static.workspace = true
 colored.workspace = true
 rosy_lib.workspace = true
+impls.workspace = true

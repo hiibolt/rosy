@@ -1,6 +1,16 @@
 use super::super::{RE, ST, VE};
 
+/*
+Allowed operation type combinations for concatenation:
 
+Left Right Result Comment
+RE RE VE Concatenate two Reals to a Vector
+RE VE VE Append a Real to the left of a Vector
+ST ST ST Concatenate two Strings
+VE RE VE Append a Real to the right of a Vector
+VE VE VE Concatenate two Vectors
+GR GR GR Concatenate two Graphics Objects
+*/
 pub trait RosyConcat<T> {
     type Output;
     fn concat(self, other: T) -> Self::Output;
