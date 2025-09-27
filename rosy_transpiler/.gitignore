@@ -1,8 +1,0 @@
-/target
-/assets/rust/target
-
-/.direnv
-.envrc
-
-/outputs/*
-!/outputs/makefile

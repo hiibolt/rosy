@@ -159,6 +159,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rosy_output"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "rosy_lib",
+]
+
+[[package]]
 name = "rosy_transpiler"
 version = "0.1.0"
 dependencies = [
@@ -167,14 +175,6 @@ dependencies = [
  "lazy_static",
  "pest",
  "pest_derive",
-]
-
-[[package]]
-name = "rust"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "rosy_lib",
 ]
 
 [[package]]

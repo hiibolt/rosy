@@ -1,11 +1,22 @@
 mod operators;
 mod intrinsics;
 
+pub use operators::*;
+pub use intrinsics::*;
+
 pub type RE = f64;
 pub type ST = String;
 pub type LO = bool;
-pub type CE = (f64, f64);
+pub type CM = (f64, f64);
 pub type VE = Vec<f64>;
+
+pub enum RosyType {
+    RE,
+    ST,
+    LO,
+    CE,
+    VE,
+}
 
 /*
 #[cfg(test)]

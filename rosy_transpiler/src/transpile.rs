@@ -34,9 +34,7 @@ pub trait Transpile {
 }
 impl Transpile for Program {
     fn transpile_with_context(&self, _context: &TranspileContext) -> Result<String> {
-        let mainfile = std::fs::read_to_string("assets/rust/src/main.rs")
-            .context("Failed to read main.rs template file!")?;
-        let mut output = mainfile + "\n\n\n\n/// Automatically generated\n";
+        let mut output = String::new();
 
         // Transpile the AST to Rust
         for statement in &self.statements {
@@ -53,10 +51,10 @@ impl Transpile for Expr {
     fn transpile_with_context(&self, context: &TranspileContext) -> Result<String> {
         let res = match self {
             Expr::Number(n) => {
-                format!("Cosy::Real({}f64)", n)
+                format!("{}f64", n)
             },
             Expr::String(s) => {
-                format!("Cosy::String(String::from(\"{}\"))", s)
+                format!("String::from(\"{}\")", s)
             },
             Expr::Var(name) => {
                 // If it's a function argument, it's already a reference, so just use the name
@@ -64,14 +62,14 @@ impl Transpile for Expr {
                 name.to_string()
             },
             Expr::Exp { expr } => {
-                let sub_expr: String = (*expr).transpile_with_context(context)
+                let _sub_expr: String = (*expr).transpile_with_context(context)
                     .context("Failed to convert sub-expression to string!")?;
-                format!("Cosy::Real(todo!({}))", sub_expr)
+                todo!();
             },
             Expr::Complex { expr } => {
                 let sub_expr: String = (*expr).transpile_with_context(context)
                     .context("Failed to convert complex expression to string!")?;
-                format!("{}.into_complex()", sub_expr)
+                format!("{}.cm()", sub_expr)
             },
             Expr::Add { left, right } => {
                 let left_str: String = (*left).transpile_with_context(context)
@@ -100,7 +98,7 @@ impl Transpile for Expr {
                     format!("&{}", right_str)
                 };
                 
-                format!("({} + {})", left_ref, right_ref)
+                format!("({}.cosy_add({}))", left_ref, right_ref)
             },
             Expr::Concat { terms } => {
                 let term_strs: Result<Vec<String>> = terms.iter()
@@ -158,7 +156,7 @@ impl Transpile for Statement {
                     if let Some(step_expr) = step {
                         let step = step_expr.transpile_with_context(context)
                             .context("Failed to convert loop step expression to string!")?;
-                        body = format!("({}).step_by({}.into_usize())", body, step);
+                        body = format!("({}).step_by({} as usize)", body, step);
                     }
 
                     body
@@ -182,7 +180,7 @@ impl Transpile for Statement {
                 ))
             },
             Statement::VarDecl { name, .. } => {
-                Ok(format!("let mut {} = Cosy::Real(0f64);", name))
+                Ok(format!("let mut {} = 0f64;", name))
             },
             Statement::Write { unit, exprs } => {
                 let mut exprs_sts = Vec::new();
@@ -269,7 +267,7 @@ impl Transpile for Statement {
                     body_sts.push(stmt_st);
                 }
 
-                Ok(format!("fn {} ( {} ) -> Cosy {{\n{}\n{}}}",
+                Ok(format!("fn {} ( {} ) -> Cosy {{\n{}\n\t{}\n}}",
                     fn_name,
                     args.into_iter()
                         .map(|st| format!("{st}: &Cosy"))

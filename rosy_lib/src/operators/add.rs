@@ -1,4 +1,4 @@
-use super::super::{RE, CE, VE};
+use super::super::{RE, CM, VE};
 
 pub trait RosyAdd<Rhs = Self> {
     type Output;
@@ -11,10 +11,10 @@ impl RosyAdd<&RE> for &RE {
         self + rhs
     }
 }
-// RE + CE
-impl RosyAdd<&CE> for &RE {
-    type Output = CE;
-    fn rosy_add(self, other: &CE) -> Self::Output {
+// RE + CM
+impl RosyAdd<&CM> for &RE {
+    type Output = CM;
+    fn rosy_add(self, other: &CM) -> Self::Output {
         (self + other.0, other.1)
     }
 }
@@ -26,17 +26,17 @@ impl RosyAdd<&VE> for &RE {
     }
 }
 
-// CE + RE
-impl RosyAdd<&RE> for &CE {
-    type Output = CE;
+// CM + RE
+impl RosyAdd<&RE> for &CM {
+    type Output = CM;
     fn rosy_add(self, other: &RE) -> Self::Output {
         (self.0 + other, self.1)
     }
 }
-// CE + CE
-impl RosyAdd<&CE> for &CE {
-    type Output = CE;
-    fn rosy_add(self, other: &CE) -> Self::Output {
+// CM + CM
+impl RosyAdd<&CM> for &CM {
+    type Output = CM;
+    fn rosy_add(self, other: &CM) -> Self::Output {
         (self.0 + other.0, self.1 + other.1)
     }
 }
