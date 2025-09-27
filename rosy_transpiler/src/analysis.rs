@@ -1,10 +1,11 @@
 use std::collections::{HashMap, HashSet};
 use anyhow::{Result, bail};
 use crate::ast::{Program, Statement, Expr};
+use rosy_lib::RosyType;
 
 #[derive(Debug, Default)]
 struct Scope {
-    variables:  HashSet<String>,
+    variables:  HashMap<String, RosyType>, // Changed from HashSet to HashMap to track types
     procedures: HashMap<String, ProcedureInfo>,
     functions:  HashMap<String, FunctionInfo>,
     // Track function/procedure arguments that cannot be modified
@@ -14,10 +15,14 @@ struct Scope {
 #[derive(Debug, Clone)]
 struct ProcedureInfo {
     arg_count: usize,
+    arg_types: Vec<RosyType>, // Add argument types
 }
+
 #[derive(Debug, Clone)]
 struct FunctionInfo {
     arg_count: usize,
+    arg_types: Vec<RosyType>, // Add argument types
+    return_type: RosyType,    // Add return type
 }
 
 #[derive(Debug)]
@@ -56,6 +61,7 @@ impl StaticAnalyzer {
             if let Statement::Procedure { name, args, .. } = statement {
                 let proc_info = ProcedureInfo {
                     arg_count: args.len(),
+                    arg_types: args.iter().map(|arg| arg.r#type).collect(),
                 };
                 
                 if let Some(scope) = self.current_scope() {
@@ -68,11 +74,14 @@ impl StaticAnalyzer {
             }
         }
     }
+    
     fn collect_functions(&mut self, program: &Program) {
         for statement in &program.statements {
-            if let Statement::Function { name, args, .. } = statement {
+            if let Statement::Function { name, args, return_type, .. } = statement {
                 let func_info = FunctionInfo {
                     arg_count: args.len(),
+                    arg_types: args.iter().map(|arg| arg.r#type).collect(),
+                    return_type: *return_type,
                 };
                 
                 if let Some(scope) = self.current_scope() {
@@ -89,17 +98,38 @@ impl StaticAnalyzer {
     fn analyze_statement(&mut self, statement: &Statement) {
         match statement {
             Statement::Loop { iterator, start, end, step, body } => {
-                self.analyze_expression(start);
-                self.analyze_expression(end);
+                // Check that loop bounds are numeric (RE type)
+                if let Some(start_type) = self.get_expression_type(start) {
+                    if start_type != RosyType::RE {
+                        self.add_error(format!("Loop start expression must be of type RE, found {:?}", start_type));
+                    }
+                } else {
+                    self.analyze_expression(start);
+                }
+                
+                if let Some(end_type) = self.get_expression_type(end) {
+                    if end_type != RosyType::RE {
+                        self.add_error(format!("Loop end expression must be of type RE, found {:?}", end_type));
+                    }
+                } else {
+                    self.analyze_expression(end);
+                }
+                
                 if let Some(step_expr) = step {
-                    self.analyze_expression(step_expr);
+                    if let Some(step_type) = self.get_expression_type(step_expr) {
+                        if step_type != RosyType::RE {
+                            self.add_error(format!("Loop step expression must be of type RE, found {:?}", step_type));
+                        }
+                    } else {
+                        self.analyze_expression(step_expr);
+                    }
                 }
                 
                 self.push_scope();
                 
-                // The loop iterator is a variable in the new scope
+                // The loop iterator is a RE variable in the new scope
                 if let Some(scope_mut) = self.current_scope_mut() {
-                    scope_mut.variables.insert(iterator.clone());
+                    scope_mut.variables.insert(iterator.clone(), RosyType::RE);
                 }
                 
                 for stmt in body {
@@ -110,10 +140,10 @@ impl StaticAnalyzer {
             },
             Statement::VarDecl { data, .. } => {
                 if let Some(scope) = self.current_scope() {
-                    if scope.variables.contains(&data.name) {
+                    if scope.variables.contains_key(&data.name) {
                         self.add_error(format!("Variable '{}' is already declared", data.name));
                     } else if let Some(scope_mut) = self.current_scope_mut() {
-                        scope_mut.variables.insert(data.name.clone());
+                        scope_mut.variables.insert(data.name.clone(), data.r#type);
                     }
                 }
             },
@@ -130,14 +160,27 @@ impl StaticAnalyzer {
             Statement::Assign { name, value } => {
                 if !self.is_variable_defined(name) {
                     self.add_error(format!("Variable '{}' is not defined during assignment", name));
+                } else {
+                    // Type checking for assignment
+                    if let Some(var_type) = self.get_variable_type(name) {
+                        if let Some(expr_type) = self.get_expression_type(value) {
+                            if var_type != expr_type {
+                                self.add_error(format!(
+                                    "Type mismatch in assignment to '{}': expected {:?}, found {:?}",
+                                    name, var_type, expr_type
+                                ));
+                            }
+                        } else {
+                            // Still analyze the expression for other errors
+                            self.analyze_expression(value);
+                        }
+                    }
                 }
                 
                 // Check if trying to modify an immutable argument
                 if self.is_immutable_argument(name) {
                     self.add_error(format!("Cannot modify argument '{}' - arguments are immutable in functions and procedures", name));
                 }
-                
-                self.analyze_expression(value);
             },
             Statement::Procedure { args, body, .. } |
             Statement::Function { args, body, .. } => {
@@ -146,7 +189,7 @@ impl StaticAnalyzer {
                 if let Some(scope_mut) = self.current_scope_mut() {
                     for arg in args {
                         // Arguments are both variables and immutable
-                        scope_mut.variables.insert(arg.name.clone());
+                        scope_mut.variables.insert(arg.name.clone(), arg.r#type);
                         scope_mut.immutable_arguments.insert(arg.name.clone());
                     }
                 }
@@ -158,37 +201,176 @@ impl StaticAnalyzer {
                 self.pop_scope();
             },
             Statement::ProcedureCall { name, args } => {
-                if let Some(proc_info) = self.find_procedure(name) {
-                    if args.len() != proc_info.arg_count {
-                        self.add_error(
-                            format!("Procedure '{}' expects {} argument(s), but {} were provided", 
-                                   name, proc_info.arg_count, args.len())
-                        );
-                    }
-                    
-                    for arg in args {
-                        self.analyze_expression(arg);
-                    }
+                // First collect expected types and arg count
+                let (expected_arg_count, expected_arg_types) = if let Some(proc_info) = self.find_procedure(name) {
+                    (proc_info.arg_count, proc_info.arg_types.clone())
                 } else {
                     self.add_error(format!("Procedure '{}' is not defined", name));
+                    return;
+                };
+
+                if args.len() != expected_arg_count {
+                    self.add_error(
+                        format!("Procedure '{}' expects {} argument(s), but {} were provided", 
+                               name, expected_arg_count, args.len())
+                    );
+                } else {
+                    // Check argument types
+                    for (i, (arg_expr, expected_type)) in args.iter().zip(expected_arg_types.iter()).enumerate() {
+                        if let Some(actual_type) = self.get_expression_type(arg_expr) {
+                            if actual_type != *expected_type {
+                                self.add_error(format!(
+                                    "Procedure '{}' argument {} type mismatch: expected {:?}, found {:?}",
+                                    name, i + 1, expected_type, actual_type
+                                ));
+                            }
+                        } else {
+                            self.analyze_expression(arg_expr);
+                        }
+                    }
                 }
             },
             Statement::FunctionCall { name, args }=> {
-                if let Some(proc_info) = self.find_function(name) {
-                    if args.len() != proc_info.arg_count {
-                        self.add_error(
-                            format!("Function '{}' expects {} argument(s), but {} were provided", 
-                                   name, proc_info.arg_count, args.len())
-                        );
-                    }
-                    
-                    for arg in args {
-                        self.analyze_expression(arg);
-                    }
+                // First collect expected types and arg count
+                let (expected_arg_count, expected_arg_types) = if let Some(func_info) = self.find_function(name) {
+                    (func_info.arg_count, func_info.arg_types.clone())
                 } else {
-                    self.add_error(format!("Procedure '{}' is not defined", name));
+                    self.add_error(format!("Function '{}' is not defined", name));
+                    return;
+                };
+
+                if args.len() != expected_arg_count {
+                    self.add_error(
+                        format!("Function '{}' expects {} argument(s), but {} were provided", 
+                               name, expected_arg_count, args.len())
+                    );
+                } else {
+                    // Check argument types
+                    for (i, (arg_expr, expected_type)) in args.iter().zip(expected_arg_types.iter()).enumerate() {
+                        if let Some(actual_type) = self.get_expression_type(arg_expr) {
+                            if actual_type != *expected_type {
+                                self.add_error(format!(
+                                    "Function '{}' argument {} type mismatch: expected {:?}, found {:?}",
+                                    name, i + 1, expected_type, actual_type
+                                ));
+                            }
+                        } else {
+                            self.analyze_expression(arg_expr);
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    /// Recursively determine the type of an expression
+    fn get_expression_type(&mut self, expr: &Expr) -> Option<RosyType> {
+        match expr {
+            Expr::Number(_) => Some(RosyType::RE),
+            Expr::String(_) => Some(RosyType::ST),
+            Expr::Var(name) => self.get_variable_type(name),
+            Expr::Exp { expr: inner } => {
+                // EXP function takes RE and returns RE
+                if let Some(inner_type) = self.get_expression_type(inner) {
+                    if inner_type != RosyType::RE {
+                        self.add_error(format!("EXP function requires RE argument, found {:?}", inner_type));
+                        return None;
+                    }
+                    Some(RosyType::RE)
+                } else {
+                    self.analyze_expression(inner);
+                    None
+                }
+            },
+            Expr::Complex { expr: inner } => {
+                // CM function can take VE and returns CM
+                if let Some(inner_type) = self.get_expression_type(inner) {
+                    match inner_type {
+                        RosyType::VE => Some(RosyType::CM),
+                        RosyType::RE => Some(RosyType::CM), // Single real can become complex
+                        _ => {
+                            self.add_error(format!("CM function requires VE or RE argument, found {:?}", inner_type));
+                            None
+                        }
+                    }
+                } else {
+                    self.analyze_expression(inner);
+                    None
+                }
+            },
+            Expr::Add { left, right } => {
+                let left_type = self.get_expression_type(left);
+                let right_type = self.get_expression_type(right);
+                
+                match (left_type, right_type) {
+                    (Some(RosyType::RE), Some(RosyType::RE)) => Some(RosyType::RE),
+                    (Some(RosyType::CM), Some(RosyType::CM)) => Some(RosyType::CM),
+                    (Some(RosyType::VE), Some(RosyType::VE)) => Some(RosyType::VE),
+                    (Some(left_t), Some(right_t)) if left_t != right_t => {
+                        self.add_error(format!("Addition type mismatch: {:?} + {:?}", left_t, right_t));
+                        None
+                    },
+                    _ => {
+                        // Analyze sub-expressions for other errors
+                        if left_type.is_none() { self.analyze_expression(left); }
+                        if right_type.is_none() { self.analyze_expression(right); }
+                        None
+                    }
+                }
+            },
+            Expr::Concat { terms } => {
+                if terms.is_empty() {
+                    return Some(RosyType::VE); // Empty concat becomes empty vector
+                }
+                
+                // Check all terms are RE type
+                let mut all_re = true;
+                for term in terms {
+                    if let Some(term_type) = self.get_expression_type(term) {
+                        if term_type != RosyType::RE {
+                            self.add_error(format!("Concatenation requires all elements to be RE type, found {:?}", term_type));
+                            all_re = false;
+                        }
+                    } else {
+                        self.analyze_expression(term);
+                        all_re = false;
+                    }
+                }
+                
+                if all_re { Some(RosyType::VE) } else { None }
+            },
+            Expr::FunctionCall { name, args } => {
+                // First collect expected types and return type
+                let (expected_arg_count, expected_arg_types, return_type) = if let Some(func_info) = self.find_function(name) {
+                    (func_info.arg_count, func_info.arg_types.clone(), func_info.return_type)
+                } else {
+                    self.add_error(format!("Function '{}' is not defined", name));
+                    return None;
+                };
+
+                if args.len() != expected_arg_count {
+                    self.add_error(
+                        format!("Function '{}' expects {} argument(s), but {} were provided", 
+                               name, expected_arg_count, args.len())
+                    );
+                } else {
+                    // Check argument types
+                    for (i, (arg_expr, expected_type)) in args.iter().zip(expected_arg_types.iter()).enumerate() {
+                        if let Some(actual_type) = self.get_expression_type(arg_expr) {
+                            if actual_type != *expected_type {
+                                self.add_error(format!(
+                                    "Function '{}' argument {} type mismatch: expected {:?}, found {:?}",
+                                    name, i + 1, expected_type, actual_type
+                                ));
+                            }
+                        } else {
+                            self.analyze_expression(arg_expr);
+                        }
+                    }
+                }
+                
+                Some(return_type)
+            },
         }
     }
 
@@ -198,7 +380,7 @@ impl StaticAnalyzer {
             Expr::String(_) => { },
             Expr::Var(name) => {
                 if !self.is_variable_defined(name) {
-                    self.add_error(format!("Variable '{}' is not defined in expression `{expr:?}`", name));
+                    self.add_error(format!("Variable '{}' is not defined in expression", name));
                 }
             },
             Expr::Exp { expr } => {
@@ -237,11 +419,20 @@ impl StaticAnalyzer {
 
     fn is_variable_defined(&self, name: &str) -> bool {
         for scope in self.scope_stack.iter().rev() {
-            if scope.variables.contains(name) {
+            if scope.variables.contains_key(name) {
                 return true;
             }
         }
         false
+    }
+    
+    fn get_variable_type(&self, name: &str) -> Option<RosyType> {
+        for scope in self.scope_stack.iter().rev() {
+            if let Some(var_type) = scope.variables.get(name) {
+                return Some(*var_type);
+            }
+        }
+        None
     }
 
     fn is_immutable_argument(&self, name: &str) -> bool {

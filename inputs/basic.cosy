@@ -3,7 +3,7 @@ BEGIN ;
         WRITE 6 "X: " X ;
         WRITE 6 "Y: " Y ;
         VARIABLE (VE) Z ;
-        ADDTWONUMS := Z ;
+        ADDTWONUMS := X + Y ;
     ENDFUNCTION ;
 
     PROCEDURE PRINTSEVENNUMS ;
