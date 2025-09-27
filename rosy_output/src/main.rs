@@ -7,23 +7,25 @@
 use rosy_lib::*;
 use anyhow::{Result, Context};
 
-				// <INJECT_START>
+    // <INJECT_START>
 	fn ADDTWONUMS ( X: &f64, Y: &f64 ) -> Result<f64> {
 		let mut ADDTWONUMS: f64;
 		println!("{}{}", String::from("X: ").rosy_display(), X.rosy_display());
 		println!("{}{}", String::from("Y: ").rosy_display(), Y.rosy_display());
-		let mut Z: Vec<f64>;
+		let mut Z: Vec<f64> = vec!();
 		ADDTWONUMS = (X.rosy_add(Y)).to_owned();
 		Ok(ADDTWONUMS)
 	}
 	fn PRINTSEVENNUMS (  ) -> Result<()> {
-		let mut X: Vec<f64>;
-		X = (&(&0f64.rosy_add(&1f64))).concat(&2f64).concat(&3f64).concat(&4f64).concat(&5f64).concat(&6f64).concat(&7f64).to_owned();
+		let mut X: Vec<f64> = vec!();
+		let mut Y: Vec<f64> = vec!();
+		Y = (&Y).concat(&8f64).to_owned();
+		X = (&(&0f64.rosy_add(&1f64))).concat(&2f64).concat(&3f64).concat(&4f64).concat(&5f64).concat(&6f64).concat(&7f64).concat(&Y).to_owned();
 		println!("{}", X.rosy_display());
 		Ok(())
 	}
 	fn PRINTACOMPLEXNUM (  ) -> Result<()> {
-		let mut X: Vec<f64>;
+		let mut X: Vec<f64> = vec!();
 		let mut Y: (f64, f64);
 		X = (&2f64).concat(&1f64).to_owned();
 		Y = X.cm().context("...while trying to convert to a CM!")?.to_owned();

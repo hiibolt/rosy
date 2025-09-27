@@ -67,7 +67,7 @@ fn main() -> Result<()> {
         ensure!(parts.len() == 2, "Expected exactly one '// <INJECT_END>' in main.rs template file!");
         let after_inject = parts[1];
 
-        format!("{}\t// <INJECT_START>\n{}\n\t// <INJECT_END>{}", 
+        format!("{}// <INJECT_START>\n{}\n\t// <INJECT_END>{}", 
             before_inject, 
             rust.lines()
                 .map(|line| format!("\t{}", line))

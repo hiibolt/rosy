@@ -1,4 +1,5 @@
 use anyhow::{ensure, Context, Result};
+use rosy_lib::RosyType;
 use std::collections::HashSet;
 
 use crate::ast::{Expr, Program, Statement, VariableData};
@@ -185,7 +186,18 @@ impl Transpile for Statement {
             Statement::VarDecl { data, .. } => {
                 let rust_type = data.r#type.as_rust_type();
 
-                Ok(format!("let mut {}: {};", data.name, rust_type))
+                let optional_init = {
+                    let required_init = match data.r#type {
+                        RosyType::VE => Some("vec!()"),
+                        _ => None,
+                    };
+                    match required_init {
+                        Some(init) => format!(" = {}", init),
+                        None => String::new(),
+                    }
+                };
+
+                Ok(format!("let mut {}: {}{};", data.name, rust_type, optional_init))
             },
             Statement::Write { unit, exprs } => {
                 let mut exprs_sts = Vec::new();
