@@ -1,6 +1,15 @@
 [workspace]
 resolver = "3"
 members = [ "rosy_lib",
-    "rosy_transpiler"
+    "rosy_transpiler",
+    "rosy_lib",
+    "rosy_output"
 ]
 
+[workspace.dependencies]
+anyhow = "1.0"
+pest = "2.7"
+pest_derive = "2.7"
+lazy_static = "1.4"
+colored = "3.0"
+rosy_lib = { path = "rosy_lib" }
