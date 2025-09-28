@@ -1,0 +1,29 @@
+use anyhow::{Result, Context};
+
+use super::super::{Rule, Statement, build_expr};
+
+pub fn build_write(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
+    let mut inner = pair.into_inner();
+
+    let unit = inner.next()
+        .context("Missing first token `unit`!")?
+        .as_str()
+        .parse::<u8>()
+        .context("Failed to parse `unit` as u8 in `write` statement!")?;
+
+    let exprs = {
+        let mut exprs = Vec::new();
+        while let Some(expr_pair) = inner.next() {
+            if expr_pair.as_rule() == Rule::semicolon {
+                break;
+            }
+
+            let expr = build_expr(expr_pair)
+                .context("Failed to build expression in `write` statement!")?;
+            exprs.push(expr);
+        }
+        exprs
+    };
+
+    Ok(Some(Statement::Write { unit, exprs }))
+}
