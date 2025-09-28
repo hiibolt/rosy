@@ -152,6 +152,11 @@ impl VSCodeExtensionGenerator {
                             "name": "comment.block.rosy",
                             "begin": "/\\*",
                             "end": "\\*/"
+                        },
+                        {
+                            "name": "comment.block.rosy",
+                            "begin": "\\{",
+                            "end": "\\}"
                         }
                     ]
                 },

@@ -1,5 +1,8 @@
 WHITESPACE = _{ " " | "\t" | NEWLINE }
 
+// Comments use {..} syntax with non-greedy matching
+COMMENT = _{ "{" ~ (!"}" ~ ANY)* ~ "}" }
+
 program = { SOI ~ begin ~ statement* ~ end ~ EOI }
 statement   = _{ 
   var_decl 
@@ -81,7 +84,8 @@ endif = { "ENDIF" ~ semicolon }
     "RE" |
     "LO" |
     "VE" |
-    "CM" }
+    "CM" |
+    "ST" }
 
 /// Assignment
 assignment  = { identifier ~ ":=" ~ expr ~ semicolon }

@@ -165,4 +165,39 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    #[serial_test::serial]
+    fn global_variables() -> Result<()> {
+        let root_path = PathBuf::from("..");
+        let script_path = PathBuf::from("../examples/global_vars.rosy");
+
+        let output = rosy(&root_path, &script_path)?;
+
+        assert_eq!(
+            output,
+            concat!(
+                "Initial state:\n",
+                "=== Current Global State ===\n",
+                "Counter: 0\n",
+                "Message: Initial message\n",
+                "Status: INCOMPLETE\n",
+                "========================\n",
+                "Counter incremented to: 1\n",
+                "Counter incremented to: 2\n",
+                "Counter incremented to: 3\n",
+                "Global message set to: Hello from global variables!\n",
+                "Operation marked as complete\n",
+                "Final state:\n",
+                "=== Current Global State ===\n",
+                "Counter: 3\n",
+                "Message: Hello from global variables!\n",
+                "Status: COMPLETE\n",
+                "========================\n",
+                "Operation is complete!\n",
+            )
+        );
+
+        Ok(())
+    }
 }

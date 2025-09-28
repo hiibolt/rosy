@@ -1,88 +1,116 @@
-use anyhow::{ensure, Context, Result};
+use crate::ast::*;
+use crate::analysis::ProgramAnalyzer;
+use anyhow::{Result, Context, ensure};
+use std::collections::{HashMap, HashSet};
+
 use rosy_lib::RosyType;
-use std::collections::HashSet;
 
-use crate::ast::{Expr, Program, Statement, VariableData};
-
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct TranspileContext {
-    /// Variables that are function/procedure arguments (already references)
-    function_args: HashSet<VariableData>,
+    args: HashMap<String, RosyType>,
+    // Global variable analysis results
+    global_variables: HashSet<String>,
+    global_variable_types: HashMap<String, RosyType>,
+    procedure_global_usage: HashMap<String, Vec<String>>,
 }
 
 impl TranspileContext {
-    fn new() -> Self {
-        Self::default()
-    }
-    
-    fn with_args(args: &[VariableData]) -> Self {
-        Self {
-            function_args: args.iter().cloned().collect(),
+    pub fn with_args(args: &[VariableData]) -> Self {
+        let mut arg_map = HashMap::new();
+        for arg in args {
+            arg_map.insert(arg.name.clone(), arg.r#type.clone());
+        }
+        Self { 
+            args: arg_map,
+            ..Default::default()
         }
     }
-    
-    fn is_function_arg(&self, name: &str) -> bool {
-        self.function_args.iter().any(|arg| arg.name == name)
+
+    pub fn with_global_analysis(
+        global_vars: HashSet<String>, 
+        global_types: HashMap<String, RosyType>,
+        proc_global_usage: HashMap<String, Vec<String>>
+    ) -> Self {
+        Self {
+            global_variables: global_vars,
+            global_variable_types: global_types,
+            procedure_global_usage: proc_global_usage,
+            ..Default::default()
+        }
+    }
+
+    pub fn get_procedure_globals(&self, proc_name: &str) -> Vec<String> {
+        self.procedure_global_usage.get(proc_name).cloned().unwrap_or_default()
+    }
+
+    pub fn get_global_type(&self, var_name: &str) -> Option<&RosyType> {
+        self.global_variable_types.get(var_name)
     }
 }
 
 pub trait Transpile {
     fn transpile(&self) -> Result<String> {
-        self.transpile_with_context(&TranspileContext::new())
+        self.transpile_with_context(&TranspileContext::default())
     }
-    
+
     fn transpile_with_context(&self, context: &TranspileContext) -> Result<String>;
 }
+
 impl Transpile for Program {
     fn transpile_with_context(&self, _context: &TranspileContext) -> Result<String> {
-        let mut output = String::new();
-        let mut global_vars = Vec::new();
-        let mut functions_and_procedures = Vec::new();
-
-        // Separate global variables from functions/procedures
+        // First, perform analysis to collect global variable usage
+        let mut analyzer = ProgramAnalyzer::new();
+        analyzer.analyze(self)?;
+        
+        // Extract analysis results
+        let mut global_vars = HashSet::new();
+        let mut global_types = HashMap::new();
+        let mut proc_global_usage = HashMap::new();
+        
+        // Collect global variables and their types
+        for statement in &self.statements {
+            if let Statement::VarDecl { data } = statement {
+                global_vars.insert(data.name.clone());
+                global_types.insert(data.name.clone(), data.r#type.clone());
+            }
+        }
+        
+        // Create a new analyzer to get global usage info
+        let mut temp_analyzer = ProgramAnalyzer::new();
+        temp_analyzer.analyze(self)?;
+        
+        // Build procedure global usage map
         for statement in &self.statements {
             match statement {
-                Statement::VarDecl { .. } => {
-                    let var_st = statement.transpile()
-                        .context("Failed to convert global variable to string!")?;
-                    global_vars.push(var_st);
-                },
-                _ => {
-                    let stmt_st = statement.transpile()
-                        .context("Failed to convert statement to string!")?;
-                    functions_and_procedures.push(stmt_st);
+                Statement::Procedure { name, .. } | Statement::Function { name, .. } => {
+                    let globals = temp_analyzer.get_procedure_globals(name);
+                    proc_global_usage.insert(name.clone(), globals);
                 }
+                _ => {}
             }
         }
+        
+        // Create context with global analysis
+        let context = TranspileContext::with_global_analysis(
+            global_vars,
+            global_types,
+            proc_global_usage
+        );
 
-        // First output all functions and procedures (except run)
-        let mut run_function = None;
-        for stmt in functions_and_procedures {
-            if stmt.starts_with("fn run (  ) -> Result<()>") {
-                run_function = Some(stmt);
-            } else {
-                output.push_str(&stmt);
-                output.push('\n');
-            }
-        }
+        let mut output = String::new();
 
-        // Then output the run function with global variables moved inside it
-        if let Some(mut run_fn) = run_function {
-            // Insert global variables at the beginning of the run function body
-            if !global_vars.is_empty() {
-                let global_vars_str = global_vars.join("\n\t");
-                run_fn = run_fn.replace(
-                    "fn run (  ) -> Result<()> {\n",
-                    &format!("fn run (  ) -> Result<()> {{\n\t{}\n", global_vars_str)
-                );
-            }
-            output.push_str(&run_fn);
+        // Transpile all statements (global variables and functions/procedures)
+        for statement in &self.statements {
+            let statement_st: String = statement.transpile_with_context(&context)
+                .context("Failed to convert statement to string!")?;
+            output.push_str(&statement_st);
             output.push('\n');
         }
 
         Ok(output)
     }
 }
+
 impl Transpile for Expr {
     fn transpile_with_context(&self, context: &TranspileContext) -> Result<String> {
         let res = match self {
@@ -96,8 +124,6 @@ impl Transpile for Expr {
                 format!("{}", b)
             },
             Expr::Var(name) => {
-                // If it's a function argument, it's already a reference, so just use the name
-                // If it's a regular variable, we'll add the reference when needed in operations
                 name.to_string()
             },
             Expr::Exp { expr } => {
@@ -118,7 +144,7 @@ impl Transpile for Expr {
                 
                 // Add reference prefix only if the operand is not already a function argument
                 let left_ref = if let Expr::Var(name) = left.as_ref() {
-                    if context.is_function_arg(name) {
+                    if context.args.contains_key(name) {
                         left_str
                     } else {
                         format!("&{}", left_str)
@@ -128,7 +154,7 @@ impl Transpile for Expr {
                 };
                 
                 let right_ref = if let Expr::Var(name) = right.as_ref() {
-                    if context.is_function_arg(name) {
+                    if context.args.contains_key(name) {
                         right_str
                     } else {
                         format!("&{}", right_str)
@@ -145,7 +171,7 @@ impl Transpile for Expr {
                         let term_str = term.transpile_with_context(context)?;
                         // Apply same reference logic as in Add
                         if let Expr::Var(name) = term.as_ref() {
-                            if context.is_function_arg(name) {
+                            if context.args.contains_key(name) {
                                 Ok(term_str)
                             } else {
                                 Ok(format!("&{}", term_str))
@@ -224,18 +250,15 @@ impl Transpile for Statement {
             Statement::VarDecl { data, .. } => {
                 let rust_type = data.r#type.as_rust_type();
 
-                let optional_init = {
-                    let required_init = match data.r#type {
-                        RosyType::VE => Some("vec!()"),
-                        _ => None,
-                    };
-                    match required_init {
-                        Some(init) => format!(" = {}", init),
-                        None => String::new(),
-                    }
+                let default_init = match data.r#type {
+                    RosyType::VE => " = vec!()",
+                    RosyType::RE => " = 0.0",
+                    RosyType::ST => " = String::new()",
+                    RosyType::LO => " = false",
+                    RosyType::CM => " = (0.0, 0.0)",
                 };
 
-                Ok(format!("let mut {}: {}{};", data.name, rust_type, optional_init))
+                Ok(format!("let mut {}: {}{};", data.name, rust_type, default_init))
             },
             Statement::Write { unit, exprs } => {
                 let mut exprs_sts = Vec::new();
@@ -243,10 +266,22 @@ impl Transpile for Statement {
                 ensure!(*unit == 6, "Only WRITE with unit 6 (console) is supported so far!");
 
                 for expr in exprs {
-                    let mut expr_st: String = expr.transpile_with_context(context)
+                    let expr_st: String = expr.transpile_with_context(context)
                         .context("Failed to convert expression to string!")?;
-                    expr_st = format!("{expr_st}.rosy_display()");
-                    exprs_sts.push(expr_st);
+                    
+                    // For variables that are procedure parameters (already references), 
+                    // we don't need to add & prefix
+                    let display_expr = if let Expr::Var(name) = expr {
+                        if context.args.contains_key(name) {
+                            format!("{}.rosy_display()", name)
+                        } else {
+                            format!("(&{}).rosy_display()", expr_st)
+                        }
+                    } else {
+                        format!("(&{}).rosy_display()", expr_st)
+                    };
+                    
+                    exprs_sts.push(display_expr);
                 }
 
                 Ok(format!(
@@ -260,19 +295,38 @@ impl Transpile for Statement {
                 Ok(format!("{} = from_stdin().context(\"...while trying to read from stdin!\")?;", name))
             },
             Statement::Assign { name, value } => {
-                let value_st: String = value.transpile_with_context(context)
-                    .context("Failed to convert value expression to string!")?;
-                Ok(format!("{} = {}.to_owned();", name, value_st))
+                let value_st = value.transpile_with_context(context)
+                    .context("Failed to convert assignment value to string!")?;
+                
+                // Check if this is a procedure parameter (already a mutable reference)
+                if context.args.contains_key(name) {
+                    Ok(format!("*{} = {}.to_owned();", name, value_st))
+                } else {
+                    // Local variable or global variable from main scope
+                    Ok(format!("{} = {}.to_owned();", name, value_st))
+                }
             },
             Statement::Procedure {
                 name,
                 args,
                 body
             } => {
-                let fn_name = if name == "RUN" { "run" } else { &name };
-
-                // Create context for procedure body that knows about the arguments
-                let body_context = TranspileContext::with_args(args);
+                // Get the global variables this procedure uses
+                let global_vars = context.get_procedure_globals(name);
+                
+                // Create context for procedure body that knows about the arguments AND globals
+                let mut body_context = TranspileContext::with_args(args);
+                
+                // Add global variables as procedure parameters to the context
+                for global_var in &global_vars {
+                    if let Some(global_type) = context.get_global_type(global_var) {
+                        body_context.args.insert(global_var.clone(), global_type.clone());
+                    }
+                }
+                
+                body_context.global_variables = context.global_variables.clone();
+                body_context.global_variable_types = context.global_variable_types.clone();
+                body_context.procedure_global_usage = context.procedure_global_usage.clone();
                 
                 let mut body_sts = Vec::new();
                 for stmt in body {
@@ -285,33 +339,50 @@ impl Transpile for Statement {
                     body_sts.push(stmt_st);
                 }
 
-                // Add type annotations for procedure arguments just like functions
-                let args_with_types: Vec<String> = if fn_name == "run" {
-                    // main function should have no parameters
-                    Vec::new()
-                } else {
-                    args.iter()
-                        .map(|arg| {
-                            let rust_type = arg.r#type.as_rust_type();
-                            format!("{}: &{}", arg.name, rust_type)
-                        })
-                        .collect()
-                };
+                // Add type annotations for procedure arguments
+                let mut args_with_types: Vec<String> = args.iter()
+                    .map(|arg| {
+                        let rust_type = arg.r#type.as_rust_type();
+                        format!("{}: &{}", arg.name, rust_type)
+                    })
+                    .collect();
+
+                // Add global variables as mutable reference parameters
+                for global_var in &global_vars {
+                    if let Some(global_type) = context.get_global_type(global_var) {
+                        let rust_type = global_type.as_rust_type();
+                        args_with_types.push(format!("{}: &mut {}", global_var, rust_type));
+                    }
+                }
 
                 Ok(format!(
                     "fn {} ( {} ) -> Result<()> {{\n{}\n\tOk(())\n}}",
-                    fn_name,
+                    name,
                     args_with_types.join(", "),
                     body_sts.join("\n")
                 ))
             },
             Statement::ProcedureCall { name, args } => {
                 let mut arg_strs = Vec::new();
+                
+                // Add the explicit arguments first
                 for arg in args {
                     let arg_st: String = arg.transpile_with_context(context)
                         .context("Failed to convert argument expression to string!")?;
                     // Add reference for procedure call arguments since procedures expect &Cosy
                     arg_strs.push(format!("&{}", arg_st));
+                }
+                
+                // Add the required global variables as references
+                let global_vars = context.get_procedure_globals(name);
+                for global_var in &global_vars {
+                    // If we're inside a procedure that already has this as a parameter, pass it directly
+                    if context.args.contains_key(global_var) {
+                        arg_strs.push(global_var.clone());
+                    } else {
+                        // Otherwise, pass a mutable reference to the global variable
+                        arg_strs.push(format!("&mut {}", global_var));
+                    }
                 }
                 
                 Ok(format!("{}({}).with_context(|| format!(\"...while trying to call procedure {}!\"))?;", name, arg_strs.join(", "), name))
@@ -362,8 +433,15 @@ impl Transpile for Statement {
                 Ok(format!("{}({}).with_context(|| format!(\"...while trying to call function {}!\"))?", name, arg_strs.join(", "), name))
             },
             Statement::If { condition, then_body, elseif_clauses, else_body } => {
-                let condition_st = condition.transpile_with_context(context)
+                let mut condition_st = condition.transpile_with_context(context)
                     .context("Failed to convert IF condition to string!")?;
+                
+                // If the condition is a boolean variable that's a procedure parameter, dereference it
+                if let Expr::Var(name) = condition {
+                    if context.args.contains_key(name) {
+                        condition_st = format!("*{}", condition_st);
+                    }
+                }
                 
                 let mut result = format!("if {} {{", condition_st);
                 
@@ -381,8 +459,15 @@ impl Transpile for Statement {
                 
                 // Add ELSEIF clauses
                 for elseif_clause in elseif_clauses {
-                    let elseif_condition_st = elseif_clause.condition.transpile_with_context(context)
+                    let mut elseif_condition_st = elseif_clause.condition.transpile_with_context(context)
                         .context("Failed to convert ELSEIF condition to string!")?;
+                    
+                    // Handle dereferencing for ELSEIF conditions too
+                    if let Expr::Var(name) = &elseif_clause.condition {
+                        if context.args.contains_key(name) {
+                            elseif_condition_st = format!("*{}", elseif_condition_st);
+                        }
+                    }
                     
                     result.push_str(&format!("\n}} else if {} {{", elseif_condition_st));
                     

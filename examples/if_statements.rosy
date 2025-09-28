@@ -1,13 +1,17 @@
 BEGIN;
-VARIABLE (LO) condition1;
-VARIABLE (LO) condition2;
-VARIABLE (RE) number;
+{This is a comment at the beginning}
 
+{Main procedure that demonstrates IF statements}
 PROCEDURE RUN;
-  condition1 := TRUE;
-  condition2 := FALSE;
-  number := 42;
+  VARIABLE (LO) condition1; {Boolean variable for testing}
+  VARIABLE (LO) condition2;
+  VARIABLE (RE) number; {This will store a number}
   
+  condition1 := TRUE; {Set first condition to true}
+  condition2 := FALSE;
+  number := 42; {The answer to everything}
+  
+  {Test basic IF with ELSEIF and ELSE}
   IF condition1;
     WRITE 6 "First condition is true";
   ELSEIF condition2;
@@ -16,21 +20,26 @@ PROCEDURE RUN;
     WRITE 6 "Neither condition is true";
   ENDIF;
   
+  {Another IF statement to test ELSEIF}
   IF condition2;
     WRITE 6 "This should not print";
-  ELSEIF condition1;
+  ELSEIF condition1; {This should execute}
     WRITE 6 "This should print - ELSEIF works!";
   ELSE;
     WRITE 6 "This else should not print";
   ENDIF;
   
+  {Simple IF-ELSE test}
   IF condition2;
     WRITE 6 "False condition";
   ELSE;
-    WRITE 6 "ELSE clause works!";
+    WRITE 6 "ELSE clause works!"; {This should print}
   ENDIF;
   
-  WRITE 6 "Number is: " number;
-ENDPROCEDURE;
+  WRITE 6 "Number is: " number; {Final output}
+ENDPROCEDURE; {End of main procedure}
 
-END;
+{Call the main procedure}
+RUN ;
+
+END; {End of program}

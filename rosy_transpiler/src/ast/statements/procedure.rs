@@ -20,17 +20,18 @@ pub fn build_procedure(pair: pest::iterators::Pair<Rule>) -> Result<Option<State
             if arg_pair.as_rule() == Rule::semicolon {
                 break;
             }
-
-            ensure!(arg_pair.as_rule() == Rule::function_argument_name, 
-                "Expected function argument name, found: {:?}", arg_pair.as_rule());
-            let name = arg_pair.as_str();
-
-            let next_arg_pair = start_procedure_inner.next()
-                .context(format!("Missing type for function argument: {}", name))?;
-            ensure!(next_arg_pair.as_rule() == Rule::r#type, 
-                "Expected type for function argument, found: {:?}", next_arg_pair.as_rule());
-            let type_str = next_arg_pair.as_str();
-
+            ensure!(arg_pair.as_rule() == Rule::procedure_argument_name_and_type, 
+                "Expected procedure argument name and type, found: {:?}", arg_pair.as_rule());
+            
+            let mut arg_inner = arg_pair.into_inner();
+            let name = arg_inner.next()
+                .context("Missing procedure argument name!")?
+                .as_str();
+            let type_pair = arg_inner.next()
+                .context(format!("Missing type for procedure argument: {}", name))?;
+            ensure!(type_pair.as_rule() == Rule::r#type, 
+                "Expected type for procedure argument, found: {:?}", type_pair.as_rule());
+            let type_str = type_pair.as_str();
             let variable_data = VariableData {
                 name: name.to_string(),
                 r#type: type_str.try_into()

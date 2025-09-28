@@ -1,0 +1,75 @@
+BEGIN;
+{Global variables example - demonstrates automatic global variable passing}
+
+{Global counter variable}
+VARIABLE (RE) counter;
+{Global message variable}
+VARIABLE (ST) global_message;
+{Global flag for tracking operations}
+VARIABLE (LO) operation_complete;
+
+{Procedure that increments the global counter}
+PROCEDURE INCREMENT_COUNTER;
+    counter := counter + 1;
+    WRITE 6 "Counter incremented to: " counter;
+ENDPROCEDURE;
+
+{Procedure that sets the global message}
+PROCEDURE SET_MESSAGE message (ST);
+    global_message := message;
+    WRITE 6 "Global message set to: " global_message;
+ENDPROCEDURE;
+
+{Procedure that marks an operation as complete}
+PROCEDURE MARK_COMPLETE;
+    operation_complete := TRUE;
+    WRITE 6 "Operation marked as complete";
+ENDPROCEDURE;
+
+{Procedure that displays all global state}
+PROCEDURE DISPLAY_GLOBALS;
+    WRITE 6 "=== Current Global State ===";
+    WRITE 6 "Counter: " counter;
+    WRITE 6 "Message: " global_message;
+    IF operation_complete;
+        WRITE 6 "Status: COMPLETE";
+    ELSE;
+        WRITE 6 "Status: INCOMPLETE";
+    ENDIF;
+    WRITE 6 "========================";
+ENDPROCEDURE;
+
+{Main procedure that orchestrates the global variable usage}
+PROCEDURE RUN;
+    {Initialize global variables}
+    counter := 0;
+    global_message := "Initial message";
+    operation_complete := FALSE;
+    
+    {Display initial state}
+    WRITE 6 "Initial state:";
+    DISPLAY_GLOBALS;
+    
+    {Perform operations that modify globals}
+    INCREMENT_COUNTER;
+    INCREMENT_COUNTER;
+    INCREMENT_COUNTER;
+    
+    SET_MESSAGE "Hello from global variables!";
+    
+    MARK_COMPLETE;
+    
+    {Display final state}
+    WRITE 6 "Final state:";
+    DISPLAY_GLOBALS;
+    
+    {Demonstrate conditional logic with global}
+    IF operation_complete;
+        WRITE 6 "Operation is complete!";
+    ENDIF;
+ENDPROCEDURE;
+
+{Call the main procedure}
+RUN;
+
+END;
