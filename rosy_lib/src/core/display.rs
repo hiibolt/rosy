@@ -44,3 +44,15 @@ impl RosyDisplay for &usize {
         self.to_string()
     }
 }
+
+impl RosyDisplay for &str {
+    fn rosy_display(self) -> String {
+        self.to_string()
+    }
+}
+
+impl RosyDisplay for String {
+    fn rosy_display(self) -> String {
+        self
+    }
+}

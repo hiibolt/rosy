@@ -19,11 +19,11 @@ VARIABLE (CM) COMPLEX_X1; {Complex variable for demos}
 VARIABLE (RE) A;
 VARIABLE (RE) B;
 
-{Pause procedure for user interaction}
+{Pause procedure for user interaction - modified for automated testing}
 PROCEDURE PAUSE;
     VARIABLE (RE) I;
-    WRITE 6 "Enter any number to continue: ";
-    READ 5 I;
+    WRITE 6 "[PAUSE - press ENTER to continue in interactive mode]";
+    {read 5 I;}
 ENDPROCEDURE;
 
 {String manipulation demo}
@@ -72,16 +72,13 @@ PROCEDURE COSYCM;
     WRITE 6 "";
     IM := CM(0 & 1);
     COMPLEX_X1 := CM(A & B);
-    {TDD: ST() conversion function needs implementation}
-    {WRITE 6 "IM := CM(0&1) is " ST(IM) "  : imaginary unit";}
-    {WRITE 6 "COMPLEX_X1 := CM(A&B) is " ST(COMPLEX_X1);}
-    WRITE 6 "IM := CM(0&1) - imaginary unit created";
-    WRITE 6 "COMPLEX_X1 := CM(A&B) - complex from A and B created";
+    {ST() conversion function now works!}
+    WRITE 6 "IM := CM(0&1) is " ST(IM) "  : imaginary unit";
+    WRITE 6 "COMPLEX_X1 := CM(A&B) is " ST(COMPLEX_X1);
     WRITE 6 "";
-    {TDD: Complex extraction operators need implementation}
-    {WRITE 6 "Extracting the real      part of COMPLEX_X1: " ST(COMPLEX_X1|1);}
-    {WRITE 6 "Extracting the imaginary part of COMPLEX_X1: " ST(COMPLEX_X1|2);}
-    WRITE 6 "Complex extraction operators not yet implemented";
+    {Complex extraction operators now work!}
+    WRITE 6 "Extracting the real      part of COMPLEX_X1: " ST(COMPLEX_X1|1);
+    WRITE 6 "Extracting the imaginary part of COMPLEX_X1: " ST(COMPLEX_X1|2);
     PAUSE;
 ENDPROCEDURE;
 

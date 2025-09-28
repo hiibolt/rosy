@@ -73,11 +73,13 @@ endif = { "ENDIF" ~ semicolon }
   end_loop = { "ENDLOOP" ~ semicolon }
 
 /// [ INTRINSIC FUNCTIONS ]
-  builtin_function = _{ exp | cm }
+  builtin_function = _{ exp | cm | st }
   /// EXP
   exp = { "EXP(" ~ expr ~ ")" }
   /// CM
   cm = { "CM(" ~ expr ~ ")" }
+  /// ST - String conversion
+  st = { "ST(" ~ expr ~ ")" }
 /// [ INTRINSIC TYPES ]
   type = @{ "(" ~ inner_type ~ ")"}
   inner_type = _{
@@ -105,12 +107,13 @@ term = _{
 boolean = { "TRUE" | "FALSE" }
 
 // Infix operators
-infix_op    = _{ add | concat }
+infix_op    = _{ extract | add | concat }
+extract     = { "|" }
 add         = { "+" }
 concat      = { "&" }
 
 identifier  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
-number      = @{ "-"? ~ ASCII_DIGIT+ }
+number      = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 unit        = @{ ASCII_DIGIT+ }
 string      = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 semicolon   = { ";" }

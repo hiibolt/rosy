@@ -46,6 +46,29 @@ impl TranspileContext {
     pub fn get_global_type(&self, var_name: &str) -> Option<&RosyType> {
         self.global_variable_types.get(var_name)
     }
+
+    /// Smart reference conversion - converts &mut T to &T when needed for trait calls
+    pub fn smart_reference(&self, expr: &Expr, expr_str: &str) -> String {
+        match expr {
+            Expr::Var(name) => {
+                if self.args.contains_key(name) {
+                    // This is a procedure parameter (&mut T), convert to &T
+                    format!("&*{}", expr_str)
+                } else {
+                    // This is a local/global variable, just add &
+                    format!("&{}", expr_str)
+                }
+            },
+            // For operations that return owned values (like Extract, StringConvert), just add &
+            Expr::Extract { .. } | Expr::StringConvert { .. } => {
+                format!("(&{})", expr_str)
+            },
+            _ => {
+                // For other complex expressions, just wrap in parentheses and add &
+                format!("(&{})", expr_str)
+            }
+        }
+    }
 }
 
 pub trait Transpile {
@@ -142,26 +165,9 @@ impl Transpile for Expr {
                 let right_str: String = (*right).transpile_with_context(context)
                     .context("Failed to convert right expression to string!")?;
                 
-                // Add reference prefix only if the operand is not already a function argument
-                let left_ref = if let Expr::Var(name) = left.as_ref() {
-                    if context.args.contains_key(name) {
-                        left_str
-                    } else {
-                        format!("&{}", left_str)
-                    }
-                } else {
-                    format!("&{}", left_str)
-                };
-                
-                let right_ref = if let Expr::Var(name) = right.as_ref() {
-                    if context.args.contains_key(name) {
-                        right_str
-                    } else {
-                        format!("&{}", right_str)
-                    }
-                } else {
-                    format!("&{}", right_str)
-                };
+                // For procedure parameters, use &* to convert from &mut to &
+                let left_ref = context.smart_reference(left, &left_str);
+                let right_ref = context.smart_reference(right, &right_str);
                 
                 format!("({}.rosy_add({}))", left_ref, right_ref)
             },
@@ -169,16 +175,8 @@ impl Transpile for Expr {
                 let term_strs: Result<Vec<String>> = terms.iter()
                     .map(|term| {
                         let term_str = term.transpile_with_context(context)?;
-                        // Apply same reference logic as in Add
-                        if let Expr::Var(name) = term.as_ref() {
-                            if context.args.contains_key(name) {
-                                Ok(term_str)
-                            } else {
-                                Ok(format!("&{}", term_str))
-                            }
-                        } else {
-                            Ok(format!("&{}", term_str))
-                        }
+                        // For procedure parameters, use &* to convert from &mut to &
+                        Ok(context.smart_reference(term, &term_str))
                     })
                     .collect();
                 
@@ -198,7 +196,52 @@ impl Transpile for Expr {
                 }
                 
                 format!("{}({}).with_context(|| format!(\"...while trying to call function {}!\"))?", name, arg_strs.join(", "), name)
-            }
+            },
+            Expr::Extract { object, index } => {
+                let object_str = object.transpile_with_context(context)
+                    .context("Failed to convert extract object to string!")?;
+                let index_str = index.transpile_with_context(context)
+                    .context("Failed to convert extract index to string!")?;
+                
+                // Always use parentheses and smart reference conversion for object
+                let object_ref = match object.as_ref() {
+                    Expr::Var(name) => {
+                        if context.args.contains_key(name) {
+                            format!("(&*{})", name)
+                        } else {
+                            format!("(&{})", name)
+                        }
+                    },
+                    _ => {
+                        format!("({})", object_str)
+                    }
+                };
+                
+                // Smart reference conversion for index
+                let index_ref = context.smart_reference(index, &index_str);
+                
+                format!("{}.rosy_extract({}).context(\"...while trying to extract component!\")?", object_ref, index_ref)
+            },
+            Expr::StringConvert { expr } => {
+                let sub_expr: String = (*expr).transpile_with_context(context)
+                    .context("Failed to convert string conversion expression to string!")?;
+                
+                // Always use parentheses and smart reference conversion
+                let expr_ref = match expr.as_ref() {
+                    Expr::Var(name) => {
+                        if context.args.contains_key(name) {
+                            format!("(&*{})", name)
+                        } else {
+                            format!("(&{})", name)
+                        }
+                    },
+                    _ => {
+                        format!("({})", sub_expr)
+                    }
+                };
+                
+                format!("{}.rosy_to_string().context(\"...while trying to convert to string!\")?", expr_ref)
+            },
         };
 
         Ok(res)
@@ -269,16 +312,21 @@ impl Transpile for Statement {
                     let expr_st: String = expr.transpile_with_context(context)
                         .context("Failed to convert expression to string!")?;
                     
-                    // For variables that are procedure parameters (already references), 
-                    // we don't need to add & prefix
-                    let display_expr = if let Expr::Var(name) = expr {
-                        if context.args.contains_key(name) {
-                            format!("{}.rosy_display()", name)
-                        } else {
-                            format!("(&{}).rosy_display()", expr_st)
+                    // Use smart reference conversion for all expressions
+                    let display_expr = match expr {
+                        Expr::Var(name) => {
+                            // For simple variables that are procedure parameters, use &* 
+                            if context.args.contains_key(name) {
+                                format!("(&*{}).rosy_display()", name)
+                            } else {
+                                format!("(&{}).rosy_display()", expr_st)
+                            }
+                        },
+                        _ => {
+                            // For complex expressions, call rosy_display directly since 
+                            // they already return owned values or handle their own referencing
+                            format!("({}).rosy_display()", expr_st)
                         }
-                    } else {
-                        format!("(&{}).rosy_display()", expr_st)
                     };
                     
                     exprs_sts.push(display_expr);

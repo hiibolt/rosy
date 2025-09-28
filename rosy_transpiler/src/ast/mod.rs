@@ -34,16 +34,18 @@ pub struct ElseIfClause {
     pub body: Vec<Statement>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    Number(i32),
+    Number(f64),
     String(String),
     Boolean(bool),
     Var(String),
+    Add { left: Box<Expr>, right: Box<Expr> },
+    Concat { terms: Vec<Expr> },
+    Extract { object: Box<Expr>, index: Box<Expr> },
     Exp { expr: Box<Expr> },
     Complex { expr: Box<Expr> },
-    Add { left: Box<Expr>, right: Box<Expr> },
-    Concat { terms: Vec<Box<Expr>> },
+    StringConvert { expr: Box<Expr> },
     FunctionCall { name: String, args: Vec<Expr> },
 }
 
@@ -109,7 +111,7 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                 Ok(Expr::FunctionCall { name, args })
             },
             Rule::number => {
-                let n = primary.as_str().parse::<i32>()?;
+                let n = primary.as_str().parse::<f64>()?;
                 Ok(Expr::Number(n))
             }
             Rule::boolean => {
@@ -142,6 +144,13 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                 let expr = Box::new(build_expr(expr_pair)?);
                 Ok(Expr::Complex { expr })
             },
+            Rule::st => {
+                let mut inner = primary.into_inner();
+                let expr_pair = inner.next()
+                    .context("Missing inner expression for `ST`!")?;
+                let expr = Box::new(build_expr(expr_pair)?);
+                Ok(Expr::StringConvert { expr })
+            },
             Rule::expr => build_expr(primary),
             _ => bail!("Unexpected primary expr: {:?}", primary.as_rule()),
         })
@@ -159,14 +168,18 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                 let right = right?;
 
                 let terms = if let Expr::Concat{ mut terms } = left {
-                    terms.push(Box::new(right));
+                    terms.push(right);
                     terms
                 } else {
-                    vec![Box::new(left), Box::new(right)]
+                    vec![left, right]
                 };
 
                 Ok(Expr::Concat { terms })
             },
+            Rule::extract => Ok(Expr::Extract {
+                object: Box::new(left?),
+                index: Box::new(right?),
+            }),
             _ => bail!("Unexpected infix operator: {:?}", op.as_rule()),
         })
         .parse(pair.into_inner())

@@ -62,29 +62,93 @@ impl ProgramAnalyzer {
             }
         }
 
-        // Second pass: analyze procedure/function bodies for global variable usage AND type checking
+        // Second pass: analyze procedure/function bodies for direct global variable usage
         for statement in &program.statements {
             match statement {
                 Statement::Procedure { name, args, body } => {
                     self.analyze_procedure_body(name, args, body);
-                    // Also do full type checking for the procedure body
+                }
+                Statement::Function { name, args, body, .. } => {
+                    self.analyze_function_body(name, args, body);
+                }
+                _ => {}
+            }
+        }
+
+        // Third pass: propagate transitive global variable dependencies
+        let mut changed = true;
+        while changed {
+            changed = false;
+            for statement in &program.statements {
+                if let Statement::Procedure { name, args, body } = statement {
+                    let original_usage = self.procedure_global_usage.get(name).cloned().unwrap_or_default();
+                    let mut updated_usage = original_usage.clone();
+                    
+                    // Add transitive dependencies from procedure calls
+                    for stmt in body {
+                        self.collect_transitive_globals(stmt, &mut updated_usage);
+                    }
+                    
+                    if updated_usage != original_usage {
+                        self.procedure_global_usage.insert(name.clone(), updated_usage);
+                        changed = true;
+                    }
+                }
+            }
+        }
+
+        // Fourth pass: type checking for procedure/function bodies
+        for statement in &program.statements {
+            match statement {
+                Statement::Procedure { name: _, args, body } => {
                     self.analyze_procedure_body_types(args, body);
                 }
-                Statement::Function { name, args, body, return_type } => {
-                    self.analyze_function_body(name, args, body);
-                    // Also do full type checking for the function body
+                Statement::Function { name: _, args, body, return_type } => {
                     self.analyze_function_body_types(args, body, return_type);
                 }
                 _ => {}
             }
         }
 
-        // Third pass: analyze top-level statements (like procedure calls) with full type checking
+        // Fifth pass: analyze top-level statements (like procedure calls) with full type checking
         for statement in &program.statements {
             self.analyze_statement_types(statement);
         }
 
         Ok(())
+    }
+
+    fn collect_transitive_globals(&self, stmt: &Statement, global_usage: &mut HashSet<String>) {
+        match stmt {
+            Statement::ProcedureCall { name, .. } => {
+                if let Some(called_proc_globals) = self.procedure_global_usage.get(name) {
+                    for global_var in called_proc_globals {
+                        global_usage.insert(global_var.clone());
+                    }
+                }
+            }
+            Statement::If { then_body, elseif_clauses, else_body, .. } => {
+                for stmt in then_body {
+                    self.collect_transitive_globals(stmt, global_usage);
+                }
+                for elseif_clause in elseif_clauses {
+                    for stmt in &elseif_clause.body {
+                        self.collect_transitive_globals(stmt, global_usage);
+                    }
+                }
+                if let Some(else_statements) = else_body {
+                    for stmt in else_statements {
+                        self.collect_transitive_globals(stmt, global_usage);
+                    }
+                }
+            }
+            Statement::Loop { body, .. } => {
+                for stmt in body {
+                    self.collect_transitive_globals(stmt, global_usage);
+                }
+            }
+            _ => {}
+        }
     }
 
     fn analyze_procedure_body(&mut self, proc_name: &str, args: &[VariableData], body: &[Statement]) {
@@ -149,43 +213,23 @@ impl ProgramAnalyzer {
                     global_usage.insert(name.clone());
                 }
             }
-            Statement::ProcedureCall { name: _, args } => {
+            Statement::ProcedureCall { name, args } => {
                 // Analyze arguments for global usage
                 for arg in args {
                     self.analyze_expression_for_globals(arg, local_vars, global_usage);
+                }
+                
+                // Add transitive global usage: if we call a procedure that uses globals,
+                // then we also use those globals transitively
+                if let Some(called_proc_globals) = self.procedure_global_usage.get(name).cloned() {
+                    for global_var in called_proc_globals {
+                        global_usage.insert(global_var);
+                    }
                 }
             }
             Statement::FunctionCall { name: _, args } => {
                 for arg in args {
                     self.analyze_expression_for_globals(arg, local_vars, global_usage);
-                }
-            }
-            Statement::If { condition, then_body, elseif_clauses, else_body } => {
-                self.analyze_expression_for_globals(condition, local_vars, global_usage);
-                for stmt in then_body {
-                    self.analyze_statement_for_globals(stmt, local_vars, global_usage);
-                }
-                for elseif_clause in elseif_clauses {
-                    self.analyze_expression_for_globals(&elseif_clause.condition, local_vars, global_usage);
-                    for stmt in &elseif_clause.body {
-                        self.analyze_statement_for_globals(stmt, local_vars, global_usage);
-                    }
-                }
-                if let Some(else_statements) = else_body {
-                    for stmt in else_statements {
-                        self.analyze_statement_for_globals(stmt, local_vars, global_usage);
-                    }
-                }
-            }
-            Statement::Loop { iterator, start, end, step, body } => {
-                local_vars.insert(iterator.clone());
-                self.analyze_expression_for_globals(start, local_vars, global_usage);
-                self.analyze_expression_for_globals(end, local_vars, global_usage);
-                if let Some(step_expr) = step {
-                    self.analyze_expression_for_globals(step_expr, local_vars, global_usage);
-                }
-                for stmt in body {
-                    self.analyze_statement_for_globals(stmt, local_vars, global_usage);
                 }
             }
             _ => {}
@@ -219,6 +263,13 @@ impl ProgramAnalyzer {
             Expr::Complex { expr: inner } => {
                 self.analyze_expression_for_globals(inner, local_vars, global_usage);
             }
+            Expr::Extract { object, index } => {
+                self.analyze_expression_for_globals(object, local_vars, global_usage);
+                self.analyze_expression_for_globals(index, local_vars, global_usage);
+            },
+            Expr::StringConvert { expr } => {
+                self.analyze_expression_for_globals(expr, local_vars, global_usage);
+            },
             _ => {} // Number, String, Boolean don't reference variables
         }
     }
@@ -296,6 +347,13 @@ impl ProgramAnalyzer {
             Expr::Complex { expr: inner } => {
                 self.analyze_expression(inner);
             }
+            Expr::Extract { object, index } => {
+                self.analyze_expression(object);
+                self.analyze_expression(index);
+            }
+            Expr::StringConvert { expr } => {
+                self.analyze_expression(expr);
+            },
         }
     }
 
@@ -339,7 +397,24 @@ impl ProgramAnalyzer {
                 } else {
                     None
                 }
-            }
+            },
+            Expr::Extract { object, index: _ } => {
+                // Extract operation returns different types based on the object type
+                if let Some(object_type) = self._get_expression_type(object) {
+                    match object_type {
+                        RosyType::ST => Some(RosyType::ST), // String extraction returns string
+                        RosyType::VE => Some(RosyType::RE), // Vector extraction returns real
+                        RosyType::CM => Some(RosyType::RE), // Complex extraction returns real (component)
+                        _ => None, // Other types don't support extraction
+                    }
+                } else {
+                    None
+                }
+            },
+            Expr::StringConvert { expr: _ } => {
+                // ST() always returns string type regardless of input
+                Some(RosyType::ST)
+            },
         }
     }
 
