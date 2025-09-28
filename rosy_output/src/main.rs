@@ -80,7 +80,6 @@ fn main() -> Result<()> {
 		println!("{}{}", (String::from("V1 := A & B creates: ")).rosy_display(), (&V1).rosy_display());
 		println!("{}{}", (String::from("V2 := V1 & V1 creates: ")).rosy_display(), (&V2).rosy_display());
 		println!("{}", (String::from("")).rosy_display());
-		println!("{}", (String::from("Vector extraction operators not yet implemented")).rosy_display());
 		PAUSE().with_context(|| format!("...while trying to call procedure PAUSE!"))?;
 		Ok(())
 	}

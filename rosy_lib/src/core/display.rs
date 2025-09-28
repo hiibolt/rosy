@@ -17,7 +17,7 @@ impl RosyDisplay for &ST {
 
 impl RosyDisplay for &LO {
     fn rosy_display(self) -> String {
-        let s = if *self { "true" } else { "false" };
+        let s = if *self { "TRUE" } else { "FALSE" };
 
         s.to_string()
     }

@@ -80,7 +80,7 @@ impl ProgramAnalyzer {
         while changed {
             changed = false;
             for statement in &program.statements {
-                if let Statement::Procedure { name, args, body } = statement {
+                if let Statement::Procedure { name, body, .. } = statement {
                     let original_usage = self.procedure_global_usage.get(name).cloned().unwrap_or_default();
                     let mut updated_usage = original_usage.clone();
                     
