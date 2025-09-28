@@ -37,10 +37,17 @@
             clippy
             openssl.dev
             pest-ide-tools
+            clang
           ]);
+          buildInputs = with pkgs; [
+            mpi
+            libclang
+            llvmPackages.libclang
+          ];
 
           RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
           PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
           OPENSSL_LIB_DIR = pkgs.openssl.out + "/lib";
         };
       in

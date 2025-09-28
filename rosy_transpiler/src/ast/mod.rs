@@ -75,6 +75,7 @@ fn build_statement (
         Rule::function => statements::build_function(pair).context("...while building function declaration!"),
         Rule::function_call => statements::build_function_call(pair).context("...while building function call!"),
         Rule::if_statement => statements::build_if(pair).context("...while building if statement!"),
+        
         // Ignored
         Rule::begin | Rule::end | Rule::EOI | Rule::end_procedure | 
         Rule::end_function | Rule::end_loop | Rule::endif => Ok(None),
