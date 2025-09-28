@@ -12,3 +12,4 @@ rosy_lib.workspace = true
 impls.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+serial_test.workspace = true

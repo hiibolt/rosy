@@ -9,7 +9,8 @@ statement   = _{
   | function
   | loop
   | procedure
-  | procedure_call }
+  | procedure_call
+  | if_statement }
 
 /// BEGIN and END
 begin = { "BEGIN" ~ semicolon }
@@ -24,7 +25,14 @@ var_decl = { "VARIABLE" ~ type ~ variable_name ~ semicolon }
 variable_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
 
 /// Keywords - define all reserved words
-keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" }
+keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" | "IF" | "ELSEIF" | "ELSE" | "ENDIF" | "TRUE" | "FALSE" }
+
+/// [ IF / ELSEIF / ELSE / ENDIF ]
+if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
+if_clause = { "IF" ~ expr ~ semicolon ~ statement* }
+elseif_clause = { "ELSEIF" ~ expr ~ semicolon ~ statement* }
+else_clause = { "ELSE" ~ semicolon ~ statement* }
+endif = { "ENDIF" ~ semicolon }
 
 /// [ PROCEDURES / FUNCTIONS ]
   ///
@@ -83,10 +91,14 @@ expr = { term ~ (infix_op ~ term)* }
 term = _{ 
     builtin_function | 
     function_call |
+    boolean |
     number | 
     string |
     identifier |
     "(" ~ expr ~ ")" }
+
+// Boolean literals
+boolean = { "TRUE" | "FALSE" }
 
 // Infix operators
 infix_op    = _{ add | concat }

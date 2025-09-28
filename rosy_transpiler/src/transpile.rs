@@ -36,12 +36,47 @@ pub trait Transpile {
 impl Transpile for Program {
     fn transpile_with_context(&self, _context: &TranspileContext) -> Result<String> {
         let mut output = String::new();
+        let mut global_vars = Vec::new();
+        let mut functions_and_procedures = Vec::new();
 
-        // Transpile the AST to Rust
+        // Separate global variables from functions/procedures
         for statement in &self.statements {
-            let statement_st: String = statement.transpile()
-                .context("Failed to convert statement to string!")?;
-            output.push_str(&statement_st);
+            match statement {
+                Statement::VarDecl { .. } => {
+                    let var_st = statement.transpile()
+                        .context("Failed to convert global variable to string!")?;
+                    global_vars.push(var_st);
+                },
+                _ => {
+                    let stmt_st = statement.transpile()
+                        .context("Failed to convert statement to string!")?;
+                    functions_and_procedures.push(stmt_st);
+                }
+            }
+        }
+
+        // First output all functions and procedures (except run)
+        let mut run_function = None;
+        for stmt in functions_and_procedures {
+            if stmt.starts_with("fn run (  ) -> Result<()>") {
+                run_function = Some(stmt);
+            } else {
+                output.push_str(&stmt);
+                output.push('\n');
+            }
+        }
+
+        // Then output the run function with global variables moved inside it
+        if let Some(mut run_fn) = run_function {
+            // Insert global variables at the beginning of the run function body
+            if !global_vars.is_empty() {
+                let global_vars_str = global_vars.join("\n\t");
+                run_fn = run_fn.replace(
+                    "fn run (  ) -> Result<()> {\n",
+                    &format!("fn run (  ) -> Result<()> {{\n\t{}\n", global_vars_str)
+                );
+            }
+            output.push_str(&run_fn);
             output.push('\n');
         }
 
@@ -56,6 +91,9 @@ impl Transpile for Expr {
             },
             Expr::String(s) => {
                 format!("String::from(\"{}\")", s)
+            },
+            Expr::Boolean(b) => {
+                format!("{}", b)
             },
             Expr::Var(name) => {
                 // If it's a function argument, it's already a reference, so just use the name
@@ -322,6 +360,62 @@ impl Transpile for Statement {
                 }
                 
                 Ok(format!("{}({}).with_context(|| format!(\"...while trying to call function {}!\"))?", name, arg_strs.join(", "), name))
+            },
+            Statement::If { condition, then_body, elseif_clauses, else_body } => {
+                let condition_st = condition.transpile_with_context(context)
+                    .context("Failed to convert IF condition to string!")?;
+                
+                let mut result = format!("if {} {{", condition_st);
+                
+                // Add THEN body
+                for stmt in then_body {
+                    let stmt_st = stmt.transpile_with_context(context)
+                        .context("Failed to convert IF body statement to string!")?
+                        .lines()
+                        .map(|line| format!("\t{}", line))
+                        .collect::<Vec<String>>()
+                        .join("\n");
+                    result.push('\n');
+                    result.push_str(&stmt_st);
+                }
+                
+                // Add ELSEIF clauses
+                for elseif_clause in elseif_clauses {
+                    let elseif_condition_st = elseif_clause.condition.transpile_with_context(context)
+                        .context("Failed to convert ELSEIF condition to string!")?;
+                    
+                    result.push_str(&format!("\n}} else if {} {{", elseif_condition_st));
+                    
+                    for stmt in &elseif_clause.body {
+                        let stmt_st = stmt.transpile_with_context(context)
+                            .context("Failed to convert ELSEIF body statement to string!")?
+                            .lines()
+                            .map(|line| format!("\t{}", line))
+                            .collect::<Vec<String>>()
+                            .join("\n");
+                        result.push('\n');
+                        result.push_str(&stmt_st);
+                    }
+                }
+                
+                // Add ELSE clause if present
+                if let Some(else_statements) = else_body {
+                    result.push_str("\n} else {");
+                    
+                    for stmt in else_statements {
+                        let stmt_st = stmt.transpile_with_context(context)
+                            .context("Failed to convert ELSE body statement to string!")?
+                            .lines()
+                            .map(|line| format!("\t{}", line))
+                            .collect::<Vec<String>>()
+                            .join("\n");
+                        result.push('\n');
+                        result.push_str(&stmt_st);
+                    }
+                }
+                
+                result.push_str("\n}");
+                Ok(result)
             }
         }
     }

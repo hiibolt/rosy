@@ -120,6 +120,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[serial_test::serial]
     fn basic_rosy() -> Result<()> {
         let root_path = PathBuf::from("..");
         let script_path = PathBuf::from("../examples/basic.rosy");
@@ -138,6 +139,27 @@ mod tests {
                 "2\n",
                 "4\n",
                 ""
+            )
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn if_statements() -> Result<()> {
+        let root_path = PathBuf::from("..");
+        let script_path = PathBuf::from("../examples/if_statements.rosy");
+
+        let output = rosy(&root_path, &script_path)?;
+
+        assert_eq!(
+            output,
+            concat!(
+                "First condition is true\n",
+                "This should print - ELSEIF works!\n",
+                "ELSE clause works!\n",
+                "Number is: 42\n"
             )
         );
 

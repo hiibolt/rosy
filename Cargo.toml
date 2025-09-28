@@ -16,3 +16,4 @@ rosy_lib = { path = "rosy_lib" }
 impls = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
+serial_test = "3.2"

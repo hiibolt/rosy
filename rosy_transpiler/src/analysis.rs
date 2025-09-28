@@ -259,6 +259,45 @@ impl StaticAnalyzer {
                         }
                     }
                 }
+            },
+            Statement::If { condition, then_body, elseif_clauses, else_body } => {
+                // Check that the main IF condition is of type LO (boolean)
+                if let Some(condition_type) = self.get_expression_type(condition) {
+                    if condition_type != RosyType::LO {
+                        self.add_error(format!("IF condition must be of type LO (boolean), found {:?}", condition_type));
+                    }
+                } else {
+                    self.analyze_expression(condition);
+                }
+                
+                // Analyze statements in the THEN body
+                for stmt in then_body {
+                    self.analyze_statement(stmt);
+                }
+                
+                // Analyze ELSEIF clauses
+                for elseif_clause in elseif_clauses {
+                    // Check that each ELSEIF condition is of type LO (boolean)
+                    if let Some(condition_type) = self.get_expression_type(&elseif_clause.condition) {
+                        if condition_type != RosyType::LO {
+                            self.add_error(format!("ELSEIF condition must be of type LO (boolean), found {:?}", condition_type));
+                        }
+                    } else {
+                        self.analyze_expression(&elseif_clause.condition);
+                    }
+                    
+                    // Analyze statements in the ELSEIF body
+                    for stmt in &elseif_clause.body {
+                        self.analyze_statement(stmt);
+                    }
+                }
+                
+                // Analyze ELSE body if present
+                if let Some(else_statements) = else_body {
+                    for stmt in else_statements {
+                        self.analyze_statement(stmt);
+                    }
+                }
             }
         }
     }
@@ -268,6 +307,7 @@ impl StaticAnalyzer {
         match expr {
             Expr::Number(_) => Some(RosyType::RE),
             Expr::String(_) => Some(RosyType::ST),
+            Expr::Boolean(_) => Some(RosyType::LO),
             Expr::Var(name) => self.get_variable_type(name),
             Expr::Exp { expr: _inner } => {
                 todo!();
@@ -381,6 +421,7 @@ impl StaticAnalyzer {
         match expr {
             Expr::Number(_) => { },
             Expr::String(_) => { },
+            Expr::Boolean(_) => { },
             Expr::Var(name) => {
                 if !self.is_variable_defined(name) {
                     self.add_error(format!("Variable '{}' is not defined in expression", name));

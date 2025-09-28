@@ -7,6 +7,7 @@
 use rosy_lib::*;
 use anyhow::{Result, Context};
 
+fn main() -> Result<()> {
     // <INJECT_START>
 	fn ADDTWONUMS ( X: &f64, Y: &f64 ) -> Result<f64> {
 		let mut ADDTWONUMS: f64;
@@ -47,10 +48,7 @@ use anyhow::{Result, Context};
 		Ok(())
 	}
 	// <INJECT_END>
-
-fn main () -> Result<()> {
-    run()
-        .context("Encountered a runtime error")?;
-
+    
+    run()?;
     Ok(())
 }

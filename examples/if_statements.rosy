@@ -1,0 +1,36 @@
+BEGIN;
+VARIABLE (LO) condition1;
+VARIABLE (LO) condition2;
+VARIABLE (RE) number;
+
+PROCEDURE RUN;
+  condition1 := TRUE;
+  condition2 := FALSE;
+  number := 42;
+  
+  IF condition1;
+    WRITE 6 "First condition is true";
+  ELSEIF condition2;
+    WRITE 6 "Second condition is true";
+  ELSE;
+    WRITE 6 "Neither condition is true";
+  ENDIF;
+  
+  IF condition2;
+    WRITE 6 "This should not print";
+  ELSEIF condition1;
+    WRITE 6 "This should print - ELSEIF works!";
+  ELSE;
+    WRITE 6 "This else should not print";
+  ENDIF;
+  
+  IF condition2;
+    WRITE 6 "False condition";
+  ELSE;
+    WRITE 6 "ELSE clause works!";
+  ENDIF;
+  
+  WRITE 6 "Number is: " number;
+ENDPROCEDURE;
+
+END;
