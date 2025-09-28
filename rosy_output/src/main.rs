@@ -9,36 +9,55 @@ use anyhow::{Result, Context};
 
 fn main() -> Result<()> {
     // <INJECT_START>
-	fn RUN (  ) -> Result<()> {
-		let mut condition1: bool = false;
-		let mut condition2: bool = false;
-		let mut number: f64 = 0.0;
-		condition1 = true.to_owned();
-		condition2 = false.to_owned();
-		number = 42f64.to_owned();
-		if condition1 {
-			println!("{}", (&String::from("First condition is true")).rosy_display());
-		} else if condition2 {
-			println!("{}", (&String::from("Second condition is true")).rosy_display());
-		} else {
-			println!("{}", (&String::from("Neither condition is true")).rosy_display());
-		}
-		if condition2 {
-			println!("{}", (&String::from("This should not print")).rosy_display());
-		} else if condition1 {
-			println!("{}", (&String::from("This should print - ELSEIF works!")).rosy_display());
-		} else {
-			println!("{}", (&String::from("This else should not print")).rosy_display());
-		}
-		if condition2 {
-			println!("{}", (&String::from("False condition")).rosy_display());
-		} else {
-			println!("{}", (&String::from("ELSE clause works!")).rosy_display());
-		}
-		println!("{}{}", (&String::from("Number is: ")).rosy_display(), (&number).rosy_display());
+	let mut counter: f64 = 0.0;
+	let mut global_message: String = String::new();
+	let mut operation_complete: bool = false;
+	fn INCREMENT_COUNTER ( counter: &mut f64 ) -> Result<()> {
+		*counter = (counter.rosy_add(&1f64)).to_owned();
+		println!("{}{}", (&String::from("Counter incremented to: ")).rosy_display(), counter.rosy_display());
 		Ok(())
 	}
-	RUN().with_context(|| format!("...while trying to call procedure RUN!"))?;
+	fn SET_MESSAGE ( message: &String, global_message: &mut String ) -> Result<()> {
+		*global_message = message.to_owned();
+		println!("{}{}", (&String::from("Global message set to: ")).rosy_display(), global_message.rosy_display());
+		Ok(())
+	}
+	fn MARK_COMPLETE ( operation_complete: &mut bool ) -> Result<()> {
+		*operation_complete = true.to_owned();
+		println!("{}", (&String::from("Operation marked as complete")).rosy_display());
+		Ok(())
+	}
+	fn DISPLAY_GLOBALS ( counter: &mut f64, global_message: &mut String, operation_complete: &mut bool ) -> Result<()> {
+		println!("{}", (&String::from("=== Current Global State ===")).rosy_display());
+		println!("{}{}", (&String::from("Counter: ")).rosy_display(), counter.rosy_display());
+		println!("{}{}", (&String::from("Message: ")).rosy_display(), global_message.rosy_display());
+		if *operation_complete {
+			println!("{}", (&String::from("Status: COMPLETE")).rosy_display());
+		} else {
+			println!("{}", (&String::from("Status: INCOMPLETE")).rosy_display());
+		}
+		println!("{}", (&String::from("========================")).rosy_display());
+		Ok(())
+	}
+	fn RUN ( counter: &mut f64, global_message: &mut String, operation_complete: &mut bool ) -> Result<()> {
+		*counter = 0f64.to_owned();
+		*global_message = String::from("Initial message").to_owned();
+		*operation_complete = false.to_owned();
+		println!("{}", (&String::from("Initial state:")).rosy_display());
+		DISPLAY_GLOBALS(counter, global_message, operation_complete).with_context(|| format!("...while trying to call procedure DISPLAY_GLOBALS!"))?;
+		INCREMENT_COUNTER(counter).with_context(|| format!("...while trying to call procedure INCREMENT_COUNTER!"))?;
+		INCREMENT_COUNTER(counter).with_context(|| format!("...while trying to call procedure INCREMENT_COUNTER!"))?;
+		INCREMENT_COUNTER(counter).with_context(|| format!("...while trying to call procedure INCREMENT_COUNTER!"))?;
+		SET_MESSAGE(&String::from("Hello from global variables!"), global_message).with_context(|| format!("...while trying to call procedure SET_MESSAGE!"))?;
+		MARK_COMPLETE(operation_complete).with_context(|| format!("...while trying to call procedure MARK_COMPLETE!"))?;
+		println!("{}", (&String::from("Final state:")).rosy_display());
+		DISPLAY_GLOBALS(counter, global_message, operation_complete).with_context(|| format!("...while trying to call procedure DISPLAY_GLOBALS!"))?;
+		if *operation_complete {
+			println!("{}", (&String::from("Operation is complete!")).rosy_display());
+		}
+		Ok(())
+	}
+	RUN(&mut counter, &mut global_message, &mut operation_complete).with_context(|| format!("...while trying to call procedure RUN!"))?;
 	// <INJECT_END>
     
     Ok(())

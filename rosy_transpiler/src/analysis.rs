@@ -300,7 +300,7 @@ impl ProgramAnalyzer {
     }
 
     /// Recursively determine the type of an expression
-    fn get_expression_type(&mut self, expr: &Expr) -> Option<RosyType> {
+    fn _get_expression_type(&mut self, expr: &Expr) -> Option<RosyType> {
         match expr {
             Expr::Number(_) => Some(RosyType::RE),
             Expr::String(_) => Some(RosyType::ST),
@@ -316,9 +316,21 @@ impl ProgramAnalyzer {
                 // For now, assume addition returns RE
                 Some(RosyType::RE)
             },
-            Expr::Concat { terms: _terms } => {
-                // Concatenation returns a vector
-                Some(RosyType::VE)
+            Expr::Concat { terms } => {
+                // Check if all terms are strings - if so, return ST, otherwise VE
+                let all_strings = terms.iter().all(|term| {
+                    if let Some(term_type) = self._get_expression_type(term) {
+                        term_type == RosyType::ST
+                    } else {
+                        false
+                    }
+                });
+                
+                if all_strings {
+                    Some(RosyType::ST) // String concatenation
+                } else {
+                    Some(RosyType::VE) // Vector concatenation
+                }
             },
             Expr::FunctionCall { name, args: _args } => {
                 // Look up the function's return type
@@ -377,7 +389,7 @@ impl ProgramAnalyzer {
                         _has_return = true;
                         
                         // Check that return value type matches function return type
-                        if let Some(value_type) = self.get_expression_type(value) {
+                        if let Some(value_type) = self._get_expression_type(value) {
                             if value_type != *return_type {
                                 self.add_error(format!(
                                     "Function return type mismatch: expected {:?}, found {:?}",
@@ -421,7 +433,7 @@ impl ProgramAnalyzer {
                 
                 // Check type compatibility
                 if let Some(var_type) = self.get_variable_type(name) {
-                    if let Some(expr_type) = self.get_expression_type(value) {
+                    if let Some(expr_type) = self._get_expression_type(value) {
                         if var_type != expr_type {
                             self.add_error(format!(
                                 "Type mismatch in assignment to '{}': expected {:?}, found {:?}",
@@ -446,7 +458,7 @@ impl ProgramAnalyzer {
             }
             Statement::If { condition, then_body, elseif_clauses, else_body } => {
                 // Check that IF condition is boolean
-                if let Some(condition_type) = self.get_expression_type(condition) {
+                if let Some(condition_type) = self._get_expression_type(condition) {
                     if condition_type != RosyType::LO {
                         self.add_error(format!("IF condition must be of type LO (boolean), found {:?}", condition_type));
                     }
@@ -460,7 +472,7 @@ impl ProgramAnalyzer {
                 
                 // Analyze ELSEIF clauses
                 for elseif_clause in elseif_clauses {
-                    if let Some(condition_type) = self.get_expression_type(&elseif_clause.condition) {
+                    if let Some(condition_type) = self._get_expression_type(&elseif_clause.condition) {
                         if condition_type != RosyType::LO {
                             self.add_error(format!("ELSEIF condition must be of type LO (boolean), found {:?}", condition_type));
                         }
@@ -484,18 +496,18 @@ impl ProgramAnalyzer {
                 self.define_variable(iterator, RosyType::RE);
                 
                 // Start, end, and step should be RE type
-                if let Some(start_type) = self.get_expression_type(start) {
+                if let Some(start_type) = self._get_expression_type(start) {
                     if start_type != RosyType::RE {
                         self.add_error(format!("LOOP start value must be of type RE, found {:?}", start_type));
                     }
                 }
-                if let Some(end_type) = self.get_expression_type(end) {
+                if let Some(end_type) = self._get_expression_type(end) {
                     if end_type != RosyType::RE {
                         self.add_error(format!("LOOP end value must be of type RE, found {:?}", end_type));
                     }
                 }
                 if let Some(step_expr) = step {
-                    if let Some(step_type) = self.get_expression_type(step_expr) {
+                    if let Some(step_type) = self._get_expression_type(step_expr) {
                         if step_type != RosyType::RE {
                             self.add_error(format!("LOOP step value must be of type RE, found {:?}", step_type));
                         }
