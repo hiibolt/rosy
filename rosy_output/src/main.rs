@@ -13,7 +13,7 @@ fn main() -> Result<()> {
 	let mut global_message: String = String::new();
 	let mut operation_complete: bool = false;
 	fn INCREMENT_COUNTER ( counter: &mut f64 ) -> Result<()> {
-		*counter = (&*counter).rosy_add(&1f64);
+		*counter = (&*counter).rosy_add((&1f64));
 		println!("{}{}", (String::from("Counter incremented to: ")).rosy_display(), (&*counter).rosy_display());
 		Ok(())
 	}

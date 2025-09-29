@@ -63,10 +63,14 @@ impl TranspileContext {
                     format!("(&{})", name)
                 }
             },
+            // For literals and complex expressions, we need parentheses around the reference
+            // to ensure method calls work correctly (e.g., (&false).rosy_to_string() vs &false.rosy_to_string())
+            Expr::Number(_) | Expr::String(_) | Expr::Boolean(_) => {
+                format!("(&{})", expr_str)
+            },
             _ => {
-                // For non-variable expressions (function calls, operations, etc.),
-                // don't add extra parentheses around the entire expression
-                format!("&{}", expr_str)
+                // For function calls and other complex expressions, parentheses are needed
+                format!("(&({}))", expr_str)
             }
         }
     }
@@ -231,19 +235,8 @@ impl Transpile for Expr {
                 let sub_expr: String = (*expr).transpile_with_context(context)
                     .context("Failed to convert string conversion expression to string!")?;
                 
-                // For procedure parameters (mutable references), use the correct conversion
-                let expr_ref = match expr.as_ref() {
-                    Expr::Var(name) if context.is_mutable_reference(name) => {
-                        format!("(&*{})", name)
-                    },
-                    Expr::Var(name) => {
-                        format!("(&{})", name)
-                    },
-                    _ => {
-                        // For complex expressions, the result is already a value
-                        format!("&{}", sub_expr)
-                    }
-                };
+                // Use the same reference formatting logic as other expressions
+                let expr_ref = context.get_expr_immutable_ref(expr, &sub_expr);
                 
                 format!("{}.rosy_to_string().context(\"...while trying to convert to string!\")?", expr_ref)
             },
