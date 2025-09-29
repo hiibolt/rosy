@@ -12,13 +12,6 @@ impl RosyToString for &f64 {
     }
 }
 
-/// Convert owned f64 to string
-impl RosyToString for f64 {
-    fn rosy_to_string(&self) -> Result<String> {
-        Ok(self.to_string())
-    }
-}
-
 impl RosyToString for &usize {
     fn rosy_to_string(&self) -> Result<String> {
         Ok(self.to_string())
