@@ -9,55 +9,40 @@ use anyhow::{Result, Context};
 
 fn main() -> Result<()> {
     // <INJECT_START>
-	let mut counter: f64 = 0.0;
-	let mut global_message: String = String::new();
-	let mut operation_complete: bool = false;
-	fn INCREMENT_COUNTER ( counter: &mut f64 ) -> Result<()> {
-		*counter = (&*counter).rosy_add((&1f64));
-		println!("{}{}", (String::from("Counter incremented to: ")).rosy_display(), (&*counter).rosy_display());
-		Ok(())
+	let mut X_ST: String = String::new();
+	let mut X_RE: f64 = 0.0;
+	let mut X_VE: Vec<f64> = vec!();
+	let mut X_CM: (f64, f64) = (0.0, 0.0);
+	X_ST = String::from("Hello World").to_owned();
+	println!("{}{}", (String::from("X_ST: ")).rosy_display(), (&X_ST).rosy_display());
+	X_RE = 3f64.to_owned();
+	println!("{}{}", (String::from("X_RE: ")).rosy_display(), ((&X_RE).rosy_to_string().context("...while trying to convert to string!")?).rosy_display());
+	X_VE = ((&X_RE)).concat((&4f64)).to_owned();
+	println!("{}{}", (String::from("X_VE: ")).rosy_display(), (&X_VE).rosy_display());
+	X_CM = X_VE.cm().context("...while trying to convert to a CM!")?.to_owned();
+	println!("{}{}", (String::from("X_CM: ")).rosy_display(), (&X_CM).rosy_display());
+	println!("{}", (String::from("")).rosy_display());
+	X_ST = String::from("Another string").to_owned();
+	fn PLUS_ONE ( A: &f64 ) -> Result<f64> {
+		let mut PLUS_ONE: f64 = 0.0;
+		PLUS_ONE = (&*A).rosy_add((&1f64)).to_owned();
+		Ok(PLUS_ONE)
 	}
-	fn SET_MESSAGE ( message: &String, global_message: &mut String ) -> Result<()> {
-		*global_message = (*message).clone();
-		println!("{}{}", (String::from("Global message set to: ")).rosy_display(), (&*global_message).rosy_display());
-		Ok(())
+	println!("{}{}", (String::from("PLUS_ONE(5): ")).rosy_display(), (PLUS_ONE((&5f64)).with_context(|| format!("...while trying to call function PLUS_ONE!"))?).rosy_display());
+	println!("{}", (String::from("")).rosy_display());
+	let mut X_LO: bool = false;
+	X_LO = true.to_owned();
+	if X_LO {
+		println!("{}", (String::from("X_LO is TRUE")).rosy_display());
+	} else {
+		println!("{}", (String::from("X_LO is FALSE")).rosy_display());
 	}
-	fn MARK_COMPLETE ( operation_complete: &mut bool ) -> Result<()> {
-		*operation_complete = true;
-		println!("{}", (String::from("Operation marked as complete")).rosy_display());
-		Ok(())
+	println!("{}", (String::from("")).rosy_display());
+	let mut STEP: f64 = 0.0;
+	STEP = 2f64.to_owned();
+	for I in ((0f64 as usize)..=(8f64 as usize)).step_by(STEP as usize) {
+		println!("{}{}", (String::from("In loop, index I is: ")).rosy_display(), ((&I).rosy_to_string().context("...while trying to convert to string!")?).rosy_display());
 	}
-	fn DISPLAY_GLOBALS ( counter: &mut f64, global_message: &mut String, operation_complete: &mut bool ) -> Result<()> {
-		println!("{}", (String::from("=== Current Global State ===")).rosy_display());
-		println!("{}{}", (String::from("Counter: ")).rosy_display(), (&*counter).rosy_display());
-		println!("{}{}", (String::from("Message: ")).rosy_display(), (&*global_message).rosy_display());
-		if *operation_complete {
-			println!("{}", (String::from("Status: COMPLETE")).rosy_display());
-		} else {
-			println!("{}", (String::from("Status: INCOMPLETE")).rosy_display());
-		}
-		println!("{}", (String::from("========================")).rosy_display());
-		Ok(())
-	}
-	fn RUN ( counter: &mut f64, global_message: &mut String, operation_complete: &mut bool ) -> Result<()> {
-		*counter = 0f64;
-		*global_message = String::from("Initial message");
-		*operation_complete = false;
-		println!("{}", (String::from("Initial state:")).rosy_display());
-		DISPLAY_GLOBALS(counter, global_message, operation_complete).with_context(|| format!("...while trying to call procedure DISPLAY_GLOBALS!"))?;
-		INCREMENT_COUNTER(counter).with_context(|| format!("...while trying to call procedure INCREMENT_COUNTER!"))?;
-		INCREMENT_COUNTER(counter).with_context(|| format!("...while trying to call procedure INCREMENT_COUNTER!"))?;
-		INCREMENT_COUNTER(counter).with_context(|| format!("...while trying to call procedure INCREMENT_COUNTER!"))?;
-		SET_MESSAGE(&String::from("Hello from global variables!"), global_message).with_context(|| format!("...while trying to call procedure SET_MESSAGE!"))?;
-		MARK_COMPLETE(operation_complete).with_context(|| format!("...while trying to call procedure MARK_COMPLETE!"))?;
-		println!("{}", (String::from("Final state:")).rosy_display());
-		DISPLAY_GLOBALS(counter, global_message, operation_complete).with_context(|| format!("...while trying to call procedure DISPLAY_GLOBALS!"))?;
-		if *operation_complete {
-			println!("{}", (String::from("Operation is complete!")).rosy_display());
-		}
-		Ok(())
-	}
-	RUN(&mut counter, &mut global_message, &mut operation_complete).with_context(|| format!("...while trying to call procedure RUN!"))?;
 	// <INJECT_END>
     
     Ok(())

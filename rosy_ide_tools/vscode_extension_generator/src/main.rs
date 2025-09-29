@@ -47,7 +47,8 @@ impl VSCodeExtensionGenerator {
             "VARIABLE", "BEGIN", "END", "PROCEDURE", "FUNCTION", "RETURNS",
             "WRITE", "READ", "IF", "THEN", "ELSE", "ENDIF", "LOOP", "ENDLOOP",
             "FOR", "TO", "ENDFOR", "WHILE", "ENDWHILE", "RETURN", "CALL",
-            "INTEGER", "REAL", "STRING", "BOOLEAN", "TRUE", "FALSE"
+            "INTEGER", "REAL", "STRING", "BOOLEAN", "TRUE", "FALSE", "ENDFUNCTION",
+            "ENDPROCEDURE"
         ];
         
         self.keywords = keywords.into_iter().map(|s| s.to_string()).collect();
@@ -121,7 +122,7 @@ impl VSCodeExtensionGenerator {
                 ["'", "'"]
             ],
             "indentationRules": {
-                "increaseIndentPattern": "^.*\\{[^}\"']*$|^.*\\([^)\"']*$|^.*\\[[^\\]\"']*$|^.*(BEGIN|THEN|ELSE|LOOP|FOR|WHILE|PROCEDURE|FUNCTION)\\s*$",
+                "increaseIndentPattern": "^.*\\{[^}\"']*$|^.*\\([^)\"']*$|^.*\\[[^\\]\"']*$|^.*(BEGIN|THEN|ELSE|LOOP|FOR|WHILE|PROCEDURE|FUNCTION|ENDFUNCTION|ENDPROCEDURE)\\s*$",
                 "decreaseIndentPattern": "^\\s*(\\}|\\)|\\]|END|ENDIF|ENDLOOP|ENDFOR|ENDWHILE|ELSE).*$"
             }
         })
@@ -192,9 +193,9 @@ impl VSCodeExtensionGenerator {
                             "name": "keyword.control.rosy",
                             "match": format!("\\b({}|{}|{}|{})\\b", 
                                 "BEGIN|END|IF|THEN|ELSE|ENDIF",
-                                "LOOP|ENDLOOP|FOR|TO|ENDFOR", 
+                                "LOOP|ENDLOOP", 
                                 "WHILE|ENDWHILE|RETURN",
-                                "PROCEDURE|FUNCTION|RETURNS|CALL")
+                                "PROCEDURE|FUNCTION|ENDPROCEDURE|ENDFUNCTION")
                         },
                         {
                             "name": "keyword.other.rosy",
@@ -206,7 +207,7 @@ impl VSCodeExtensionGenerator {
                         },
                         {
                             "name": "entity.name.type.rosy",
-                            "match": "\\(\\s*(RE|LO|VE|CM)\\s*\\)"
+                            "match": "\\(\\s*(RE|LO|VE|CM|ST)\\s*\\)"
                         },
                         {
                             "name": "constant.language.rosy",

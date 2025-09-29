@@ -19,6 +19,12 @@ impl RosyToString for f64 {
     }
 }
 
+impl RosyToString for &usize {
+    fn rosy_to_string(&self) -> Result<String> {
+        Ok(self.to_string())
+    }
+}
+
 /// Convert strings to strings (identity)
 impl RosyToString for &String {
     fn rosy_to_string(&self) -> Result<String> {

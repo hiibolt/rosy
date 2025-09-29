@@ -48,7 +48,7 @@
     "keywords": {
       "patterns": [
         {
-          "match": "\\b(BEGIN|END|IF|THEN|ELSE|ENDIF|LOOP|ENDLOOP|FOR|TO|ENDFOR|WHILE|ENDWHILE|RETURN|PROCEDURE|FUNCTION|RETURNS|CALL)\\b",
+          "match": "\\b(BEGIN|END|IF|THEN|ELSE|ENDIF|LOOP|ENDLOOP|WHILE|ENDWHILE|RETURN|PROCEDURE|FUNCTION|ENDPROCEDURE|ENDFUNCTION)\\b",
           "name": "keyword.control.rosy"
         },
         {
@@ -60,7 +60,7 @@
           "name": "entity.name.type.rosy"
         },
         {
-          "match": "\\(\\s*(RE|LO|VE|CM)\\s*\\)",
+          "match": "\\(\\s*(RE|LO|VE|CM|ST)\\s*\\)",
           "name": "entity.name.type.rosy"
         },
         {

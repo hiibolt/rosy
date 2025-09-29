@@ -1,0 +1,81 @@
+BEGIN ;
+    {Here's an old example of the dynamic typing system in COSY}
+    {
+    VARIABLE LX 1 ;
+    VARIABLE X1 LX ;
+
+    X1 := "Hello World" ;
+    WRITE 6 "X1: "&X1&" which is an ST" ;
+    X1 := 3 ;
+    WRITE 6 "X1: "&ST(X1)&" which is an RE" ;
+    X1 := X1 & 4 ;
+    WRITE 6 "X1: "&X1&" which is a VE" ;
+    X1 := CM(X1) ;
+    WRITE 6 "X1: "&X1&" which is a CM" ;
+    }
+
+
+
+    { Unlike this, I'm proposing a statically typed system  }
+    { Note the lack of length specifier, as it's not needed }
+    {  as the Rust compiler infers it at compile time.      }
+    VARIABLE (ST) X_ST ;
+    VARIABLE (RE) X_RE ;
+    VARIABLE (VE) X_VE ;
+    VARIABLE (CM) X_CM ;
+
+    { Print each variable after assignment }
+    X_ST := "Hello World" ;
+    WRITE 6 "X_ST: " X_ST ;
+
+    X_RE := 3 ;
+    WRITE 6 "X_RE: " ST(X_RE) ;
+
+    X_VE := X_RE & 4 ;
+    WRITE 6 "X_VE: " X_VE ;
+
+    X_CM := CM(X_VE) ;
+    WRITE 6 "X_CM: " X_CM ;
+    WRITE 6 "" ;
+
+
+
+    { There are major benefits, namely optimization and the ability to }
+    { trivially parallelize code on the CPU ond GPU, and type checks   }
+    { help catch bugs early.                                           }
+    X_ST := "Another string" ; { OK }
+    {X_ST := 5 ;}              { Error }
+
+
+
+    { Additionally, one of the largest benefits is aggressive compiler }
+    { optimizations, applying even to user-defined functions, which    }
+    { in COSY are dynamically typed - causing massive runtime and      }
+    { preventing the compiler from inlining/optimizing them.           }
+    FUNCTION (RE) PLUS_ONE A (RE) ;
+        PLUS_ONE := A + 1 ;
+    ENDFUNCTION ;
+    WRITE 6 "PLUS_ONE(5): " PLUS_ONE(5) ;
+    WRITE 6 "" ;
+
+
+
+    { Type checks exist on everything, even IF statements... }
+    VARIABLE (LO) X_LO ;
+    X_LO := TRUE ;
+    IF X_LO ; { For example, using X_RE would be an error caught at transpilation time }
+        WRITE 6 "X_LO is TRUE" ;
+    ELSE;
+        WRITE 6 "X_LO is FALSE" ;
+    ENDIF ;
+    WRITE 6 "" ;
+
+
+
+    { ...and LOOPs }
+    VARIABLE (RE) STEP ;
+    STEP := 2 ;
+    LOOP I 0 8 STEP ;
+        WRITE 6 "In loop, index I is: " ST(I) ;
+    ENDLOOP ;
+END ;
