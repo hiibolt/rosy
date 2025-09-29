@@ -47,25 +47,42 @@ impl TranspileContext {
         self.global_variable_types.get(var_name)
     }
 
-    /// Smart reference conversion - converts &mut T to &T when needed for trait calls
-    pub fn smart_reference(&self, expr: &Expr, expr_str: &str) -> String {
+    /// Check if a variable is a mutable reference (procedure parameter or global passed as &mut)
+    fn is_mutable_reference(&self, var_name: &str) -> bool {
+        self.args.contains_key(var_name)
+    }
+
+    /// Get the appropriate reference format for expressions that need immutable references
+    /// Only applies &* conversion for variables that are mutable references
+    fn get_expr_immutable_ref(&self, expr: &Expr, expr_str: &str) -> String {
         match expr {
             Expr::Var(name) => {
-                if self.args.contains_key(name) {
-                    // This is a procedure parameter (&mut T), convert to &T
-                    format!("&*{}", expr_str)
+                if self.is_mutable_reference(name) {
+                    format!("(&*{})", name)
                 } else {
-                    // This is a local/global variable, just add &
-                    format!("&{}", expr_str)
+                    format!("(&{})", name)
                 }
             },
-            // For operations that return owned values (like Extract, StringConvert), just add &
-            Expr::Extract { .. } | Expr::StringConvert { .. } => {
-                format!("(&{})", expr_str)
+            _ => {
+                // For non-variable expressions (function calls, operations, etc.),
+                // don't add extra parentheses around the entire expression
+                format!("&{}", expr_str)
+            }
+        }
+    }
+
+    /// Get the appropriate format for display expressions
+    fn get_display_ref(&self, expr: &Expr, expr_str: &str) -> String {
+        match expr {
+            Expr::Var(name) => {
+                if self.is_mutable_reference(name) {
+                    format!("(&*{}).rosy_display()", name)
+                } else {
+                    format!("(&{}).rosy_display()", name)
+                }
             },
             _ => {
-                // For other complex expressions, just wrap in parentheses and add &
-                format!("(&{})", expr_str)
+                format!("({}).rosy_display()", expr_str)
             }
         }
     }
@@ -166,17 +183,17 @@ impl Transpile for Expr {
                     .context("Failed to convert right expression to string!")?;
                 
                 // For procedure parameters, use &* to convert from &mut to &
-                let left_ref = context.smart_reference(left, &left_str);
-                let right_ref = context.smart_reference(right, &right_str);
+                let left_ref = context.get_expr_immutable_ref(left, &left_str);
+                let right_ref = context.get_expr_immutable_ref(right, &right_str);
                 
-                format!("({}.rosy_add({}))", left_ref, right_ref)
+                format!("{}.rosy_add({})", left_ref, right_ref)
             },
             Expr::Concat { terms } => {
                 let term_strs: Result<Vec<String>> = terms.iter()
                     .map(|term| {
                         let term_str = term.transpile_with_context(context)?;
                         // For procedure parameters, use &* to convert from &mut to &
-                        Ok(context.smart_reference(term, &term_str))
+                        Ok(context.get_expr_immutable_ref(term, &term_str))
                     })
                     .collect();
                 
@@ -192,7 +209,8 @@ impl Transpile for Expr {
                     let arg_st: String = arg.transpile_with_context(context)
                         .context("Failed to convert argument expression to string!")?;
                     // Add reference for function call arguments since functions expect &Cosy
-                    arg_strs.push(format!("&{}", arg_st));
+                    let arg_ref = context.get_expr_immutable_ref(arg, &arg_st);
+                    arg_strs.push(arg_ref);
                 }
                 
                 format!("{}({}).with_context(|| format!(\"...while trying to call function {}!\"))?", name, arg_strs.join(", "), name)
@@ -203,22 +221,9 @@ impl Transpile for Expr {
                 let index_str = index.transpile_with_context(context)
                     .context("Failed to convert extract index to string!")?;
                 
-                // Always use parentheses and smart reference conversion for object
-                let object_ref = match object.as_ref() {
-                    Expr::Var(name) => {
-                        if context.args.contains_key(name) {
-                            format!("(&*{})", name)
-                        } else {
-                            format!("(&{})", name)
-                        }
-                    },
-                    _ => {
-                        format!("({})", object_str)
-                    }
-                };
-                
-                // Smart reference conversion for index
-                let index_ref = context.smart_reference(index, &index_str);
+                // For procedure parameters (mutable references), use &* to get immutable reference
+                let object_ref = context.get_expr_immutable_ref(object, &object_str);
+                let index_ref = context.get_expr_immutable_ref(index, &index_str);
                 
                 format!("{}.rosy_extract({}).context(\"...while trying to extract component!\")?", object_ref, index_ref)
             },
@@ -226,17 +231,17 @@ impl Transpile for Expr {
                 let sub_expr: String = (*expr).transpile_with_context(context)
                     .context("Failed to convert string conversion expression to string!")?;
                 
-                // Always use parentheses and smart reference conversion
+                // For procedure parameters (mutable references), use the correct conversion
                 let expr_ref = match expr.as_ref() {
+                    Expr::Var(name) if context.is_mutable_reference(name) => {
+                        format!("(&*{})", name)
+                    },
                     Expr::Var(name) => {
-                        if context.args.contains_key(name) {
-                            format!("(&*{})", name)
-                        } else {
-                            format!("(&{})", name)
-                        }
+                        format!("(&{})", name)
                     },
                     _ => {
-                        format!("({})", sub_expr)
+                        // For complex expressions, the result is already a value
+                        format!("&{}", sub_expr)
                     }
                 };
                 
@@ -247,6 +252,7 @@ impl Transpile for Expr {
         Ok(res)
     }
 }
+
 impl Transpile for Statement {
     fn transpile_with_context(&self, context: &TranspileContext) -> Result<String> {
         match self {
@@ -312,22 +318,8 @@ impl Transpile for Statement {
                     let expr_st: String = expr.transpile_with_context(context)
                         .context("Failed to convert expression to string!")?;
                     
-                    // Use smart reference conversion for all expressions
-                    let display_expr = match expr {
-                        Expr::Var(name) => {
-                            // For simple variables that are procedure parameters, use &* 
-                            if context.args.contains_key(name) {
-                                format!("(&*{}).rosy_display()", name)
-                            } else {
-                                format!("(&{}).rosy_display()", expr_st)
-                            }
-                        },
-                        _ => {
-                            // For complex expressions, call rosy_display directly since 
-                            // they already return owned values or handle their own referencing
-                            format!("({}).rosy_display()", expr_st)
-                        }
-                    };
+                    // For simple variables that are procedure parameters, use special handling
+                    let display_expr = context.get_display_ref(expr, &expr_st);
                     
                     exprs_sts.push(display_expr);
                 }
@@ -347,10 +339,20 @@ impl Transpile for Statement {
                     .context("Failed to convert assignment value to string!")?;
                 
                 // Check if this is a procedure parameter (already a mutable reference)
-                if context.args.contains_key(name) {
-                    Ok(format!("*{} = {}.to_owned();", name, value_st))
+                if context.is_mutable_reference(name) {
+                    // For mutable references, dereference and assign the value directly
+                    // Handle string type conversion if needed
+                    match value {
+                        Expr::Var(var_name) if context.is_mutable_reference(var_name) => {
+                            // If assigning from another mutable reference, clone it
+                            Ok(format!("*{} = (*{}).clone();", name, var_name))
+                        },
+                        _ => {
+                            Ok(format!("*{} = {};", name, value_st))
+                        }
+                    }
                 } else {
-                    // Local variable or global variable from main scope
+                    // For regular variables, assign with .to_owned()
                     Ok(format!("{} = {}.to_owned();", name, value_st))
                 }
             },
@@ -475,7 +477,8 @@ impl Transpile for Statement {
                     let arg_st: String = arg.transpile_with_context(context)
                         .context("Failed to convert argument expression to string!")?;
                     // Add reference for function call arguments since functions expect &Cosy
-                    arg_strs.push(format!("&{}", arg_st));
+                    let arg_ref = context.get_expr_immutable_ref(arg, &arg_st);
+                    arg_strs.push(arg_ref);
                 }
                 
                 Ok(format!("{}({}).with_context(|| format!(\"...while trying to call function {}!\"))?", name, arg_strs.join(", "), name))

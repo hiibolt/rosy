@@ -232,6 +232,46 @@ impl ProgramAnalyzer {
                     self.analyze_expression_for_globals(arg, local_vars, global_usage);
                 }
             }
+            Statement::If { condition, then_body, elseif_clauses, else_body } => {
+                // Analyze the IF condition for global variable usage
+                self.analyze_expression_for_globals(condition, local_vars, global_usage);
+                
+                // Analyze the THEN body
+                for stmt in then_body {
+                    self.analyze_statement_for_globals(stmt, local_vars, global_usage);
+                }
+                
+                // Analyze ELSEIF clauses
+                for elseif_clause in elseif_clauses {
+                    self.analyze_expression_for_globals(&elseif_clause.condition, local_vars, global_usage);
+                    for stmt in &elseif_clause.body {
+                        self.analyze_statement_for_globals(stmt, local_vars, global_usage);
+                    }
+                }
+                
+                // Analyze ELSE body
+                if let Some(else_statements) = else_body {
+                    for stmt in else_statements {
+                        self.analyze_statement_for_globals(stmt, local_vars, global_usage);
+                    }
+                }
+            }
+            Statement::Loop { iterator, start, end, step, body } => {
+                // Add loop iterator as local variable
+                local_vars.insert(iterator.clone());
+                
+                // Analyze loop bounds for global usage
+                self.analyze_expression_for_globals(start, local_vars, global_usage);
+                self.analyze_expression_for_globals(end, local_vars, global_usage);
+                if let Some(step_expr) = step {
+                    self.analyze_expression_for_globals(step_expr, local_vars, global_usage);
+                }
+                
+                // Analyze loop body
+                for stmt in body {
+                    self.analyze_statement_for_globals(stmt, local_vars, global_usage);
+                }
+            }
             _ => {}
         }
     }
