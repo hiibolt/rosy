@@ -67,11 +67,11 @@ impl TryFrom<&str> for RosyType {
     type Error = anyhow::Error;
     fn try_from( value: &str ) -> Result<RosyType, Self::Error> {
         match value {
-            "(RE)" => Ok(RosyType::RE),
-            "(ST)" => Ok(RosyType::ST),
-            "(LO)" => Ok(RosyType::LO),
-            "(CM)" => Ok(RosyType::CM),
-            "(VE)" => Ok(RosyType::VE),
+            "RE" => Ok(RosyType::RE),
+            "ST" => Ok(RosyType::ST),
+            "LO" => Ok(RosyType::LO),
+            "CM" => Ok(RosyType::CM),
+            "VE" => Ok(RosyType::VE),
             _ => Err(anyhow::anyhow!("Can't convert {} to a ROSY type", value)),
         }
     }

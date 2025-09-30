@@ -1,20 +1,22 @@
 use anyhow::{Result, Context};
 
-use super::super::{Rule, Statement, VariableData};
+use super::super::{Rule, Statement, VariableData, build_type};
 
 pub fn build_var_decl(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
     let mut inner = pair.into_inner();
-    let type_str = inner.next()
-        .context("Missing first token `type` when building var decl!")?
-        .as_str().to_string();
+
+    let (r#type, dimensions) = build_type(
+        inner.next()
+            .context("Missing first token `type`!")?
+    ).context("...while building variable type in variable declaration!")?;
     let name = inner.next()
         .context("Missing second token `variable_name`!")?
         .as_str().to_string();
 
     let variable_data = VariableData {
         name,
-        r#type: type_str.as_str().try_into()
-            .with_context(|| format!("Unknown type: {type_str}"))?
+        r#type,
+        dimensions
     };
 
     Ok(Some(Statement::VarDecl {

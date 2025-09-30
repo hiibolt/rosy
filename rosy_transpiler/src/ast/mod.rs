@@ -1,7 +1,7 @@
 mod statements;
 
 use crate::parsing::{Rule, PRATT_PARSER};
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use rosy_lib::RosyType;
 
 #[derive(Debug)]
@@ -9,10 +9,11 @@ pub struct Program {
     pub statements: Vec<Statement>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct VariableData {
     pub name: String,
-    pub r#type: RosyType
+    pub r#type: RosyType,
+    pub dimensions: Vec<Expr>
 }
 #[derive(Debug)]
 pub enum Statement {
@@ -47,6 +48,28 @@ pub enum Expr {
     Complex { expr: Box<Expr> },
     StringConvert { expr: Box<Expr> },
     FunctionCall { name: String, args: Vec<Expr> },
+}
+
+fn build_type (pair: pest::iterators::Pair<Rule>) -> Result<(RosyType, Vec<Expr>)> {
+    ensure!(pair.as_rule() == Rule::r#type, 
+        "Expected `type` rule when building type, found: {:?}", pair.as_rule());
+        
+    let mut inner_pair = pair.into_inner();
+    let type_str = inner_pair.next()
+        .context("Missing type string when building var decl!")?
+        .as_str().to_string();
+    let mut dimensions = Vec::new();
+    while let Some(dim_pair) = inner_pair.next() {
+        let expr = build_expr(dim_pair)
+            .context("Failed to build dimension expression in variable declaration!")?;
+        dimensions.push(expr);
+    }
+
+    let r#type: RosyType = type_str.as_str()
+        .try_into()
+        .with_context(|| format!("Unknown type: {type_str}"))?;
+
+    Ok((r#type, dimensions))
 }
 
 pub fn build_ast(pair: pest::iterators::Pair<Rule>) -> Result<Program> {

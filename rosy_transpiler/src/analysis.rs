@@ -97,7 +97,7 @@ impl ProgramAnalyzer {
             }
         }
 
-        // Fourth pass: type checking for procedure/function bodies
+        // Fourth pass: type checking for procedure/function/array definition bodies
         for statement in &program.statements {
             match statement {
                 Statement::Procedure { name: _, args, body } => {

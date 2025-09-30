@@ -1,21 +1,19 @@
 use anyhow::{Result, Context, ensure};
 
-use rosy_lib::RosyType;
-use super::super::{Rule, Statement, VariableData, build_statement};
+use super::super::{Rule, Statement, VariableData, build_statement, build_type};
 
 pub fn build_function(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
     let mut inner = pair.into_inner();
-    let (return_type, name, args) = {
+    let (return_type, return_dimensions, name, args) = {
         let mut start_function_inner = inner
             .next()
             .context("Missing first token `start_function`!")?
             .into_inner();
 
-        let type_str = start_function_inner.next()
-            .context("Missing return type in function declaration!")?
-            .as_str().to_string();
-        let return_type: RosyType = type_str.as_str().try_into()
-            .with_context(|| format!("Unknown type: {type_str}"))?;
+        let (return_type, return_dimensions) = build_type(
+            start_function_inner.next()
+                .context("Missing return type for function!")?
+        ).context("...while building function return type!")?;
 
         let name = start_function_inner.next()
             .context("Missing function name!")?
@@ -32,28 +30,28 @@ pub fn build_function(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statem
                 "Expected function argument name, found: {:?}", arg_pair.as_rule());
             let name = arg_pair.as_str();
 
-            let next_arg_pair = start_function_inner.next()
-                .context(format!("Missing type for function argument: {}", name))?;
-            ensure!(next_arg_pair.as_rule() == Rule::r#type, 
-                "Expected type for function argument, found: {:?}", next_arg_pair.as_rule());
-            let type_str = next_arg_pair.as_str();
+            let (argument_type, argument_dimensions) = build_type(
+                start_function_inner.next()
+                    .context(format!("Missing type for function argument: {}", name))?
+            ).context("...while building function argument type!")?;
 
-            let variable_data = VariableData {
+            let argument_data = VariableData {
                 name: name.to_string(),
-                r#type: type_str.try_into()
-                    .with_context(|| format!("Unknown type: {type_str}"))?
+                r#type: argument_type,
+                dimensions: argument_dimensions
             };
-            args.push(variable_data);
+            args.push(argument_data);
         }
 
-        (return_type, name, args)
+        (return_type, return_dimensions, name, args)
     };
 
     let body = {
         let mut statements = vec!(
             Statement::VarDecl { data: VariableData {
                 name: name.clone(),
-                r#type: return_type.clone()
+                r#type: return_type,
+                dimensions: return_dimensions
             } }
         );
 

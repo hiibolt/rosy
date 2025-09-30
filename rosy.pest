@@ -81,8 +81,8 @@ endif = { "ENDIF" ~ semicolon }
   /// ST - String conversion
   st = { "ST(" ~ expr ~ ")" }
 /// [ INTRINSIC TYPES ]
-  type = @{ "(" ~ inner_type ~ ")"}
-  inner_type = _{
+  type = { "(" ~ inner_type ~ expr* ~ ")"}
+  inner_type = {
     "RE" |
     "LO" |
     "VE" |

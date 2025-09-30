@@ -291,16 +291,26 @@ impl Transpile for Statement {
             },
             Statement::VarDecl { data, .. } => {
                 let rust_type = data.r#type.as_rust_type();
+                let mut type_body = rust_type.to_string();
+                for _ in &data.dimensions {
+                    type_body = format!("Vec<{}>", type_body);
+                }
 
                 let default_init = match data.r#type {
-                    RosyType::VE => " = vec!()",
-                    RosyType::RE => " = 0.0",
-                    RosyType::ST => " = String::new()",
-                    RosyType::LO => " = false",
-                    RosyType::CM => " = (0.0, 0.0)",
+                    RosyType::VE => "vec!()",
+                    RosyType::RE => "0.0",
+                    RosyType::ST => "String::new()",
+                    RosyType::LO => "false",
+                    RosyType::CM => "(0.0, 0.0)",
                 };
+                let mut default_init_body = default_init.to_string();
+                for expr in &data.dimensions {
+                    let expr_str = expr.transpile_with_context(context)
+                        .context("Failed to convert dimension expression to string!")?;
+                    default_init_body = format!("vec![{}; ({}) as usize]", default_init_body, expr_str);
+                }
 
-                Ok(format!("let mut {}: {}{};", data.name, rust_type, default_init))
+                Ok(format!("let mut {}: {} = {};", data.name, type_body, default_init_body))
             },
             Statement::Write { unit, exprs } => {
                 let mut exprs_sts = Vec::new();

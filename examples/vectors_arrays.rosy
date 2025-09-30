@@ -1,0 +1,10 @@
+BEGIN;
+    {Main procedure}
+    PROCEDURE RUN;
+        VARIABLE (RE 1 2 3 4) X;
+        WRITE 6 "X: " X;
+    ENDPROCEDURE;
+    
+    {Call the main procedure}
+    RUN;
+END;
