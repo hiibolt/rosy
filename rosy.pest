@@ -90,11 +90,12 @@ endif = { "ENDIF" ~ semicolon }
     "ST" }
 
 /// Assignment
-assignment  = { identifier ~ ":=" ~ expr ~ semicolon }
+assignment  = { (indexed_identifier | identifier) ~ ":=" ~ expr ~ semicolon }
 
 // Expression parsing using Pratt parser
 expr = { term ~ (infix_op ~ term)* }
 term = _{ 
+    indexed_identifier |
     builtin_function | 
     function_call |
     boolean |
@@ -112,6 +113,7 @@ extract     = { "|" }
 add         = { "+" }
 concat      = { "&" }
 
+indexed_identifier =   { identifier ~ "[" ~ expr ~ ("," ~ expr)* ~ "]" }
 identifier  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
 number      = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 unit        = @{ ASCII_DIGIT+ }

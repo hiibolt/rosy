@@ -240,6 +240,16 @@ impl Transpile for Expr {
                 
                 format!("{}.rosy_to_string().context(\"...while trying to convert to string!\")?", expr_ref)
             },
+            Expr::VarIndexing { name, indices } => {
+                let mut result = name.clone();
+                for index in indices {
+                    let index_str = index.transpile_with_context(context)
+                        .context("Failed to convert index expression to string!")?;
+                    let index_ref = context.get_expr_immutable_ref(index, &index_str);
+                    result = format!("{}[(*({}) - 1.0) as usize]", result, index_ref);
+                }
+                result
+            }
         };
 
         Ok(res)
@@ -283,9 +293,9 @@ impl Transpile for Statement {
                 };
                 
                 Ok(format!(
-                    "for {} in {} {{\n{}\n}}",
-                    iterator,
-                    loop_iterator,
+                    "for {} in {} {{\n\tlet mut {} = {} as f64;\n{}\n}}",
+                    iterator, loop_iterator,
+                    iterator, iterator,
                     body_stmts.join("\n")
                 ))
             },
@@ -304,7 +314,7 @@ impl Transpile for Statement {
                     RosyType::CM => "(0.0, 0.0)",
                 };
                 let mut default_init_body = default_init.to_string();
-                for expr in &data.dimensions {
+                for expr in data.dimensions.iter().rev() {
                     let expr_str = expr.transpile_with_context(context)
                         .context("Failed to convert dimension expression to string!")?;
                     default_init_body = format!("vec![{}; ({}) as usize]", default_init_body, expr_str);
@@ -337,9 +347,17 @@ impl Transpile for Statement {
                 ensure!(*unit == 5, "Only READ with unit 5 (stdin) is supported so far!");
                 Ok(format!("{} = from_stdin().context(\"...while trying to read from stdin!\")?;", name))
             },
-            Statement::Assign { name, value } => {
+            Statement::Assign { name, value, indicies } => {
                 let value_st = value.transpile_with_context(context)
                     .context("Failed to convert assignment value to string!")?;
+
+                let mut indicies_str = String::new();
+                for index in indicies {
+                    let index_str = index.transpile_with_context(context)
+                        .context("Failed to convert index expression to string!")?;
+                    let index_ref = context.get_expr_immutable_ref(index, &index_str);
+                    indicies_str += &format!("[(*({}) - 1.0) as usize]", index_ref);
+                }
                 
                 // Check if this is a procedure parameter (already a mutable reference)
                 if context.is_mutable_reference(name) {
@@ -348,15 +366,15 @@ impl Transpile for Statement {
                     match value {
                         Expr::Var(var_name) if context.is_mutable_reference(var_name) => {
                             // If assigning from another mutable reference, clone it
-                            Ok(format!("*{} = (*{}).clone();", name, var_name))
+                            Ok(format!("(*{}){indicies_str} = (*{}).clone();", name, var_name))
                         },
                         _ => {
-                            Ok(format!("*{} = {};", name, value_st))
+                            Ok(format!("(*{}){indicies_str} = {};", name, value_st))
                         }
                     }
                 } else {
                     // For regular variables, assign with .to_owned()
-                    Ok(format!("{} = {}.to_owned();", name, value_st))
+                    Ok(format!("{}{indicies_str} = {}.to_owned();", name, value_st))
                 }
             },
             Statement::Procedure {

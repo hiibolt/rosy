@@ -50,9 +50,3 @@ impl RosyDisplay for &str {
         self.to_string()
     }
 }
-
-impl RosyDisplay for String {
-    fn rosy_display(self) -> String {
-        self
-    }
-}

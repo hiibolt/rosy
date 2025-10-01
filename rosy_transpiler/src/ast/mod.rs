@@ -20,7 +20,7 @@ pub enum Statement {
     VarDecl { data: VariableData },
     Write { unit: u8, exprs: Vec<Expr> },
     Read { unit: u8, name: String },
-    Assign { name: String, value: Expr },
+    Assign { name: String, value: Expr, indicies: Vec<Expr> },
     Procedure { name: String, args: Vec<VariableData>, body: Vec<Statement> },
     ProcedureCall { name: String, args: Vec<Expr> },
     Function { name: String, args: Vec<VariableData>, return_type: RosyType, body: Vec<Statement> },
@@ -41,6 +41,7 @@ pub enum Expr {
     String(String),
     Boolean(bool),
     Var(String),
+    VarIndexing { name: String, indices: Vec<Expr> },
     Add { left: Box<Expr>, right: Box<Expr> },
     Concat { terms: Vec<Expr> },
     Extract { object: Box<Expr>, index: Box<Expr> },
@@ -100,7 +101,7 @@ fn build_statement (
         Rule::function => statements::build_function(pair).context("...while building function declaration!"),
         Rule::function_call => statements::build_function_call(pair).context("...while building function call!"),
         Rule::if_statement => statements::build_if(pair).context("...while building if statement!"),
-        
+
         // Ignored
         Rule::begin | Rule::end | Rule::EOI | Rule::end_procedure | 
         Rule::end_function | Rule::end_loop | Rule::endif => Ok(None),
@@ -108,9 +109,49 @@ fn build_statement (
     }
 }
 
+fn build_indexed_identifier(pair: pest::iterators::Pair<Rule>) -> Result<(String, Vec<Expr>)> {
+    ensure!(pair.as_rule() == Rule::indexed_identifier, 
+        "Expected `indexed_identifier` rule when building indexed identifier, found: {:?}", pair.as_rule());
+        
+    let mut inner = pair.into_inner();
+    let name = inner.next()
+        .context("Missing variable name in indexed identifier!")?
+        .as_str().to_string();
+    
+    let indices = {
+        let mut indices = Vec::new();
+        while let Some(index_pair) = inner.next() {
+            let expr = build_expr(index_pair)
+                .context("Failed to build expression in indexed identifier!")?;
+            indices.push(expr);
+        }
+        indices
+    };
+
+    Ok((name, indices))
+}
+
 fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
+            Rule::indexed_identifier => {
+                let mut inner = primary.into_inner();
+                let name = inner.next()
+                    .context("Missing variable name in indexed identifier!")?
+                    .as_str().to_string();
+                
+                let indices = {
+                    let mut indices = Vec::new();
+                    while let Some(index_pair) = inner.next() {
+                        let expr = build_expr(index_pair)
+                            .context("Failed to build expression in indexed identifier!")?;
+                        indices.push(expr);
+                    }
+                    indices
+                };
+
+                Ok(Expr::VarIndexing { name, indices })
+            },
             Rule::function_call => {
                 let mut inner = primary.into_inner();
                 let name = inner.next()

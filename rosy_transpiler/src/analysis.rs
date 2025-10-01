@@ -17,7 +17,7 @@ pub fn analyze_program(program: &Program) -> Result<()> {
 
 pub struct ProgramAnalyzer {
     // Variable type tracking
-    variable_types: HashMap<String, RosyType>,
+    variable_types: HashMap<String, VariableData>,
     // Procedure/function signatures
     procedure_signatures: HashMap<String, Vec<VariableData>>,
     function_signatures: HashMap<String, (RosyType, Vec<VariableData>)>,
@@ -50,7 +50,7 @@ impl ProgramAnalyzer {
             match statement {
                 Statement::VarDecl { data } => {
                     self.global_variables.insert(data.name.clone());
-                    self.define_variable(&data.name, data.r#type.clone());
+                    self.define_variable(&data.name, data.clone());
                 }
                 Statement::Procedure { name, args, .. } => {
                     self.procedure_signatures.insert(name.clone(), args.clone());
@@ -195,11 +195,17 @@ impl ProgramAnalyzer {
                 // Local variable declaration
                 local_vars.insert(data.name.clone());
             }
-            Statement::Assign { name, value } => {
+            Statement::Assign { name, value, indicies } => {
                 // Check if we're assigning to a global variable
                 if self.global_variables.contains(name) && !local_vars.contains(name) {
                     global_usage.insert(name.clone());
                 }
+
+                // Analyze the index expressions
+                for expr in indicies {
+                    self.analyze_expression_for_globals(expr, local_vars, global_usage);
+                }
+
                 // Analyze the expression for global variable usage
                 self.analyze_expression_for_globals(value, local_vars, global_usage);
             }
@@ -325,8 +331,8 @@ impl ProgramAnalyzer {
             .unwrap_or_default()
     }
 
-    fn define_variable(&mut self, name: &str, var_type: RosyType) {
-        self.variable_types.insert(name.to_string(), var_type);
+    fn define_variable(&mut self, name: &str, var_data: VariableData) {
+        self.variable_types.insert(name.to_string(), var_data);
     }
 
     fn is_variable_defined(&self, name: &str) -> bool {
@@ -334,7 +340,7 @@ impl ProgramAnalyzer {
     }
 
     fn get_variable_type(&self, name: &str) -> Option<RosyType> {
-        self.variable_types.get(name).cloned()
+        self.variable_types.get(name).map(|data| data.r#type.clone())
     }
 
     fn analyze_procedure_call(&mut self, name: &str, args: &[Expr]) {
@@ -394,11 +400,19 @@ impl ProgramAnalyzer {
             Expr::StringConvert { expr } => {
                 self.analyze_expression(expr);
             },
+            Expr::VarIndexing { name, indices } => {
+                if !self.is_variable_defined(name) {
+                    self.add_error(format!("Variable '{}' is not defined in expression", name));
+                }
+                for index in indices {
+                    self.analyze_expression(index);
+                }
+            }
         }
     }
 
     /// Recursively determine the type of an expression
-    fn _get_expression_type(&mut self, expr: &Expr) -> Option<RosyType> {
+    fn get_expression_type(&mut self, expr: &Expr) -> Option<RosyType> {
         match expr {
             Expr::Number(_) => Some(RosyType::RE),
             Expr::String(_) => Some(RosyType::ST),
@@ -417,7 +431,7 @@ impl ProgramAnalyzer {
             Expr::Concat { terms } => {
                 // Check if all terms are strings - if so, return ST, otherwise VE
                 let all_strings = terms.iter().all(|term| {
-                    if let Some(term_type) = self._get_expression_type(term) {
+                    if let Some(term_type) = self.get_expression_type(term) {
                         term_type == RosyType::ST
                     } else {
                         false
@@ -440,7 +454,7 @@ impl ProgramAnalyzer {
             },
             Expr::Extract { object, index: _ } => {
                 // Extract operation returns different types based on the object type
-                if let Some(object_type) = self._get_expression_type(object) {
+                if let Some(object_type) = self.get_expression_type(object) {
                     match object_type {
                         RosyType::ST => Some(RosyType::ST), // String extraction returns string
                         RosyType::VE => Some(RosyType::RE), // Vector extraction returns real
@@ -455,6 +469,9 @@ impl ProgramAnalyzer {
                 // ST() always returns string type regardless of input
                 Some(RosyType::ST)
             },
+            Expr::VarIndexing { name, .. } => {
+                self.get_variable_type(name)
+            }
         }
     }
 
@@ -465,7 +482,7 @@ impl ProgramAnalyzer {
         
         // Add procedure arguments to scope
         for arg in args {
-            self.define_variable(&arg.name, arg.r#type.clone());
+            self.define_variable(&arg.name, arg.clone());
         }
         
         // Analyze each statement in the procedure body
@@ -477,13 +494,13 @@ impl ProgramAnalyzer {
         self.variable_types = original_vars;
     }
 
-    fn analyze_function_body_types(&mut self, args: &[VariableData], body: &[Statement], return_type: &RosyType) {
+    fn analyze_function_body_types(&mut self, args: &[VariableData], body: &[Statement], _return_type: &RosyType) {
         // Create local scope with function arguments
         let original_vars = self.variable_types.clone();
         
         // Add function arguments to scope
         for arg in args {
-            self.define_variable(&arg.name, arg.r#type.clone());
+            self.define_variable(&arg.name, arg.clone());
         }
         
         // Analyze each statement in the function body
@@ -492,19 +509,17 @@ impl ProgramAnalyzer {
         }
         
         // Check for return statements and validate return type
-        let mut _has_return = false;
+        /* i lowkey think i superceded this with improvements, but should test later. todo!();
         for stmt in body {
-            if let Statement::Assign { name, value } = stmt {
+            if let Statement::Assign { name, value, indicies } = stmt {
                 // In ROSY, functions return by assigning to the function name
                 if let Some((_func_return_type, _)) = self.function_signatures.iter()
                     .find(|(_, (_, func_args))| func_args == args)
                     .map(|(_, (ret_type, func_args))| (ret_type, func_args))
                 {
                     if self.function_signatures.iter().any(|(func_name, (_, _))| func_name == name) {
-                        _has_return = true;
-                        
                         // Check that return value type matches function return type
-                        if let Some(value_type) = self._get_expression_type(value) {
+                        if let Some(value_type) = self.get_expression_type(value) {
                             if value_type != *return_type {
                                 self.add_error(format!(
                                     "Function return type mismatch: expected {:?}, found {:?}",
@@ -515,7 +530,7 @@ impl ProgramAnalyzer {
                     }
                 }
             }
-        }
+        } */
         
         // Note: We don't require explicit return statements in ROSY functions
         // as they can return by assigning to the function name
@@ -527,7 +542,7 @@ impl ProgramAnalyzer {
     fn analyze_statement_types(&mut self, stmt: &Statement) {
         match stmt {
             Statement::VarDecl { data } => {
-                self.define_variable(&data.name, data.r#type.clone());
+                self.define_variable(&data.name, data.clone());
             }
             Statement::Write { exprs, .. } => {
                 for expr in exprs {
@@ -539,16 +554,25 @@ impl ProgramAnalyzer {
                     self.add_error(format!("Variable '{}' is not defined in READ statement", name));
                 }
             }
-            Statement::Assign { name, value } => {
+            Statement::Assign { name, value, indicies } => {
                 // Check if variable is defined
                 if !self.is_variable_defined(name) {
                     self.add_error(format!("Variable '{}' is not defined in assignment", name));
                     return;
                 }
+
+                // Check that each index expression is an RE
+                for index_expr in indicies {
+                    if let Some(index_type) = self.get_expression_type(index_expr) {
+                        if index_type != RosyType::RE {
+                            self.add_error(format!("Array index must be of type RE, found {:?}", index_type));
+                        }
+                    }
+                }
                 
                 // Check type compatibility
                 if let Some(var_type) = self.get_variable_type(name) {
-                    if let Some(expr_type) = self._get_expression_type(value) {
+                    if let Some(expr_type) = self.get_expression_type(value) {
                         if var_type != expr_type {
                             self.add_error(format!(
                                 "Type mismatch in assignment to '{}': expected {:?}, found {:?}",
@@ -557,6 +581,7 @@ impl ProgramAnalyzer {
                         }
                     }
                 }
+
                 
                 self.analyze_expression(value);
             }
@@ -573,7 +598,7 @@ impl ProgramAnalyzer {
             }
             Statement::If { condition, then_body, elseif_clauses, else_body } => {
                 // Check that IF condition is boolean
-                if let Some(condition_type) = self._get_expression_type(condition) {
+                if let Some(condition_type) = self.get_expression_type(condition) {
                     if condition_type != RosyType::LO {
                         self.add_error(format!("IF condition must be of type LO (boolean), found {:?}", condition_type));
                     }
@@ -587,7 +612,7 @@ impl ProgramAnalyzer {
                 
                 // Analyze ELSEIF clauses
                 for elseif_clause in elseif_clauses {
-                    if let Some(condition_type) = self._get_expression_type(&elseif_clause.condition) {
+                    if let Some(condition_type) = self.get_expression_type(&elseif_clause.condition) {
                         if condition_type != RosyType::LO {
                             self.add_error(format!("ELSEIF condition must be of type LO (boolean), found {:?}", condition_type));
                         }
@@ -608,21 +633,25 @@ impl ProgramAnalyzer {
             }
             Statement::Loop { iterator, start, end, step, body } => {
                 // Loop iterator should be RE type
-                self.define_variable(iterator, RosyType::RE);
+                self.define_variable(iterator, VariableData { 
+                    name: iterator.clone(), 
+                    r#type: RosyType::RE, 
+                    dimensions: vec![]
+                });
                 
                 // Start, end, and step should be RE type
-                if let Some(start_type) = self._get_expression_type(start) {
+                if let Some(start_type) = self.get_expression_type(start) {
                     if start_type != RosyType::RE {
                         self.add_error(format!("LOOP start value must be of type RE, found {:?}", start_type));
                     }
                 }
-                if let Some(end_type) = self._get_expression_type(end) {
+                if let Some(end_type) = self.get_expression_type(end) {
                     if end_type != RosyType::RE {
                         self.add_error(format!("LOOP end value must be of type RE, found {:?}", end_type));
                     }
                 }
                 if let Some(step_expr) = step {
-                    if let Some(step_type) = self._get_expression_type(step_expr) {
+                    if let Some(step_type) = self.get_expression_type(step_expr) {
                         if step_type != RosyType::RE {
                             self.add_error(format!("LOOP step value must be of type RE, found {:?}", step_type));
                         }
