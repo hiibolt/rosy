@@ -1,0 +1,138 @@
+BEGIN;
+{******************************************************************************
+* COSY DATA TYPE BRIEF DEMO - Updated for new ROSY syntax
+* Demonstrates basic data types: RE, ST, LO, VE, CM
+* DA and CD functionality commented out (not yet implemented)
+* Includes unimplemented operators for TDD testing
+******************************************************************************}
+
+{Global variables}
+VARIABLE (RE) NO;
+VARIABLE (RE) NV; 
+VARIABLE (RE) LX;
+{Global demo variables}
+VARIABLE (ST) X1;
+VARIABLE (ST) X2; 
+VARIABLE (ST) X3;
+VARIABLE (CM) IM;
+VARIABLE (CM) COMPLEX_X1; {Complex variable for demos}
+VARIABLE (RE) A;
+VARIABLE (RE) B;
+
+{Pause procedure for user interaction - modified for automated testing}
+PROCEDURE PAUSE;
+    VARIABLE (RE) I;
+    WRITE 6 "[PAUSE - press ENTER to continue in interactive mode]";
+    {read 5 I;}
+ENDPROCEDURE;
+
+{String manipulation demo}
+PROCEDURE COSYST;
+    WRITE 6 "";
+    WRITE 6 "** ROSY Strings **";
+    WRITE 6 "";
+    X1 := "Hello World!";
+    {Extraction and concatenation - TDD: These operators need implementation}
+    {X2 := X1|(7&8);} {String extraction by range - not implemented yet}
+    {X2 := X2&(X1|7)&(X1|LENGTH(X1));} {String indexing and LENGTH function - not implemented yet}
+    X2 := "World" & " " & "Hello";
+    WRITE 6 X2 " " X1;
+    WRITE 6 "";
+    WRITE 6 "The above string was crafted by basic concatenation.";
+    PAUSE;
+ENDPROCEDURE;
+
+{Logical operations demo}
+PROCEDURE COSYLO;
+    VARIABLE (LO) L1;
+    VARIABLE (LO) L2;
+    WRITE 6 "";
+    WRITE 6 "** ROSY Logicals **";
+    WRITE 6 "";
+    L1 := TRUE;
+    L2 := FALSE;
+    {TDD: Logical operations need implementation}
+    {WRITE 6 "(" ST(L1) ")*(" ST(L2) ") is " ST(L1*L2);} {Logical AND (*) and ST() conversion - not implemented}
+    {WRITE 6 "(" ST(L1) ")+(" ST(L2) ") is " ST(L1+L2);} {Logical OR (+) and ST() conversion - not implemented}
+    IF L1;
+        WRITE 6 "L1 is TRUE";
+    ENDIF;
+    IF L2;
+        WRITE 6 "L2 is TRUE";
+    ELSE;
+        WRITE 6 "L2 is FALSE";
+    ENDIF;
+    PAUSE;
+ENDPROCEDURE;
+
+{Complex numbers demo}
+PROCEDURE COSYCM;
+    WRITE 6 "";
+    WRITE 6 "** ROSY Complex numbers **";
+    WRITE 6 "";
+    IM := CM(0 & 1);
+    COMPLEX_X1 := CM(A & B);
+    {ST() conversion function now works!}
+    WRITE 6 "IM := CM(0&1) is " ST(IM) "  : imaginary unit";
+    WRITE 6 "COMPLEX_X1 := CM(A&B) is " ST(COMPLEX_X1);
+    WRITE 6 "";
+    {Complex extraction operators now work!}
+    WRITE 6 "Extracting the real      part of COMPLEX_X1: " ST(COMPLEX_X1|1);
+    WRITE 6 "Extracting the imaginary part of COMPLEX_X1: " ST(COMPLEX_X1|2);
+    PAUSE;
+ENDPROCEDURE;
+
+{Vector operations demo}
+PROCEDURE COSYVE;
+    VARIABLE (VE) V1;
+    VARIABLE (VE) V2;
+    WRITE 6 "";
+    WRITE 6 "** ROSY Vectors **";
+    WRITE 6 "";
+    V1 := A & B;
+    V2 := V1 & V1;
+    WRITE 6 "V1 := A & B creates: " V1;
+    WRITE 6 "V2 := V1 & V1 creates: " V2;
+    WRITE 6 "";
+    {TDD: Vector extraction operators need implementation}
+    {WRITE 6 "Extracting component 3 from V2:" V2|3;}
+    {WRITE 6 "Extracting components 2 to 4 from V2:" V2|(2&4);}
+    WRITE 6 "Vector extraction operators not yet implemented";
+    PAUSE;
+ENDPROCEDURE;
+
+{Main program procedure}
+PROCEDURE RUN;
+    {Initialize variables and run demos}
+    A := 2;
+    B := 3;
+    WRITE 6 "";
+    WRITE 6 "A=" A "  B=" B;
+    WRITE 6 "";
+    
+    COSYST;
+    COSYLO;
+    COSYCM;
+    COSYVE;
+    
+    {DA and CD demos commented out for future implementation}
+    {DAINI NO NV 0 NM;} {DA initialization - not implemented yet}
+    {COSYDA;}
+    {COSYCD;}
+ENDPROCEDURE;
+
+{Initialize global variables}
+NO := 3;  {order for DA operations}
+NV := 2;  {dimension for DA operations}
+{TDD: VMAX, LST, LCD functions need implementation}
+{LX := VMAX(LST(80) & LCD(NO&NV));} {Complex variable size calculation - not implemented}
+LX := 80; {Simple assignment for now}
+
+{TDD: String extraction operators need implementation}
+{WRITE 6 "The estimated variable size LX is " (ST(LX)|(1&8));}
+WRITE 6 "The estimated variable size LX is " LX;
+
+{Call main procedure}
+RUN;
+
+END;

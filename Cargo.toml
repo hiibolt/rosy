@@ -1,11 +1,20 @@
-[package]
-name = "cosyrs"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "3"
+members = [ "rosy_lib",
+    "rosy_transpiler",
+    "rosy_lib",
+    "rosy_output",
+    "rosy_ide_tools/vscode_extension_generator"
+]
 
-[dependencies]
-anyhow = "1.0.99"
+[workspace.dependencies]
+anyhow = "1.0"
 pest = "2.7"
 pest_derive = "2.7"
 lazy_static = "1.4"
-colored = "3.0.0"
+rosy_lib = { path = "rosy_lib" }
+impls = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
+serial_test = "3.2"
+mpi = "0.8"

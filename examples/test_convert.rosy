@@ -1,0 +1,27 @@
+BEGIN;
+{Test the ST() string conversion function}
+
+VARIABLE (RE) test_real;
+VARIABLE (ST) test_string;
+VARIABLE (LO) test_bool;
+VARIABLE (VE) test_vector;
+VARIABLE (CM) test_complex;
+
+{Test converting different types to strings}
+test_real := 42.5;
+test_string := "Hello World";
+test_bool := TRUE;
+test_vector := 1 & 2 & 3;
+test_complex := CM(3 & 4);
+
+WRITE 6 "Real to string: " ST(test_real);
+WRITE 6 "String to string: " ST(test_string);
+WRITE 6 "Boolean to string: " ST(test_bool);
+WRITE 6 "Vector to string: " ST(test_vector);
+WRITE 6 "Complex to string: " ST(test_complex);
+
+{Test with literals}
+WRITE 6 "Literal real: " ST(99);
+WRITE 6 "Literal boolean: " ST(FALSE);
+
+END;

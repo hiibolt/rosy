@@ -1,0 +1,47 @@
+BEGIN;
+    {Function to add two numbers}
+    FUNCTION (RE) ADDTWONUMS X (RE) Y (RE);
+        WRITE 6 "X: " X;
+        WRITE 6 "Y: " Y;
+        VARIABLE (VE) Z;
+        ADDTWONUMS := X + Y;
+    ENDFUNCTION;
+
+    {Procedure to print seven numbers}
+    PROCEDURE PRINTSEVENNUMS;
+        VARIABLE (VE) X;
+        VARIABLE (VE) Y;
+        Y := Y & 8;
+        X := (0 + 1) & 2 & 3 & 4 & 5 & 6 & 7 & Y;
+        WRITE 6 X;
+    ENDPROCEDURE;
+
+    {Procedure to print a complex number}
+    PROCEDURE PRINTACOMPLEXNUM;
+        VARIABLE (VE) X;
+        VARIABLE (CM) Y;
+        X := 2 & 1;
+        Y := CM(X);
+        WRITE 6 Y;
+    ENDPROCEDURE;
+
+    {Main procedure}
+    PROCEDURE RUN;
+        VARIABLE (RE) X;
+        VARIABLE (RE) Y;
+        X := 3;
+        Y := 4;
+        WRITE 6 "Summation of 3 and 4: " ADDTWONUMS(X,Y);
+        
+        PRINTSEVENNUMS;
+        PRINTACOMPLEXNUM;
+
+        VARIABLE (RE) I;
+        LOOP I 0 4 2;
+            WRITE 6 I;
+        ENDLOOP;
+    ENDPROCEDURE;
+    
+    {Call the main procedure}
+    RUN;
+END;

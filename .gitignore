@@ -1,8 +1,6 @@
 /target
-/assets/rust/target
-
 /.direnv
 .envrc
-
-/outputs/*
-!/outputs/makefile
+*/target
+/outputs
+cosy-spec.md
