@@ -1,6 +1,6 @@
 use crate::ast::*;
-use super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
-use std::collections::HashSet;
+use super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, VariableScope};
+use std::collections::BTreeSet;
 use anyhow::{Result, Error, anyhow};
 
 impl Transpile for Expr {
@@ -10,19 +10,29 @@ impl Transpile for Expr {
         match self {
             Expr::Number(n) => Ok(TranspilationOutput {
                 serialization: format!("&{n}f64"),
-                requested_variables: HashSet::new(),
+                requested_variables: BTreeSet::new(),
+            }),
+            Expr::String(s) => Ok(TranspilationOutput {
+                serialization: format!("&\"{}\".to_string()", s.replace('"', "\\\"")),
+                requested_variables: BTreeSet::new(),
             }),
             Expr::Var(name) => {
-                let leveled_var_data = context.variables.get(name)
+                let scoped_var_data = context.variables.get(name)
                     .ok_or(vec!(anyhow!("Variable '{}' is not defined in this scope!", name)))?;
 
                 let mut serialization = name.clone();
-                let mut requested_variables = HashSet::new();
-                if leveled_var_data.levels_above > 0 {
-                    serialization = format!("(&*{serialization})");
-                    requested_variables.insert(name.clone());
-                } else {
-                    serialization = format!("&{serialization}");
+                let mut requested_variables = BTreeSet::new();
+                match scoped_var_data.scope {
+                    VariableScope::Higher => {
+                        serialization = format!("(&*{serialization})");
+                        requested_variables.insert(name.clone());
+                    },
+                    VariableScope::Arg => {
+                        serialization = format!("(&*{serialization})");
+                    },
+                    VariableScope::Local => {
+                        serialization = format!("&{serialization}");
+                    }
                 }
                 
                 Ok(TranspilationOutput {
@@ -45,7 +55,7 @@ impl Transpile for Expr {
                 // Then, transpile both sides and combine
                 let mut serialization = String::new();
                 let mut errors = Vec::new();
-                let mut requested_variables = HashSet::new();
+                let mut requested_variables = BTreeSet::new();
 
                 // Transpile left
                 match left.transpile(context) {
@@ -83,6 +93,45 @@ impl Transpile for Expr {
                 } else {
                     Err(errors)
                 }
+            },
+            Expr::StringConvert { expr } => {
+                // First, ensure the type is convertible to ST
+                let expr_type = expr.type_of(context)
+                    .map_err(|e| vec!(e))?;
+                if rosy_lib::intrinsics::st::get_return_type(&expr_type).is_none() {
+                    return Err(vec!(anyhow!(
+                        "Cannot convert type '{}' to 'ST'!", expr_type
+                    )));
+                }
+
+                // Then, transpile the expression
+                let TranspilationOutput {
+                    serialization: expr_serialization,
+                    requested_variables
+                } = expr.transpile(context)
+                    .map_err(|e| e.into_iter().map(|err| {
+                        err.context("...while transpiling expression for STRING conversion")
+                    }).collect::<Vec<Error>>())?;
+
+                // Finally, serialize the conversion
+                let serialization = format!("({}).rosy_to_string()", expr_serialization);
+                Ok(TranspilationOutput {
+                    serialization,
+                    requested_variables
+                })
+            },
+            Expr::FunctionCall { name, args } => {
+                let function_call_statement = FunctionCallStatement {
+                    name: name.clone(),
+                    args: args.clone()
+                };
+                let mut output = function_call_statement
+                    .transpile(context)
+                    .map_err(|e| e.into_iter().map(|err| {
+                        err.context(format!("...while transpiling function call to '{}'", name))
+                    }).collect::<Vec<Error>>())?;
+                output.serialization = format!("&{}", output.serialization);
+                Ok(output)
             }
             _ => todo!()
         }

@@ -1,7 +1,7 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
-use crate::ast::*;
-use super::{Transpile, TranspilationInputContext, TranspilationOutput, LeveledVariableData, indent};
+use crate::{ast::*};
+use super::{Transpile, TranspilationInputContext, TranspilationOutput, TranspilationInputProcedureContext, ScopedVariableData, VariableScope, indent};
 use anyhow::{Result, Error, anyhow};
 
 
@@ -11,9 +11,10 @@ impl Transpile for ProcedureStatement {
         if context.functions.contains_key(&self.name) ||
             matches!(context.procedures.insert(
                 self.name.clone(),
-                self.args.iter()
-                    .map(|data| data.name.clone())
-                    .collect()
+                TranspilationInputProcedureContext {
+                    args: self.args.clone(),
+                    requested_variables: BTreeSet::new()
+                }
             ), Some(_))
         {
             return Err(vec!(anyhow!("Procedure '{}' is already defined in this scope!", self.name)));
@@ -22,11 +23,23 @@ impl Transpile for ProcedureStatement {
 
         // Define and raise the level of any existing variables
         let mut inner_context: TranspilationInputContext = context.clone();
-        let mut requested_variables = HashSet::new();
+        let mut requested_variables = BTreeSet::new();
         let mut serialized_statements = Vec::new();
         let mut errors = Vec::new();
-        for (_, LeveledVariableData { levels_above, .. }) in inner_context.variables.iter_mut() {
-            *levels_above += 1;
+        for (_, ScopedVariableData { scope, .. }) in inner_context.variables.iter_mut() {
+            *scope = match *scope {
+                VariableScope::Local => VariableScope::Higher,
+                VariableScope::Arg => VariableScope::Higher,
+                VariableScope::Higher => VariableScope::Higher
+            }
+        }
+        for arg in &self.args {
+            if matches!(inner_context.variables.insert(arg.name.clone(), ScopedVariableData {
+                scope: VariableScope::Arg,
+                data: arg.clone()
+            }), Some(_)) {
+                errors.push(anyhow!("Argument '{}' is already defined!", arg.name));
+            }
         }
 
         // Transpile each inner statement
@@ -44,6 +57,25 @@ impl Transpile for ProcedureStatement {
                     }
                 }
             }
+        }
+
+        // Update the procedure context with the requested variables,
+        //  first removing those which are locally defined or args
+        requested_variables = requested_variables.into_iter()
+            .filter(|var| {
+                if let Some(var_data) = inner_context.variables.get(var) {
+                    !matches!(var_data.scope, VariableScope::Local | VariableScope::Arg)
+                } else {
+                    true
+                }
+            })
+            .collect();
+        if let Some(proc_context) = context.procedures.get_mut(&self.name) {
+            proc_context.requested_variables = requested_variables.clone();
+        } else {
+            errors.push(anyhow!(
+                "Procedure '{}' was not found in context after being inserted!", self.name
+            ).context("...while updating procedure context"));
         }
 
         // Serialize arguments

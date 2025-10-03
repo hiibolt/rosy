@@ -39,15 +39,30 @@ pub struct AssignStatement {
     pub indicies: Vec<Expr>,
 }
 #[derive(Debug)]
+pub struct WriteStatement {
+    pub unit: u8,
+    pub exprs: Vec<Expr>,
+}
+#[derive(Debug)]
+pub struct FunctionCallStatement {
+    pub name: String,
+    pub args: Vec<Expr>,
+}
+#[derive(Debug)]
+pub struct ProcedureCallStatement {
+    pub name: String,
+    pub args: Vec<Expr>,
+}
+#[derive(Debug)]
 pub enum Statement {
     VarDecl(VarDeclStatement),
-    Write { unit: u8, exprs: Vec<Expr> },
+    Write(WriteStatement),
     Read { unit: u8, name: String },
     Assign(AssignStatement),
     Procedure(ProcedureStatement),
-    ProcedureCall { name: String, args: Vec<Expr> },
+    ProcedureCall(ProcedureCallStatement),
     Function(FunctionStatement),
-    FunctionCall { name: String, args: Vec<Expr> },
+    FunctionCall(FunctionCallStatement),
     Loop { iterator: String, start: Expr, end: Expr, step: Option<Expr>, body: Vec<Statement> },
     If { condition: Expr, then_body: Vec<Statement>, elseif_clauses: Vec<ElseIfClause>, else_body: Option<Vec<Statement>> },
 }

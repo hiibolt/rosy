@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 use crate::ast::*;
 use super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
@@ -33,7 +33,7 @@ impl Transpile for AssignStatement {
         
         // Serialize the indicies
         let mut serialized_indicies = String::new();
-        let mut requested_variables = HashSet::new();
+        let mut requested_variables = BTreeSet::new();
         let mut errors = Vec::new();
         for dim in &self.indicies {
             match dim.transpile(context) {

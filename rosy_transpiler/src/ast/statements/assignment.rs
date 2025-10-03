@@ -13,7 +13,6 @@ pub fn build_assignment(pair: pest::iterators::Pair<Rule>) -> Result<Option<Stat
                 .context("Failed to build indexed identifier in assignment!")?
         },
         Rule::identifier => {
-            println!("Building simple identifier in assignment LHS...");
             (lhs.as_str().to_string(), Vec::new())
         },
         other => bail!("Unexpected rule in assignment LHS: {:?}", other),

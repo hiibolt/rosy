@@ -27,7 +27,7 @@ fn rosy (
     let ast = build_ast(program)
         .context("Failed to build AST!")?;
 
-    info!("Stage 4 - Transpilation");
+    info!("Stage 3 - Transpilation");
     let TranspilationOutput { serialization, .. } = ast
         .transpile(&mut TranspilationInputContext::default())
         .map_err(|vec_errs| {
@@ -73,7 +73,7 @@ fn rosy (
     write(rosy_output_path.join("src/main.rs"), &new_contents)
         .context("Failed to write Rust output file!")?;
 
-    info!("Stage 5 - Compilation");
+    info!("Stage 4 - Compilation");
     // We ensure to collect the output and emit it
     //  via `info!` so that if there are any
     //  compilation errors, they are visible

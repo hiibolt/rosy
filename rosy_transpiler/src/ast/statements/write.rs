@@ -1,6 +1,6 @@
 use anyhow::{Result, Context};
 
-use super::super::{Rule, Statement, build_expr};
+use super::super::{Rule, Statement, WriteStatement, build_expr};
 
 pub fn build_write(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
     let mut inner = pair.into_inner();
@@ -25,5 +25,5 @@ pub fn build_write(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement
         exprs
     };
 
-    Ok(Some(Statement::Write { unit, exprs }))
+    Ok(Some(Statement::Write(WriteStatement { unit, exprs })))
 }

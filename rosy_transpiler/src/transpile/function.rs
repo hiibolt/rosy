@@ -1,42 +1,46 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 use crate::ast::*;
-use super::{Transpile, TranspilationInputContext, TranspilationOutput, LeveledVariableData, indent};
+use super::{Transpile, TranspilationInputContext, TranspilationOutput, ScopedVariableData, VariableScope, TranspilationInputFunctionContext, indent};
 use anyhow::{Result, Error, anyhow};
 
 
 impl Transpile for FunctionStatement {
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
-        // Insert the procedure signature, but check it doesn't already exist
+        // Insert the function signature, but check it doesn't already exist
         if context.functions.contains_key(&self.name) ||
-            matches!(context.procedures.insert(
+            matches!(context.functions.insert(
                 self.name.clone(),
-                self.args.iter()
-                    .map(|data| data.name.clone())
-                    .collect()
+                TranspilationInputFunctionContext {
+                    return_type: self.return_type.clone(),
+                    args: self.args.clone(),
+                    requested_variables: BTreeSet::new()
+                }
             ), Some(_))
         {
-            return Err(vec!(anyhow!("Procedure '{}' is already defined in this scope!", self.name)));
+            return Err(vec!(anyhow!("Function '{}' is already defined in this scope!", self.name)));
         }
 
 
         // Define and raise the level of any existing variables
         let mut inner_context: TranspilationInputContext = context.clone();
-        let mut requested_variables = HashSet::from_iter(
-            self.args.iter().map(|arg| arg.name.clone())
-        );
+        let mut requested_variables = BTreeSet::new();
         let mut serialized_statements = Vec::new();
         let mut errors = Vec::new();
+        for (_, ScopedVariableData { scope, .. }) in inner_context.variables.iter_mut() {
+            *scope = match *scope {
+                VariableScope::Local => VariableScope::Higher,
+                VariableScope::Arg => VariableScope::Higher,
+                VariableScope::Higher => VariableScope::Higher
+            }
+        }
         for arg in &self.args {
-            if matches!(inner_context.variables.insert(arg.name.clone(), LeveledVariableData {
-                levels_above: 0,
+            if matches!(inner_context.variables.insert(arg.name.clone(), ScopedVariableData {
+                scope: VariableScope::Arg,
                 data: arg.clone()
             }), Some(_)) {
                 errors.push(anyhow!("Argument '{}' is already defined!", arg.name));
             }
-        }
-        for (_, LeveledVariableData { levels_above, .. }) in inner_context.variables.iter_mut() {
-            *levels_above += 1;
         }
 
         // Transpile each inner statement
@@ -49,11 +53,20 @@ impl Transpile for FunctionStatement {
                 Err(stmt_errors) => {
                     for e in stmt_errors {
                         errors.push(e.context(format!(
-                            "...while transpiling statement in procedure '{}'", self.name
+                            "...while transpiling statement in function '{}'", self.name
                         )));
                     }
                 }
             }
+        }
+
+        // Update the function context with the requested variables
+        if let Some(func_context) = context.functions.get_mut(&self.name) {
+            func_context.requested_variables = requested_variables.clone();
+        } else {
+            errors.push(anyhow!(
+                "Function '{}' was not found in context after being inserted!", self.name
+            ).context("...while updating function context"));
         }
 
         // Serialize arguments
@@ -66,7 +79,7 @@ impl Transpile for FunctionStatement {
                     errors.push(anyhow!(
                         "Variable '{}' was requested but not found in context!", var_name
                     ).context(format!(
-                        "...while transpiling procedure '{}'", self.name
+                        "...while transpiling function '{}'", self.name
                     )));
                     continue;
                 };
@@ -77,14 +90,13 @@ impl Transpile for FunctionStatement {
                     var_data.data.r#type.as_rust_type()
                 ));
             }
-            /* superceded by requests? automatic optimization :3
             for var_data in self.args.iter() {
                 serialized_args.push(format!(
-                    "{}: &mut {}",
+                    "{}: &{}",
                     var_data.name,
                     var_data.r#type.as_rust_type()
                 ));
-            } */
+            }
             serialized_args
         };
 

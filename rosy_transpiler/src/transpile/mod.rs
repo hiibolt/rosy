@@ -3,11 +3,15 @@ mod var_decl;
 mod procedure;
 mod function;
 mod assign;
+mod variable_data;
+mod write;
+mod function_call;
+mod procedure_call;
 
 use crate::ast::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 use anyhow::{Result, Error};
-use rosy_lib::{RosyBaseType, RosyType};
+use rosy_lib::RosyType;
 
 fn indent ( st: String ) -> String {
     st.lines()
@@ -45,27 +49,53 @@ impl TypeOf for Expr {
                     left.type_of(context)?,
                     right.type_of(context)?
                 ))?
-            }
+            },
+            Expr::StringConvert { expr } => {
+                let expr_type = expr.type_of(context)?;
+                rosy_lib::intrinsics::st::get_return_type(&expr_type)
+                    .ok_or(anyhow::anyhow!("Cannot convert type '{expr_type}' to 'ST'!"))?
+            },
+            Expr::FunctionCall { name, .. } => context.functions.get(name)
+                .ok_or(anyhow::anyhow!("Function '{}' is not defined in this scope, can't call it from expression!", name))?
+                .return_type
+                .clone(),
             _ => todo!()
         })
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum VariableScope {
+    Local,
+    Arg,
+    Higher
+}
 #[derive(Debug, Clone)]
-pub struct LeveledVariableData {
-    pub levels_above: usize,
+pub struct ScopedVariableData {
+    pub scope: VariableScope,
     pub data: VariableData
+}
+#[derive(Debug, Clone)]
+pub struct TranspilationInputFunctionContext {
+    pub return_type: RosyType,
+    pub args: Vec<VariableData>,
+    pub requested_variables: BTreeSet<String>
+}
+#[derive(Debug, Clone)]
+pub struct TranspilationInputProcedureContext {
+    pub args: Vec<VariableData>,
+    pub requested_variables: BTreeSet<String>
 }
 #[derive(Clone, Default)]
 pub struct TranspilationInputContext {
-    pub variables:  HashMap<String, LeveledVariableData>,
-    pub functions:  HashMap<String, (RosyType, Vec<String>)>,
-    pub procedures: HashMap<String, Vec<String>>
+    pub variables:  HashMap<String, ScopedVariableData>,
+    pub functions:  HashMap<String, TranspilationInputFunctionContext>,
+    pub procedures: HashMap<String, TranspilationInputProcedureContext>
 }
 #[derive(Default)]
 pub struct TranspilationOutput {
     pub serialization: String,
-    requested_variables: HashSet<String>
+    requested_variables: BTreeSet<String>
 }
 pub trait Transpile {
     fn transpile ( 
@@ -73,65 +103,7 @@ pub trait Transpile {
     ) -> Result<TranspilationOutput, Vec<Error>>;
 }
 
-impl Transpile for VariableData {
-    // note that this transpiles as the default value for the type
-    fn transpile (
-        &self, context: &mut TranspilationInputContext
-    ) -> Result<TranspilationOutput, Vec<Error>> {
-        let base_value = match self.r#type.base_type {
-            RosyBaseType::RE => "0.0",
-            RosyBaseType::ST => "\"\".to_string()",
-            RosyBaseType::LO => "false",
-            RosyBaseType::CM => "(0.0, 0.0)",
-            RosyBaseType::VE => "vec![]"
-        }.to_string();
 
-        let mut requested_variables = HashSet::new();
-        let mut errors = Vec::new();
-        let serialization = if self.dimension_exprs.is_empty() {
-            base_value
-        } else {
-            let mut result = base_value;
-            for dim in self.dimension_exprs.iter().rev() {
-                // ensure the type compiles down to a RE
-                if let Err(e) = dim.type_of(context).and_then(|t| {
-                    let expected_type = RosyType::RE();
-                    if t == expected_type {
-                        Ok(())
-                    } else {
-                        Err(anyhow::anyhow!("Array dimension expression must be of type {expected_type}, found {t}"))
-                    }
-                }) {
-                    errors.push(e.context("...while checking array dimension expression type"));
-                    continue;
-                }
-
-                // transpile each dimension expression
-                match dim.transpile(context) {
-                    Ok(output) => {
-                        result = format!("vec![{}; ({}).to_owned() as usize]", result, output.serialization);
-                        requested_variables.extend(output.requested_variables);
-                    },
-                    Err(dim_errors) => {
-                        for e in dim_errors {
-                            errors.push(e.context("...while transpiling array dimension expression!"));
-                        }
-                    }
-                }
-            }
-            result
-        };
-
-        if errors.is_empty() {
-            Ok(TranspilationOutput {
-                serialization,
-                requested_variables
-            })
-        } else {
-            Err(errors)
-        }
-    }
-}
 impl Transpile for Program {
     fn transpile (
         &self, context: &mut TranspilationInputContext
@@ -154,7 +126,7 @@ impl Transpile for Program {
         if errors.is_empty() {
             Ok(TranspilationOutput {
                 serialization: serialization.join("\n"),
-                requested_variables: HashSet::new(),
+                requested_variables: BTreeSet::new(),
             })
         } else {
             Err(errors)
@@ -165,46 +137,76 @@ impl Transpile for Statement {
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         // Handle analyzing the specific statement
         match &self {
-            Statement::VarDecl(var_decl) => match var_decl.transpile(context) {
+            Statement::VarDecl(var_decl_stmt) => match var_decl_stmt.transpile(context) {
                 Ok(output) => Ok(output),
                 Err(vec_err) => Err(add_context_to_all(
                     vec_err,
                     format!(
                         "...while transpiling variable declaration for variable {}",
-                        var_decl.data.name
+                        var_decl_stmt.data.name
                     )
                 ))
             },
-            Statement::Procedure(procedure) => match procedure.transpile(context) {
+            Statement::Procedure(procedure_stmt) => match procedure_stmt.transpile(context) {
                 Ok(output) => Ok(output),
                 Err(vec_err) => Err(add_context_to_all(
                     vec_err,
                     format!(
                         "...while transpiling procedure {}",
-                        procedure.name
+                        procedure_stmt.name
                     )
                 ))
             },
-            Statement::Assign(assign) => match assign.transpile(context) {
+            Statement::Assign(assign_stmt) => match assign_stmt.transpile(context) {
                 Ok(output) => Ok(output),
                 Err(vec_err) => Err(add_context_to_all(
                     vec_err,
                     format!(
                         "...while transpiling assignment to variable {}",
-                        assign.name
+                        assign_stmt.name
                     )
                 ))
             },
-            Statement::Function(function) => match function.transpile(context) {
+            Statement::Function(function_stmt) => match function_stmt.transpile(context) {
                 Ok(output) => Ok(output),
                 Err(vec_err) => Err(add_context_to_all(
                     vec_err,
                     format!(
                         "...while transpiling function {}",
-                        function.name
+                        function_stmt.name
                     )
                 ))
-            }
+            },
+            Statement::Write(write_stmt) => match write_stmt.transpile(context) {
+                Ok(output) => Ok(output),
+                Err(vec_err) => Err(add_context_to_all(
+                    vec_err,
+                    format!(
+                        "...while transpiling WRITE statement to unit {}",
+                        write_stmt.unit
+                    )
+                ))
+            },
+            Statement::FunctionCall(function_call_stmt) => match function_call_stmt.transpile(context) {
+                Ok(output) => Ok(output),
+                Err(vec_err) => Err(add_context_to_all(
+                    vec_err,
+                    format!(
+                        "...while transpiling function call to function {}",
+                        function_call_stmt.name
+                    )
+                ))
+            },
+            Statement::ProcedureCall(procedure_call_stmt) => match procedure_call_stmt.transpile(context) {
+                Ok(output) => Ok(output),
+                Err(vec_err) => Err(add_context_to_all(
+                    vec_err,
+                    format!(
+                        "...while transpiling procedure call to procedure {}",
+                        procedure_call_stmt.name
+                    )
+                ))
+            },
             _ => todo!()
         }
     }
