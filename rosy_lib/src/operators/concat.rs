@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use crate::RosyType;
+
 use super::super::{RE, ST, VE};
 
 /*
@@ -11,6 +14,26 @@ VE RE VE Append a Real to the right of a Vector
 VE VE VE Concatenate two Vectors
 GR GR GR Concatenate two Graphics Objects
 */
+
+pub fn get_return_type ( lhs: &RosyType, rhs: &RosyType ) -> Option<RosyType> {
+    let registry: HashMap<(RosyType, RosyType), RosyType> = {
+        let mut m = HashMap::new();
+        let all = vec!(
+            (RosyType::RE(), RosyType::RE(), RosyType::VE()),
+            (RosyType::RE(), RosyType::VE(), RosyType::VE()),
+            (RosyType::ST(), RosyType::ST(), RosyType::ST()),
+            (RosyType::VE(), RosyType::RE(), RosyType::VE()),
+            (RosyType::VE(), RosyType::VE(), RosyType::VE()),
+        );
+        for (left, right, result) in all {
+            m.insert((left, right), result);
+        }
+        m
+    };
+
+    registry.get(&(*lhs, *rhs)).copied()
+}
+
 pub trait RosyConcat<T> {
     type Output;
     fn concat(self, other: T) -> Self::Output;

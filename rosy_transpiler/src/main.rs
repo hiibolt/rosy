@@ -1,12 +1,11 @@
 mod transpile;
 mod parsing;
 mod ast;
-mod analysis;
 
-use crate::{ast::build_ast, parsing::{CosyParser, Rule}, transpile::Transpile, analysis::analyze_program};
+use crate::{transpile::{TranspilationInputContext, TranspilationOutput, Transpile}, ast::build_ast, parsing::{CosyParser, Rule}};
 use std::{fs::write, path::PathBuf, process::Command};
 use pest::Parser;
-use anyhow::{ensure, Context, Result};
+use anyhow::{ensure, Context, Result, anyhow};
 use tracing::info;
 use tracing_subscriber;
 
@@ -28,13 +27,21 @@ fn rosy (
     let ast = build_ast(program)
         .context("Failed to build AST!")?;
 
-    info!("Stage 3 - Static Analysis");
-    analyze_program(&ast)
-        .context("Static analysis failed!")?;
-
     info!("Stage 4 - Transpilation");
-    let rust = ast.transpile()
-        .context("Failed to transpile AST to C++!")?;
+    let TranspilationOutput { serialization, .. } = ast
+        .transpile(&mut TranspilationInputContext::default())
+        .map_err(|vec_errs| {
+            let mut combined = String::new();
+            for (outer_ind, err) in vec_errs.iter().enumerate() {
+                let mut body = String::new();
+                for (ind, ctx) in err.chain().enumerate() {
+                    body.push_str(&format!("  {}. {}\n", ind + 1, ctx));
+                }
+                combined.push_str(&format!("\n#{}: {}\nContext:\n{}", outer_ind + 1, err.root_cause(), body));
+            }
+            anyhow!("Failed to transpile with the following errors:\n{}", combined)
+        })?;
+
     let rosy_output_path = root.join("rosy_output");
     let new_contents = {
         // Get the contents of `rosy_output/src/main.rs`
@@ -56,7 +63,7 @@ fn rosy (
 
         format!("{}// <INJECT_START>\n{}\n\t// <INJECT_END>{}", 
             before_inject, 
-            rust.lines()
+            serialization.lines()
                 .map(|line| format!("\t{}", line))
                 .collect::<Vec<String>>()
                 .join("\n"), 

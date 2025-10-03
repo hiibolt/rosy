@@ -1,40 +1,224 @@
-use crate::ast::*;
-use rosy_lib::RosyType;
-use std::collections::{HashMap, HashSet};
-use anyhow::{Result, bail};
+mod expr;
+mod var_decl;
+mod procedure;
+mod function;
+mod assign;
 
-pub fn analyze_program(program: &Program) -> Result<()> {
-    let mut analyzer = ProgramAnalyzer::new();
-    analyzer.analyze(program)?;
-    
-    if !analyzer.errors.is_empty() {
-        let error_msg = analyzer.errors.join("\n");
-        bail!("Static analysis failed:\n{}", error_msg);
-    }
-    
-    Ok(())
+use crate::ast::*;
+use std::collections::{HashMap, HashSet};
+use anyhow::{Result, Error};
+use rosy_lib::{RosyBaseType, RosyType};
+
+fn indent ( st: String ) -> String {
+    st.lines()
+        .map(|line| format!("\t{}", line))
+        .collect::<Vec<String>>()
+        .join("\n")
+}
+fn add_context_to_all ( arr: Vec<Error>, context: String ) -> Vec<Error> {
+    arr.into_iter()
+        .map(|err| err.context(context.clone()))
+        .collect()
 }
 
+pub trait TypeOf {
+    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType>;
+}
+impl TypeOf for Expr {
+    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
+        Ok(match self {
+            Expr::Number(_) => RosyType::RE(),
+            Expr::String(_) => RosyType::ST(),
+            Expr::Boolean(_) => RosyType::LO(),
+            Expr::Var(name) => {
+                let var_data = context.variables.get(name)
+                    .ok_or(anyhow::anyhow!("Variable '{}' is not defined in this scope!", name))?;
+
+                var_data.data.r#type.clone()
+            },
+            Expr::Add { left, right } => {
+                rosy_lib::operators::add::get_return_type(
+                    &left.type_of(context)?,
+                    &right.type_of(context)?
+                ).ok_or(anyhow::anyhow!(
+                    "Cannot add types '{}' and '{}' together!",
+                    left.type_of(context)?,
+                    right.type_of(context)?
+                ))?
+            }
+            _ => todo!()
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LeveledVariableData {
+    pub levels_above: usize,
+    pub data: VariableData
+}
+#[derive(Clone, Default)]
+pub struct TranspilationInputContext {
+    pub variables:  HashMap<String, LeveledVariableData>,
+    pub functions:  HashMap<String, (RosyType, Vec<String>)>,
+    pub procedures: HashMap<String, Vec<String>>
+}
+#[derive(Default)]
+pub struct TranspilationOutput {
+    pub serialization: String,
+    requested_variables: HashSet<String>
+}
+pub trait Transpile {
+    fn transpile ( 
+        &self, context: &mut TranspilationInputContext
+    ) -> Result<TranspilationOutput, Vec<Error>>;
+}
+
+impl Transpile for VariableData {
+    // note that this transpiles as the default value for the type
+    fn transpile (
+        &self, context: &mut TranspilationInputContext
+    ) -> Result<TranspilationOutput, Vec<Error>> {
+        let base_value = match self.r#type.base_type {
+            RosyBaseType::RE => "0.0",
+            RosyBaseType::ST => "\"\".to_string()",
+            RosyBaseType::LO => "false",
+            RosyBaseType::CM => "(0.0, 0.0)",
+            RosyBaseType::VE => "vec![]"
+        }.to_string();
+
+        let mut requested_variables = HashSet::new();
+        let mut errors = Vec::new();
+        let serialization = if self.dimension_exprs.is_empty() {
+            base_value
+        } else {
+            let mut result = base_value;
+            for dim in self.dimension_exprs.iter().rev() {
+                // ensure the type compiles down to a RE
+                if let Err(e) = dim.type_of(context).and_then(|t| {
+                    let expected_type = RosyType::RE();
+                    if t == expected_type {
+                        Ok(())
+                    } else {
+                        Err(anyhow::anyhow!("Array dimension expression must be of type {expected_type}, found {t}"))
+                    }
+                }) {
+                    errors.push(e.context("...while checking array dimension expression type"));
+                    continue;
+                }
+
+                // transpile each dimension expression
+                match dim.transpile(context) {
+                    Ok(output) => {
+                        result = format!("vec![{}; ({}).to_owned() as usize]", result, output.serialization);
+                        requested_variables.extend(output.requested_variables);
+                    },
+                    Err(dim_errors) => {
+                        for e in dim_errors {
+                            errors.push(e.context("...while transpiling array dimension expression!"));
+                        }
+                    }
+                }
+            }
+            result
+        };
+
+        if errors.is_empty() {
+            Ok(TranspilationOutput {
+                serialization,
+                requested_variables
+            })
+        } else {
+            Err(errors)
+        }
+    }
+}
+impl Transpile for Program {
+    fn transpile (
+        &self, context: &mut TranspilationInputContext
+    ) -> Result<TranspilationOutput, Vec<Error>> {
+        let mut serialization = Vec::new();
+        let mut errors = Vec::new();
+        for statement in &self.statements {
+            match statement.transpile(context) {
+                Ok(output) => {
+                    serialization.push(output.serialization);
+                },
+                Err(stmt_errors) => {
+                    for e in stmt_errors {
+                        errors.push(e.context("...while transpiling a top-level statement"));
+                    }
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(TranspilationOutput {
+                serialization: serialization.join("\n"),
+                requested_variables: HashSet::new(),
+            })
+        } else {
+            Err(errors)
+        }
+    }
+}
+impl Transpile for Statement {
+    fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
+        // Handle analyzing the specific statement
+        match &self {
+            Statement::VarDecl(var_decl) => match var_decl.transpile(context) {
+                Ok(output) => Ok(output),
+                Err(vec_err) => Err(add_context_to_all(
+                    vec_err,
+                    format!(
+                        "...while transpiling variable declaration for variable {}",
+                        var_decl.data.name
+                    )
+                ))
+            },
+            Statement::Procedure(procedure) => match procedure.transpile(context) {
+                Ok(output) => Ok(output),
+                Err(vec_err) => Err(add_context_to_all(
+                    vec_err,
+                    format!(
+                        "...while transpiling procedure {}",
+                        procedure.name
+                    )
+                ))
+            },
+            Statement::Assign(assign) => match assign.transpile(context) {
+                Ok(output) => Ok(output),
+                Err(vec_err) => Err(add_context_to_all(
+                    vec_err,
+                    format!(
+                        "...while transpiling assignment to variable {}",
+                        assign.name
+                    )
+                ))
+            },
+            Statement::Function(function) => match function.transpile(context) {
+                Ok(output) => Ok(output),
+                Err(vec_err) => Err(add_context_to_all(
+                    vec_err,
+                    format!(
+                        "...while transpiling function {}",
+                        function.name
+                    )
+                ))
+            }
+            _ => todo!()
+        }
+    }
+}
+
+/*
 pub struct ProgramAnalyzer {
-    // Variable type tracking
-    variable_types: HashMap<String, VariableData>,
-    // Procedure/function signatures
-    procedure_signatures: HashMap<String, Vec<VariableData>>,
-    function_signatures: HashMap<String, (RosyType, Vec<VariableData>)>,
-    // Global variable usage tracking
-    global_variables: HashSet<String>,
     procedure_global_usage: HashMap<String, HashSet<String>>,
-    // Error collection
     errors: Vec<String>,
 }
 
 impl ProgramAnalyzer {
     pub fn new() -> Self {
         Self {
-            variable_types: HashMap::new(),
-            procedure_signatures: HashMap::new(),
-            function_signatures: HashMap::new(),
-            global_variables: HashSet::new(),
             procedure_global_usage: HashMap::new(),
             errors: Vec::new(),
         }
@@ -46,17 +230,19 @@ impl ProgramAnalyzer {
 
     pub fn analyze(&mut self, program: &Program) -> Result<()> {
         // First pass: collect global variables and procedure/function signatures
+        let mut variables:  HashMap<String, (LevelsAbove, VariableData)> = HashMap::new();
+        let mut functions:  HashMap<String, (VariableType, Vec<VariableData>)> = HashMap::new();
+        let mut procedures: HashMap<String, Vec<VariableData>> = HashMap::new();
         for statement in &program.statements {
             match statement {
                 Statement::VarDecl { data } => {
-                    self.global_variables.insert(data.name.clone());
-                    self.define_variable(&data.name, data.clone());
+                    variables.insert(data.name.clone(), (0, data.clone()));
                 }
                 Statement::Procedure { name, args, .. } => {
-                    self.procedure_signatures.insert(name.clone(), args.clone());
+                    procedures.insert(name.clone(), args.clone());
                 }
                 Statement::Function { name, args, return_type, .. } => {
-                    self.function_signatures.insert(name.clone(), (return_type.clone(), args.clone()));
+                    functions.insert(name.clone(), (return_type.clone(), args.clone()));
                 }
                 _ => {}
             }
@@ -330,11 +516,6 @@ impl ProgramAnalyzer {
             })
             .unwrap_or_default()
     }
-
-    fn define_variable(&mut self, name: &str, var_data: VariableData) {
-        self.variable_types.insert(name.to_string(), var_data);
-    }
-
     fn is_variable_defined(&self, name: &str) -> bool {
         self.variable_types.contains_key(name)
     }
@@ -672,4 +853,4 @@ impl ProgramAnalyzer {
             _ => {}
         }
     }
-}
+} */

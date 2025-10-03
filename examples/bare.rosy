@@ -1,0 +1,21 @@
+BEGIN;
+    {Main procedure}
+    VARIABLE (RE) MEOW1;
+    VARIABLE (RE 1 2) MEOW_2D;
+    PROCEDURE RUN NOT_MEOW_2D (RE 1 2) ;
+        VARIABLE (RE) MEOW2 ;
+        VARIABLE (RE (MEOW2 + 1)) MEOW_VAR ;
+        PROCEDURE NESTED ;
+            VARIABLE (RE MEOW1 (MEOW2 + 1) 3 4) X;
+            X[1, 2, 3] := MEOW_VAR ;
+        ENDPROCEDURE ;
+        MEOW_VAR[0] := 5 ;
+    ENDPROCEDURE ;
+
+    FUNCTION (RE) ADD_TWO A (RE) B (RE) ;
+        ADD_TWO := A + B ;
+    ENDFUNCTION ;
+    
+    {Call the main procedure}
+    {RUN;}
+END;

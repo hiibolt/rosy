@@ -2,28 +2,51 @@ mod statements;
 
 use crate::parsing::{Rule, PRATT_PARSER};
 use anyhow::{bail, ensure, Context, Result};
-use rosy_lib::RosyType;
+use rosy_lib::{RosyBaseType, RosyType};
 
 #[derive(Debug)]
 pub struct Program {
     pub statements: Vec<Statement>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct VariableData {
     pub name: String,
     pub r#type: RosyType,
-    pub dimensions: Vec<Expr>
+    pub dimension_exprs: Vec<Expr>
+}
+#[derive(Debug)]
+pub struct VarDeclStatement {
+    pub data: VariableData
+}
+#[derive(Debug)]
+pub struct ProcedureStatement {
+    pub name: String,
+    pub args: Vec<VariableData>,
+    pub body: Vec<Statement>
+}
+#[derive(Debug)]
+pub struct FunctionStatement {
+    pub name: String,
+    pub args: Vec<VariableData>,
+    pub return_type: RosyType,
+    pub body: Vec<Statement>
+}
+#[derive(Debug)]
+pub struct AssignStatement {
+    pub name: String,
+    pub value: Expr,
+    pub indicies: Vec<Expr>,
 }
 #[derive(Debug)]
 pub enum Statement {
-    VarDecl { data: VariableData },
+    VarDecl(VarDeclStatement),
     Write { unit: u8, exprs: Vec<Expr> },
     Read { unit: u8, name: String },
-    Assign { name: String, value: Expr, indicies: Vec<Expr> },
-    Procedure { name: String, args: Vec<VariableData>, body: Vec<Statement> },
+    Assign(AssignStatement),
+    Procedure(ProcedureStatement),
     ProcedureCall { name: String, args: Vec<Expr> },
-    Function { name: String, args: Vec<VariableData>, return_type: RosyType, body: Vec<Statement> },
+    Function(FunctionStatement),
     FunctionCall { name: String, args: Vec<Expr> },
     Loop { iterator: String, start: Expr, end: Expr, step: Option<Expr>, body: Vec<Statement> },
     If { condition: Expr, then_body: Vec<Statement>, elseif_clauses: Vec<ElseIfClause>, else_body: Option<Vec<Statement>> },
@@ -66,9 +89,11 @@ fn build_type (pair: pest::iterators::Pair<Rule>) -> Result<(RosyType, Vec<Expr>
         dimensions.push(expr);
     }
 
-    let r#type: RosyType = type_str.as_str()
+    let base_type: RosyBaseType = type_str
+        .as_str()
         .try_into()
         .with_context(|| format!("Unknown type: {type_str}"))?;
+    let r#type = RosyType::new(base_type, dimensions.len()); 
 
     Ok((r#type, dimensions))
 }

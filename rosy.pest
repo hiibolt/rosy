@@ -41,7 +41,7 @@ endif = { "ENDIF" ~ semicolon }
   ///
   /// [ PROCEDURES ]
   /// Container
-  procedure = { start_procedure ~ statement+ ~ end_procedure }
+  procedure = { start_procedure ~ statement* ~ end_procedure }
   /// Calling - ensure the name is not a keyword
   procedure_call = { procedure_name ~ expr* ~ semicolon }
   /// PROCEDURE
@@ -54,7 +54,7 @@ endif = { "ENDIF" ~ semicolon }
   ///
   /// [ FUNCTIONS ]
   /// Container
-  function = { start_function ~ statement+ ~ end_function }
+  function = { start_function ~ statement* ~ end_function }
   /// Calling - ensure the name is not a keyword
   function_call = ${ function_name ~ "(" ~ expr ~ ("," ~ expr)* ~ ")"  }
   /// FUNCTION

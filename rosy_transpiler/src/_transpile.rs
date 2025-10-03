@@ -1,10 +1,10 @@
 use crate::ast::*;
-use crate::analysis::ProgramAnalyzer;
 use anyhow::{Result, Context, ensure};
 use std::collections::{HashMap, HashSet};
 
 use rosy_lib::RosyType;
 
+/*
 #[derive(Default, Clone)]
 pub struct TranspileContext {
     args: HashMap<String, RosyType>,
@@ -18,7 +18,7 @@ impl TranspileContext {
     pub fn with_args(args: &[VariableData]) -> Self {
         let mut arg_map = HashMap::new();
         for arg in args {
-            arg_map.insert(arg.name.clone(), arg.r#type.clone());
+            arg_map.insert(arg.name.clone(), arg.r#type.base_type.clone());
         }
         Self { 
             args: arg_map,
@@ -115,7 +115,7 @@ impl Transpile for Program {
         for statement in &self.statements {
             if let Statement::VarDecl { data } = statement {
                 global_vars.insert(data.name.clone());
-                global_types.insert(data.name.clone(), data.r#type.clone());
+                global_types.insert(data.name.clone(), data.r#type.base_type.clone());
             }
         }
         
@@ -300,13 +300,13 @@ impl Transpile for Statement {
                 ))
             },
             Statement::VarDecl { data, .. } => {
-                let rust_type = data.r#type.as_rust_type();
+                let rust_type = data.r#type.base_type.as_rust_type();
                 let mut type_body = rust_type.to_string();
-                for _ in &data.dimensions {
+                for _ in &data.r#type.dimensions {
                     type_body = format!("Vec<{}>", type_body);
                 }
 
-                let default_init = match data.r#type {
+                let default_init = match data.r#type.base_type {
                     RosyType::VE => "vec!()",
                     RosyType::RE => "0.0",
                     RosyType::ST => "String::new()",
@@ -314,7 +314,7 @@ impl Transpile for Statement {
                     RosyType::CM => "(0.0, 0.0)",
                 };
                 let mut default_init_body = default_init.to_string();
-                for expr in data.dimensions.iter().rev() {
+                for expr in data.r#type.dimensions.iter().rev() {
                     let expr_str = expr.transpile_with_context(context)
                         .context("Failed to convert dimension expression to string!")?;
                     default_init_body = format!("vec![{}; ({}) as usize]", default_init_body, expr_str);
@@ -413,7 +413,7 @@ impl Transpile for Statement {
                 // Add type annotations for procedure arguments
                 let mut args_with_types: Vec<String> = args.iter()
                     .map(|arg| {
-                        let rust_type = arg.r#type.as_rust_type();
+                        let rust_type = arg.r#type.base_type.as_rust_type();
                         format!("{}: &{}", arg.name, rust_type)
                     })
                     .collect();
@@ -482,12 +482,12 @@ impl Transpile for Statement {
                     name,
                     args.into_iter()
                         .map(|var_data| {
-                            let rust_type = var_data.r#type.as_rust_type();
+                            let rust_type = var_data.r#type.base_type.as_rust_type();
                             format!("{}: &{rust_type}", var_data.name)
                         })
                         .collect::<Vec<String>>()
                         .join(", "),
-                    return_type.as_rust_type(),
+                    return_type.base_type.as_rust_type(),
                     body_sts.join("\n"),
                     name
                 ))
@@ -576,4 +576,4 @@ impl Transpile for Statement {
             }
         }
     }
-}
+} */
