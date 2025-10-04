@@ -69,10 +69,15 @@ pub struct IfStatement {
     pub else_body: Option<Vec<Statement>>,
 }
 #[derive(Debug)]
+pub struct ReadStatement {
+    pub unit: u8,
+    pub var_name: String,
+}
+#[derive(Debug)]
 pub enum Statement {
     VarDecl(VarDeclStatement),
     Write(WriteStatement),
-    Read { unit: u8, name: String },
+    Read(ReadStatement),
     Assign(AssignStatement),
     Procedure(ProcedureStatement),
     ProcedureCall(ProcedureCallStatement),
