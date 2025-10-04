@@ -10,50 +10,41 @@ use anyhow::{Result, Context};
 
 fn main() -> Result<()> {
     // <INJECT_START>
-	let mut counter: f64 = 0.0;
-	let mut global_message: String = "".to_string();
-	let mut operation_complete: bool = false;
-	fn INCREMENT_COUNTER ( counter: &mut f64 ) {
-		*counter = (&mut RosyAdd::rosy_add(&*counter, &*&mut 1f64)).to_owned();
-		println!("{}{}", &mut "Counter incremented to: ".to_string(), &mut RosyST::rosy_to_string(&*counter));
+	fn ADDTWONUMS ( X: &f64, Y: &f64 ) -> f64 {
+		let mut ADDTWONUMS: f64 = 0.0;
+		println!("{}{}", &mut "X: ".to_string(), &mut RosyST::rosy_to_string(&*X));
+		println!("{}{}", &mut "Y: ".to_string(), &mut RosyST::rosy_to_string(&*Y));
+		let mut Z: Vec<f64> = vec![];
+		ADDTWONUMS = (&mut RosyAdd::rosy_add(&*X, &*Y)).to_owned();
+		ADDTWONUMS
 	}
-	fn SET_MESSAGE ( global_message: &mut String, message: &mut String ) {
-		*global_message = (message).to_owned();
-		println!("{}{}", &mut "Global message set to: ".to_string(), global_message);
+	fn PRINTSEVENNUMS (  ) {
+		let mut X: Vec<f64> = vec![];
+		let mut Y: Vec<f64> = vec![];
+		Y = (&mut RosyConcat::rosy_concat(&*&mut Y, &*&mut 8f64)).to_owned();
+		X = (&mut RosyConcat::rosy_concat(&*&mut RosyConcat::rosy_concat(&*&mut RosyConcat::rosy_concat(&*&mut RosyConcat::rosy_concat(&*&mut RosyConcat::rosy_concat(&*&mut RosyConcat::rosy_concat(&*&mut RosyConcat::rosy_concat(&*&mut RosyAdd::rosy_add(&*&mut 0f64, &*&mut 1f64), &*&mut 2f64), &*&mut 3f64), &*&mut 4f64), &*&mut 5f64), &*&mut 6f64), &*&mut 7f64), &*&mut Y)).to_owned();
+		println!("{}", &mut RosyST::rosy_to_string(&*&mut X));
 	}
-	fn MARK_COMPLETE ( operation_complete: &mut bool ) {
-		*operation_complete = (&mut true).to_owned();
-		println!("{}", &mut "Operation marked as complete".to_string());
+	fn PRINTACOMPLEXNUM (  ) {
+		let mut X: Vec<f64> = vec![];
+		let mut Y: (f64, f64) = (0.0, 0.0);
+		X = (&mut RosyConcat::rosy_concat(&*&mut 2f64, &*&mut 1f64)).to_owned();
+		println!("{}", &mut RosyST::rosy_to_string(&*&mut Y));
 	}
-	fn DISPLAY_GLOBALS ( counter: &mut f64, global_message: &mut String, operation_complete: &mut bool ) {
-		println!("{}", &mut "=== Current Global State ===".to_string());
-		println!("{}{}", &mut "Counter: ".to_string(), &mut RosyST::rosy_to_string(&*counter));
-		println!("{}{}", &mut "Message: ".to_string(), global_message);
-		if (operation_complete).to_owned() {
-			println!("{}", &mut "Status: COMPLETE".to_string());
-		} else {
-			println!("{}", &mut "Status: INCOMPLETE".to_string());
-		}
-		println!("{}", &mut "========================".to_string());
-	}
-	fn RUN ( counter: &mut f64, global_message: &mut String, operation_complete: &mut bool ) {
-		*counter = (&mut 0f64).to_owned();
-		*global_message = (&mut "Initial message".to_string()).to_owned();
-		*operation_complete = (&mut false).to_owned();
-		println!("{}", &mut "Initial state:".to_string());
-		DISPLAY_GLOBALS(counter, global_message, operation_complete);
-		INCREMENT_COUNTER(counter);
-		INCREMENT_COUNTER(counter);
-		INCREMENT_COUNTER(counter);
-		SET_MESSAGE(global_message, &mut &mut "Hello from global variables!".to_string());
-		MARK_COMPLETE(operation_complete);
-		println!("{}", &mut "Final state:".to_string());
-		DISPLAY_GLOBALS(counter, global_message, operation_complete);
-		if (operation_complete).to_owned() {
-			println!("{}", &mut "Operation is complete!".to_string());
+	fn RUN (  ) {
+		let mut X: f64 = 0.0;
+		let mut Y: f64 = 0.0;
+		X = (&mut 3f64).to_owned();
+		Y = (&mut 4f64).to_owned();
+		println!("{}{}", &mut "Summation of 3 and 4: ".to_string(), &mut RosyST::rosy_to_string(&*&ADDTWONUMS(&mut X, &mut Y)));
+		PRINTSEVENNUMS();
+		PRINTACOMPLEXNUM();
+		for I in (((&mut 0f64).to_owned() as usize)..=((&mut 4f64).to_owned() as usize)).step_by((&mut 2f64).to_owned() as usize) {
+			let mut I = I as RE;
+			println!("{}", &mut RosyST::rosy_to_string(&*&mut I));
 		}
 	}
-	RUN(&mut counter, &mut global_message, &mut operation_complete);
+	RUN();
 	// <INJECT_END>
     
     Ok(())

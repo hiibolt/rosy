@@ -47,6 +47,26 @@ impl TypeOf for VariableIdentifier {
         Ok(var_type)
     }
 }
+impl TypeOf for ConcatExpr {
+    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
+        let mut terms = self.terms.clone();
+
+        let mut r#type = match terms.pop() {
+            Some(term) => term.type_of(context)?,
+            None => return Err(anyhow::anyhow!("Cannot concatenate zero terms!"))
+        };
+        while let Some(term_expr) = terms.pop() {
+            let term_type = term_expr.type_of(context)?;
+            r#type = rosy_lib::operators::concat::get_return_type(&r#type, &term_type)
+                .ok_or(anyhow::anyhow!(
+                    "Cannot concatenate types '{}' and '{}' together!",
+                    r#type, term_type
+                ))?;
+        }
+
+        Ok(r#type)
+    }
+}
 impl TypeOf for Expr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         Ok(match self {
@@ -76,6 +96,8 @@ impl TypeOf for Expr {
                 .ok_or(anyhow::anyhow!("Function '{}' is not defined in this scope, can't call it from expression!", name))?
                 .return_type
                 .clone(),
+            Expr::Concat(concat_expr) => concat_expr.type_of(context)
+                .context("...while determining type of concatention expression")?,
             _ => todo!()
         })
     }

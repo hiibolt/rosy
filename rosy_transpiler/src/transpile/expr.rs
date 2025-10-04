@@ -137,6 +137,68 @@ impl Transpile for Expr {
                 output.serialization = format!("&{}", output.serialization);
                 Ok(output)
             },
+            Expr::Concat(concat_expr)=> {
+                // First, do a type check 
+                //
+                // Sneaky way to check that all terms are compatible :3
+                let _ = concat_expr.type_of(context)
+                    .map_err(|e| vec!(e.context("...while verifying types of concatenation expression")))?;
+
+                let mut requested_variables = BTreeSet::new();
+                let mut errors = Vec::new();
+                let serialization = {
+                    let mut terms = concat_expr.terms.clone();
+
+                    // Serialize the first term as a base
+                    let _ = terms.get(0)
+                        .ok_or(vec!(anyhow!("Concatenation expression must have at least one term!")))?;
+                    let first_term = terms.remove(0);
+                    let mut serialization = match first_term.transpile(context) {
+                        Ok(output) => {
+                            requested_variables.extend(output.requested_variables);
+                            output.serialization
+                        },
+                        Err(mut e) => {
+                            for err in e.drain(..) {
+                                errors.push(err.context("...while transpiling first term of concatenation"));
+                            }
+                            String::new() // dummy value to collect more errors
+                        }
+                    };
+
+                    // Then, for each subsequent term, serialize and concatenate
+                    for (i, term) in terms.into_iter().enumerate() {
+                        serialization = format!(
+                            "&mut RosyConcat::rosy_concat(&*{}, &*{})",
+                            serialization,
+                            match term.transpile(context) {
+                                Ok(output) => {
+                                    requested_variables.extend(output.requested_variables);
+                                    output.serialization
+                                },
+                                Err(vec_err) => {
+                                    for err in vec_err {
+                                        errors.push(err.context(format!(
+                                            "...while transpiling term {} of concatenation", i+2
+                                        )));
+                                    }
+                                    String::new() // dummy value to collect more errors
+                                }
+                            }
+                        );
+                    }
+                    
+                    serialization
+                };
+                if errors.is_empty() {
+                    Ok(TranspilationOutput {
+                        serialization,
+                        requested_variables
+                    })
+                } else {
+                    Err(errors)
+                }
+            },
             _ => todo!()
         }
     }

@@ -98,13 +98,17 @@ pub struct ElseIfClause {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct ConcatExpr {
+    pub terms: Vec<Expr>
+}
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Number(f64),
     String(String),
     Boolean(bool),
     Var(VariableIdentifier),
     Add { left: Box<Expr>, right: Box<Expr> },
-    Concat { terms: Vec<Expr> },
+    Concat(ConcatExpr),
     Extract { object: Box<Expr>, index: Box<Expr> },
     Exp { expr: Box<Expr> },
     Complex { expr: Box<Expr> },
@@ -284,14 +288,14 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                 let left = left?;
                 let right = right?;
 
-                let terms = if let Expr::Concat{ mut terms } = left {
+                let terms = if let Expr::Concat(ConcatExpr { mut terms }) = left {
                     terms.push(right);
                     terms
                 } else {
                     vec![left, right]
                 };
 
-                Ok(Expr::Concat { terms })
+                Ok(Expr::Concat(ConcatExpr { terms }))
             },
             Rule::extract => Ok(Expr::Extract {
                 object: Box::new(left?),
