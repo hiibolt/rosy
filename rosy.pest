@@ -72,9 +72,7 @@ endif = { "ENDIF" ~ semicolon }
   end_loop = { "ENDLOOP" ~ semicolon }
 
 /// [ INTRINSIC FUNCTIONS ]
-  builtin_function = _{ exp | cm | st }
-  /// EXP
-  exp = { "EXP(" ~ expr ~ ")" }
+  builtin_function = _{ cm | st }
   /// CM
   cm = { "CM(" ~ expr ~ ")" }
   /// ST - String conversion

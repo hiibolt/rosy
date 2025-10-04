@@ -10,41 +10,17 @@ use anyhow::{Result, Context};
 
 fn main() -> Result<()> {
     // <INJECT_START>
-	fn ADDTWONUMS ( X: &f64, Y: &f64 ) -> f64 {
-		let mut ADDTWONUMS: f64 = 0.0;
-		println!("{}{}", &mut "X: ".to_string(), &mut RosyST::rosy_to_string(&*X));
-		println!("{}{}", &mut "Y: ".to_string(), &mut RosyST::rosy_to_string(&*Y));
-		let mut Z: Vec<f64> = vec![];
-		ADDTWONUMS = (&mut RosyAdd::rosy_add(&*X, &*Y)).to_owned();
-		ADDTWONUMS
-	}
-	fn PRINTSEVENNUMS (  ) {
-		let mut X: Vec<f64> = vec![];
-		let mut Y: Vec<f64> = vec![];
-		Y = (&mut RosyConcat::rosy_concat(&*&mut Y, &*&mut 8f64)).to_owned();
-		X = (&mut RosyConcat::rosy_concat(&*&mut RosyConcat::rosy_concat(&*&mut RosyConcat::rosy_concat(&*&mut RosyConcat::rosy_concat(&*&mut RosyConcat::rosy_concat(&*&mut RosyConcat::rosy_concat(&*&mut RosyConcat::rosy_concat(&*&mut RosyAdd::rosy_add(&*&mut 0f64, &*&mut 1f64), &*&mut 2f64), &*&mut 3f64), &*&mut 4f64), &*&mut 5f64), &*&mut 6f64), &*&mut 7f64), &*&mut Y)).to_owned();
-		println!("{}", &mut RosyST::rosy_to_string(&*&mut X));
-	}
-	fn PRINTACOMPLEXNUM (  ) {
-		let mut X: Vec<f64> = vec![];
-		let mut Y: (f64, f64) = (0.0, 0.0);
-		X = (&mut RosyConcat::rosy_concat(&*&mut 2f64, &*&mut 1f64)).to_owned();
-		println!("{}", &mut RosyST::rosy_to_string(&*&mut Y));
-	}
-	fn RUN (  ) {
-		let mut X: f64 = 0.0;
-		let mut Y: f64 = 0.0;
-		X = (&mut 3f64).to_owned();
-		Y = (&mut 4f64).to_owned();
-		println!("{}{}", &mut "Summation of 3 and 4: ".to_string(), &mut RosyST::rosy_to_string(&*&ADDTWONUMS(&mut X, &mut Y)));
-		PRINTSEVENNUMS();
-		PRINTACOMPLEXNUM();
-		for I in (((&mut 0f64).to_owned() as usize)..=((&mut 4f64).to_owned() as usize)).step_by((&mut 2f64).to_owned() as usize) {
-			let mut I = I as RE;
-			println!("{}", &mut RosyST::rosy_to_string(&*&mut I));
-		}
-	}
-	RUN();
+	let mut test_string: String = "".to_string();
+	let mut test_vector: Vec<f64> = vec![];
+	let mut test_complex: (f64, f64) = (0.0, 0.0);
+	test_string = (&mut "Hello".to_string()).to_owned();
+	println!("{}{}", &mut "String: ".to_string(), &mut test_string);
+	println!("{}{}", &mut "Character 1: ".to_string(), &mut RosyST::rosy_to_string(&*&mut RosyExtract::rosy_extract(&*&mut test_string, &*&mut 1f64).context("...while trying to extract an element")?));
+	println!("{}{}", &mut "Character 3: ".to_string(), &mut RosyST::rosy_to_string(&*&mut RosyExtract::rosy_extract(&*&mut test_string, &*&mut 3f64).context("...while trying to extract an element")?));
+	test_vector = (&mut RosyConcat::rosy_concat(&*&mut RosyConcat::rosy_concat(&*&mut 10f64, &*&mut 20f64), &*&mut 30f64)).to_owned();
+	println!("{}{}", &mut "Vector: ".to_string(), &mut RosyST::rosy_to_string(&*&mut test_vector));
+	println!("{}{}", &mut "Element 1: ".to_string(), &mut RosyST::rosy_to_string(&*&mut RosyExtract::rosy_extract(&*&mut test_vector, &*&mut 1f64).context("...while trying to extract an element")?));
+	println!("{}{}", &mut "Element 2: ".to_string(), &mut RosyST::rosy_to_string(&*&mut RosyExtract::rosy_extract(&*&mut test_vector, &*&mut 2f64).context("...while trying to extract an element")?));
 	// <INJECT_END>
     
     Ok(())

@@ -102,6 +102,11 @@ pub struct ConcatExpr {
     pub terms: Vec<Expr>
 }
 #[derive(Debug, Clone, PartialEq)]
+pub struct ExtractExpr {
+    pub object: Box<Expr>,
+    pub index: Box<Expr>,
+}
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Number(f64),
     String(String),
@@ -109,8 +114,7 @@ pub enum Expr {
     Var(VariableIdentifier),
     Add { left: Box<Expr>, right: Box<Expr> },
     Concat(ConcatExpr),
-    Extract { object: Box<Expr>, index: Box<Expr> },
-    Exp { expr: Box<Expr> },
+    Extract(ExtractExpr),
     Complex { expr: Box<Expr> },
     StringConvert { expr: Box<Expr> },
     FunctionCall { name: String, args: Vec<Expr> },
@@ -251,13 +255,6 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                 let s = &s[1..s.len()-1];
                 Ok(Expr::String(s.to_string()))
             },
-            Rule::exp => {
-                let mut inner = primary.into_inner();
-                let expr_pair = inner.next()
-                    .context("Missing inner expression for `EXP`!")?;
-                let expr = Box::new(build_expr(expr_pair)?);
-                Ok(Expr::Exp { expr })
-            },
             Rule::cm => {
                 let mut inner = primary.into_inner();
                 let expr_pair = inner.next()
@@ -297,10 +294,10 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
 
                 Ok(Expr::Concat(ConcatExpr { terms }))
             },
-            Rule::extract => Ok(Expr::Extract {
+            Rule::extract => Ok(Expr::Extract(ExtractExpr {
                 object: Box::new(left?),
                 index: Box::new(right?),
-            }),
+            })),
             _ => bail!("Unexpected infix operator: {:?}", op.as_rule()),
         })
         .parse(pair.into_inner())

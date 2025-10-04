@@ -67,6 +67,22 @@ impl TypeOf for ConcatExpr {
         Ok(r#type)
     }
 }
+impl TypeOf for ExtractExpr {
+    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
+        let object_type = self.object.type_of(context)
+            .map_err(|e| e.context("...while determining type of object expression for extraction"))?;
+        let index_type = self.index.type_of(context)
+            .map_err(|e| e.context("...while determining type of index expression for extraction"))?;
+
+        let result_type = rosy_lib::operators::extract::get_return_type(&object_type, &index_type)
+            .ok_or(anyhow::anyhow!(
+                "Cannot extract from type '{}' using index of type '{}'!",
+                object_type, index_type
+            ))?;
+
+        Ok(result_type)
+    }
+}
 impl TypeOf for Expr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         Ok(match self {
@@ -98,6 +114,8 @@ impl TypeOf for Expr {
                 .clone(),
             Expr::Concat(concat_expr) => concat_expr.type_of(context)
                 .context("...while determining type of concatention expression")?,
+            Expr::Extract(extract_expr) => extract_expr.type_of(context)
+                .context("...while determining type of extraction expression")?,
             _ => todo!()
         })
     }

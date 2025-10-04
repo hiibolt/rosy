@@ -199,6 +199,53 @@ impl Transpile for Expr {
                     Err(errors)
                 }
             },
+            Expr::Extract(extract_expr) => {
+                // First, ensure the types are compatible
+                let _ = extract_expr.type_of(context)
+                    .map_err(|e| vec!(e.context("...while verifying types of extraction expression")))?;
+
+                // Then, transpile both sides and combine
+                let mut serialization = String::from("&mut RosyExtract::rosy_extract(&*");
+                let mut errors = Vec::new();
+                let mut requested_variables = BTreeSet::new();
+
+                // Transpile object
+                match extract_expr.object.transpile(context) {
+                    Ok(output) => {
+                        serialization.push_str(&output.serialization);
+                        requested_variables.extend(output.requested_variables);
+                    },
+                    Err(mut e) => {
+                        for err in e.drain(..) {
+                            errors.push(err.context("...while transpiling object of extraction"));
+                        }
+                    }
+                }
+
+                // Transpile index
+                serialization.push_str(", &*");
+                match extract_expr.index.transpile(context) {
+                    Ok(output) => {
+                        serialization.push_str(&output.serialization);
+                        requested_variables.extend(output.requested_variables);
+                    },
+                    Err(mut e) => {
+                        for err in e.drain(..) {
+                            errors.push(err.context("...while transpiling index of extraction"));
+                        }
+                    }
+                }
+                serialization.push_str(").context(\"...while trying to extract an element\")?");
+
+                if errors.is_empty() {
+                    Ok(TranspilationOutput {
+                        serialization,
+                        requested_variables
+                    })
+                } else {
+                    Err(errors)
+                }
+            },
             _ => todo!()
         }
     }
