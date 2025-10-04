@@ -1,26 +1,18 @@
 
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 use anyhow::{Result, Context};
 
 use crate::RosyType;
 
 
-pub fn get_return_type ( input: &RosyType ) -> Option<RosyType> {
-    let registry: HashMap<RosyType, RosyType> = {
-        let mut m = HashMap::new();
-        let all = vec!(
-            (RosyType::ST(), RosyType::RE()),
-            (RosyType::ST(), RosyType::LO()),
-            (RosyType::ST(), RosyType::ST()),
-        );
-        for (input, result) in all {
-            m.insert(input, result);
-        }
-        m
-    };
-
-    registry.get(input).copied()
+pub fn can_be_obtained ( input: &RosyType ) -> bool {
+    let registry: HashSet<_> = HashSet::from([
+        RosyType::RE(),
+        RosyType::ST(),
+        RosyType::LO()
+    ]);
+    registry.contains(input)
 }
 pub fn from_stdin<T: RosyFromST> ( ) -> Result<T> {
     let mut input = String::new();

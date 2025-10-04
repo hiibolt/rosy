@@ -1,34 +1,52 @@
 use std::collections::BTreeSet;
 
 use crate::ast::*;
-use super::{Transpile, TranspilationInputContext, TranspilationOutput, VariableScope};
+use super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error, anyhow};
 
 
 impl Transpile for ReadStatement {
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
+        let mut errors = Vec::new();
+
+        println!("context: {:#?}", context.variables);
         
-        // Check that the requested variable name
-        let var_data = context.variables.get(&self.var_name)
-            .ok_or(vec!(anyhow!(
-                "Variable '{}' is not defined in this scope!", self.var_name
-            )))?;
-        match var_data.scope {
-            VariableScope::Higher => {
-                requested_variables.insert(self.var_name.clone());
+        // Serialize the identifier
+        let serialized_variable_identifier = match self.identifier.transpile(context) {
+            Ok(output) => {
+                requested_variables.extend(output.requested_variables);
+                output.serialization
             },
-            VariableScope::Arg => {},
-            VariableScope::Local => {}
+            Err(vec_err) => {
+                for err in vec_err {
+                    errors.push(err.context(format!(
+                        "...while transpiling identifier expression for READ into '{}'", self.identifier.name
+                    )));
+                }
+                String::new() // dummy value to collect more errors
+            }
+        };
+
+        // Get the variable type and ensure it's compatible with READ
+        let variable_type = match self.identifier.type_of(context) {
+            Ok(var_type) => var_type,
+            Err(e) => {
+                errors.push(e.context(format!(
+                    "...while determining type of variable identifier for READ into '{}'", self.identifier.name
+                )));
+                return Err(errors); // Cannot continue without the type
+            }
+        };
+        if !rosy_lib::intrinsics::from_st::can_be_obtained(&variable_type) {
+            errors.push(anyhow!(
+                "Cannot READ into variable '{}' of type {}!", self.identifier.name, variable_type
+            ));
+            return Err(errors); // Cannot continue if the type is incompatible
         }
 
-        // Check that the variable is of a supported type
-        let variable_type = &var_data.data.r#type;
-        let return_type = rosy_lib::intrinsics::from_st::get_return_type(variable_type)
-            .ok_or(vec!(anyhow!(
-                "READ doesn't support reading into variables of type '{}', found variable '{}' of type '{}'", 
-                variable_type, self.var_name, variable_type
-            )))?;
+        // Serialize the variable type
+        let serialized_variable_type = variable_type.as_rust_type();
 
         // Emulate the checking of the unit
         match self.unit {
@@ -41,11 +59,15 @@ impl Transpile for ReadStatement {
         // Serialize the entire function
         let serialization = format!(
             "{} = rosy_lib::intrinsics::from_st::from_stdin::<{}>().context(\"Failed to READ into {}\")?;",
-            self.var_name, return_type.as_rust_type(), self.var_name
+            serialized_variable_identifier, serialized_variable_type, self.identifier.name
         );
-        Ok(TranspilationOutput {
-            serialization,
-            requested_variables
-        })
+        if errors.is_empty() {
+            Ok(TranspilationOutput {
+                serialization,
+                requested_variables
+            })
+        } else {
+            Err(errors)
+        }
     }
 }

@@ -13,7 +13,7 @@ mod read;
 
 use crate::ast::*;
 use std::collections::{BTreeSet, HashMap};
-use anyhow::{Result, Error};
+use anyhow::{Result, Context, Error};
 use rosy_lib::RosyType;
 
 fn indent ( st: String ) -> String {
@@ -31,18 +31,32 @@ fn add_context_to_all ( arr: Vec<Error>, context: String ) -> Vec<Error> {
 pub trait TypeOf {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType>;
 }
+impl TypeOf for VariableIdentifier {
+    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
+        let var_data = context.variables.get(&self.name)
+            .ok_or(anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.name))?;
+
+        let mut var_type = var_data.data.r#type.clone();
+        var_type.dimensions = var_type.dimensions
+            .checked_sub(self.indicies.len())
+            .ok_or(anyhow::anyhow!(
+                "Variable '{}' does not have enough dimensions to index into it (tried to index {} times, but it only has {} dimensions)!",
+                self.name, self.indicies.len(), var_type.dimensions
+            ))?;
+
+        Ok(var_type)
+    }
+}
 impl TypeOf for Expr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         Ok(match self {
             Expr::Number(_) => RosyType::RE(),
             Expr::String(_) => RosyType::ST(),
             Expr::Boolean(_) => RosyType::LO(),
-            Expr::Var(name) => {
-                let var_data = context.variables.get(name)
-                    .ok_or(anyhow::anyhow!("Variable '{}' is not defined in this scope!", name))?;
-
-                var_data.data.r#type.clone()
-            },
+            Expr::Var(identifier) => identifier.type_of(context)
+                .context(format!(
+                    "...while determining type of variable identifier '{}'", identifier.name
+                ))?,
             Expr::Add { left, right } => {
                 rosy_lib::operators::add::get_return_type(
                     &left.type_of(context)?,
@@ -166,7 +180,7 @@ impl Transpile for Statement {
                     vec_err,
                     format!(
                         "...while transpiling assignment to variable {}",
-                        assign_stmt.name
+                        assign_stmt.identifier.name
                     )
                 ))
             },
@@ -239,6 +253,79 @@ impl Transpile for Statement {
                     )
                 ))
             }
+        }
+    }
+}
+impl Transpile for VariableIdentifier {
+    fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
+        // Check that the variable exists and that the 
+        //  dimensions are correct
+        //
+        // Cheeky trick to reuse code :3
+        let _ = self.type_of(context)
+            .map_err(|err| {
+                vec!(err.context(format!("...while checking the type of variable {}", self.name)))
+            })?;
+
+        // Serialize the indicies
+        let mut serialized_indicies = String::new();
+        let mut requested_variables = BTreeSet::new();
+        let mut errors = Vec::new();
+        for (i, index_expr) in self.indicies.iter().enumerate() {
+            let i = i + 1;
+            let name = &self.name;
+
+            // Check that the type is RE
+            let index_expr_type = index_expr.type_of(context)
+                .map_err(|err| {
+                    vec!(err.context(format!("...while checking the type for index expression {i} of {name}")))
+                })?;
+            let expected_type = RosyType::RE();
+            if index_expr_type != expected_type {
+                return Err(vec!(anyhow::anyhow!("Indexing expression {i} when indexing {name} was {index_expr_type}, when it should be {expected_type}!")));
+            }
+
+            // Transpile it
+            match index_expr.transpile(context) {
+                Ok(output) => {
+                    serialized_indicies.push_str(&format!("[({}).to_owned() as usize]", output.serialization));
+                    requested_variables.extend(output.requested_variables);
+                },
+                Err(vec_err) => {
+                    for err in vec_err {
+                        errors.push(err.context(format!(
+                            "...while transpiling index expression to {}", self.name
+                        )));
+                    }
+                }
+            }
+        }
+
+        let dereference = match context.variables.get(&self.name)
+            .ok_or(vec!(anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.name)))? 
+            .scope
+        {
+            VariableScope::Local => "",
+            VariableScope::Arg => "*",
+            VariableScope::Higher => {
+                // Also add to requested variables
+                requested_variables.insert(self.name.clone());
+                "*"
+            }
+        };
+        let serialization = format!(
+            "{}{}{}",
+            dereference,
+            self.name,
+            serialized_indicies
+        );
+        if errors.is_empty() {
+            Ok(TranspilationOutput {
+                serialization,
+                requested_variables
+            })
+        } else {
+            Err(errors)
         }
     }
 }

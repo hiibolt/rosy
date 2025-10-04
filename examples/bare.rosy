@@ -29,6 +29,10 @@ BEGIN;
         WRITE 6 "i: " ST(I) ;
     ENDLOOP ;
 
+    VARIABLE (RE 2) TEST ;
+    READ 5 TEST[1] ;
+    WRITE 6 "TEST[1] " ST(TEST[1]) " TEST[2]" ST(TEST[2]) ;
+
     {Call the main procedure}
     RUN ;
 END;

@@ -21,11 +21,10 @@ end = { "END" ~ semicolon }
 
 /// WRITE
 write = { "WRITE" ~ unit ~ expr+ ~ semicolon }
-read = { "READ" ~ unit ~ identifier ~ semicolon }
+read = { "READ" ~ unit ~ variable_identifier ~ semicolon }
 
 /// VARIABLE
 var_decl = { "VARIABLE" ~ type ~ variable_name ~ semicolon }
-variable_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
 
 /// Keywords - define all reserved words
 keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" | "IF" | "ELSEIF" | "ELSE" | "ENDIF" | "TRUE" | "FALSE" }
@@ -69,7 +68,7 @@ endif = { "ENDIF" ~ semicolon }
   ///
   /// [ LOOPS ]
   loop = { start_loop ~ statement+ ~ end_loop }
-  start_loop = { "LOOP" ~ identifier ~ expr ~ expr ~ expr? ~ semicolon }
+  start_loop = { "LOOP" ~ variable_name ~ expr ~ expr ~ expr? ~ semicolon }
   end_loop = { "ENDLOOP" ~ semicolon }
 
 /// [ INTRINSIC FUNCTIONS ]
@@ -90,18 +89,17 @@ endif = { "ENDIF" ~ semicolon }
     "ST" }
 
 /// Assignment
-assignment  = { (indexed_identifier | identifier) ~ ":=" ~ expr ~ semicolon }
+assignment  = { variable_identifier ~ ":=" ~ expr ~ semicolon }
 
 // Expression parsing using Pratt parser
 expr = { term ~ (infix_op ~ term)* }
 term = _{ 
-    indexed_identifier |
     builtin_function | 
     function_call |
     boolean |
     number | 
     string |
-    identifier |
+    variable_identifier |
     "(" ~ expr ~ ")" }
 
 // Boolean literals
@@ -113,8 +111,9 @@ extract     = { "|" }
 add         = { "+" }
 concat      = { "&" }
 
-indexed_identifier =   { identifier ~ "[" ~ expr ~ ("," ~ expr)* ~ "]" }
-identifier  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
+variable_identifier = { variable_name ~ variable_indexing? }
+variable_indexing = { "[" ~ expr ~ ("," ~ expr)* ~ "]" }
+variable_name  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
 number      = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 unit        = @{ ASCII_DIGIT+ }
 string      = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }

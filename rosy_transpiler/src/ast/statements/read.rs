@@ -1,6 +1,6 @@
 use anyhow::{Result, Context};
 
-use super::super::{Rule, Statement, ReadStatement};
+use super::super::{Rule, Statement, ReadStatement, build_variable_identifier};
 
 pub fn build_read(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
     let mut inner = pair.into_inner();
@@ -11,10 +11,10 @@ pub fn build_read(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>
         .parse::<u8>()
         .context("Failed to parse `unit` as u8 in `read` statement!")?;
 
-    let var_name = inner.next()
-        .context("Missing second token `variable_name`!")?
-        .as_str()
-        .to_string();
+    let identifier = build_variable_identifier(
+        inner.next()
+        .context("Missing second token `variable_identifier`!")?
+    ).context("...while building variable identifier for read statement")?;
 
-    Ok(Some(Statement::Read(ReadStatement { unit, var_name })))
+    Ok(Some(Statement::Read(ReadStatement { unit, identifier })))
 }

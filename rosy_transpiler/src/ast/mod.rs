@@ -32,11 +32,15 @@ pub struct FunctionStatement {
     pub return_type: RosyType,
     pub body: Vec<Statement>
 }
+#[derive(Debug, Clone, PartialEq)]
+pub struct VariableIdentifier {
+    pub name: String,
+    pub indicies: Vec<Expr>
+}
 #[derive(Debug)]
 pub struct AssignStatement {
-    pub name: String,
+    pub identifier: VariableIdentifier,
     pub value: Expr,
-    pub indicies: Vec<Expr>,
 }
 #[derive(Debug)]
 pub struct WriteStatement {
@@ -71,7 +75,7 @@ pub struct IfStatement {
 #[derive(Debug)]
 pub struct ReadStatement {
     pub unit: u8,
-    pub var_name: String,
+    pub identifier: VariableIdentifier
 }
 #[derive(Debug)]
 pub enum Statement {
@@ -98,8 +102,7 @@ pub enum Expr {
     Number(f64),
     String(String),
     Boolean(bool),
-    Var(String),
-    VarIndexing { name: String, indices: Vec<Expr> },
+    Var(VariableIdentifier),
     Add { left: Box<Expr>, right: Box<Expr> },
     Concat { terms: Vec<Expr> },
     Extract { object: Box<Expr>, index: Box<Expr> },
@@ -169,49 +172,41 @@ fn build_statement (
     }
 }
 
-fn build_indexed_identifier(pair: pest::iterators::Pair<Rule>) -> Result<(String, Vec<Expr>)> {
-    ensure!(pair.as_rule() == Rule::indexed_identifier, 
-        "Expected `indexed_identifier` rule when building indexed identifier, found: {:?}", pair.as_rule());
+fn build_variable_identifier(pair: pest::iterators::Pair<Rule>) -> Result<VariableIdentifier> {
+    ensure!(pair.as_rule() == Rule::variable_identifier, 
+        "Expected `variable_identifier` rule when building variable identifier, found: {:?}", pair.as_rule());
         
     let mut inner = pair.into_inner();
     let name = inner.next()
         .context("Missing variable name in indexed identifier!")?
         .as_str().to_string();
     
-    let indices = {
+    let indicies = if let Some(next) = inner.next() {
         let mut indices = Vec::new();
-        while let Some(index_pair) = inner.next() {
+        let mut inner_indices = next.into_inner();
+        while let Some(index_pair) = inner_indices.next() {
             let expr = build_expr(index_pair)
                 .context("Failed to build expression in indexed identifier!")?;
             indices.push(expr);
         }
         indices
+    } else {
+        Vec::new()
     };
 
-    Ok((name, indices))
+    Ok(VariableIdentifier {
+        name,
+        indicies
+    })
 }
 
 fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
-            Rule::indexed_identifier => {
-                let mut inner = primary.into_inner();
-                let name = inner.next()
-                    .context("Missing variable name in indexed identifier!")?
-                    .as_str().to_string();
-                
-                let indices = {
-                    let mut indices = Vec::new();
-                    while let Some(index_pair) = inner.next() {
-                        let expr = build_expr(index_pair)
-                            .context("Failed to build expression in indexed identifier!")?;
-                        indices.push(expr);
-                    }
-                    indices
-                };
-
-                Ok(Expr::VarIndexing { name, indices })
-            },
+            Rule::variable_identifier => Ok(Expr::Var(
+                build_variable_identifier(primary)
+                    .context("Failed to build variable identifier!")?
+            )),
             Rule::function_call => {
                 let mut inner = primary.into_inner();
                 let name = inner.next()
@@ -245,15 +240,13 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                     _ => bail!("Unexpected boolean value: {}", primary.as_str()),
                 };
                 Ok(Expr::Boolean(b))
-            }
+            },
             Rule::string => {
-                
                 let s = primary.as_str();
                 // Remove the surrounding quotes
                 let s = &s[1..s.len()-1];
                 Ok(Expr::String(s.to_string()))
-            }
-            Rule::identifier => Ok(Expr::Var(primary.as_str().to_string())),
+            },
             Rule::exp => {
                 let mut inner = primary.into_inner();
                 let expr_pair = inner.next()
