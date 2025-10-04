@@ -18,3 +18,4 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
 serial_test = "3.2"
 mpi = "0.8"
+dace = "0.2.1"
