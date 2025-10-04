@@ -1,11 +1,10 @@
 mod transpile;
-mod parsing;
 mod ast;
 
-use crate::{transpile::{TranspilationInputContext, TranspilationOutput, Transpile}, ast::build_ast, parsing::{CosyParser, Rule}};
+use crate::{transpile::{TranspilationInputContext, TranspilationOutput, Transpile}, ast::build_ast};
 use std::{fs::write, path::PathBuf, process::Command};
-use pest::Parser;
 use anyhow::{ensure, Context, Result, anyhow};
+use pest::Parser;
 use tracing::info;
 use tracing_subscriber;
 
@@ -18,7 +17,7 @@ fn rosy (
         .with_context(|| format!("Failed to read script file from `{}`!", script_path.display()))?;
 
     info!("Stage 1 - Parsing");
-    let program = CosyParser::parse(Rule::program, &script)
+    let program = ast::CosyParser::parse(ast::Rule::program, &script)
         .context("Couldn't parse!")?
         .next()
         .context("Expected a program")?;

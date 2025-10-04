@@ -83,6 +83,18 @@ impl TypeOf for ExtractExpr {
         Ok(result_type)
     }
 }
+impl TypeOf for ComplexExpr {
+    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
+        let expr_type = self.expr.type_of(context)
+            .map_err(|e| e.context("...while determining type of expression for complex conversion"))?;
+        let result_type = rosy_lib::intrinsics::cm::get_return_type(&expr_type)
+            .ok_or(anyhow::anyhow!(
+                "Cannot convert type '{}' to 'CP'!",
+                expr_type
+            ))?;
+        Ok(result_type)
+    }
+}
 impl TypeOf for Expr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         Ok(match self {
@@ -116,7 +128,8 @@ impl TypeOf for Expr {
                 .context("...while determining type of concatention expression")?,
             Expr::Extract(extract_expr) => extract_expr.type_of(context)
                 .context("...while determining type of extraction expression")?,
-            _ => todo!()
+            Expr::Complex(complex_expr) => complex_expr.type_of(context)
+                .context("...while determining type of complex conversion expression")?
         })
     }
 }

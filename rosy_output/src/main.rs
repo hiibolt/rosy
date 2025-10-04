@@ -21,6 +21,10 @@ fn main() -> Result<()> {
 	println!("{}{}", &mut "Vector: ".to_string(), &mut RosyST::rosy_to_string(&*&mut test_vector));
 	println!("{}{}", &mut "Element 1: ".to_string(), &mut RosyST::rosy_to_string(&*&mut RosyExtract::rosy_extract(&*&mut test_vector, &*&mut 1f64).context("...while trying to extract an element")?));
 	println!("{}{}", &mut "Element 2: ".to_string(), &mut RosyST::rosy_to_string(&*&mut RosyExtract::rosy_extract(&*&mut test_vector, &*&mut 2f64).context("...while trying to extract an element")?));
+	test_complex = (&mut RosyCM::rosy_cm(&*&mut RosyConcat::rosy_concat(&*&mut 5f64, &*&mut 7f64)).context("...while trying to convert to (CM)")?).to_owned();
+	println!("{}{}", &mut "Complex: ".to_string(), &mut RosyST::rosy_to_string(&*&mut test_complex));
+	println!("{}{}", &mut "Real part: ".to_string(), &mut RosyST::rosy_to_string(&*&mut RosyExtract::rosy_extract(&*&mut test_complex, &*&mut 1f64).context("...while trying to extract an element")?));
+	println!("{}{}", &mut "Imaginary part: ".to_string(), &mut RosyST::rosy_to_string(&*&mut RosyExtract::rosy_extract(&*&mut test_complex, &*&mut 2f64).context("...while trying to extract an element")?));
 	// <INJECT_END>
     
     Ok(())

@@ -18,9 +18,9 @@ WRITE 6 "Element 1: " ST(test_vector|1) ;
 WRITE 6 "Element 2: " ST(test_vector|2) ;
 
 {Test complex extraction}
-{test_complex := CM(5 & 7);
-WRITE 6 "Complex: " test_complex;
-WRITE 6 "Real part: " test_complex|1;
-WRITE 6 "Imaginary part: " test_complex|2;}
+test_complex := CM(5 & 7);
+WRITE 6 "Complex: " ST(test_complex);
+WRITE 6 "Real part: " ST(test_complex|1);
+WRITE 6 "Imaginary part: " ST(test_complex|2);
 
 END;

@@ -1,8 +1,30 @@
 mod statements;
 
-use crate::parsing::{Rule, PRATT_PARSER};
+use pest::pratt_parser::PrattParser;
+use pest_derive::Parser;
 use anyhow::{bail, ensure, Context, Result};
 use rosy_lib::{RosyBaseType, RosyType};
+
+#[derive(Parser)]
+#[grammar = "../../rosy.pest"]
+pub struct CosyParser;
+
+// Create a static PrattParser for expressions
+lazy_static::lazy_static! {
+    pub static ref PRATT_PARSER: PrattParser<Rule> = {
+        use pest::pratt_parser::{Assoc::*, Op};
+        use Rule::*;
+
+        // Precedence is defined from lowest to highest priority
+        PrattParser::new()
+            // Lowest precedence: concatenation (&)
+            .op(Op::infix(concat, Left))
+            // Medium precedence: extraction (|)
+            .op(Op::infix(extract, Left))
+            // Highest precedence: addition (+)
+            .op(Op::infix(add, Left))
+    };
+}
 
 #[derive(Debug)]
 pub struct Program {
@@ -107,6 +129,10 @@ pub struct ExtractExpr {
     pub index: Box<Expr>,
 }
 #[derive(Debug, Clone, PartialEq)]
+pub struct ComplexExpr {
+    pub expr: Box<Expr>,
+}
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Number(f64),
     String(String),
@@ -115,7 +141,7 @@ pub enum Expr {
     Add { left: Box<Expr>, right: Box<Expr> },
     Concat(ConcatExpr),
     Extract(ExtractExpr),
-    Complex { expr: Box<Expr> },
+    Complex(ComplexExpr),
     StringConvert { expr: Box<Expr> },
     FunctionCall { name: String, args: Vec<Expr> },
 }
@@ -260,7 +286,7 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                 let expr_pair = inner.next()
                     .context("Missing inner expression for `CM`!")?;
                 let expr = Box::new(build_expr(expr_pair)?);
-                Ok(Expr::Complex { expr })
+                Ok(Expr::Complex(ComplexExpr { expr }))
             },
             Rule::st => {
                 let mut inner = primary.into_inner();
