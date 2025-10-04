@@ -1,6 +1,6 @@
 use anyhow::{Result, Context};
 
-use super::super::{Rule, Statement, build_expr, build_statement};
+use super::super::{Rule, Statement, LoopStatement, build_expr, build_statement};
 
 pub fn build_loop(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
     let mut inner = pair.into_inner();
@@ -52,5 +52,5 @@ pub fn build_loop(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>
         }
     }
 
-    Ok(Some(Statement::Loop { iterator, start, end, step, body }))  
+    Ok(Some(Statement::Loop(LoopStatement { iterator, start, end, step, body })))  
 }

@@ -25,6 +25,10 @@ BEGIN;
 
     WRITE 6 "add two: " ST(ADD_TWO_AND_MEOW(2, 2) + ADD_TWO_AND_MEOW(3, 3 + 4)) ;
 
+    LOOP I 0 MEOW1 + 1 + 1 1 + 2 ;
+        WRITE 6 "i: " ST(I) ;
+    ENDLOOP ;
+
     {Call the main procedure}
     RUN ;
 END;

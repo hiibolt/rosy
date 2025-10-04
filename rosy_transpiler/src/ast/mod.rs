@@ -54,6 +54,14 @@ pub struct ProcedureCallStatement {
     pub args: Vec<Expr>,
 }
 #[derive(Debug)]
+pub struct LoopStatement {
+    pub iterator: String,
+    pub start: Expr,
+    pub end: Expr,
+    pub step: Option<Expr>,
+    pub body: Vec<Statement>,
+}
+#[derive(Debug)]
 pub enum Statement {
     VarDecl(VarDeclStatement),
     Write(WriteStatement),
@@ -63,7 +71,7 @@ pub enum Statement {
     ProcedureCall(ProcedureCallStatement),
     Function(FunctionStatement),
     FunctionCall(FunctionCallStatement),
-    Loop { iterator: String, start: Expr, end: Expr, step: Option<Expr>, body: Vec<Statement> },
+    Loop(LoopStatement),
     If { condition: Expr, then_body: Vec<Statement>, elseif_clauses: Vec<ElseIfClause>, else_body: Option<Vec<Statement>> },
 }
 

@@ -34,6 +34,10 @@ fn main() -> Result<()> {
 		ADD_TWO_AND_MEOW
 	}
 	println!("{}{}", &"add two: ".to_string(), (&ADD_TWO_AND_MEOW(&mut MEOW1, &2f64, &2f64).rosy_add(&ADD_TWO_AND_MEOW(&mut MEOW1, &3f64, &3f64.rosy_add(&4f64)))).rosy_to_string());
+	for I in (((&0f64).to_owned() as usize)..=((&MEOW1.rosy_add(&1f64).rosy_add(&1f64)).to_owned() as usize)).step_by((&1f64.rosy_add(&2f64)).to_owned() as usize) {
+		let I = I as RE;
+		println!("{}{}", &"i: ".to_string(), (&I).rosy_to_string());
+	}
 	RUN(&mut MEOW1);
 	// <INJECT_END>
     

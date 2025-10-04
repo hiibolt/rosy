@@ -7,6 +7,7 @@ mod variable_data;
 mod write;
 mod function_call;
 mod procedure_call;
+mod r#loop;
 
 use crate::ast::*;
 use std::collections::{BTreeSet, HashMap};
@@ -204,6 +205,16 @@ impl Transpile for Statement {
                     format!(
                         "...while transpiling procedure call to procedure {}",
                         procedure_call_stmt.name
+                    )
+                ))
+            },
+            Statement::Loop(loop_stmt) => match loop_stmt.transpile(context) {
+                Ok(output) => Ok(output),
+                Err(vec_err) => Err(add_context_to_all(
+                    vec_err,
+                    format!(
+                        "...while transpiling loop with iterator {}",
+                        loop_stmt.iterator
                     )
                 ))
             },
