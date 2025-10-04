@@ -16,6 +16,10 @@ impl Transpile for Expr {
                 serialization: format!("&\"{}\".to_string()", s.replace('"', "\\\"")),
                 requested_variables: BTreeSet::new(),
             }),
+            Expr::Boolean(b) => Ok(TranspilationOutput {
+                serialization: format!("&{}", if *b { "true" } else { "false" }),
+                requested_variables: BTreeSet::new(),
+            }),
             Expr::Var(name) => {
                 let scoped_var_data = context.variables.get(name)
                     .ok_or(vec!(anyhow!("Variable '{}' is not defined in this scope!", name)))?;

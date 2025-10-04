@@ -8,6 +8,7 @@ mod write;
 mod function_call;
 mod procedure_call;
 mod r#loop;
+mod r#if;
 
 use crate::ast::*;
 use std::collections::{BTreeSet, HashMap};
@@ -215,6 +216,15 @@ impl Transpile for Statement {
                     format!(
                         "...while transpiling loop with iterator {}",
                         loop_stmt.iterator
+                    )
+                ))
+            },
+            Statement::If(if_stmt) => match if_stmt.transpile(context) {
+                Ok(output) => Ok(output),
+                Err(vec_err) => Err(add_context_to_all(
+                    vec_err,
+                    format!(
+                        "...while transpiling IF statement"
                     )
                 ))
             },

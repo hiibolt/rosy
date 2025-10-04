@@ -62,6 +62,13 @@ pub struct LoopStatement {
     pub body: Vec<Statement>,
 }
 #[derive(Debug)]
+pub struct IfStatement {
+    pub condition: Expr,
+    pub then_body: Vec<Statement>,
+    pub elseif_clauses: Vec<ElseIfClause>,
+    pub else_body: Option<Vec<Statement>>,
+}
+#[derive(Debug)]
 pub enum Statement {
     VarDecl(VarDeclStatement),
     Write(WriteStatement),
@@ -72,7 +79,7 @@ pub enum Statement {
     Function(FunctionStatement),
     FunctionCall(FunctionCallStatement),
     Loop(LoopStatement),
-    If { condition: Expr, then_body: Vec<Statement>, elseif_clauses: Vec<ElseIfClause>, else_body: Option<Vec<Statement>> },
+    If(IfStatement),
 }
 
 #[derive(Debug)]
