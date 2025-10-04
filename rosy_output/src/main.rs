@@ -19,10 +19,10 @@ fn main() -> Result<()> {
 		let mut MEOW_VAR: Vec<f64> = vec![0.0; (&RosyAdd::rosy_add(&MEOW2, &1f64)).to_owned() as usize];
 		fn NESTED ( MEOW1: &mut f64, MEOW2: &mut f64, MEOW_VAR: &mut Vec<f64> ) {
 			let mut X: Vec<Vec<Vec<Vec<f64>>>> = vec![vec![vec![vec![0.0; (&4f64).to_owned() as usize]; (&3f64).to_owned() as usize]; (&RosyAdd::rosy_add(&*MEOW2, &1f64)).to_owned() as usize]; (&*MEOW1).to_owned() as usize];
-			X[(&1f64).to_owned() as usize][(&2f64).to_owned() as usize][(&3f64).to_owned() as usize] = (&*MEOW_VAR).to_owned();
+			X[((&1f64).to_owned() - 1.0f64) as usize][((&2f64).to_owned() - 1.0f64) as usize][((&3f64).to_owned() - 1.0f64) as usize] = (&*MEOW_VAR).to_owned();
 			println!("{}", &"meow".to_string());
 		}
-		MEOW_VAR[(&0f64).to_owned() as usize] = (&5f64).to_owned();
+		MEOW_VAR[((&0f64).to_owned() - 1.0f64) as usize] = (&5f64).to_owned();
 	}
 	fn ADD_TWO ( A: &f64, B: &f64 ) -> f64 {
 		let mut ADD_TWO: f64 = 0.0;
@@ -40,8 +40,11 @@ fn main() -> Result<()> {
 		println!("{}{}", &"i: ".to_string(), (&I).rosy_to_string());
 	}
 	let mut TEST: Vec<f64> = vec![0.0; (&2f64).to_owned() as usize];
-	TEST[(&1f64).to_owned() as usize] = rosy_lib::intrinsics::from_st::from_stdin::<f64>().context("Failed to READ into TEST")?;
-	println!("{}{}{}{}", &"TEST[1] ".to_string(), (&TEST[(&1f64).to_owned() as usize]).rosy_to_string(), &" TEST[2]".to_string(), (&TEST[(&2f64).to_owned() as usize]).rosy_to_string());
+	println!("{}", &"Set element 1 of TEST: ".to_string());
+	TEST[((&1f64).to_owned() - 1.0f64) as usize] = rosy_lib::intrinsics::from_st::from_stdin::<f64>().context("Failed to READ into TEST")?;
+	println!("{}", &"Set element 2 of TEST: ".to_string());
+	TEST[((&2f64).to_owned() - 1.0f64) as usize] = rosy_lib::intrinsics::from_st::from_stdin::<f64>().context("Failed to READ into TEST")?;
+	println!("{}{}{}{}", &"TEST[1]: ".to_string(), (&TEST[((&1f64).to_owned() - 1.0f64) as usize]).rosy_to_string(), &" | TEST[2]: ".to_string(), (&TEST[((&2f64).to_owned() - 1.0f64) as usize]).rosy_to_string());
 	RUN(&mut MEOW1);
 	// <INJECT_END>
     

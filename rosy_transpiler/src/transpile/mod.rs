@@ -288,7 +288,7 @@ impl Transpile for VariableIdentifier {
             // Transpile it
             match index_expr.transpile(context) {
                 Ok(output) => {
-                    serialized_indicies.push_str(&format!("[({}).to_owned() as usize]", output.serialization));
+                    serialized_indicies.push_str(&format!("[(({}).to_owned() - 1.0f64) as usize]", output.serialization));
                     requested_variables.extend(output.requested_variables);
                 },
                 Err(vec_err) => {

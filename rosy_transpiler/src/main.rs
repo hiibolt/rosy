@@ -91,13 +91,12 @@ fn rosy (
 
     info!("Stage 6 - Execution");
     let output = Command::new(root.join("target/release/rosy_output"))
+        .stdin(std::process::Stdio::inherit())
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
         .output()
         .context("Failed to execute generated binary")?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    info!("Program stdout:\n{}", stdout);
-    info!("Program stderr:\n{}", stderr);
-    ensure!(output.status.success(), "Execution failed with exit code: {:?}, `stdout`:\n{stdout}\n...and `stderr`:\n{stderr}", output.status.code());
+    ensure!(output.status.success(), "Execution failed with exit code: {:?}", output.status.code());
 
     Ok(stdout.to_string())
 }

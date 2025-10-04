@@ -9,8 +9,6 @@ impl Transpile for ReadStatement {
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
         let mut errors = Vec::new();
-
-        println!("context: {:#?}", context.variables);
         
         // Serialize the identifier
         let serialized_variable_identifier = match self.identifier.transpile(context) {
