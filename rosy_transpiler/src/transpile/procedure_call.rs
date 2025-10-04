@@ -62,7 +62,7 @@ impl Transpile for ProcedureCallStatement {
                         ));
                     } else {
                         // If the type is correct, add the serialization
-                        serialized_args.push(arg_output.serialization);
+                        serialized_args.push(format!("&mut {}", arg_output.serialization));
                         requested_variables.extend(arg_output.requested_variables);
                     }
                 },

@@ -1,8 +1,8 @@
 BEGIN;
     {Function to add two numbers}
     FUNCTION (RE) ADDTWONUMS X (RE) Y (RE);
-        WRITE 6 "X: " X;
-        WRITE 6 "Y: " Y;
+        WRITE 6 "X: " ST(X);
+        WRITE 6 "Y: " ST(Y);
         VARIABLE (VE) Z;
         ADDTWONUMS := X + Y;
     ENDFUNCTION;

@@ -301,21 +301,15 @@ impl Transpile for VariableIdentifier {
             }
         }
 
-        let dereference = match context.variables.get(&self.name)
+        // Finally, serialize the entire variable
+        if VariableScope::Higher == context.variables.get(&self.name)
             .ok_or(vec!(anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.name)))? 
             .scope
         {
-            VariableScope::Local => "",
-            VariableScope::Arg => "*",
-            VariableScope::Higher => {
-                // Also add to requested variables
-                requested_variables.insert(self.name.clone());
-                "*"
-            }
-        };
+            requested_variables.insert(self.name.clone());
+        }
         let serialization = format!(
-            "{}{}{}",
-            dereference,
+            "{}{}",
             self.name,
             serialized_indicies
         );

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::ast::*;
-use super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
+use super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, VariableScope};
 use anyhow::{Result, Error, anyhow};
 
 impl Transpile for AssignStatement {
@@ -58,9 +58,21 @@ impl Transpile for AssignStatement {
         };
 
         // Serialize the entire function
+        let dereference = match context.variables.get(&self.identifier.name)
+            .ok_or(vec!(anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.identifier.name)))? 
+            .scope
+        {
+            VariableScope::Local => "",
+            VariableScope::Arg => "*",
+            VariableScope::Higher => {
+                // Also add to requested variables
+                requested_variables.insert(self.identifier.name.clone());
+                "*"
+            }
+        };
         let serialization = format!(
-            "{} = ({}).to_owned();",
-            serialized_identifier, serialized_value
+            "{}{} = ({}).to_owned();",
+            dereference, serialized_identifier, serialized_value
         );
         if errors.is_empty() {
             Ok(TranspilationOutput {

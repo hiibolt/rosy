@@ -126,7 +126,7 @@ impl Transpile for LoopStatement {
         };
 
         let serialization = format!(
-            "for {} in ((({}).to_owned() as usize)..=(({}).to_owned() as usize)){} {{\n\tlet {} = {} as RE;\n{}\n}}",
+            "for {} in ((({}).to_owned() as usize)..=(({}).to_owned() as usize)){} {{\n\tlet mut {} = {} as RE;\n{}\n}}",
             self.iterator,
             start_serialization,
             end_serialization,

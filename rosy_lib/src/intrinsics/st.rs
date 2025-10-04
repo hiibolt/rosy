@@ -24,33 +24,33 @@ pub fn get_return_type ( lhs: &RosyType ) -> Option<RosyType> {
 
 /// Trait for converting ROSY data types to strings
 pub trait RosyST {
-    fn rosy_to_string(&self) -> String;
+    fn rosy_to_string(self) -> String;
 }
 
 /// Convert real numbers to strings
 impl RosyST for &RE {
-    fn rosy_to_string(&self) -> String {
+    fn rosy_to_string(self) -> String {
         self.to_string()
     }
 }
 
 /// Convert strings to strings (identity)
 impl RosyST for &ST {
-    fn rosy_to_string(&self) -> String {
+    fn rosy_to_string(self) -> String {
         (*self).clone()
     }
 }
 
 /// Convert booleans to strings
 impl RosyST for &LO {
-    fn rosy_to_string(&self) -> String {
-        if **self { "TRUE".to_string() } else { "FALSE".to_string() }
+    fn rosy_to_string(self) -> String {
+        if *self { "TRUE".to_string() } else { "FALSE".to_string() }
     }
 }
 
 /// Convert vectors to strings
 impl RosyST for &VE {
-    fn rosy_to_string(&self) -> String {
+    fn rosy_to_string(self) -> String {
         let elements: Vec<String> = self.iter().map(|x| x.to_string()).collect();
         format!("[{}]", elements.join(", "))
     }
@@ -58,8 +58,8 @@ impl RosyST for &VE {
 
 /// Convert complex numbers to strings
 impl RosyST for &CM {
-    fn rosy_to_string(&self) -> String {
-        let (real, imag) = **self;
+    fn rosy_to_string(self) -> String {
+        let (real, imag) = *self;
         if imag >= 0.0 {
             format!("({} + {}i)", real, imag)
         } else {

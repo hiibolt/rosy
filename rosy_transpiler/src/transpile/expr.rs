@@ -1,5 +1,5 @@
 use crate::ast::*;
-use super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
+use super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, VariableScope};
 use std::collections::BTreeSet;
 use anyhow::{Result, Error, anyhow};
 
@@ -9,15 +9,15 @@ impl Transpile for Expr {
     ) -> Result<TranspilationOutput, Vec<Error>> {
         match self {
             Expr::Number(n) => Ok(TranspilationOutput {
-                serialization: format!("&{n}f64"),
+                serialization: format!("&mut {n}f64"),
                 requested_variables: BTreeSet::new(),
             }),
             Expr::String(s) => Ok(TranspilationOutput {
-                serialization: format!("&\"{}\".to_string()", s.replace('"', "\\\"")),
+                serialization: format!("&mut \"{}\".to_string()", s.replace('"', "\\\"")),
                 requested_variables: BTreeSet::new(),
             }),
             Expr::Boolean(b) => Ok(TranspilationOutput {
-                serialization: format!("&{}", if *b { "true" } else { "false" }),
+                serialization: format!("&mut {}", if *b { "true" } else { "false" }),
                 requested_variables: BTreeSet::new(),
             }),
             Expr::Var(identifier) => {
@@ -31,8 +31,16 @@ impl Transpile for Expr {
                         ))
                     }).collect::<Vec<Error>>())?;
                 
+                let reference = match context.variables.get(&identifier.name)
+                    .ok_or(vec!(anyhow::anyhow!("Variable '{}' is not defined in this scope!", identifier.name)))? 
+                    .scope
+                {
+                    VariableScope::Local => "&mut ",
+                    VariableScope::Arg => "",
+                    VariableScope::Higher => ""
+                };
                 Ok(TranspilationOutput {
-                    serialization: format!("&{}", serialized_identifier),
+                    serialization: format!("{}{}", reference, serialized_identifier),
                     requested_variables
                 })
             },
@@ -49,7 +57,7 @@ impl Transpile for Expr {
                 }
 
                 // Then, transpile both sides and combine
-                let mut serialization = String::from("&RosyAdd::rosy_add(");
+                let mut serialization = String::from("&mut RosyAdd::rosy_add(&*");
                 let mut errors = Vec::new();
                 let mut requested_variables = BTreeSet::new();
 
@@ -67,7 +75,7 @@ impl Transpile for Expr {
                 }
 
                 // Transpile right
-                serialization.push_str(", ");
+                serialization.push_str(", &*");
                 match right.transpile(context) {
                     Ok(output) => {
                         serialization.push_str(&output.serialization);
@@ -110,7 +118,7 @@ impl Transpile for Expr {
                     }).collect::<Vec<Error>>())?;
 
                 // Finally, serialize the conversion
-                let serialization = format!("({}).rosy_to_string()", expr_serialization);
+                let serialization = format!("&mut RosyST::rosy_to_string(&*{})", expr_serialization);
                 Ok(TranspilationOutput {
                     serialization,
                     requested_variables

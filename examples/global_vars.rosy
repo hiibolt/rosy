@@ -11,7 +11,7 @@ VARIABLE (LO) operation_complete;
 {Procedure that increments the global counter}
 PROCEDURE INCREMENT_COUNTER;
     counter := counter + 1;
-    WRITE 6 "Counter incremented to: " counter;
+    WRITE 6 "Counter incremented to: " ST(counter);
 ENDPROCEDURE;
 
 {Procedure that sets the global message}
@@ -29,7 +29,7 @@ ENDPROCEDURE;
 {Procedure that displays all global state}
 PROCEDURE DISPLAY_GLOBALS;
     WRITE 6 "=== Current Global State ===";
-    WRITE 6 "Counter: " counter;
+    WRITE 6 "Counter: " ST(counter);
     WRITE 6 "Message: " global_message;
     IF operation_complete;
         WRITE 6 "Status: COMPLETE";
