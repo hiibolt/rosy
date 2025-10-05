@@ -1,5 +1,5 @@
 use crate::ast::*;
-use super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
+use super::super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
 use std::collections::BTreeSet;
 use anyhow::{Result, Error};
 use rosy_lib::{RosyBaseType, RosyType};

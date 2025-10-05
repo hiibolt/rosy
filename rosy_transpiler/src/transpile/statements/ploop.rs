@@ -1,14 +1,14 @@
 use std::collections::BTreeSet;
 
 use crate::{ast::*};
-use super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, ScopedVariableData, VariableScope, indent};
+use super::super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, ScopedVariableData, VariableScope, indent};
 use anyhow::{Result, Error, anyhow};
 use rosy_lib::RosyType;
 
 
-impl Transpile for LoopStatement {
+impl Transpile for PLoopStatement {
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
-        // Verify the start, end, and step expressions are REs
+        // Verify the start and end expressions are REs
         let start_type = self.start.type_of(context)
             .map_err(|e| vec!(e))?;
         if start_type != RosyType::RE() {
@@ -23,29 +23,11 @@ impl Transpile for LoopStatement {
                 "Loop end expression must be of type 'RE', found '{}'", end_type
             )));
         }
-        if let Some(step_expr) = &self.step {
-            let step_type = step_expr.type_of(context)
-                .map_err(|e| vec!(e))?;
-            if step_type != RosyType::RE() {
-                return Err(vec!(anyhow!(
-                    "Loop step expression must be of type 'RE', found '{}'", step_type
-                )));
-            }
-        }
 
-        // Define and raise the level of any existing variables
-        let mut inner_context: TranspilationInputContext = context.clone();
+        // Define the iterator
+        let mut inner_context = context.clone();
         let mut requested_variables = BTreeSet::new();
-        let mut serialized_statements = Vec::new();
         let mut errors = Vec::new();
-        for (_, ScopedVariableData { scope, .. }) in inner_context.variables.iter_mut() {
-            *scope = match *scope {
-                VariableScope::Local => VariableScope::Higher,
-                VariableScope::Arg => VariableScope::Higher,
-                VariableScope::Higher => VariableScope::Higher
-            }
-        }
-        // Define the iterator variable
         if matches!(inner_context.variables.insert(self.iterator.clone(), ScopedVariableData { 
             scope: VariableScope::Local,
             data: VariableData { 
@@ -60,6 +42,7 @@ impl Transpile for LoopStatement {
         }
 
         // Transpile each inner statement
+        let mut serialized_statements = Vec::new();
         for stmt in &self.body {
             match stmt.transpile(&mut inner_context) {
                 Ok(output) => {
@@ -74,8 +57,8 @@ impl Transpile for LoopStatement {
             }
         }
 
-        // Serialize the start, end, and step expressions
-        let start_serialization = match self.start.transpile(context) {
+        // Serialize the start and end expressions
+        let _start_serialization = match self.start.transpile(context) {
             Ok(output) => {
                 requested_variables.extend(output.requested_variables);
                 output.serialization
@@ -105,35 +88,53 @@ impl Transpile for LoopStatement {
                 return Err(errors);
             }
         };
-        let step_serialization = if let Some(step_expr) = &self.step {
-            match step_expr.transpile(context) {
-                Ok(output) => {
-                    requested_variables.extend(output.requested_variables);
-                    format!(".step_by(({}).to_owned() as usize)", output.serialization)
-                },
-                Err(vec_err) => {
-                    for e in vec_err {
-                        errors.push(e.context(format!(
-                            "...while transpiling step expression for loop with iterator '{}'",
-                            self.iterator
-                        )));
-                    }
-                    return Err(errors);
+
+        // Check the type of the output array
+        let output_type = self.output.type_of(context)
+            .map_err(|e| vec!(e))?;
+        if output_type.dimensions < 1 && output_type != RosyType::VE() {
+            return Err(vec!(anyhow!(
+                "Output variable '{}' for a PLOOP must be an array type, found '{}'", self.output.name, output_type
+            )));
+        }
+
+        // Serialize the output identifier
+        let output_serialization = match self.output.transpile(context) {
+            Ok(output) => {
+                requested_variables.extend(output.requested_variables);
+                output.serialization
+            },
+            Err(vec_err) => {
+                for e in vec_err {
+                    errors.push(e.context(format!(
+                        "...while transpiling output variable identifier '{}'",
+                        self.output.name
+                    )));
                 }
+                return Err(errors);
             }
-        } else {
-            String::from("")
         };
 
+
+        let iterator_declaration_serialization = {
+            requested_variables.insert("rosy_mpi_context".to_string());
+            format!(
+                "let mut {} = rosy_mpi_context.get_rank(&mut {})? + 1.0f64;",
+                self.iterator,
+                end_serialization
+            )
+        };
+        let coordination_serialization = format!(
+            "rosy_mpi_context.coordinate(&mut {}, {}u8, &mut {})?;",
+            output_serialization,
+            self.commutivity_rule.unwrap_or(1),
+            end_serialization
+        );
         let serialization = format!(
-            "for {} in ((({}).to_owned() as usize)..=(({}).to_owned() as usize)){} {{\n\tlet mut {} = {} as RE;\n{}\n}}",
-            self.iterator,
-            start_serialization,
-            end_serialization,
-            step_serialization,
-            self.iterator,
-            self.iterator,
-            indent(serialized_statements.join("\n"))
+            "{{\n\t{}\n\n{}\n\n\t{}\n}}",
+            iterator_declaration_serialization,
+            indent(serialized_statements.join("\n")),
+            coordination_serialization
         );
         if errors.is_empty() {
             Ok(TranspilationOutput {

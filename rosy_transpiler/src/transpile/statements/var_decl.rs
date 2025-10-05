@@ -1,5 +1,5 @@
 use crate::ast::*;
-use super::{Transpile, TranspilationInputContext, TranspilationOutput, ScopedVariableData, VariableScope};
+use super::super::{Transpile, TranspilationInputContext, TranspilationOutput, ScopedVariableData, VariableScope};
 use anyhow::{Result, Error, anyhow};
 
 impl Transpile for VarDeclStatement {

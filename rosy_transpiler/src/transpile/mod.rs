@@ -1,15 +1,6 @@
 mod expr;
-mod var_decl;
-mod procedure;
-mod function;
-mod assign;
-mod variable_data;
-mod write;
-mod function_call;
-mod procedure_call;
-mod r#loop;
-mod r#if;
-mod read;
+mod core;
+mod statements;
 
 use crate::ast::*;
 use std::collections::{BTreeSet, HashMap};
@@ -47,83 +38,20 @@ impl TypeOf for VariableIdentifier {
         Ok(var_type)
     }
 }
-impl TypeOf for ConcatExpr {
-    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
-        let mut terms = self.terms.clone();
-
-        let mut r#type = match terms.pop() {
-            Some(term) => term.type_of(context)?,
-            None => return Err(anyhow::anyhow!("Cannot concatenate zero terms!"))
-        };
-        while let Some(term_expr) = terms.pop() {
-            let term_type = term_expr.type_of(context)?;
-            r#type = rosy_lib::operators::concat::get_return_type(&r#type, &term_type)
-                .ok_or(anyhow::anyhow!(
-                    "Cannot concatenate types '{}' and '{}' together!",
-                    r#type, term_type
-                ))?;
-        }
-
-        Ok(r#type)
-    }
-}
-impl TypeOf for ExtractExpr {
-    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
-        let object_type = self.object.type_of(context)
-            .map_err(|e| e.context("...while determining type of object expression for extraction"))?;
-        let index_type = self.index.type_of(context)
-            .map_err(|e| e.context("...while determining type of index expression for extraction"))?;
-
-        let result_type = rosy_lib::operators::extract::get_return_type(&object_type, &index_type)
-            .ok_or(anyhow::anyhow!(
-                "Cannot extract from type '{}' using index of type '{}'!",
-                object_type, index_type
-            ))?;
-
-        Ok(result_type)
-    }
-}
-impl TypeOf for ComplexExpr {
-    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
-        let expr_type = self.expr.type_of(context)
-            .map_err(|e| e.context("...while determining type of expression for complex conversion"))?;
-        let result_type = rosy_lib::intrinsics::cm::get_return_type(&expr_type)
-            .ok_or(anyhow::anyhow!(
-                "Cannot convert type '{}' to 'CP'!",
-                expr_type
-            ))?;
-        Ok(result_type)
-    }
-}
 impl TypeOf for Expr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         Ok(match self {
             Expr::Number(_) => RosyType::RE(),
             Expr::String(_) => RosyType::ST(),
             Expr::Boolean(_) => RosyType::LO(),
-            Expr::Var(identifier) => identifier.type_of(context)
-                .context(format!(
-                    "...while determining type of variable identifier '{}'", identifier.name
-                ))?,
-            Expr::Add { left, right } => {
-                rosy_lib::operators::add::get_return_type(
-                    &left.type_of(context)?,
-                    &right.type_of(context)?
-                ).ok_or(anyhow::anyhow!(
-                    "Cannot add types '{}' and '{}' together!",
-                    left.type_of(context)?,
-                    right.type_of(context)?
-                ))?
-            },
-            Expr::StringConvert { expr } => {
-                let expr_type = expr.type_of(context)?;
-                rosy_lib::intrinsics::st::get_return_type(&expr_type)
-                    .ok_or(anyhow::anyhow!("Cannot convert type '{expr_type}' to 'ST'!"))?
-            },
-            Expr::FunctionCall { name, .. } => context.functions.get(name)
-                .ok_or(anyhow::anyhow!("Function '{}' is not defined in this scope, can't call it from expression!", name))?
-                .return_type
-                .clone(),
+            Expr::Var(var_expr) => var_expr.type_of(context)
+                .context(format!("...while determining type of variable identifier '{}'", var_expr.identifier.name))?,
+            Expr::Add(add_expr) => add_expr.type_of(context)
+                .context("...while determining type of addition expression")?,
+            Expr::StringConvert(string_convert_expr) => string_convert_expr.type_of(context)
+                .context("...while determining type of string conversion expression")?,
+            Expr::FunctionCall(function_call_expr) => function_call_expr.type_of(context)
+                .context(format!("...while determining type of function call expression to '{}'", function_call_expr.name))?,
             Expr::Concat(concat_expr) => concat_expr.type_of(context)
                 .context("...while determining type of concatention expression")?,
             Expr::Extract(extract_expr) => extract_expr.type_of(context)
@@ -303,6 +231,16 @@ impl Transpile for Statement {
                     format!(
                         "...while transpiling READ statement from unit {}",
                         read_stmt.unit
+                    )
+                ))
+            },
+            Statement::PLoop(ploop_stmt) => match ploop_stmt.transpile(context) {
+                Ok(output) => Ok(output),
+                Err(vec_err) => Err(add_context_to_all(
+                    vec_err,
+                    format!(
+                        "...while transpiling parallel loop with iterator {}",
+                        ploop_stmt.iterator
                     )
                 ))
             }

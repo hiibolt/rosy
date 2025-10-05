@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::ast::*;
-use super::{Transpile, TranspilationInputContext, TranspilationOutput, ScopedVariableData, VariableScope, TranspilationInputFunctionContext, indent};
+use super::super::{Transpile, TranspilationInputContext, TranspilationOutput, ScopedVariableData, VariableScope, TranspilationInputFunctionContext, indent};
 use anyhow::{Result, Error, anyhow};
 
 

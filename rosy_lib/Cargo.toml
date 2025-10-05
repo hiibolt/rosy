@@ -5,3 +5,5 @@ edition = "2024"
 
 [dependencies]
 anyhow.workspace = true
+mpi.workspace = true
+bincode.workspace = true

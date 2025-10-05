@@ -41,7 +41,7 @@ pub fn build_loop(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>
     // Process remaining elements (statements and end)
     while let Some(element) = inner.next() {
         // Skip the end element
-        if element.as_rule() == Rule::end {
+        if element.as_rule() == Rule::end_loop {
             break;
         }
 

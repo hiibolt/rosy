@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::{ast::*, transpile::TypeOf};
-use super::{Transpile, TranspilationInputContext, TranspilationOutput};
+use super::super::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error, anyhow};
 use rosy_lib::RosyType;
 

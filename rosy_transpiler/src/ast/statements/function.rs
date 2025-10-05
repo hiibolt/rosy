@@ -12,7 +12,6 @@ pub fn build_function(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statem
 
         // we choose to ignore the dimensions of the return type for now
         //  since they can be changed dynamically
-        //  todo!();
         let (return_type, _) = build_type(
             start_function_inner.next()
                 .context("Missing return type for function!")?

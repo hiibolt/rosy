@@ -100,6 +100,15 @@ pub struct ReadStatement {
     pub identifier: VariableIdentifier
 }
 #[derive(Debug)]
+pub struct PLoopStatement {
+    pub iterator: String,
+    pub start: Expr,
+    pub end: Expr,
+    pub body: Vec<Statement>,
+    pub commutivity_rule: Option<u8>,
+    pub output: VariableIdentifier
+}
+#[derive(Debug)]
 pub enum Statement {
     VarDecl(VarDeclStatement),
     Write(WriteStatement),
@@ -110,6 +119,7 @@ pub enum Statement {
     Function(FunctionStatement),
     FunctionCall(FunctionCallStatement),
     Loop(LoopStatement),
+    PLoop(PLoopStatement),
     If(IfStatement),
 }
 
@@ -133,17 +143,35 @@ pub struct ComplexExpr {
     pub expr: Box<Expr>,
 }
 #[derive(Debug, Clone, PartialEq)]
+pub struct VarExpr {
+    pub identifier: VariableIdentifier,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct AddExpr {
+    pub left: Box<Expr>,
+    pub right: Box<Expr>,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct StringConvertExpr {
+    pub expr: Box<Expr>,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionCallExpr {
+    pub name: String,
+    pub args: Vec<Expr>,
+}
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Number(f64),
     String(String),
     Boolean(bool),
-    Var(VariableIdentifier),
-    Add { left: Box<Expr>, right: Box<Expr> },
+    Var(VarExpr),
+    Add(AddExpr),
     Concat(ConcatExpr),
     Extract(ExtractExpr),
     Complex(ComplexExpr),
-    StringConvert { expr: Box<Expr> },
-    FunctionCall { name: String, args: Vec<Expr> },
+    StringConvert(StringConvertExpr),
+    FunctionCall(FunctionCallExpr),
 }
 
 fn build_type (pair: pest::iterators::Pair<Rule>) -> Result<(RosyType, Vec<Expr>)> {
@@ -193,6 +221,7 @@ fn build_statement (
         Rule::read => statements::build_read(pair).context("...while building read statement!"),
         Rule::assignment => statements::build_assignment(pair).context("...while building assignment statement!"),
         Rule::r#loop => statements::build_loop(pair).context("...while building loop statement!"),
+        Rule::ploop => statements::build_ploop(pair).context("...while building ploop statement!"),
         Rule::procedure => statements::build_procedure(pair).context("...while building procedure declaration!"),
         Rule::procedure_call => statements::build_procedure_call(pair).context("...while building procedure call!"),
         Rule::function => statements::build_function(pair).context("...while building function declaration!"),
@@ -237,10 +266,10 @@ fn build_variable_identifier(pair: pest::iterators::Pair<Rule>) -> Result<Variab
 fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
-            Rule::variable_identifier => Ok(Expr::Var(
-                build_variable_identifier(primary)
+            Rule::variable_identifier => Ok(Expr::Var(VarExpr {
+                identifier: build_variable_identifier(primary)
                     .context("Failed to build variable identifier!")?
-            )),
+            })),
             Rule::function_call => {
                 let mut inner = primary.into_inner();
                 let name = inner.next()
@@ -261,7 +290,7 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                     args
                 };
 
-                Ok(Expr::FunctionCall { name, args })
+                Ok(Expr::FunctionCall(FunctionCallExpr { name, args }))
             },
             Rule::number => {
                 let n = primary.as_str().parse::<f64>()?;
@@ -293,7 +322,7 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                 let expr_pair = inner.next()
                     .context("Missing inner expression for `ST`!")?;
                 let expr = Box::new(build_expr(expr_pair)?);
-                Ok(Expr::StringConvert { expr })
+                Ok(Expr::StringConvert(StringConvertExpr { expr }))
             },
             Rule::expr => build_expr(primary),
             _ => bail!("Unexpected primary expr: {:?}", primary.as_rule()),
@@ -303,10 +332,10 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
             op,
             right
         | match op.as_rule() {
-            Rule::add => Ok(Expr::Add {
+            Rule::add => Ok(Expr::Add(AddExpr {
                 left: Box::new(left?),
                 right: Box::new(right?),
-            }),
+            })),
             Rule::concat => {
                 let left = left?;
                 let right = right?;

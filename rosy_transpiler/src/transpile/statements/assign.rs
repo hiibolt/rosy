@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::ast::*;
-use super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, VariableScope};
+use super::super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, VariableScope};
 use anyhow::{Result, Error, anyhow};
 
 impl Transpile for AssignStatement {

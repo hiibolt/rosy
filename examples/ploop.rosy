@@ -1,0 +1,13 @@
+BEGIN;
+    VARIABLE (RE) NP;
+    NP := 1 ;
+    VARIABLE (RE NP) X ;
+    
+    PLOOP I 1 NP ;
+        X[I] := I + 11 ;
+    ENDPLOOP X ;
+
+    LOOP I 1 NP ;
+        WRITE 6 "X[" ST(I) "] = " ST(X[I]) ;
+    ENDLOOP ;
+END;
