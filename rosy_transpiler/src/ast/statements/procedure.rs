@@ -1,6 +1,6 @@
 use anyhow::{Result, Context, ensure};
 
-use super::super::{Rule, Statement, VariableData, build_statement, build_type};
+use super::super::{Rule, Statement, VariableData, ProcedureStatement, build_statement, build_type};
 
 pub fn build_procedure(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
     let mut inner = pair.into_inner();
@@ -27,15 +27,15 @@ pub fn build_procedure(pair: pest::iterators::Pair<Rule>) -> Result<Option<State
             let name = arg_inner.next()
                 .context("Missing procedure argument name!")?
                 .as_str();
-            let (r#type, dimensions) = build_type(
+            let (r#type, dimension_exprs) = build_type(
                 arg_inner.next()
                     .context("Missing procedure argument type!")?
-            ).context("...while building procedure argument type!")?;
+            ).context("...while building procedure argument type")?;
 
             let variable_data = VariableData {
                 name: name.to_string(),
                 r#type,
-                dimensions
+                dimension_exprs
             };
             args.push(variable_data);
         }
@@ -63,5 +63,5 @@ pub fn build_procedure(pair: pest::iterators::Pair<Rule>) -> Result<Option<State
         statements
     };
 
-    Ok(Some(Statement::Procedure { name, args, body }))
+    Ok(Some(Statement::Procedure(ProcedureStatement { name, args, body })))
 }

@@ -11,6 +11,7 @@ statement   = _{
   | assignment 
   | function
   | loop
+  | ploop
   | procedure
   | procedure_call
   | if_statement }
@@ -21,14 +22,13 @@ end = { "END" ~ semicolon }
 
 /// WRITE
 write = { "WRITE" ~ unit ~ expr+ ~ semicolon }
-read = { "READ" ~ unit ~ identifier ~ semicolon }
+read = { "READ" ~ unit ~ variable_identifier ~ semicolon }
 
 /// VARIABLE
 var_decl = { "VARIABLE" ~ type ~ variable_name ~ semicolon }
-variable_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
 
 /// Keywords - define all reserved words
-keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" | "IF" | "ELSEIF" | "ELSE" | "ENDIF" | "TRUE" | "FALSE" }
+keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" | "IF" | "ELSEIF" | "ELSE" | "ENDIF" | "TRUE" | "FALSE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
 
 /// [ IF / ELSEIF / ELSE / ENDIF ]
 if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
@@ -41,7 +41,7 @@ endif = { "ENDIF" ~ semicolon }
   ///
   /// [ PROCEDURES ]
   /// Container
-  procedure = { start_procedure ~ statement+ ~ end_procedure }
+  procedure = { start_procedure ~ statement* ~ end_procedure }
   /// Calling - ensure the name is not a keyword
   procedure_call = { procedure_name ~ expr* ~ semicolon }
   /// PROCEDURE
@@ -54,9 +54,9 @@ endif = { "ENDIF" ~ semicolon }
   ///
   /// [ FUNCTIONS ]
   /// Container
-  function = { start_function ~ statement+ ~ end_function }
+  function = { start_function ~ statement* ~ end_function }
   /// Calling - ensure the name is not a keyword
-  function_call = ${ function_name ~ "(" ~ expr ~ ("," ~ expr)* ~ ")"  }
+  function_call = { function_name ~ "(" ~ expr ~ ("," ~ expr)* ~ ")"  }
   /// FUNCTION
   start_function = { "FUNCTION" ~ type ~ function_name ~ function_argument_name_and_type+ ~ semicolon }
   function_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
@@ -67,15 +67,17 @@ endif = { "ENDIF" ~ semicolon }
 
 /// [ LOOPS / WHILES ]
   ///
-  /// [ LOOPS ]
+  /// [ LOOP ]
   loop = { start_loop ~ statement+ ~ end_loop }
-  start_loop = { "LOOP" ~ identifier ~ expr ~ expr ~ expr? ~ semicolon }
+  start_loop = { "LOOP" ~ variable_name ~ expr ~ expr ~ expr? ~ semicolon }
   end_loop = { "ENDLOOP" ~ semicolon }
+  /// [ PLOOP ]
+  ploop = { start_ploop ~ statement+ ~ end_ploop }
+  start_ploop = { "PLOOP" ~ variable_name ~ expr ~ expr ~ semicolon }
+  end_ploop = { "ENDPLOOP" ~ unit? ~ variable_identifier ~ semicolon }
 
 /// [ INTRINSIC FUNCTIONS ]
-  builtin_function = _{ exp | cm | st }
-  /// EXP
-  exp = { "EXP(" ~ expr ~ ")" }
+  builtin_function = _{ cm | st }
   /// CM
   cm = { "CM(" ~ expr ~ ")" }
   /// ST - String conversion
@@ -90,18 +92,17 @@ endif = { "ENDIF" ~ semicolon }
     "ST" }
 
 /// Assignment
-assignment  = { (indexed_identifier | identifier) ~ ":=" ~ expr ~ semicolon }
+assignment  = { variable_identifier ~ ":=" ~ expr ~ semicolon }
 
 // Expression parsing using Pratt parser
 expr = { term ~ (infix_op ~ term)* }
 term = _{ 
-    indexed_identifier |
     builtin_function | 
     function_call |
     boolean |
     number | 
     string |
-    identifier |
+    variable_identifier |
     "(" ~ expr ~ ")" }
 
 // Boolean literals
@@ -113,8 +114,9 @@ extract     = { "|" }
 add         = { "+" }
 concat      = { "&" }
 
-indexed_identifier =   { identifier ~ "[" ~ expr ~ ("," ~ expr)* ~ "]" }
-identifier  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
+variable_identifier = { variable_name ~ variable_indexing? }
+variable_indexing = { "[" ~ expr ~ ("," ~ expr)* ~ "]" }
+variable_name  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
 number      = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 unit        = @{ ASCII_DIGIT+ }
 string      = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }

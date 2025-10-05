@@ -38,6 +38,7 @@
             openssl.dev
             pest-ide-tools
             clang
+            cmake
           ]);
           buildInputs = with pkgs; [
             mpi

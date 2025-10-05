@@ -1,12 +1,10 @@
 mod transpile;
-mod parsing;
 mod ast;
-mod analysis;
 
-use crate::{ast::build_ast, parsing::{CosyParser, Rule}, transpile::Transpile, analysis::analyze_program};
+use crate::{transpile::{TranspilationInputContext, TranspilationOutput, Transpile}, ast::build_ast};
 use std::{fs::write, path::PathBuf, process::Command};
+use anyhow::{ensure, Context, Result, anyhow};
 use pest::Parser;
-use anyhow::{ensure, Context, Result};
 use tracing::info;
 use tracing_subscriber;
 
@@ -19,7 +17,7 @@ fn rosy (
         .with_context(|| format!("Failed to read script file from `{}`!", script_path.display()))?;
 
     info!("Stage 1 - Parsing");
-    let program = CosyParser::parse(Rule::program, &script)
+    let program = ast::CosyParser::parse(ast::Rule::program, &script)
         .context("Couldn't parse!")?
         .next()
         .context("Expected a program")?;
@@ -28,13 +26,21 @@ fn rosy (
     let ast = build_ast(program)
         .context("Failed to build AST!")?;
 
-    info!("Stage 3 - Static Analysis");
-    analyze_program(&ast)
-        .context("Static analysis failed!")?;
+    info!("Stage 3 - Transpilation");
+    let TranspilationOutput { serialization, .. } = ast
+        .transpile(&mut TranspilationInputContext::default())
+        .map_err(|vec_errs| {
+            let mut combined = String::new();
+            for (outer_ind, err) in vec_errs.iter().enumerate() {
+                let mut body = String::new();
+                for (ind, ctx) in err.chain().enumerate() {
+                    body.push_str(&format!("  {}. {}\n", ind + 1, ctx));
+                }
+                combined.push_str(&format!("\n#{}: {}\nContext:\n{}", outer_ind + 1, err.root_cause(), body));
+            }
+            anyhow!("Failed to transpile with the following errors:\n{}", combined)
+        })?;
 
-    info!("Stage 4 - Transpilation");
-    let rust = ast.transpile()
-        .context("Failed to transpile AST to C++!")?;
     let rosy_output_path = root.join("rosy_output");
     let new_contents = {
         // Get the contents of `rosy_output/src/main.rs`
@@ -56,7 +62,7 @@ fn rosy (
 
         format!("{}// <INJECT_START>\n{}\n\t// <INJECT_END>{}", 
             before_inject, 
-            rust.lines()
+            serialization.lines()
                 .map(|line| format!("\t{}", line))
                 .collect::<Vec<String>>()
                 .join("\n"), 
@@ -66,7 +72,7 @@ fn rosy (
     write(rosy_output_path.join("src/main.rs"), &new_contents)
         .context("Failed to write Rust output file!")?;
 
-    info!("Stage 5 - Compilation");
+    info!("Stage 4 - Compilation");
     // We ensure to collect the output and emit it
     //  via `info!` so that if there are any
     //  compilation errors, they are visible
@@ -84,13 +90,12 @@ fn rosy (
 
     info!("Stage 6 - Execution");
     let output = Command::new(root.join("target/release/rosy_output"))
+        .stdin(std::process::Stdio::inherit())
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
         .output()
         .context("Failed to execute generated binary")?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    info!("Program stdout:\n{}", stdout);
-    info!("Program stderr:\n{}", stderr);
-    ensure!(output.status.success(), "Execution failed with exit code: {:?}, `stdout`:\n{stdout}\n...and `stderr`:\n{stderr}", output.status.code());
+    ensure!(output.status.success(), "Execution failed with exit code: {:?}", output.status.code());
 
     Ok(stdout.to_string())
 }

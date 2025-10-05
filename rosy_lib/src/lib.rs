@@ -1,10 +1,12 @@
-mod operators;
-mod intrinsics;
-mod core;
+pub mod operators;
+pub mod intrinsics;
+pub mod core;
+pub mod mpi;
 
 pub use operators::*;
 pub use intrinsics::*;
 pub use core::*;
+pub use mpi::*;
 
 pub type RE = f64;
 pub type ST = String;
@@ -12,87 +14,104 @@ pub type LO = bool;
 pub type CM = (f64, f64);
 pub type VE = Vec<f64>;
 
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum RosyType {
+pub struct RosyType {
+    pub base_type: RosyBaseType,
+    pub dimensions: usize
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RosyBaseType {
     RE,
     ST,
     LO,
     CM,
     VE,
 }
-impl RosyType {
-    pub fn as_rust_type(&self) -> &'static str {
-        match self {
-            RosyType::RE => "f64",
-            RosyType::ST => "String",
-            RosyType::LO => "bool",
-            RosyType::CM => "(f64, f64)",
-            RosyType::VE => "Vec<f64>",
-        }
-    }
-    pub fn cm_intrinsic_result ( &self ) -> Option<RosyType> {
-        match self {
-            RosyType::RE => Some(RosyType::CM),
-            RosyType::CM => Some(RosyType::CM),
-            RosyType::VE => Some(RosyType::CM),
-            _ => None,
-        }
-    }
-
-    pub fn add_operation_result ( &self, other: &RosyType ) -> Option<RosyType> {
-        match (self, other) {
-            (RosyType::RE, RosyType::RE) => Some(RosyType::RE),
-            (RosyType::RE, RosyType::CM) => Some(RosyType::CM),
-            (RosyType::RE, RosyType::VE) => Some(RosyType::VE),
-            (RosyType::CM, RosyType::RE) => Some(RosyType::CM),
-            (RosyType::CM, RosyType::CM) => Some(RosyType::CM),
-            (RosyType::CM, RosyType::VE) => Some(RosyType::VE),
-            (RosyType::VE, RosyType::RE) => Some(RosyType::VE),
-            (RosyType::VE, RosyType::VE) => Some(RosyType::VE),
-            _ => None,
-        }
-    }
-    pub fn concat_operation_result ( &self, other: &RosyType ) -> Option<RosyType> {
-        match (self, other) {
-            (RosyType::RE, RosyType::RE) => Some(RosyType::VE),
-            (RosyType::RE, RosyType::VE) => Some(RosyType::VE),
-            (RosyType::ST, RosyType::ST) => Some(RosyType::ST),
-            (RosyType::VE, RosyType::RE) => Some(RosyType::VE),
-            (RosyType::VE, RosyType::VE) => Some(RosyType::VE),
-            _ => None,
+impl std::fmt::Display for RosyType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.dimensions == 0 {
+            write!(f, "({:?})", self.base_type)
+        } else {
+            let dims = "*".repeat(self.dimensions);
+            write!(f, "({:?} {dims})", self.base_type)
         }
     }
 }
-impl TryFrom<&str> for RosyType {
+impl RosyType {
+    pub fn new ( base_type: RosyBaseType, dimensions: usize ) -> Self {
+        RosyType {
+            base_type,
+            dimensions
+        }
+    }
+
+    #[allow(non_snake_case)]
+    pub fn RE ( ) -> Self {
+        RosyType {
+            base_type: RosyBaseType::RE,
+            dimensions: 0
+        }
+    }
+    #[allow(non_snake_case)]
+    pub fn ST ( ) -> Self {
+        RosyType {
+            base_type: RosyBaseType::ST,
+            dimensions: 0
+        }
+    }
+    #[allow(non_snake_case)]
+    pub fn LO ( ) -> Self {
+        RosyType {
+            base_type: RosyBaseType::LO,
+            dimensions: 0
+        }
+    }
+    #[allow(non_snake_case)]
+    pub fn CM ( ) -> Self {
+        RosyType {
+            base_type: RosyBaseType::CM,
+            dimensions: 0
+        }
+    }
+    #[allow(non_snake_case)]
+    pub fn VE ( ) -> Self {
+        RosyType {
+            base_type: RosyBaseType::VE,
+            dimensions: 0
+        }
+    }
+
+    pub fn as_rust_type (&self) -> String {
+        let base = match self.base_type {
+            RosyBaseType::RE => "f64",
+            RosyBaseType::ST => "String",
+            RosyBaseType::LO => "bool",
+            RosyBaseType::CM => "(f64, f64)",
+            RosyBaseType::VE => "Vec<f64>"
+        }.to_string();
+
+        if self.dimensions == 0 {
+            base
+        } else {
+            let mut result = base;
+            for _ in 0..self.dimensions {
+                result = format!("Vec<{}>", result);
+            }
+            result
+        }
+    }
+}
+impl TryFrom<&str> for RosyBaseType {
     type Error = anyhow::Error;
-    fn try_from( value: &str ) -> Result<RosyType, Self::Error> {
+    fn try_from( value: &str ) -> Result<RosyBaseType, Self::Error> {
         match value {
-            "RE" => Ok(RosyType::RE),
-            "ST" => Ok(RosyType::ST),
-            "LO" => Ok(RosyType::LO),
-            "CM" => Ok(RosyType::CM),
-            "VE" => Ok(RosyType::VE),
+            "RE" => Ok(RosyBaseType::RE),
+            "ST" => Ok(RosyBaseType::ST),
+            "LO" => Ok(RosyBaseType::LO),
+            "CM" => Ok(RosyBaseType::CM),
+            "VE" => Ok(RosyBaseType::VE),
             _ => Err(anyhow::anyhow!("Can't convert {} to a ROSY type", value)),
         }
     }
-}
-
-use anyhow::{Result, Context};
-pub fn from_stdin<T: std::str::FromStr> ( ) -> Result<T>
-where
-    <T as std::str::FromStr>::Err: std::error::Error + Send + Sync + 'static,
-{
-    use std::io;
-
-    let mut input = String::new();
-    io::stdin()
-        .read_line(&mut input)
-        .context("Failed to read line from stdin!")?;
-
-    let input = input.trim();
-    let value = input
-        .parse::<T>()
-        .map_err(|e| anyhow::anyhow!("Failed to parse input '{}': {}", input, e))?;
-
-    Ok(value)
 }

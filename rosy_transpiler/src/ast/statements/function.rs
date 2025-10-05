@@ -1,19 +1,21 @@
 use anyhow::{Result, Context, ensure};
 
-use super::super::{Rule, Statement, VariableData, build_statement, build_type};
+use super::super::{Rule, Statement, VariableData, VarDeclStatement, FunctionStatement, build_statement, build_type};
 
 pub fn build_function(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
     let mut inner = pair.into_inner();
-    let (return_type, return_dimensions, name, args) = {
+    let (return_type, name, args) = {
         let mut start_function_inner = inner
             .next()
             .context("Missing first token `start_function`!")?
             .into_inner();
 
-        let (return_type, return_dimensions) = build_type(
+        // we choose to ignore the dimensions of the return type for now
+        //  since they can be changed dynamically
+        let (return_type, _) = build_type(
             start_function_inner.next()
                 .context("Missing return type for function!")?
-        ).context("...while building function return type!")?;
+        ).context("...while building function return type")?;
 
         let name = start_function_inner.next()
             .context("Missing function name!")?
@@ -33,26 +35,26 @@ pub fn build_function(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statem
             let (argument_type, argument_dimensions) = build_type(
                 start_function_inner.next()
                     .context(format!("Missing type for function argument: {}", name))?
-            ).context("...while building function argument type!")?;
+            ).context("...while building function argument type")?;
 
             let argument_data = VariableData {
                 name: name.to_string(),
                 r#type: argument_type,
-                dimensions: argument_dimensions
+                dimension_exprs: argument_dimensions,
             };
             args.push(argument_data);
         }
 
-        (return_type, return_dimensions, name, args)
+        (return_type, name, args)
     };
 
     let body = {
         let mut statements = vec!(
-            Statement::VarDecl { data: VariableData {
+            Statement::VarDecl(VarDeclStatement { data: VariableData {
                 name: name.clone(),
-                r#type: return_type,
-                dimensions: return_dimensions
-            } }
+                r#type: return_type.clone(),
+                dimension_exprs: Vec::new(),
+            }})
         );
 
         // Process remaining elements (statements and end_function)
@@ -72,5 +74,5 @@ pub fn build_function(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statem
         statements
     };
 
-    Ok(Some(Statement::Function { name, args, return_type, body }))
+    Ok(Some(Statement::Function(FunctionStatement { name, args, return_type, body })))
 }

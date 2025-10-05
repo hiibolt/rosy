@@ -1,8 +1,8 @@
 BEGIN;
     {Function to add two numbers}
     FUNCTION (RE) ADDTWONUMS X (RE) Y (RE);
-        WRITE 6 "X: " X;
-        WRITE 6 "Y: " Y;
+        WRITE 6 "X: " ST(X);
+        WRITE 6 "Y: " ST(Y);
         VARIABLE (VE) Z;
         ADDTWONUMS := X + Y;
     ENDFUNCTION;
@@ -13,7 +13,7 @@ BEGIN;
         VARIABLE (VE) Y;
         Y := Y & 8;
         X := (0 + 1) & 2 & 3 & 4 & 5 & 6 & 7 & Y;
-        WRITE 6 X;
+        WRITE 6 ST(X);
     ENDPROCEDURE;
 
     {Procedure to print a complex number}
@@ -21,8 +21,8 @@ BEGIN;
         VARIABLE (VE) X;
         VARIABLE (CM) Y;
         X := 2 & 1;
-        Y := CM(X);
-        WRITE 6 Y;
+        {Y := CM(X);}
+        WRITE 6 ST(Y);
     ENDPROCEDURE;
 
     {Main procedure}
@@ -31,14 +31,13 @@ BEGIN;
         VARIABLE (RE) Y;
         X := 3;
         Y := 4;
-        WRITE 6 "Summation of 3 and 4: " ADDTWONUMS(X,Y);
+        WRITE 6 "Summation of 3 and 4: " ST(ADDTWONUMS(X,Y));
         
         PRINTSEVENNUMS;
         PRINTACOMPLEXNUM;
 
-        VARIABLE (RE) I;
         LOOP I 0 4 2;
-            WRITE 6 I;
+            WRITE 6 ST(I);
         ENDLOOP;
     ENDPROCEDURE;
     

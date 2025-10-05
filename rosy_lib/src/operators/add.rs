@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+use crate::RosyType;
+
 use super::super::{RE, CM, VE};
 
 /*
@@ -25,6 +29,27 @@ CD CM CD
 CD DA CD
 CD CD CD
 */
+
+pub fn get_return_type ( lhs: &RosyType, rhs: &RosyType ) -> Option<RosyType> {
+    let registry: HashMap<(RosyType, RosyType), RosyType> = {
+        let mut m = HashMap::new();
+        let all = vec!(
+            (RosyType::RE(), RosyType::RE(), RosyType::RE()),
+            (RosyType::RE(), RosyType::CM(), RosyType::CM()),
+            (RosyType::RE(), RosyType::VE(), RosyType::VE()),
+            (RosyType::CM(), RosyType::RE(), RosyType::CM()),
+            (RosyType::CM(), RosyType::CM(), RosyType::CM()),
+            (RosyType::VE(), RosyType::RE(), RosyType::VE()),
+            (RosyType::VE(), RosyType::VE(), RosyType::VE()),
+        );
+        for (left, right, result) in all {
+            m.insert((left, right), result);
+        }
+        m
+    };
+
+    registry.get(&(*lhs, *rhs)).copied()
+}
 
 pub trait RosyAdd<Rhs = Self> {
     type Output;

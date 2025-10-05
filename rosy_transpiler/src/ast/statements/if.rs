@@ -1,10 +1,10 @@
 use anyhow::{Result, Context, bail};
 
-use super::super::{Rule, Statement, ElseIfClause, build_expr, build_statement};
+use super::super::{Rule, Statement, IfStatement, ElseIfClause, build_expr, build_statement};
 
 pub fn build_if(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>>{
     let mut inner = pair.into_inner();
-    
+
     // Parse the main IF clause
     let (condition, then_body) = {
         let mut if_clause_inner = inner
@@ -85,5 +85,5 @@ pub fn build_if(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>>{
         }
     }
     
-    Ok(Some(Statement::If { condition, then_body, elseif_clauses, else_body }))
+    Ok(Some(Statement::If(IfStatement { condition, then_body, elseif_clauses, else_body })))
 }

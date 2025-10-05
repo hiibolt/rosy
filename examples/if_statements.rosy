@@ -36,7 +36,7 @@ PROCEDURE RUN;
     WRITE 6 "ELSE clause works!"; {This should print}
   ENDIF;
   
-  WRITE 6 "Number is: " number; {Final output}
+  WRITE 6 "Number is: " ST(number); {Final output}
 ENDPROCEDURE; {End of main procedure}
 
 {Call the main procedure}
