@@ -28,7 +28,7 @@ impl RosyMPIContext {
     }
     // Coordinates a value array between all different processes
     //  according to the specified communication standard.
-    pub fn coordinate<T: Encode + Decode<()>> (
+    pub fn coordinate<T: Encode + Decode<()> + std::fmt::Debug> (
         &self,
 
         value: &mut Vec<T>,
@@ -40,36 +40,27 @@ impl RosyMPIContext {
                 // In this standard, each process sends to all other processes 
                 //  in its group.
                 //
-                // For example, for 8 processes and 2 groups,
-                // - Process 0 sends to 1, 2, 3
-                // - ...
-                // - Process 3 sends to 0, 1, 2
-                // - Process 4 sends to 5, 6, 7
-                // - ...
-                // - Process 7 sends to 4, 5, 6 
+                // For example, for 6 processes and 3 groups,
+                // - Process 0 sends/recieves from processes 2 and 4
+                // - Process 1 sends/recieves from processes 3 and 5
+                // - Process 2 sends/recieves from processes 0 and 4
+                // - Process 3 sends/recieves from processes 1 and 5
+                // - Process 4 sends/recieves from processes 0 and 2
+                // - Process 5 sends/recieves from processes 1 and 3
+                let group_num = self.get_group_num(num_groups)
+                    .context("Failed to get group number")?;
                 let num_groups = *num_groups as i32;
-
-                ensure!(self.size % num_groups == 0, "Total number of processes ({}) must be divisible by the number of processes per group ({})!", self.size, num_groups);
                 let processes_per_group = self.size / num_groups;
-                let group_id = self.rank / processes_per_group;
-                let group_start = group_id * processes_per_group;
-                let group_end = group_start + processes_per_group;
+                let group_id = self.rank % processes_per_group;
 
-                let mut other_nodes = Vec::new();
-                for r in group_start..group_end {
-                    if r != self.rank {
-                        other_nodes.push(r);
-                    }
-                }
+                let other_nodes: Vec<i32> = (0..self.size)
+                    .filter(|r| (r % processes_per_group) == group_id && *r != self.rank)
+                    .collect();
 
                 // Get the value we're going to be sending,
-                //  which is the group_id'th element of the array
-                let binary_value: Vec<u8> = if (group_id as usize) < value.len() {
-                    bincode::encode_to_vec(&value[group_id as usize], self.bincode_config)
-                        .context("Failed to serialize value for communication")?
-                } else {
-                    bail!("Not enough elements in value array to coordinate! Expected at least {} elements, found {}", group_id + 1, value.len());
-                };
+                //  which is the group_num'th element of the array
+                let binary_value: Vec<u8> = bincode::encode_to_vec(&value[group_num as usize], self.bincode_config)
+                    .context("Failed to serialize value for communication")?;
 
                 // Send this value to all other nodes in the group
                 for to_send in other_nodes.iter() {
@@ -80,19 +71,13 @@ impl RosyMPIContext {
                 // Now receive values from all other nodes in the group
                 for _ in other_nodes.iter() {
                     let (msg, status) = self.world.any_process().receive_vec::<u8>();
-
-                    let (decoded_value, _): (T, usize) = bincode::decode_from_slice(
-                        &msg,
-                        self.bincode_config
-                    ).context("Failed to decode received value")?;
-
-                    // Place this value in the array at the index of the sender's rank
-                    let sender_rank = status.source_rank();
-                    if (sender_rank as usize) < value.len() {
-                        value[sender_rank as usize] = decoded_value;
-                    } else {
-                        bail!("Not enough elements in value array to coordinate! Expected at least {} elements, found {}", sender_rank + 1, value.len());
-                    }
+                    let recieved_from = status.source_rank() as usize;
+                    let (decoded_value, _): (T, _) = bincode::decode_from_slice(&msg, self.bincode_config)
+                        .context("Failed to deserialize received value")?;
+                    
+                    // Store the received value in the appropriate position
+                    let recieved_from_group = (recieved_from as i32) / processes_per_group;
+                    value[recieved_from_group as usize] = decoded_value;
                 }
 
                 Ok(())
@@ -100,17 +85,17 @@ impl RosyMPIContext {
             _ => bail!( "Unsupported communication standard: {}", communication_standard )
         }
     }
-    pub fn get_rank ( 
+    pub fn get_group_num ( 
         &self,
         num_groups: &mut RE
     ) -> Result<RE> {
         let num_groups = *num_groups as i32;
+        let processes_per_group = self.size / num_groups;
 
         ensure!(self.size % num_groups == 0, "Total number of processes ({}) must be divisible by the number of processes per group ({})!", self.size, num_groups);
-        let processes_per_group = self.size / num_groups;
-        let rank_in_group = self.rank % processes_per_group;
+        let group_num = self.rank / processes_per_group;
 
-        Ok(rank_in_group as RE)
+        Ok(group_num as RE)
     }
     fn _get_root_rank ( 
         &self,

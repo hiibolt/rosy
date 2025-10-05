@@ -1,0 +1,33 @@
+#!/bin/bash
+#PBS -N rosy
+#PBS -l select=100:ncpus=1:mpiprocs=1
+#PBS -l walltime=00:10:00
+#PBS -j oe
+#PBS -o rosy.out
+
+# Change to the directory from which the job was submitted
+cd $PBS_O_WORKDIR
+
+# Load MPI modules
+echo ""
+echo "[ Loading Modules ]"
+module purge
+module load openmpi/openmpi-5.0.7-gcc-14.2.0-cuda-12.8
+
+# Build - and set the path to - your compiled Rust binary
+echo ""
+echo "[ Building Program ]"
+cargo run --bin rosy_transpiler examples/ploop.rosy && \
+RUST_BIN=./target/release/rosy_output && \
+
+# Run with 2 processes (1 per node)
+echo "" && \
+echo "[ Starting Program ]" && \
+time mpirun -np 100 -hostfile $PBS_NODEFILE $RUST_BIN
+
+# Test with regular COSY
+echo ""
+echo "[ Testing with COSY ]"
+COSY_BIN=/home/z1994244/projects/cosy/types/cosy
+COSY_SRCFILE=/home/z1994244/projects/cosy/types/ploop_stresstest.fox
+time mpirun -np 100 -hostfile $PBS_NODEFILE $COSY_BIN $COSY_SRCFILE

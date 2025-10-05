@@ -1,12 +1,13 @@
 BEGIN;
     VARIABLE (RE) NP;
-    NP := 1 ;
+    NP := 100 ;
     VARIABLE (RE NP) X ;
     
     PLOOP I 1 NP ;
         X[I] := I + 11 ;
     ENDPLOOP X ;
 
+    WRITE 6 "Final values of X:" ;
     LOOP I 1 NP ;
         WRITE 6 "X[" ST(I) "] = " ST(X[I]) ;
     ENDLOOP ;

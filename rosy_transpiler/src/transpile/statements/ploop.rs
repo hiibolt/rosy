@@ -119,7 +119,7 @@ impl Transpile for PLoopStatement {
         let iterator_declaration_serialization = {
             requested_variables.insert("rosy_mpi_context".to_string());
             format!(
-                "let mut {} = rosy_mpi_context.get_rank(&mut {})? + 1.0f64;",
+                "let mut {} = rosy_mpi_context.get_group_num(&mut {})? + 1.0f64;",
                 self.iterator,
                 end_serialization
             )

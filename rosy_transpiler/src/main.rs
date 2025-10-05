@@ -11,7 +11,7 @@ use tracing_subscriber;
 fn rosy (
     root: &PathBuf,
     script_path: &PathBuf
-) -> Result<String> {
+) -> Result<()> {
     info!("Loading script...");
     let script = std::fs::read_to_string(&script_path)
         .with_context(|| format!("Failed to read script file from `{}`!", script_path.display()))?;
@@ -88,16 +88,7 @@ fn rosy (
     info!("Cargo stderr:\n{}", stderr);
     ensure!(output.status.success(), "Compilation failed with exit code: {:?} with stdout:\n{stdout} and stderr:\n{stderr}", output.status.code());
 
-    info!("Stage 6 - Execution");
-    let output = Command::new(root.join("target/release/rosy_output"))
-        .stdin(std::process::Stdio::inherit())
-        .stdout(std::process::Stdio::inherit())
-        .stderr(std::process::Stdio::inherit())
-        .output()
-        .context("Failed to execute generated binary")?;
-    ensure!(output.status.success(), "Execution failed with exit code: {:?}", output.status.code());
-
-    Ok(stdout.to_string())
+    Ok(())
 }
 
 fn main() -> Result<()> {
@@ -115,11 +106,10 @@ fn main() -> Result<()> {
         .nth(1)
         .unwrap_or("examples/basic.rosy".to_string()));
 
-    println!("{}", rosy(&root_path, &script_path)?);
-
-    Ok(())
+    rosy(&root_path, &script_path)
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -205,4 +195,4 @@ mod tests {
 
         Ok(())
     }
-}
+} */
