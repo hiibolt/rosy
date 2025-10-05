@@ -1,14 +1,16 @@
 BEGIN;
     VARIABLE (RE) NP;
-    NP := 100 ;
+    NP := 10 ;
     VARIABLE (RE NP) X ;
     
     PLOOP I 1 NP ;
-        X[I] := I + 11 ;
+        LOOP J 1 100000000 ;
+            X[I] := X[I] + I + 11 + J ;
+        ENDLOOP ;
     ENDPLOOP X ;
 
     WRITE 6 "Final values of X:" ;
     LOOP I 1 NP ;
         WRITE 6 "X[" ST(I) "] = " ST(X[I]) ;
     ENDLOOP ;
-END;
+END ;
