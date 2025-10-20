@@ -9,6 +9,7 @@ mod procedure_call;
 mod function;
 mod function_call;
 mod r#if;
+mod da_init;
 
 pub use var_decl::build_var_decl;
 pub use write::build_write;
@@ -21,3 +22,4 @@ pub use procedure_call::build_procedure_call;
 pub use function::build_function;
 pub use function_call::build_function_call;
 pub use r#if::build_if;
+pub use da_init::build_da_init;

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::RosyType;
 
-use super::super::{RE, CM, VE};
+use super::super::{RE, CM, VE, DA};
 
 /*
 Allowed operation type combinations for addition:
@@ -37,10 +37,13 @@ pub fn get_return_type ( lhs: &RosyType, rhs: &RosyType ) -> Option<RosyType> {
             (RosyType::RE(), RosyType::RE(), RosyType::RE()),
             (RosyType::RE(), RosyType::CM(), RosyType::CM()),
             (RosyType::RE(), RosyType::VE(), RosyType::VE()),
+            (RosyType::RE(), RosyType::DA(), RosyType::DA()),
             (RosyType::CM(), RosyType::RE(), RosyType::CM()),
             (RosyType::CM(), RosyType::CM(), RosyType::CM()),
             (RosyType::VE(), RosyType::RE(), RosyType::VE()),
             (RosyType::VE(), RosyType::VE(), RosyType::VE()),
+            (RosyType::DA(), RosyType::RE(), RosyType::DA()),
+            (RosyType::DA(), RosyType::DA(), RosyType::DA()),
         );
         for (left, right, result) in all {
             m.insert((left, right), result);
@@ -77,6 +80,14 @@ impl RosyAdd<&VE> for &RE {
     }
 }
 
+// RE + DA
+impl RosyAdd<&DA> for &RE {
+    type Output = DA;
+    fn rosy_add(self, other: &DA) -> Self::Output {
+        other + *self
+    }
+}
+
 // CM + RE
 impl RosyAdd<&RE> for &CM {
     type Output = CM;
@@ -107,5 +118,21 @@ impl RosyAdd<&VE> for &VE {
             .zip(other.iter())
             .map(|(x, y)| x + y)
             .collect()
+    }
+}
+
+// DA + RE
+impl RosyAdd<&RE> for &DA {
+    type Output = DA;
+    fn rosy_add(self, other: &RE) -> Self::Output {
+        self + *other
+    }
+}
+
+// DA + DA
+impl RosyAdd<&DA> for &DA {
+    type Output = DA;
+    fn rosy_add(self, other: &DA) -> Self::Output {
+        self + other
     }
 }

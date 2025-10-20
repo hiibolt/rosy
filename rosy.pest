@@ -6,6 +6,7 @@ COMMENT = _{ "{" ~ (!"}" ~ ANY)* ~ "}" }
 program = { SOI ~ begin ~ statement* ~ end ~ EOI }
 statement   = _{ 
   var_decl 
+  | daini
   | write
   | read
   | assignment 
@@ -28,7 +29,7 @@ read = { "READ" ~ unit ~ variable_identifier ~ semicolon }
 var_decl = { "VARIABLE" ~ type ~ variable_name ~ semicolon }
 
 /// Keywords - define all reserved words
-keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" | "IF" | "ELSEIF" | "ELSE" | "ENDIF" | "TRUE" | "FALSE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
+keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" | "IF" | "ELSEIF" | "ELSE" | "ENDIF" | "TRUE" | "FALSE" | "DAINI" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
 
 /// [ IF / ELSEIF / ELSE / ENDIF ]
 if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
@@ -77,11 +78,17 @@ endif = { "ENDIF" ~ semicolon }
   end_ploop = { "ENDPLOOP" ~ unit? ~ variable_identifier ~ semicolon }
 
 /// [ INTRINSIC FUNCTIONS ]
-  builtin_function = _{ cm | st }
+  builtin_function = _{ cm | st | da }
   /// CM
   cm = { "CM(" ~ expr ~ ")" }
   /// ST - String conversion
   st = { "ST(" ~ expr ~ ")" }
+  /// DA - Create DA identity vector
+  da = { "DA" ~ "(" ~ expr ~ ")" }
+
+/// [ INTRINSIC PROCEDURES ]
+  /// [ DA ]
+  daini = { "DAINI" ~ expr ~ expr ~ semicolon }
 /// [ INTRINSIC TYPES ]
   type = { "(" ~ inner_type ~ expr* ~ ")"}
   inner_type = {
@@ -89,7 +96,8 @@ endif = { "ENDIF" ~ semicolon }
     "LO" |
     "VE" |
     "CM" |
-    "ST" }
+    "ST" |
+    "DA" }
 
 /// Assignment
 assignment  = { variable_identifier ~ ":=" ~ expr ~ semicolon }
@@ -119,5 +127,6 @@ variable_indexing = { "[" ~ expr ~ ("," ~ expr)* ~ "]" }
 variable_name  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
 number      = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 unit        = @{ ASCII_DIGIT+ }
+constant    = @{ ASCII_DIGIT+ }
 string      = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 semicolon   = { ";" }

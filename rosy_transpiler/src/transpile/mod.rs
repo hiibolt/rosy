@@ -57,7 +57,9 @@ impl TypeOf for Expr {
             Expr::Extract(extract_expr) => extract_expr.type_of(context)
                 .context("...while determining type of extraction expression")?,
             Expr::Complex(complex_expr) => complex_expr.type_of(context)
-                .context("...while determining type of complex conversion expression")?
+                .context("...while determining type of complex conversion expression")?,
+            Expr::DA(da_expr) => da_expr.type_of(context)
+                .context("...while determining type of DA expression")?
         })
     }
 }
@@ -135,6 +137,15 @@ impl Transpile for Statement {
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         // Handle analyzing the specific statement
         match &self {
+            Statement::DAInit(da_init_stmt) => match da_init_stmt.transpile(context) {
+                Ok(output) => Ok(output),
+                Err(vec_err) => Err(add_context_to_all(
+                    vec_err,
+                    format!(
+                        "...while transpiling DA initialization statement"
+                    )
+                ))
+            },
             Statement::VarDecl(var_decl_stmt) => match var_decl_stmt.transpile(context) {
                 Ok(output) => Ok(output),
                 Err(vec_err) => Err(add_context_to_all(

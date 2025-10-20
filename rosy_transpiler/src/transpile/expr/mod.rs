@@ -5,6 +5,7 @@ mod extract;
 mod add;
 mod string_convert;
 mod function_call;
+mod da;
 
 use crate::ast::*;
 use super::{Transpile, TranspilationInputContext, TranspilationOutput};
@@ -58,6 +59,10 @@ impl Transpile for Expr {
             Expr::Complex(complex_expr) => complex_expr.transpile(context)
                 .map_err(|e| e.into_iter().map(|err| {
                     err.context("...while transpiling complex expression")
+                }).collect::<Vec<Error>>()),
+            Expr::DA(da_expr) => da_expr.transpile(context)
+                .map_err(|e| e.into_iter().map(|err| {
+                    err.context("...while transpiling DA expression")
                 }).collect::<Vec<Error>>()),
         }
     }

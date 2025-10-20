@@ -19,9 +19,9 @@ lazy_static::lazy_static! {
         PrattParser::new()
             // Lowest precedence: concatenation (&)
             .op(Op::infix(concat, Left))
-            // Medium precedence: extraction (|)
+            // Extraction (|)
             .op(Op::infix(extract, Left))
-            // Highest precedence: addition (+)
+            // Addition
             .op(Op::infix(add, Left))
     };
 }
@@ -109,7 +109,13 @@ pub struct PLoopStatement {
     pub output: VariableIdentifier
 }
 #[derive(Debug)]
+pub struct DAInitStatement {
+    pub order: Expr,
+    pub number_of_variables: Expr,
+}
+#[derive(Debug)]
 pub enum Statement {
+    DAInit(DAInitStatement),
     VarDecl(VarDeclStatement),
     Write(WriteStatement),
     Read(ReadStatement),
@@ -156,6 +162,10 @@ pub struct StringConvertExpr {
     pub expr: Box<Expr>,
 }
 #[derive(Debug, Clone, PartialEq)]
+pub struct DAExpr {
+    pub index: Box<Expr>,
+}
+#[derive(Debug, Clone, PartialEq)]
 pub struct FunctionCallExpr {
     pub name: String,
     pub args: Vec<Expr>,
@@ -171,6 +181,7 @@ pub enum Expr {
     Extract(ExtractExpr),
     Complex(ComplexExpr),
     StringConvert(StringConvertExpr),
+    DA(DAExpr),
     FunctionCall(FunctionCallExpr),
 }
 
@@ -216,6 +227,7 @@ fn build_statement (
     pair: pest::iterators::Pair<Rule>
 ) -> Result<Option<Statement>> {
     match pair.as_rule() {
+        Rule::daini => statements::build_da_init(pair).context("...while building DA initialization statement!"),
         Rule::var_decl => statements::build_var_decl(pair).context("...while building variable declaration!"),
         Rule::write => statements::build_write(pair).context("...while building write statement!"),
         Rule::read => statements::build_read(pair).context("...while building read statement!"),
@@ -323,6 +335,13 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                     .context("Missing inner expression for `ST`!")?;
                 let expr = Box::new(build_expr(expr_pair)?);
                 Ok(Expr::StringConvert(StringConvertExpr { expr }))
+            },
+            Rule::da => {
+                let mut inner = primary.into_inner();
+                let expr_pair = inner.next()
+                    .context("Missing inner expression for `DA`!")?;
+                let index = Box::new(build_expr(expr_pair)?);
+                Ok(Expr::DA(DAExpr { index }))
             },
             Rule::expr => build_expr(primary),
             _ => bail!("Unexpected primary expr: {:?}", primary.as_rule()),

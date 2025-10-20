@@ -5,6 +5,7 @@
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 
+use dace::*;
 use rosy_lib::*;
 use anyhow::{Result, Context, ensure, bail};
 

@@ -1,0 +1,25 @@
+BEGIN;
+
+VARIABLE (RE) order;
+VARIABLE (RE) num_vars;
+
+{ Initialize DA system to order 3 with 2 variables }
+order := 3;
+num_vars := 2;
+DAINI order num_vars;
+
+{ Now declare DA variables after DA system is initialized }
+VARIABLE (DA) x;
+VARIABLE (DA) y;
+VARIABLE (DA) result;
+
+{ Create DA vectors: x = x1, y = x2 }
+x := DA(1);
+y := DA(2);
+
+{ Test basic addition: result = x + y }
+result := x + y;
+WRITE 6 "x + y =";
+WRITE 6 ST(result);
+
+END;

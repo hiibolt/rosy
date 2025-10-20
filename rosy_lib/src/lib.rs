@@ -8,18 +8,21 @@ pub use intrinsics::*;
 pub use core::*;
 pub use mpi::*;
 
+// Re-export dace types
+pub use dace::DA;
+
 pub type RE = f64;
 pub type ST = String;
 pub type LO = bool;
 pub type CM = (f64, f64);
 pub type VE = Vec<f64>;
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RosyType {
     pub base_type: RosyBaseType,
     pub dimensions: usize
 }
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RosyBaseType {
     RE,
@@ -27,6 +30,7 @@ pub enum RosyBaseType {
     LO,
     CM,
     VE,
+    DA,
 }
 impl std::fmt::Display for RosyType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -81,6 +85,13 @@ impl RosyType {
             dimensions: 0
         }
     }
+    #[allow(non_snake_case)]
+    pub fn DA ( ) -> Self {
+        RosyType {
+            base_type: RosyBaseType::DA,
+            dimensions: 0
+        }
+    }
 
     pub fn as_rust_type (&self) -> String {
         let base = match self.base_type {
@@ -88,7 +99,8 @@ impl RosyType {
             RosyBaseType::ST => "String",
             RosyBaseType::LO => "bool",
             RosyBaseType::CM => "(f64, f64)",
-            RosyBaseType::VE => "Vec<f64>"
+            RosyBaseType::VE => "Vec<f64>",
+            RosyBaseType::DA => "DA",
         }.to_string();
 
         if self.dimensions == 0 {
@@ -111,6 +123,7 @@ impl TryFrom<&str> for RosyBaseType {
             "LO" => Ok(RosyBaseType::LO),
             "CM" => Ok(RosyBaseType::CM),
             "VE" => Ok(RosyBaseType::VE),
+            "DA" => Ok(RosyBaseType::DA),
             _ => Err(anyhow::anyhow!("Can't convert {} to a ROSY type", value)),
         }
     }
