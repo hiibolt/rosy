@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::RosyType;
-use super::super::{RE, CM, VE, LO, ST, DA};
+use super::super::{RE, CM, VE, LO, ST;
 
 pub fn get_return_type ( lhs: &RosyType ) -> Option<RosyType> {
     let registry: HashMap<RosyType, RosyType> = {
@@ -12,7 +12,6 @@ pub fn get_return_type ( lhs: &RosyType ) -> Option<RosyType> {
             (RosyType::LO(), RosyType::ST()),
             (RosyType::CM(), RosyType::ST()),
             (RosyType::VE(), RosyType::ST()),
-            (RosyType::DA(), RosyType::ST()),
         );
         for (left, result) in all {
             m.insert(left, result);
@@ -66,12 +65,5 @@ impl RosyST for &CM {
         } else {
             format!("({} - {}i)", real, -imag)
         }
-    }
-}
-
-/// Convert DA vectors to strings
-impl RosyST for &DA {
-    fn rosy_to_string(self) -> String {
-        format!("{:?}", self)
     }
 }
