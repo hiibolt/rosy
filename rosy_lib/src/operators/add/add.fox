@@ -1,0 +1,13 @@
+BEGIN;
+
+PROCEDURE RUN;
+    VARIABLE X 1;
+    VARIABLE Y 1;
+    X := 2;
+    Y := -3;
+
+    WRITE 6 (X + Y);
+ENDPROCEDURE;
+
+RUN;
+END;

@@ -955,6 +955,7 @@ dependencies = [
  "bincode",
  "dace",
  "mpi",
+ "serial_test",
 ]
 
 [[package]]

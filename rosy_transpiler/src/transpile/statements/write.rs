@@ -11,21 +11,25 @@ impl Transpile for WriteStatement {
         let mut serialized_exprs = Vec::new();
         let mut requested_variables = BTreeSet::new();
         for expr in &self.exprs {
-            // First, ensure the expression is an ST
+            // First, ensure the expression is an ST, RE
             let expr_type = expr.type_of(context)
                 .map_err(|e| vec!(e.context("...while determining type of expression in WRITE statement")))?;
-            if expr_type != RosyType::ST() {
+            let valid_types = vec!(RosyType::ST(), RosyType::RE());
+            if !valid_types.contains(&expr_type) {
                 return Err(vec!(anyhow!(
-                    "Cannot WRITE expression of type '{}'! Only expressions of type 'ST' can be written.",
+                    "Cannot WRITE expression of type '{}'! Only expressions of type {valid_types:?} can be written.",
                     expr_type
                 )));
             }
 
             // Second, transpile the expression
+            let expr_as_st = Expr::StringConvert(StringConvertExpr { 
+                expr: Box::new(expr.clone()) 
+            });
             let TranspilationOutput {
                 serialization: serialized_expr,
                 requested_variables: expr_requested_variables
-            } = expr.transpile(context)
+            } = expr_as_st.transpile(context)
                 .map_err(|e| e.into_iter().map(|err| {
                     err.context("...while transpiling expression in WRITE statement")
                 }).collect::<Vec<Error>>())?;

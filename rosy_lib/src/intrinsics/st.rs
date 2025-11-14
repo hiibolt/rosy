@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::RosyType;
-use super::super::{RE, CM, VE, LO, ST;
+use super::super::{RE, CM, VE, LO, ST};
 
 pub fn get_return_type ( lhs: &RosyType ) -> Option<RosyType> {
     let registry: HashMap<RosyType, RosyType> = {
@@ -30,7 +30,11 @@ pub trait RosyST {
 /// Convert real numbers to strings
 impl RosyST for &RE {
     fn rosy_to_string(self) -> String {
-        self.to_string()
+        format!(
+            " {}{:.15}", 
+            if self.is_sign_negative() { "-" } else { " " },
+            self.abs()
+        )
     }
 }
 
