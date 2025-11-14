@@ -948,36 +948,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "caf4aa5b0f434c91fe5c7f1ecb6a5ece2130b02ad2a590589dda5146df959001"
 
 [[package]]
-name = "rosy_lib"
+name = "rosy_transpiler"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "bincode",
  "dace",
- "mpi",
- "serial_test",
-]
-
-[[package]]
-name = "rosy_output"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "dace",
- "mpi",
- "rosy_lib",
-]
-
-[[package]]
-name = "rosy_transpiler"
-version = "0.1.0"
-dependencies = [
- "anyhow",
  "impls",
  "lazy_static",
+ "mpi",
  "pest",
  "pest_derive",
- "rosy_lib",
  "serial_test",
  "tracing",
  "tracing-subscriber",

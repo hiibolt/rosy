@@ -3,6 +3,9 @@
 .envrc
 */target
 /outputs
+.rosy_output
+rosy_output
 cosy-spec.md
 *.out
 *.lis
+./*.fox
