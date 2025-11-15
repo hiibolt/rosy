@@ -22,9 +22,12 @@ impl Transpile for DAExpr {
                     .collect::<Vec<_>>()
             })?;
 
-        // Use DA::from(f64) to create a DA from a variable index
-        // The dace library implements From<f64> for DA
-        let serialization = format!("DA::from(({}).to_owned())", index_output.serialization);
+        // Use DA::variable(usize) to create a DA differential variable
+        // Clone the index (which is &mut T) to get an owned value for casting
+        let serialization = format!(
+            "(&mut DA::variable(({}).clone() as usize)?)",
+            index_output.serialization
+        );
 
         Ok(TranspilationOutput {
             serialization,

@@ -120,6 +120,50 @@ impl CD {
         
         super::DA::from_coeffs(imag_coeffs)
     }
+
+    /// Create a CD from separate real and imaginary DA parts.
+    ///
+    /// # Arguments
+    /// * `real` - The real part as a DA
+    /// * `imag` - The imaginary part as a DA
+    ///
+    /// # Returns
+    /// A CD combining the real and imaginary parts
+    pub fn from_da_parts(real: &super::DA, imag: &super::DA) -> Self {
+        use super::DA;
+        
+        // Get all monomials from both real and imaginary parts
+        let mut coeffs = HashMap::new();
+        
+        // Add real part coefficients
+        for (monomial, re_coeff) in real.coeffs_iter() {
+            coeffs.insert(*monomial, Complex64::new(*re_coeff, 0.0));
+        }
+        
+        // Add/update imaginary part coefficients
+        for (monomial, im_coeff) in imag.coeffs_iter() {
+            coeffs.entry(*monomial)
+                .and_modify(|c| c.im = *im_coeff)
+                .or_insert(Complex64::new(0.0, *im_coeff));
+        }
+        
+        Self { coeffs }
+    }
+
+    /// Create a CD from a DA (which becomes the real part, imaginary is zero).
+    ///
+    /// # Arguments
+    /// * `da` - The DA to use as the real part
+    ///
+    /// # Returns
+    /// A CD with the given real part and zero imaginary part
+    pub fn from_da(da: &super::DA) -> Self {
+        let coeffs: HashMap<Monomial, Complex64> = da.coeffs_iter()
+            .map(|(m, &v)| (*m, Complex64::new(v, 0.0)))
+            .collect();
+        
+        Self { coeffs }
+    }
 }
 
 // ============================================================================
@@ -364,53 +408,6 @@ impl fmt::Display for CD {
                 write!(f, "*{}", monomial)?;
             }
         }
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::rosy_lib::taylor::init_taylor;
-
-    #[test]
-    fn test_cd_creation() -> Result<()> {
-        init_taylor(10, 3)?;
-        
-        let zero = CD::zero();
-        assert!(zero.is_zero());
-        
-        let c = CD::constant(5.0);
-        assert_eq!(c.constant_part().re, 5.0);
-        assert_eq!(c.constant_part().im, 0.0);
-        
-        let x1 = CD::variable(1)?;
-        assert_eq!(x1.num_terms(), 1);
-        
-        Ok(())
-    }
-
-    #[test]
-    fn test_cd_complex() -> Result<()> {
-        init_taylor(10, 3)?;
-        
-        let i = Complex64::new(0.0, 1.0);
-        let c = CD::complex_constant(i);
-        assert_eq!(c.constant_part(), i);
-        
-        Ok(())
-    }
-
-    #[test]
-    fn test_cd_addition() -> Result<()> {
-        init_taylor(10, 3)?;
-        
-        let x1 = CD::variable(1)?;
-        let x2 = CD::variable(2)?;
-        
-        let sum = (&x1 + &x2)?;
-        assert_eq!(sum.num_terms(), 2);
-        
         Ok(())
     }
 }

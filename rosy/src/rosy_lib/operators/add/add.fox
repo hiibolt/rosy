@@ -1,12 +1,193 @@
 BEGIN;
 
 PROCEDURE RUN;
-    VARIABLE X 1;
-    VARIABLE Y 1;
-    X := 2;
-    Y := -3;
+    { All variable declarations must come first in FOX/COSY }
+    VARIABLE NM 1;
+    VARIABLE LHS_0 1;
+    VARIABLE RHS_0 1;
+    VARIABLE RESULT_0 1;
+    VARIABLE LHS_1 1;
+    VARIABLE RHS_1 2;
+    VARIABLE RESULT_1 2;
+    VARIABLE LHS_2 1;
+    VARIABLE RHS_2 3;
+    VARIABLE RESULT_2 3;
+    VARIABLE LHS_3 1;
+    VARIABLE RHS_3 1;
+    VARIABLE RESULT_3 1;
+    VARIABLE LHS_4 1;
+    VARIABLE RHS_4 100;
+    VARIABLE RESULT_4 100;
+    VARIABLE LHS_5 1;
+    VARIABLE RHS_5 1;
+    VARIABLE RESULT_5 1;
+    VARIABLE LHS_6 2;
+    VARIABLE RHS_6 1;
+    VARIABLE RESULT_6 2;
+    VARIABLE LHS_7 2;
+    VARIABLE RHS_7 2;
+    VARIABLE RESULT_7 2;
+    VARIABLE LHS_8 2;
+    VARIABLE RHS_8 1;
+    VARIABLE RESULT_8 100;
+    VARIABLE LHS_9 2;
+    VARIABLE RHS_9 100;
+    VARIABLE RESULT_9 100;
+    VARIABLE LHS_10 3;
+    VARIABLE RHS_10 1;
+    VARIABLE RESULT_10 3;
+    VARIABLE LHS_11 3;
+    VARIABLE RHS_11 3;
+    VARIABLE RESULT_11 3;
+    VARIABLE LHS_12 1;
+    VARIABLE RHS_12 1;
+    VARIABLE RESULT_12 1;
+    VARIABLE LHS_13 1;
+    VARIABLE RHS_13 2;
+    VARIABLE RESULT_13 100;
+    VARIABLE LHS_14 1;
+    VARIABLE RHS_14 1;
+    VARIABLE RESULT_14 1;
+    VARIABLE LHS_15 1;
+    VARIABLE RHS_15 100;
+    VARIABLE RESULT_15 100;
+    VARIABLE LHS_16 100;
+    VARIABLE RHS_16 1;
+    VARIABLE RESULT_16 100;
+    VARIABLE LHS_17 100;
+    VARIABLE RHS_17 2;
+    VARIABLE RESULT_17 100;
+    VARIABLE LHS_18 100;
+    VARIABLE RHS_18 1;
+    VARIABLE RESULT_18 100;
+    VARIABLE LHS_19 100;
+    VARIABLE RHS_19 100;
+    VARIABLE RESULT_19 100;
 
-    WRITE 6 (X + Y);
+    { Initialize DA system for tests that use DA/CD types }
+    { DAINI: order 1, number_of_variables 1, mode 0 (see COSY manual) }
+    DAINI 1 1 0 NM;
+
+    { Test 0: RE + RE => RE }
+    LHS_0 := 2.5;
+    RHS_0 := 2.5;
+    RESULT_0 := LHS_0 + RHS_0;
+    WRITE 6 'Test0: RE + RE => RE';
+
+    { Test 1: RE + CM => CM }
+    LHS_1 := 2.5;
+    RHS_1 := CM(1.0&2.0);
+    RESULT_1 := LHS_1 + RHS_1;
+    WRITE 6 'Test1: RE + CM => CM';
+
+    { Test 2: RE + VE => VE }
+    LHS_2 := 2.5;
+    RHS_2 := 1.0;
+    RESULT_2 := LHS_2 + RHS_2;
+    WRITE 6 'Test2: RE + VE => VE';
+
+    { Test 3: RE + DA => DA }
+    LHS_3 := 2.5;
+    RHS_3 := 1.5;
+    RESULT_3 := LHS_3 + RHS_3;
+    WRITE 6 'Test3: RE + DA => DA';
+
+    { Test 4: RE + CD => CD }
+    LHS_4 := 2.5;
+    RHS_4 := CM(1.0&0.5);
+    RESULT_4 := LHS_4 + RHS_4;
+    WRITE 6 'Test4: RE + CD => CD';
+
+    { Test 5: LO + LO => LO }
+    LHS_5 := 1;
+    RHS_5 := 1;
+    RESULT_5 := LHS_5 + RHS_5;
+    WRITE 6 'Test5: LO + LO => LO';
+
+    { Test 6: CM + RE => CM }
+    LHS_6 := CM(1.0&2.0);
+    RHS_6 := 2.5;
+    RESULT_6 := LHS_6 + RHS_6;
+    WRITE 6 'Test6: CM + RE => CM';
+
+    { Test 7: CM + CM => CM }
+    LHS_7 := CM(1.0&2.0);
+    RHS_7 := CM(1.0&2.0);
+    RESULT_7 := LHS_7 + RHS_7;
+    WRITE 6 'Test7: CM + CM => CM';
+
+    { Test 8: CM + DA => CD }
+    LHS_8 := CM(1.0&2.0);
+    RHS_8 := 1.5;
+    RESULT_8 := LHS_8 + RHS_8;
+    WRITE 6 'Test8: CM + DA => CD';
+
+    { Test 9: CM + CD => CD }
+    LHS_9 := CM(1.0&2.0);
+    RHS_9 := CM(1.0&0.5);
+    RESULT_9 := LHS_9 + RHS_9;
+    WRITE 6 'Test9: CM + CD => CD';
+
+    { Test 10: VE + RE => VE }
+    LHS_10 := 1.0;
+    RHS_10 := 2.5;
+    RESULT_10 := LHS_10 + RHS_10;
+    WRITE 6 'Test10: VE + RE => VE';
+
+    { Test 11: VE + VE => VE }
+    LHS_11 := 1.0;
+    RHS_11 := 1.0;
+    RESULT_11 := LHS_11 + RHS_11;
+    WRITE 6 'Test11: VE + VE => VE';
+
+    { Test 12: DA + RE => DA }
+    LHS_12 := 1.5;
+    RHS_12 := 2.5;
+    RESULT_12 := LHS_12 + RHS_12;
+    WRITE 6 'Test12: DA + RE => DA';
+
+    { Test 13: DA + CM => CD }
+    LHS_13 := 1.5;
+    RHS_13 := CM(1.0&2.0);
+    RESULT_13 := LHS_13 + RHS_13;
+    WRITE 6 'Test13: DA + CM => CD';
+
+    { Test 14: DA + DA => DA }
+    LHS_14 := 1.5;
+    RHS_14 := 1.5;
+    RESULT_14 := LHS_14 + RHS_14;
+    WRITE 6 'Test14: DA + DA => DA';
+
+    { Test 15: DA + CD => CD }
+    LHS_15 := 1.5;
+    RHS_15 := CM(1.0&0.5);
+    RESULT_15 := LHS_15 + RHS_15;
+    WRITE 6 'Test15: DA + CD => CD';
+
+    { Test 16: CD + RE => CD }
+    LHS_16 := CM(1.0&0.5);
+    RHS_16 := 2.5;
+    RESULT_16 := LHS_16 + RHS_16;
+    WRITE 6 'Test16: CD + RE => CD';
+
+    { Test 17: CD + CM => CD }
+    LHS_17 := CM(1.0&0.5);
+    RHS_17 := CM(1.0&2.0);
+    RESULT_17 := LHS_17 + RHS_17;
+    WRITE 6 'Test17: CD + CM => CD';
+
+    { Test 18: CD + DA => CD }
+    LHS_18 := CM(1.0&0.5);
+    RHS_18 := 1.5;
+    RESULT_18 := LHS_18 + RHS_18;
+    WRITE 6 'Test18: CD + DA => CD';
+
+    { Test 19: CD + CD => CD }
+    LHS_19 := CM(1.0&0.5);
+    RHS_19 := CM(1.0&0.5);
+    RESULT_19 := LHS_19 + RHS_19;
+    WRITE 6 'Test19: CD + CD => CD';
+
 ENDPROCEDURE;
 
 RUN;

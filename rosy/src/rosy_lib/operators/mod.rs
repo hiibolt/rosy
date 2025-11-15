@@ -1,3 +1,4 @@
+pub mod registry;
 pub mod add;
 pub mod extract;
 pub mod concat;

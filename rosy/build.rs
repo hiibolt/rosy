@@ -2,9 +2,16 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::io::Write;
 
+mod operator_codegen;
+
 fn main() {
     // Re-run if rosy_lib changes
     println!("cargo:rerun-if-changed=src/rosy_lib");
+    
+    // Generate operator test files
+    operator_codegen::codegen_operator("add");
+    // operator_codegen::codegen_operator("extract");  // Add when ready
+    // operator_codegen::codegen_operator("concat");   // Add when ready
     
     // Generate the embedded files at compile time
     let out_dir = std::env::var("OUT_DIR").unwrap();
@@ -55,9 +62,9 @@ fn collect_files(root: &Path, current: &Path) -> Vec<PathBuf> {
             if path.is_dir() {
                 files.extend(collect_files(root, &path));
             } else if path.is_file() {
-                // Include .rs, .rosy, and .fox files
+                // Include .rs, .rosy, .fox, and .md files
                 if let Some(ext) = path.extension() {
-                    if ext == "rs" || ext == "rosy" || ext == "fox" {
+                    if ext == "rs" || ext == "rosy" || ext == "fox" || ext == "md" {
                         if let Ok(relative) = path.strip_prefix(root) {
                             files.push(relative.to_path_buf());
                         }

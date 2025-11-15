@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::rosy_lib::RosyType;
-use crate::rosy_lib::{RE, CM, VE};
+use crate::rosy_lib::{RE, CM, VE, CD};
 use anyhow::{Result, ensure};
 
 pub fn get_return_type ( lhs: &RosyType ) -> Option<RosyType> {
@@ -11,6 +11,7 @@ pub fn get_return_type ( lhs: &RosyType ) -> Option<RosyType> {
             (RosyType::RE(), RosyType::CM()),
             (RosyType::CM(), RosyType::CM()),
             (RosyType::VE(), RosyType::CM()),
+            (RosyType::CD(), RosyType::CM()),
         );
         for (left, result) in all {
             m.insert(left, result);
@@ -43,5 +44,13 @@ impl RosyCM for &VE {
         ensure!(self.len() == 2, "Cannot convert vector of length {} to CM (complex), must have exactly 2 elements!", self.len());
 
         Ok((self[0], self[1]))
+    }
+}
+
+// CD -> CM (extract constant part)
+impl RosyCM for &CD {
+    fn rosy_cm(self) -> Result<CM> {
+        let c = self.constant_part();
+        Ok((c.re, c.im))
     }
 }

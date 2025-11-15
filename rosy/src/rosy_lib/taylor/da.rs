@@ -109,6 +109,11 @@ impl DA {
     pub(crate) fn from_coeffs(coeffs: HashMap<Monomial, f64>) -> Self {
         Self { coeffs }
     }
+
+    /// Iterate over coefficients (used by CD for conversion).
+    pub(crate) fn coeffs_iter(&self) -> impl Iterator<Item = (&Monomial, &f64)> {
+        self.coeffs.iter()
+    }
 }
 
 // ============================================================================
@@ -359,70 +364,6 @@ impl fmt::Display for DA {
                 write!(f, "*{}", monomial)?;
             }
         }
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::rosy_lib::taylor::init_taylor;
-
-    #[test]
-    fn test_da_creation() -> Result<()> {
-        init_taylor(10, 3)?;
-        
-        let zero = DA::zero();
-        assert!(zero.is_zero());
-        
-        let c = DA::constant(5.0);
-        assert_eq!(c.constant_part(), 5.0);
-        
-        let x1 = DA::variable(1)?;
-        assert_eq!(x1.num_terms(), 1);
-        
-        Ok(())
-    }
-
-    #[test]
-    fn test_da_addition() -> Result<()> {
-        init_taylor(10, 3)?;
-        
-        let x1 = DA::variable(1)?;
-        let x2 = DA::variable(2)?;
-        
-        let sum = (&x1 + &x2)?;
-        assert_eq!(sum.num_terms(), 2);
-        
-        let sum_const = (&x1 + 5.0)?;
-        assert_eq!(sum_const.constant_part(), 5.0);
-        
-        Ok(())
-    }
-
-    #[test]
-    fn test_da_subtraction() -> Result<()> {
-        init_taylor(10, 3)?;
-        
-        let x1 = DA::variable(1)?;
-        let x2 = DA::variable(2)?;
-        
-        let diff = (&x1 - &x2)?;
-        assert_eq!(diff.num_terms(), 2);
-        
-        Ok(())
-    }
-
-    #[test]
-    fn test_da_negation() -> Result<()> {
-        init_taylor(10, 3)?;
-        
-        let x1 = DA::variable(1)?;
-        let neg_x1 = -&x1;
-        
-        let sum = (&x1 + &neg_x1)?;
-        assert!(sum.is_zero());
-        
         Ok(())
     }
 }

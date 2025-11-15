@@ -19,7 +19,7 @@ impl Transpile for Expr {
     ) -> Result<TranspilationOutput, Vec<Error>> {
         match self {
             Expr::Number(n) => Ok(TranspilationOutput {
-                serialization: format!("&mut {n}f64"),
+                serialization: format!("&mut ({n}f64)"),
                 requested_variables: BTreeSet::new(),
             }),
             Expr::String(s) => Ok(TranspilationOutput {

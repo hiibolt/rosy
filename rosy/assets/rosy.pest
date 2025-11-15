@@ -97,7 +97,8 @@ endif = { "ENDIF" ~ semicolon }
     "VE" |
     "CM" |
     "ST" |
-    "DA" }
+    "DA" |
+    "CD" }
 
 /// Assignment
 assignment  = { variable_identifier ~ ":=" ~ expr ~ semicolon }

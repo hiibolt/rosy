@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::rosy_lib::RosyType;
-use crate::rosy_lib::{RE, CM, VE, LO, ST};
+use crate::rosy_lib::{RE, CM, VE, LO, ST, DA, CD};
 
 pub fn get_return_type ( lhs: &RosyType ) -> Option<RosyType> {
     let registry: HashMap<RosyType, RosyType> = {
@@ -12,6 +12,8 @@ pub fn get_return_type ( lhs: &RosyType ) -> Option<RosyType> {
             (RosyType::LO(), RosyType::ST()),
             (RosyType::CM(), RosyType::ST()),
             (RosyType::VE(), RosyType::ST()),
+            (RosyType::DA(), RosyType::ST()),
+            (RosyType::CD(), RosyType::ST()),
         );
         for (left, result) in all {
             m.insert(left, result);
@@ -69,5 +71,19 @@ impl RosyST for &CM {
         } else {
             format!("({} - {}i)", real, -imag)
         }
+    }
+}
+
+/// Convert Differential Algebra (DA) to strings
+impl RosyST for &DA {
+    fn rosy_to_string(self) -> String {
+        format!("DA[{} terms]", self.num_terms())
+    }
+}
+
+/// Convert Complex Differential Algebra (CD) to strings
+impl RosyST for &CD {
+    fn rosy_to_string(self) -> String {
+        format!("CD[{} terms]", self.num_terms())
     }
 }

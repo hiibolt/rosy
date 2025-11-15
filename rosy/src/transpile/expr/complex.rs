@@ -9,7 +9,7 @@ impl TypeOf for ComplexExpr {
             .map_err(|e| e.context("...while determining type of expression for complex conversion"))?;
         let result_type = crate::rosy_lib::intrinsics::cm::get_return_type(&expr_type)
             .ok_or(anyhow::anyhow!(
-                "Cannot convert type '{}' to 'CP'!",
+                "Cannot convert type '{}' to 'CM'!",
                 expr_type
             ))?;
         Ok(result_type)

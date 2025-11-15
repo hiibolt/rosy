@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::rosy_lib::RosyType;
 
-use crate::rosy_lib::{RE, ST, VE};
+use crate::rosy_lib::{RE, ST, VE, DA, CD};
 
 /*
 Allowed operation type combinations for concatenation:
@@ -12,6 +12,7 @@ RE VE VE Append a Real to the left of a Vector
 ST ST ST Concatenate two Strings
 VE RE VE Append a Real to the right of a Vector
 VE VE VE Concatenate two Vectors
+DA DA CD Concatenate two DAs into a CD (real & imaginary)
 */
 
 pub fn get_return_type ( lhs: &RosyType, rhs: &RosyType ) -> Option<RosyType> {
@@ -23,6 +24,7 @@ pub fn get_return_type ( lhs: &RosyType, rhs: &RosyType ) -> Option<RosyType> {
             (RosyType::ST(), RosyType::ST(), RosyType::ST()),
             (RosyType::VE(), RosyType::RE(), RosyType::VE()),
             (RosyType::VE(), RosyType::VE(), RosyType::VE()),
+            (RosyType::DA(), RosyType::DA(), RosyType::CD()),
         );
         for (left, right, result) in all {
             m.insert((left, right), result);
@@ -78,5 +80,13 @@ impl RosyConcat<&VE> for &VE {
         let mut result = self.clone();
         result.extend_from_slice(other);
         result
+    }
+}
+
+// DA + DA -> CD
+impl RosyConcat<&DA> for &DA {
+    type Output = CD;
+    fn rosy_concat(self, other: &DA) -> Self::Output {
+        CD::from_da_parts(self, other)
     }
 }
