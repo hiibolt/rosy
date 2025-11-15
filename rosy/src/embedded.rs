@@ -51,6 +51,7 @@ mpi = "0.8"
 bincode = "2.0"
 dace = "0.2"
 serial_test = "3.2"
+num-complex = "0.4"
 "#;
     
     std::fs::write(lib_dir.join("Cargo.toml"), lib_cargo_toml)

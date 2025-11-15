@@ -15,7 +15,8 @@ impl Transpile for VariableData {
             RosyBaseType::LO => "false",
             RosyBaseType::CM => "(0.0, 0.0)",
             RosyBaseType::VE => "vec![]",
-            RosyBaseType::DA => "DA::new()"
+            RosyBaseType::DA => "DA::zero()",
+            RosyBaseType::CD => "CD::zero()"
         }.to_string();
 
         let mut requested_variables = BTreeSet::new();

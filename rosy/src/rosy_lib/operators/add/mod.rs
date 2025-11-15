@@ -34,8 +34,9 @@
 #![doc = "```"]
 
 use std::collections::HashMap;
+use anyhow::Result;
 use crate::rosy_lib::RosyType;
-use crate::rosy_lib::{RE, CM, VE, DA};
+use crate::rosy_lib::{RE, CM, VE, DA, CD};
 
 pub fn get_return_type ( lhs: &RosyType, rhs: &RosyType ) -> Option<RosyType> {
     let registry: HashMap<(RosyType, RosyType), RosyType> = {
@@ -63,34 +64,34 @@ pub fn get_return_type ( lhs: &RosyType, rhs: &RosyType ) -> Option<RosyType> {
 
 pub trait RosyAdd<Rhs = Self> {
     type Output;
-    fn rosy_add(self, rhs: Rhs) -> Self::Output;
+    fn rosy_add(self, rhs: Rhs) -> Result<Self::Output>;
 }
 // RE + RE
 impl RosyAdd<&RE> for &RE {
     type Output = RE;
-    fn rosy_add(self, rhs: &RE) -> Self::Output {
-        self + rhs
+    fn rosy_add(self, rhs: &RE) -> Result<Self::Output> {
+        Ok(self + rhs)
     }
 }
 // RE + CM
 impl RosyAdd<&CM> for &RE {
     type Output = CM;
-    fn rosy_add(self, other: &CM) -> Self::Output {
-        (self + other.0, other.1)
+    fn rosy_add(self, other: &CM) -> Result<Self::Output> {
+        Ok((self + other.0, other.1))
     }
 }
 // RE + VE
 impl RosyAdd<&VE> for &RE {
     type Output = VE;
-    fn rosy_add(self, other: &VE) -> Self::Output {
-        other.iter().map(|x| x + self).collect()
+    fn rosy_add(self, other: &VE) -> Result<Self::Output> {
+        Ok(other.iter().map(|x| x + self).collect())
     }
 }
 
 // RE + DA
 impl RosyAdd<&DA> for &RE {
     type Output = DA;
-    fn rosy_add(self, other: &DA) -> Self::Output {
+    fn rosy_add(self, other: &DA) -> Result<Self::Output> {
         other + *self
     }
 }
@@ -98,40 +99,40 @@ impl RosyAdd<&DA> for &RE {
 // CM + RE
 impl RosyAdd<&RE> for &CM {
     type Output = CM;
-    fn rosy_add(self, other: &RE) -> Self::Output {
-        (self.0 + other, self.1)
+    fn rosy_add(self, other: &RE) -> Result<Self::Output> {
+        Ok((self.0 + other, self.1))
     }
 }
 // CM + CM
 impl RosyAdd<&CM> for &CM {
     type Output = CM;
-    fn rosy_add(self, other: &CM) -> Self::Output {
-        (self.0 + other.0, self.1 + other.1)
+    fn rosy_add(self, other: &CM) -> Result<Self::Output> {
+        Ok((self.0 + other.0, self.1 + other.1))
     }
 }
 
 // VE + RE
 impl RosyAdd<&RE> for &VE {
     type Output = VE;
-    fn rosy_add(self, other: &RE) -> Self::Output {
-        self.iter().map(|x| x + other).collect()
+    fn rosy_add(self, other: &RE) -> Result<Self::Output> {
+        Ok(self.iter().map(|x| x + other).collect())
     }
 }
 // VE + VE
 impl RosyAdd<&VE> for &VE {
     type Output = VE;
-    fn rosy_add(self, other: &VE) -> Self::Output {
-        self.iter()
+    fn rosy_add(self, other: &VE) -> Result<Self::Output> {
+        Ok(self.iter()
             .zip(other.iter())
             .map(|(x, y)| x + y)
-            .collect()
+            .collect())
     }
 }
 
 // DA + RE
 impl RosyAdd<&RE> for &DA {
     type Output = DA;
-    fn rosy_add(self, other: &RE) -> Self::Output {
+    fn rosy_add(self, other: &RE) -> Result<Self::Output> {
         self + *other
     }
 }
@@ -139,7 +140,7 @@ impl RosyAdd<&RE> for &DA {
 // DA + DA
 impl RosyAdd<&DA> for &DA {
     type Output = DA;
-    fn rosy_add(self, other: &DA) -> Self::Output {
+    fn rosy_add(self, other: &DA) -> Result<Self::Output> {
         self + other
     }
 }

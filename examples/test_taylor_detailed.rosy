@@ -1,0 +1,13 @@
+BEGIN;
+    VARIABLE (DA) X;
+    VARIABLE (DA) Y;
+    VARIABLE (DA) Z;
+    VARIABLE (RE) RESULT;
+    
+    X := X + 1.0;
+    Y := Y + 2.0;
+    Z := X + Y;
+    
+    WRITE(6,*) 'Testing DA addition with Result-based architecture';
+    WRITE(6,*) 'X + Y = Z (should be 3.0)';
+END;

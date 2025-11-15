@@ -6,6 +6,7 @@
 .rosy_output
 rosy_output
 cosy-spec.md
+manual.md
 *.out
 *.lis
-./*.fox
+*.fox

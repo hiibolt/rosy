@@ -1,0 +1,7 @@
+BEGIN;
+    VARIABLE (DA) X;
+    VARIABLE (DA) Y;
+    VARIABLE (DA) Z;
+    
+    Z := X + Y;
+END;

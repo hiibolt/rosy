@@ -31,7 +31,7 @@ impl Transpile for AddExpr {
         }
 
         // Then, transpile both sides and combine
-        let mut serialization = String::from("&mut RosyAdd::rosy_add(&*");
+        let mut serialization = String::from("RosyAdd::rosy_add(&*");
         let mut errors = Vec::new();
         let mut requested_variables = BTreeSet::new();
 
@@ -61,7 +61,7 @@ impl Transpile for AddExpr {
                 }
             }
         }
-        serialization.push(')');
+        serialization.push_str(")?");
 
         if errors.is_empty() {
             Ok(TranspilationOutput {

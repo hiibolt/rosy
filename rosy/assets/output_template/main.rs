@@ -5,7 +5,6 @@
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 
-use dace::*;
 use rosy_lib::*;
 use anyhow::{Result, Context, ensure, bail};
 
@@ -15,6 +14,10 @@ fn main() -> Result<()> {
 		.context("Failed to initialize Rosy MPI context")?;
 	let group_num = rosy_mpi_context.get_group_num(&mut  &mut 1.0f64)
 		.context("Failed to get group number")? + 1.0f64;
+
+	// Initialize Taylor series system (order 10, 6 variables by default)
+	taylor::init_taylor(10, 6)
+		.context("Failed to initialize Taylor system")?;
 
     // <INJECT_START>
 	let mut X: f64 = 0.0;

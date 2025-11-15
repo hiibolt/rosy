@@ -957,6 +957,7 @@ dependencies = [
  "impls",
  "lazy_static",
  "mpi",
+ "num-complex",
  "pest",
  "pest_derive",
  "serial_test",
