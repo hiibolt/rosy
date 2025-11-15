@@ -1,0 +1,47 @@
+BEGIN;
+    VARIABLE (ST) LHS_0;
+    VARIABLE (RE) RHS_0;
+    VARIABLE (ST) RESULT_0;
+
+    LHS_0 := "test";
+    RHS_0 := 2.5;
+    RESULT_0 := LHS_0 | RHS_0;
+    WRITE 6 ST(RESULT_0);
+
+    VARIABLE (ST) LHS_1;
+    VARIABLE (VE) RHS_1;
+    VARIABLE (ST) RESULT_1;
+
+    LHS_1 := "test";
+    RHS_1 := 1.0 & 2.0 & 3.0;
+    RESULT_1 := LHS_1 | RHS_1;
+    WRITE 6 ST(RESULT_1);
+
+    VARIABLE (CM) LHS_2;
+    VARIABLE (RE) RHS_2;
+    VARIABLE (RE) RESULT_2;
+
+    LHS_2 := CM(1.0 & 2.0);
+    RHS_2 := 2.5;
+    RESULT_2 := LHS_2 | RHS_2;
+    WRITE 6 ST(RESULT_2);
+
+    VARIABLE (VE) LHS_3;
+    VARIABLE (RE) RHS_3;
+    VARIABLE (RE) RESULT_3;
+
+    LHS_3 := 1.0 & 2.0 & 3.0;
+    RHS_3 := 2.5;
+    RESULT_3 := LHS_3 | RHS_3;
+    WRITE 6 ST(RESULT_3);
+
+    VARIABLE (VE) LHS_4;
+    VARIABLE (VE) RHS_4;
+    VARIABLE (VE) RESULT_4;
+
+    LHS_4 := 1.0 & 2.0 & 3.0;
+    RHS_4 := 1.0 & 2.0 & 3.0;
+    RESULT_4 := LHS_4 | RHS_4;
+    WRITE 6 ST(RESULT_4);
+
+END;

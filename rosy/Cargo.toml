@@ -17,3 +17,6 @@ mpi.workspace = true
 bincode.workspace = true
 dace.workspace = true
 num-complex.workspace = true
+
+[build-dependencies]
+regex = "1"

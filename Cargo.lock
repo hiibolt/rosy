@@ -960,6 +960,7 @@ dependencies = [
  "num-complex",
  "pest",
  "pest_derive",
+ "regex",
  "serial_test",
  "tracing",
  "tracing-subscriber",

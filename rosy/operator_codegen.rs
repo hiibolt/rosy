@@ -9,6 +9,7 @@
 
 use std::fs;
 use std::path::Path;
+use regex::Regex;
 
 /// Represents a parsed type rule from the source code.
 #[derive(Debug, Clone)]
@@ -66,21 +67,18 @@ fn parse_type_rule_new(line: &str) -> Option<TypeRule> {
 
 fn parse_type_rule_with_comment(line: &str) -> Option<TypeRule> {
     // Parse: TypeRule::with_comment("RE", "VE", "VE", "Add Real componentwise"),
-    let start = line.find("TypeRule::with_comment(")?;
-    let content = &line[start + "TypeRule::with_comment(".len()..];
-    let end = content.find(")")?;
-    let args = &content[..end];
+    // Using regex to properly handle comments with parentheses, commas, etc.
+    let re = Regex::new(
+        r#"TypeRule::with_comment\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)"#
+    ).ok()?;
     
-    let parts: Vec<&str> = args.split(',').map(|s| s.trim()).collect();
-    if parts.len() != 4 {
-        return None;
-    }
+    let captures = re.captures(line)?;
     
     Some(TypeRule {
-        lhs: parts[0].trim_matches('"').to_string(),
-        rhs: parts[1].trim_matches('"').to_string(),
-        result: parts[2].trim_matches('"').to_string(),
-        comment: parts[3].trim_matches('"').to_string(),
+        lhs: captures.get(1)?.as_str().to_string(),
+        rhs: captures.get(2)?.as_str().to_string(),
+        result: captures.get(3)?.as_str().to_string(),
+        comment: captures.get(4)?.as_str().to_string(),
     })
 }
 
@@ -109,7 +107,7 @@ fn get_operator_symbol(operator_name: &str) -> &'static str {
     match operator_name {
         "add" => "+",
         "concat" => "&",
-        "extract" => "j",
+        "extract" => "|",
         _ => panic!("Unknown operator name: {}", operator_name),
     }
 }
