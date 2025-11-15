@@ -149,8 +149,8 @@ pub fn generate_cosy_script(rules: &[TypeRule]) -> String {
     
     // Initialize DA system (needed for DA/CD types)
     script.push_str("\n    { Initialize DA system for tests that use DA/CD types }\n");
-    script.push_str("    { DAINI: order 1, number_of_variables 1, mode 0 (see COSY manual) }\n");
-    script.push_str("    DAINI 1 1 0 NM;\n\n");
+    script.push_str("    { DAINI: order 2, number_of_variables 2, mode 0 (see COSY manual) }\n");
+    script.push_str("    DAINI 2 2 0 NM;\n\n");
     
     // Second pass: assignments and operations
     for (idx, rule) in rules.iter().enumerate() {
@@ -191,8 +191,8 @@ fn get_cosy_test_value(type_name: &str) -> &'static str {
         "RE" => "2.5",
         "CM" => "CM(1.0&2.0)",  // COSY complex: CM(real&imaginary)
         "VE" => "1.0",  // COSY vectors are just scalars
-        "DA" => "1.5",
-        "CD" => "CM(1.0&0.5)",  // Complex DA uses CM() syntax
+        "DA" => "DA(1)",  // Use DA(var_index) to create DA variable
+        "CD" => "DA(1)+CM(0&1)*DA(2)",  // Complex DA: real part + i*imaginary part
         "LO" => "1",
         "ST" => "\"test\"",
         _ => "0.0",
@@ -204,6 +204,7 @@ fn get_cosy_var_size(type_name: &str) -> &'static str {
     match type_name {
         "CM" => "2",   // Complex needs 2 slots (real + imaginary)
         "VE" => "3",   // Vector of size 3
+        "DA" => "100", // DA needs space for coefficients
         "CD" => "100", // Complex DA needs space for DA coefficients
         _ => "1",      // Everything else is scalar
     }

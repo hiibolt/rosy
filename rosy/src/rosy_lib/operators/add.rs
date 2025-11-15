@@ -5,17 +5,13 @@
 //! `ADD_REGISTRY` constant below.
 //!
 //! # Type Compatibility
-#![doc = include_str!("../../../assets/operators/add/add_table.md")]
+//! 
+//! See `assets/operators/add/add_table.md` for the full compatibility table.
 //!
 //! # Examples
-//! ## ROSY
-#![doc = "```ignore"]
-#![doc = include_str!("../../../assets/operators/add/add.rosy")]
-#![doc = "```"]
-//! ## Equivalent COSY INFINITY
-#![doc = "```ignore"]
-#![doc = include_str!("../../../assets/operators/add/add.fox")]
-#![doc = "```"]
+//! 
+//! See `assets/operators/add/add.rosy` for ROSY examples and 
+//! `assets/operators/add/add.fox` for equivalent COSY INFINITY code.
 
 use std::collections::HashMap;
 use anyhow::Result;
@@ -349,7 +345,7 @@ mod tests {
         
         let cosy_lines: Vec<&str> = cosy_output_after_exec
             .lines()
-            .filter(|line| !line.starts_with("Test") && !line.trim().is_empty())
+            .skip(1)  // Skip the first blank line after "--- BEGINNING EXECUTION"
             .collect();
 
         // Compare outputs

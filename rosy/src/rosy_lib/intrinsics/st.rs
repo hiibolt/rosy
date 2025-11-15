@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::rosy_lib::RosyType;
 use crate::rosy_lib::{RE, CM, VE, LO, ST, DA, CD};
+use crate::rosy_lib::core::display::RosyDisplay;
 
 pub fn get_return_type ( lhs: &RosyType ) -> Option<RosyType> {
     let registry: HashMap<RosyType, RosyType> = {
@@ -32,58 +33,48 @@ pub trait RosyST {
 /// Convert real numbers to strings
 impl RosyST for &RE {
     fn rosy_to_string(self) -> String {
-        format!(
-            " {}{:.15}", 
-            if self.is_sign_negative() { "-" } else { " " },
-            self.abs()
-        )
+        self.rosy_display()
     }
 }
 
 /// Convert strings to strings (identity)
 impl RosyST for &ST {
     fn rosy_to_string(self) -> String {
-        (*self).clone()
+        self.rosy_display()
     }
 }
 
 /// Convert booleans to strings
 impl RosyST for &LO {
     fn rosy_to_string(self) -> String {
-        if *self { "TRUE".to_string() } else { "FALSE".to_string() }
+        self.rosy_display()
     }
 }
 
 /// Convert vectors to strings
 impl RosyST for &VE {
     fn rosy_to_string(self) -> String {
-        let elements: Vec<String> = self.iter().map(|x| x.to_string()).collect();
-        format!("[{}]", elements.join(", "))
+        self.rosy_display()
     }
 }
 
 /// Convert complex numbers to strings
 impl RosyST for &CM {
     fn rosy_to_string(self) -> String {
-        let (real, imag) = *self;
-        if imag >= 0.0 {
-            format!("({} + {}i)", real, imag)
-        } else {
-            format!("({} - {}i)", real, -imag)
-        }
+        self.rosy_display()
     }
 }
 
 /// Convert Differential Algebra (DA) to strings
 impl RosyST for &DA {
     fn rosy_to_string(self) -> String {
-        format!("DA[{} terms]", self.num_terms())
+        self.rosy_display()
     }
 }
 
 /// Convert Complex Differential Algebra (CD) to strings
 impl RosyST for &CD {
     fn rosy_to_string(self) -> String {
-        format!("CD[{} terms]", self.num_terms())
+        self.rosy_display()
     }
 }

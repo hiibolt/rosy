@@ -111,7 +111,7 @@ impl DA {
     }
 
     /// Iterate over coefficients (used by CD for conversion).
-    pub(crate) fn coeffs_iter(&self) -> impl Iterator<Item = (&Monomial, &f64)> {
+    pub fn coeffs_iter(&self) -> impl Iterator<Item = (&Monomial, &f64)> {
         self.coeffs.iter()
     }
 }
