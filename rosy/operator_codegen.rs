@@ -158,8 +158,7 @@ pub fn generate_cosy_script(rules: &[TypeRule]) -> String {
         script.push_str(&format!("    LHS_{} := {};\n", idx, get_cosy_test_value(&rule.lhs)));
         script.push_str(&format!("    RHS_{} := {};\n", idx, get_cosy_test_value(&rule.rhs)));
         script.push_str(&format!("    RESULT_{} := LHS_{} + RHS_{};\n", idx, idx, idx));
-        script.push_str(&format!("    WRITE 6 'Test{}: {} + {} => {}';\n\n", 
-            idx, rule.lhs, rule.rhs, rule.result));
+        script.push_str(&format!("    WRITE 6 RESULT_{};\n\n", idx));
     }
     
     script.push_str("ENDPROCEDURE;\n\nRUN;\nEND;\n");
@@ -213,10 +212,13 @@ fn get_cosy_var_size(type_name: &str) -> &'static str {
 /// Run all code generation for an operator.
 pub fn codegen_operator(operator_name: &str) {
     let src_path = Path::new("src/rosy_lib/operators")
-        .join(operator_name)
-        .join("mod.rs");
+        .join(format!("{}.rs", operator_name));
     
-    let operator_dir = Path::new("src/rosy_lib/operators").join(operator_name);
+    let operator_dir = Path::new("assets/operators").join(operator_name);
+    
+    // Create the assets directory if it doesn't exist
+    fs::create_dir_all(&operator_dir)
+        .expect("Failed to create assets directory");
     
     println!("cargo:rerun-if-changed={}", src_path.display());
     

@@ -1,5 +1,5 @@
 [package]
-name = "rosy_transpiler"
+name = "rosy"
 version = "0.1.0"
 edition = "2024"
 

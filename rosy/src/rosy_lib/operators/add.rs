@@ -5,16 +5,16 @@
 //! `ADD_REGISTRY` constant below.
 //!
 //! # Type Compatibility
-#![doc = include_str!("add_table.md")]
+#![doc = include_str!("../../../assets/operators/add/add_table.md")]
 //!
 //! # Examples
 //! ## ROSY
 #![doc = "```ignore"]
-#![doc = include_str!("add.rosy")]
+#![doc = include_str!("../../../assets/operators/add/add.rosy")]
 #![doc = "```"]
 //! ## Equivalent COSY INFINITY
 #![doc = "```ignore"]
-#![doc = include_str!("add.fox")]
+#![doc = include_str!("../../../assets/operators/add/add.fox")]
 #![doc = "```"]
 
 use std::collections::HashMap;
@@ -266,5 +266,127 @@ impl RosyAdd<&CD> for &CD {
     type Output = CD;
     fn rosy_add(self, other: &CD) -> Result<Self::Output> {
         self + other
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::process::Command;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_rosy_cosy_output_match() {
+        // Get workspace root
+        let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("Failed to get workspace root")
+            .to_path_buf();
+        
+        let rosy_script = workspace_root.join("rosy/assets/operators/add/add.rosy");
+        let cosy_script = workspace_root.join("rosy/assets/operators/add/add.fox");
+        let rosy_transpiler = workspace_root.join("target/release/rosy_transpiler");
+        let cosy_exe = workspace_root.join("cosy");
+
+        // Check if executables exist
+        if !rosy_transpiler.exists() {
+            panic!("rosy_transpiler not found at {:?}. Run: cargo build --release -p rosy_transpiler", rosy_transpiler);
+        }
+        if !cosy_exe.exists() {
+            panic!("cosy executable not found at {:?}", cosy_exe);
+        }
+
+        // Run ROSY transpiler
+        let transpile_output = Command::new(&rosy_transpiler)
+            .arg(&rosy_script)
+            .current_dir(&workspace_root)
+            .output()
+            .expect("Failed to run rosy_transpiler");
+
+        assert!(
+            transpile_output.status.success(),
+            "ROSY transpiler failed:\n{}",
+            String::from_utf8_lossy(&transpile_output.stderr)
+        );
+
+        // Run the transpiled ROSY code
+        let rosy_output = Command::new("cargo")
+            .args(&["run", "--release"])
+            .current_dir(workspace_root.join(".rosy_output"))
+            .output()
+            .expect("Failed to run transpiled ROSY code");
+
+        assert!(
+            rosy_output.status.success(),
+            "ROSY execution failed:\n{}",
+            String::from_utf8_lossy(&rosy_output.stderr)
+        );
+
+        let rosy_stdout = String::from_utf8_lossy(&rosy_output.stdout);
+        let rosy_lines: Vec<&str> = rosy_stdout.lines().collect();
+
+        // Run COSY script
+        let cosy_output = Command::new(&cosy_exe)
+            .arg(&cosy_script)
+            .current_dir(&workspace_root)
+            .output()
+            .expect("Failed to run COSY");
+
+        assert!(
+            cosy_output.status.success(),
+            "COSY execution failed:\n{}",
+            String::from_utf8_lossy(&cosy_output.stderr)
+        );
+
+        let cosy_stdout = String::from_utf8_lossy(&cosy_output.stdout);
+        
+        // Extract just the test output lines from COSY
+        // Skip the banner and compilation messages by splitting on "BEGINNING EXECUTION"
+        let cosy_output_after_exec = cosy_stdout
+            .split("--- BEGINNING EXECUTION")
+            .nth(1)
+            .unwrap_or("");
+        
+        let cosy_lines: Vec<&str> = cosy_output_after_exec
+            .lines()
+            .filter(|line| !line.starts_with("Test") && !line.trim().is_empty())
+            .collect();
+
+        // Compare outputs
+        println!("\n=== ROSY Output ({} lines) ===", rosy_lines.len());
+        for (i, line) in rosy_lines.iter().enumerate() {
+            println!("{:3}: {}", i, line);
+        }
+
+        println!("\n=== COSY Output ({} lines) ===", cosy_lines.len());
+        for (i, line) in cosy_lines.iter().enumerate() {
+            println!("{:3}: {}", i, line);
+        }
+
+        println!("\n=== Comparison ===");
+        let max_lines = rosy_lines.len().max(cosy_lines.len());
+        let mut differences = Vec::new();
+
+        for i in 0..max_lines {
+            let rosy_line = rosy_lines.get(i).map(|s| s.trim()).unwrap_or("<missing>");
+            let cosy_line = cosy_lines.get(i).map(|s| s.trim()).unwrap_or("<missing>");
+
+            if rosy_line != cosy_line {
+                differences.push(format!(
+                    "Line {}: \n  ROSY: {}\n  COSY: {}",
+                    i, rosy_line, cosy_line
+                ));
+            }
+        }
+
+        if !differences.is_empty() {
+            println!("\nFound {} differences:", differences.len());
+            for diff in &differences {
+                println!("{}", diff);
+            }
+            panic!("ROSY and COSY outputs do not match!");
+        }
+
+        println!("\n✅ All {} lines match!", rosy_lines.len());
     }
 }
