@@ -10,8 +10,8 @@ fn main() {
     
     // Generate operator test files
     operator_codegen::codegen_operator("add");
+    operator_codegen::codegen_operator("concat");
     // operator_codegen::codegen_operator("extract");  // Add when ready
-    // operator_codegen::codegen_operator("concat");   // Add when ready
     
     // Generate the embedded files at compile time
     let out_dir = std::env::var("OUT_DIR").unwrap();

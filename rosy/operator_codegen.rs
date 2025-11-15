@@ -104,11 +104,22 @@ pub fn generate_doc_table(rules: &[TypeRule]) -> String {
     table
 }
 
+/// Get the operator symbol for a given operator name.
+fn get_operator_symbol(operator_name: &str) -> &'static str {
+    match operator_name {
+        "add" => "+",
+        "concat" => "&",
+        "extract" => "j",
+        _ => panic!("Unknown operator name: {}", operator_name),
+    }
+}
+
 /// Generate ROSY test script.
 /// 
 /// For each type combination, creates variables and performs the operation.
 /// Uses language-appropriate test values for each type.
-pub fn generate_rosy_script(rules: &[TypeRule]) -> String {
+pub fn generate_rosy_script(operator_name: &str, rules: &[TypeRule]) -> String {
+    let op_symbol = get_operator_symbol(operator_name);
     let mut script = String::from("BEGIN;\n");
     
     for (idx, rule) in rules.iter().enumerate() {
@@ -120,8 +131,8 @@ pub fn generate_rosy_script(rules: &[TypeRule]) -> String {
         script.push_str(&format!("    LHS_{} := {};\n", idx, get_rosy_test_value(&rule.lhs)));
         script.push_str(&format!("    RHS_{} := {};\n", idx, get_rosy_test_value(&rule.rhs)));
         
-        // Perform operation (using + for add, will be parameterized)
-        script.push_str(&format!("    RESULT_{} := LHS_{} + RHS_{};\n", idx, idx, idx));
+        // Perform operation
+        script.push_str(&format!("    RESULT_{} := LHS_{} {} RHS_{};\n", idx, idx, op_symbol, idx));
         
         // Write the result (just output the result value for now)
         // Can't write literal strings in ROSY without ST() conversion
@@ -133,7 +144,8 @@ pub fn generate_rosy_script(rules: &[TypeRule]) -> String {
 }
 
 /// Generate COSY INFINITY test script.
-pub fn generate_cosy_script(rules: &[TypeRule]) -> String {
+pub fn generate_cosy_script(operator_name: &str, rules: &[TypeRule]) -> String {
+    let op_symbol = get_operator_symbol(operator_name);
     let mut script = String::from("BEGIN;\n\nPROCEDURE RUN;\n");
     
     // FOX/COSY requires ALL variable declarations at procedure start
@@ -154,10 +166,10 @@ pub fn generate_cosy_script(rules: &[TypeRule]) -> String {
     
     // Second pass: assignments and operations
     for (idx, rule) in rules.iter().enumerate() {
-        script.push_str(&format!("    {{ Test {}: {} + {} => {} }}\n", idx, rule.lhs, rule.rhs, rule.result));
+        script.push_str(&format!("    {{ Test {}: {} {} {} => {} }}\n", idx, rule.lhs, op_symbol, rule.rhs, rule.result));
         script.push_str(&format!("    LHS_{} := {};\n", idx, get_cosy_test_value(&rule.lhs)));
         script.push_str(&format!("    RHS_{} := {};\n", idx, get_cosy_test_value(&rule.rhs)));
-        script.push_str(&format!("    RESULT_{} := LHS_{} + RHS_{};\n", idx, idx, idx));
+        script.push_str(&format!("    RESULT_{} := LHS_{} {} RHS_{};\n", idx, idx, op_symbol, idx));
         script.push_str(&format!("    WRITE 6 RESULT_{};\n\n", idx));
     }
     
@@ -194,7 +206,7 @@ fn get_cosy_test_value(type_name: &str) -> &'static str {
         "DA" => "DA(1)",  // Use DA(var_index) to create DA variable
         "CD" => "DA(1)+CM(0&1)*DA(2)",  // Complex DA: real part + i*imaginary part
         "LO" => "1",
-        "ST" => "\"test\"",
+        "ST" => "'test'",  // COSY uses single quotes for strings
         _ => "0.0",
     }
 }
@@ -239,12 +251,12 @@ pub fn codegen_operator(operator_name: &str) {
         .expect("Failed to write doc table");
     
     // Generate ROSY script
-    let rosy_script = generate_rosy_script(&rules);
+    let rosy_script = generate_rosy_script(operator_name, &rules);
     fs::write(operator_dir.join(format!("{}.rosy", operator_name)), rosy_script)
         .expect("Failed to write ROSY script");
     
     // Generate COSY script
-    let cosy_script = generate_cosy_script(&rules);
+    let cosy_script = generate_cosy_script(operator_name, &rules);
     fs::write(operator_dir.join(format!("{}.fox", operator_name)), cosy_script)
         .expect("Failed to write COSY script");
     
