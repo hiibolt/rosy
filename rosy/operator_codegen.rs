@@ -165,8 +165,8 @@ pub fn generate_cosy_script(operator_name: &str, rules: &[TypeRule]) -> String {
     // Second pass: assignments and operations
     for (idx, rule) in rules.iter().enumerate() {
         script.push_str(&format!("    {{ Test {}: {} {} {} => {} }}\n", idx, rule.lhs, op_symbol, rule.rhs, rule.result));
-        script.push_str(&format!("    LHS_{} := {};\n", idx, get_cosy_test_value(&rule.lhs)));
-        script.push_str(&format!("    RHS_{} := {};\n", idx, get_cosy_test_value(&rule.rhs)));
+        script.push_str(&format!("    LHS_{} := {};\n", idx, get_cosy_test_value_for_operator(operator_name, &rule.lhs, "LHS")));
+        script.push_str(&format!("    RHS_{} := {};\n", idx, get_cosy_test_value_for_operator(operator_name, &rule.rhs, "RHS")));
         script.push_str(&format!("    RESULT_{} := LHS_{} {} RHS_{};\n", idx, idx, op_symbol, idx));
         script.push_str(&format!("    WRITE 6 RESULT_{};\n\n", idx));
     }
@@ -207,6 +207,25 @@ fn get_cosy_test_value(type_name: &str) -> &'static str {
         "ST" => "'test'",  // COSY uses single quotes for strings
         _ => "0.0",
     }
+}
+
+/// Get appropriate test value for COSY type, context-aware for specific operators.
+fn get_cosy_test_value_for_operator(operator_name: &str, type_name: &str, role: &str) -> &'static str {
+    // Special cases for extract operator
+    if operator_name == "extract" {
+        if type_name == "VE" && role == "RHS" {
+            return "1 & 2";  // Two-element vector for range extraction (COSY uses & to build vectors)
+        }
+        if type_name == "RE" && role == "RHS" {
+            return "1";  // Integer index for single element extraction
+        }
+        if type_name == "VE" && role == "LHS" {
+            return "10 & 20 & 30";  // Three-element vector to extract from
+        }
+    }
+    
+    // Default values for all operators
+    get_cosy_test_value(type_name)
 }
 
 /// Get COSY variable size (for VARIABLE X <size>).
