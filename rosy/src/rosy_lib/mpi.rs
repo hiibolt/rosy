@@ -1,4 +1,3 @@
-
 use mpi::{traits::*, topology::SimpleCommunicator, environment::Universe};
 use bincode::{Encode, Decode, config::Configuration};
 use anyhow::{Result, Context, ensure, bail};
