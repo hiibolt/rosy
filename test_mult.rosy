@@ -1,0 +1,66 @@
+{******************************************************************************
+* MULTIPLICATION OPERATOR TEST
+* Tests the multiplication operator for various types
+******************************************************************************}
+
+BEGIN;
+    {* Test 1: RE * RE *}
+    VARIABLE (RE) A;
+    VARIABLE (RE) B;
+    VARIABLE (RE) C;
+    
+    A := 3.0;
+    B := 4.0;
+    C := A * B;
+    WRITE 6 "RE * RE: 3.0 * 4.0 = ";
+    WRITE 6 ST(C);
+    
+    {* Test 2: RE * CM *}
+    VARIABLE (CM) CM1;
+    VARIABLE (CM) CM_RESULT;
+    
+    CM1 := CM(2.0 & 3.0);
+    CM_RESULT := A * CM1;
+    WRITE 6 "RE * CM: 3.0 * (2.0 + 3.0i) = ";
+    WRITE 6 ST(CM_RESULT);
+    
+    {* Test 3: CM * CM *}
+    VARIABLE (CM) CM2;
+    VARIABLE (CM) CM_RESULT2;
+    
+    CM2 := CM(1.0 & 2.0);
+    CM_RESULT2 := CM1 * CM2;
+    WRITE 6 "CM * CM: (2.0 + 3.0i) * (1.0 + 2.0i) = ";
+    WRITE 6 ST(CM_RESULT2);
+    
+    {* Test 4: VE * VE *}
+    VARIABLE (VE) V1;
+    VARIABLE (VE) V2;
+    VARIABLE (VE) V_RESULT;
+    
+    V1 := 2.0 & 3.0 & 4.0;
+    V2 := 5.0 & 6.0 & 7.0;
+    V_RESULT := V1 * V2;
+    WRITE 6 "VE * VE: [2, 3, 4] * [5, 6, 7] = ";
+    WRITE 6 ST(V_RESULT);
+    
+    {* Test 5: LO * LO (Logical AND) *}
+    VARIABLE (LO) L1;
+    VARIABLE (LO) L2;
+    VARIABLE (LO) L3;
+    VARIABLE (LO) L_RESULT;
+    
+    L1 := TRUE;
+    L2 := TRUE;
+    L3 := FALSE;
+    
+    L_RESULT := L1 * L2;
+    WRITE 6 "LO * LO: TRUE * TRUE = ";
+    WRITE 6 ST(L_RESULT);
+    
+    L_RESULT := L1 * L3;
+    WRITE 6 "LO * LO: TRUE * FALSE = ";
+    WRITE 6 ST(L_RESULT);
+    
+    WRITE 6 "All multiplication tests completed!";
+END;

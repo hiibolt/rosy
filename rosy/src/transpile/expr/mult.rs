@@ -5,33 +5,33 @@ use super::super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOu
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
 
-impl TypeOf for AddExpr {
+impl TypeOf for MultExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
-        crate::rosy_lib::operators::add::get_return_type(
+        crate::rosy_lib::operators::mult::get_return_type(
             &self.left.type_of(context)?,
             &self.right.type_of(context)?
         ).ok_or(anyhow::anyhow!(
-            "Cannot add types '{}' and '{}' together!",
+            "Cannot multiply types '{}' and '{}' together!",
             self.left.type_of(context)?,
             self.right.type_of(context)?
         ))
     }
 }
-impl Transpile for AddExpr {
+impl Transpile for MultExpr {
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         // First, ensure the types are compatible
         let left_type = self.left.type_of(context)
             .map_err(|e| vec!(e))?;
         let right_type = self.right.type_of(context)
             .map_err(|e| vec!(e))?;
-        if crate::rosy_lib::operators::add::get_return_type(&left_type, &right_type).is_none() {
+        if crate::rosy_lib::operators::mult::get_return_type(&left_type, &right_type).is_none() {
             return Err(vec!(anyhow!(
                 "Cannot add types '{}' and '{}' together!", left_type, right_type
             )));
         }
 
         // Then, transpile both sides and combine
-        let mut serialization = String::from("&mut RosyAdd::rosy_add(&*");
+        let mut serialization = String::from("&mut RosyMult::rosy_mult(&*");
         let mut errors = Vec::new();
         let mut requested_variables = BTreeSet::new();
 
@@ -43,7 +43,7 @@ impl Transpile for AddExpr {
             },
             Err(mut e) => {
                 for err in e.drain(..) {
-                    errors.push(err.context("...while transpiling left-hand side of addition"));
+                    errors.push(err.context("...while transpiling left-hand side of multiplication"));
                 }
             }
         }
@@ -57,7 +57,7 @@ impl Transpile for AddExpr {
             },
             Err(mut e) => {
                 for err in e.drain(..) {
-                    errors.push(err.context("...while transpiling right-hand side of addition"));
+                    errors.push(err.context("...while transpiling right-hand side of multiplication"));
                 }
             }
         }

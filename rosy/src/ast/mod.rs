@@ -23,6 +23,8 @@ lazy_static::lazy_static! {
             .op(Op::infix(extract, Left))
             // Addition
             .op(Op::infix(add, Left))
+            // Multiplication
+            .op(Op::infix(mult, Left))
     };
 }
 
@@ -158,7 +160,16 @@ pub struct AddExpr {
     pub right: Box<Expr>,
 }
 #[derive(Debug, Clone, PartialEq)]
+pub struct MultExpr {
+    pub left: Box<Expr>,
+    pub right: Box<Expr>,
+}
+#[derive(Debug, Clone, PartialEq)]
 pub struct StringConvertExpr {
+    pub expr: Box<Expr>,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct LogicalConvertExpr {
     pub expr: Box<Expr>,
 }
 #[derive(Debug, Clone, PartialEq)]
@@ -177,10 +188,12 @@ pub enum Expr {
     Boolean(bool),
     Var(VarExpr),
     Add(AddExpr),
+    Mult(MultExpr),
     Concat(ConcatExpr),
     Extract(ExtractExpr),
     Complex(ComplexExpr),
     StringConvert(StringConvertExpr),
+    LogicalConvert(LogicalConvertExpr),
     DA(DAExpr),
     FunctionCall(FunctionCallExpr),
 }
@@ -336,6 +349,13 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                 let expr = Box::new(build_expr(expr_pair)?);
                 Ok(Expr::StringConvert(StringConvertExpr { expr }))
             },
+            Rule::lo => {
+                let mut inner = primary.into_inner();
+                let expr_pair = inner.next()
+                    .context("Missing inner expression for `LO`!")?;
+                let expr = Box::new(build_expr(expr_pair)?);
+                Ok(Expr::LogicalConvert(LogicalConvertExpr { expr }))
+            },
             Rule::da => {
                 let mut inner = primary.into_inner();
                 let expr_pair = inner.next()
@@ -352,6 +372,10 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
             right
         | match op.as_rule() {
             Rule::add => Ok(Expr::Add(AddExpr {
+                left: Box::new(left?),
+                right: Box::new(right?),
+            })),
+            Rule::mult => Ok(Expr::Mult(MultExpr {
                 left: Box::new(left?),
                 right: Box::new(right?),
             })),

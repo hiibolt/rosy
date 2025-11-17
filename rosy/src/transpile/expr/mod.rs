@@ -3,7 +3,9 @@ mod concat;
 mod complex;
 mod extract;
 mod add;
+mod mult;
 mod string_convert;
+mod logical_convert;
 mod function_call;
 mod da;
 
@@ -40,9 +42,17 @@ impl Transpile for Expr {
                 .map_err(|e| e.into_iter().map(|err| {
                     err.context("...while transpiling addition expression")
                 }).collect::<Vec<Error>>()),
+            Expr::Mult(mult_expr) => mult_expr.transpile(context)
+                .map_err(|e| e.into_iter().map(|err| {
+                    err.context("...while transpiling multiplication expression")
+                }).collect::<Vec<Error>>()),
             Expr::StringConvert(string_convert_expr) => string_convert_expr.transpile(context)
                 .map_err(|e| e.into_iter().map(|err| {
                     err.context("...while transpiling string conversion expression")
+                }).collect::<Vec<Error>>()),
+            Expr::LogicalConvert(logical_convert_expr) => logical_convert_expr.transpile(context)
+                .map_err(|e| e.into_iter().map(|err| {
+                    err.context("...while transpiling logical conversion expression")
                 }).collect::<Vec<Error>>()),
             Expr::FunctionCall(function_call_expr) => function_call_expr.transpile(context)
                 .map_err(|e| e.into_iter().map(|err| {

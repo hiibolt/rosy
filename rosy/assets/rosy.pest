@@ -78,11 +78,13 @@ endif = { "ENDIF" ~ semicolon }
   end_ploop = { "ENDPLOOP" ~ unit? ~ variable_identifier ~ semicolon }
 
 /// [ INTRINSIC FUNCTIONS ]
-  builtin_function = _{ cm | st | da }
+  builtin_function = _{ cm | st | lo | da }
   /// CM
   cm = { "CM(" ~ expr ~ ")" }
   /// ST - String conversion
   st = { "ST(" ~ expr ~ ")" }
+  /// LO - Logical conversion
+  lo = { "LO(" ~ expr ~ ")" }
   /// DA - Create DA identity vector
   da = { "DA" ~ "(" ~ expr ~ ")" }
 
@@ -118,9 +120,10 @@ term = _{
 boolean = { "TRUE" | "FALSE" }
 
 // Infix operators
-infix_op    = _{ extract | add | concat }
+infix_op    = _{ extract | mult | add | concat }
 extract     = { "|" }
 add         = { "+" }
+mult        = { "*" }
 concat      = { "&" }
 
 variable_identifier = { variable_name ~ variable_indexing? }
@@ -129,5 +132,7 @@ variable_name  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
 number      = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 unit        = @{ ASCII_DIGIT+ }
 constant    = @{ ASCII_DIGIT+ }
-string      = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+string      = { new_string | old_string }
+new_string  = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+old_string  = @{ "\'" ~ (!"\'" ~ ANY)* ~ "\'" }
 semicolon   = { ";" }

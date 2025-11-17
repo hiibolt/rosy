@@ -37,11 +37,11 @@ use crate::rosy_lib::operators::{TypeRule, build_type_registry};
 /// - CD | RE => CM (CD type not fully integrated)
 /// - CD | VE => CM (CD type not fully integrated)
 pub const EXTRACT_REGISTRY: &[TypeRule] = &[
-    TypeRule::with_comment("ST", "RE", "ST", "Extract the i-th character"),
-    TypeRule::with_comment("ST", "VE", "ST", "Extract character range (two-vector)"),
-    TypeRule::with_comment("CM", "RE", "RE", "Extract component (1: real, 2: imaginary)"),
-    TypeRule::with_comment("VE", "RE", "RE", "Extract the i-th component"),
-    TypeRule::with_comment("VE", "VE", "VE", "Extract component range (two-vector)"),
+    TypeRule::with_comment("ST", "RE", "ST", "'test'", "2", "Extract i-th character"),
+    TypeRule::with_comment("ST", "VE", "ST", "'test'", "2&3", "Extract substring by range"),
+    TypeRule::with_comment("CM", "RE", "RE", "CM(3&4)", "1", "Extract real part"),
+    TypeRule::with_comment("VE", "RE", "RE", "1&2", "2", "Extract i-th component"),
+    TypeRule::with_comment("VE", "VE", "VE", "1&2&3", "2&3", "Extract subvector by range"),
 ];
 
 pub fn get_return_type(base: &RosyType, index: &RosyType) -> Option<RosyType> {
@@ -147,47 +147,11 @@ impl RosyExtract<&VE> for &VE {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::super::test_utils::test_operator_output_match;
 
     #[test]
-    fn test_st_re() -> Result<()> {
-        let s = "hello".to_string();
-        let result = (&s).rosy_extract(&1.0)?;
-        assert_eq!(result, "h");
-        Ok(())
-    }
-
-    #[test]
-    fn test_st_ve() -> Result<()> {
-        let s = "hello".to_string();
-        let result = (&s).rosy_extract(&vec![2.0, 4.0])?;
-        assert_eq!(result, "ell");
-        Ok(())
-    }
-
-    #[test]
-    fn test_cm_re() -> Result<()> {
-        let c = (3.0, 4.0);
-        let real = (&c).rosy_extract(&1.0)?;
-        let imag = (&c).rosy_extract(&2.0)?;
-        assert_eq!(real, 3.0);
-        assert_eq!(imag, 4.0);
-        Ok(())
-    }
-
-    #[test]
-    fn test_ve_re() -> Result<()> {
-        let v = vec![1.0, 2.0, 3.0];
-        let result = (&v).rosy_extract(&2.0)?;
-        assert_eq!(result, 2.0);
-        Ok(())
-    }
-
-    #[test]
-    fn test_ve_ve() -> Result<()> {
-        let v = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let result = (&v).rosy_extract(&vec![2.0, 4.0])?;
-        assert_eq!(result, vec![2.0, 3.0, 4.0]);
-        Ok(())
+    #[serial_test::serial]
+    fn test_rosy_cosy_output_match() {
+        test_operator_output_match("extract");
     }
 }

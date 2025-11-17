@@ -17,6 +17,8 @@ pub struct TypeRule {
     pub lhs: String,
     pub rhs: String,
     pub result: String,
+    pub lhs_test_val: String,
+    pub rhs_test_val: String,
     pub comment: String,
 }
 
@@ -38,6 +40,8 @@ pub fn parse_registry_from_source(source_path: &Path) -> Vec<TypeRule> {
         } else if line.trim_start().starts_with("TypeRule::with_comment(") {
             if let Some(rule) = parse_type_rule_with_comment(line) {
                 rules.push(rule);
+            } else {
+                println!("cargo:warning=Failed to parse line with comment: {}", line);
             }
         }
     }
@@ -46,30 +50,10 @@ pub fn parse_registry_from_source(source_path: &Path) -> Vec<TypeRule> {
 }
 
 fn parse_type_rule_new(line: &str) -> Option<TypeRule> {
-    // Parse: TypeRule::new("RE", "CM", "VE"),
-    let start = line.find("TypeRule::new(")?;
-    let content = &line[start + "TypeRule::new(".len()..];
-    let end = content.find(")")?;
-    let args = &content[..end];
-    
-    let parts: Vec<&str> = args.split(',').map(|s| s.trim()).collect();
-    if parts.len() != 3 {
-        return None;
-    }
-    
-    Some(TypeRule {
-        lhs: parts[0].trim_matches('"').to_string(),
-        rhs: parts[1].trim_matches('"').to_string(),
-        result: parts[2].trim_matches('"').to_string(),
-        comment: String::new(),
-    })
-}
-
-fn parse_type_rule_with_comment(line: &str) -> Option<TypeRule> {
-    // Parse: TypeRule::with_comment("RE", "VE", "VE", "Add Real componentwise"),
+    // Parse: TypeRule::new("RE", "CM", "VE", "1", "2"),
     // Using regex to properly handle comments with parentheses, commas, etc.
     let re = Regex::new(
-        r#"TypeRule::with_comment\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)"#
+        r#"TypeRule::new\s*\(\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*\)"#
     ).ok()?;
     
     let captures = re.captures(line)?;
@@ -78,6 +62,27 @@ fn parse_type_rule_with_comment(line: &str) -> Option<TypeRule> {
         lhs: captures.get(1)?.as_str().to_string(),
         rhs: captures.get(2)?.as_str().to_string(),
         result: captures.get(3)?.as_str().to_string(),
+        lhs_test_val: captures.get(4)?.as_str().to_string(),
+        rhs_test_val: captures.get(5)?.as_str().to_string(),
+        comment: captures.get(4)?.as_str().to_string(),
+    })
+}
+
+fn parse_type_rule_with_comment(line: &str) -> Option<TypeRule> {
+    // Parse: TypeRule::with_comment("RE", "VE", "VE", "Add Real componentwise"),
+    // Using regex to properly handle comments with parentheses, commas, etc.
+    let re = Regex::new(
+        r#"TypeRule::with_comment\s*\(\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*\)"#
+    ).ok()?;
+    
+    let captures = re.captures(line)?;
+    
+    Some(TypeRule {
+        lhs: captures.get(1)?.as_str().to_string(),
+        rhs: captures.get(2)?.as_str().to_string(),
+        result: captures.get(3)?.as_str().to_string(),
+        lhs_test_val: captures.get(4)?.as_str().to_string(),
+        rhs_test_val: captures.get(5)?.as_str().to_string(),
         comment: captures.get(4)?.as_str().to_string(),
     })
 }
@@ -106,6 +111,7 @@ pub fn generate_doc_table(rules: &[TypeRule]) -> String {
 fn get_operator_symbol(operator_name: &str) -> &'static str {
     match operator_name {
         "add" => "+",
+        "mult" => "*",
         "concat" => "&",
         "extract" => "|",
         _ => panic!("Unknown operator name: {}", operator_name),
@@ -126,8 +132,8 @@ pub fn generate_rosy_script(operator_name: &str, rules: &[TypeRule]) -> String {
         script.push_str(&format!("    VARIABLE ({}) RESULT_{};\n\n", rule.result, idx));
         
         // Initialize with type-appropriate test values
-        script.push_str(&format!("    LHS_{} := {};\n", idx, get_rosy_test_value(&rule.lhs)));
-        script.push_str(&format!("    RHS_{} := {};\n", idx, get_rosy_test_value(&rule.rhs)));
+        script.push_str(&format!("    LHS_{} := {};\n", idx, rule.lhs_test_val));
+        script.push_str(&format!("    RHS_{} := {};\n", idx, rule.rhs_test_val));
         
         // Perform operation
         script.push_str(&format!("    RESULT_{} := LHS_{} {} RHS_{};\n", idx, idx, op_symbol, idx));
@@ -159,73 +165,20 @@ pub fn generate_cosy_script(operator_name: &str, rules: &[TypeRule]) -> String {
     
     // Initialize DA system (needed for DA/CD types)
     script.push_str("\n    { Initialize DA system for tests that use DA/CD types }\n");
-    script.push_str("    { DAINI: order 2, number_of_variables 2, mode 0 (see COSY manual) }\n");
-    script.push_str("    DAINI 2 2 0 NM;\n\n");
+    script.push_str("    { DAINI: order 2, number_of_variables 6, mode 0 (see COSY manual) }\n");
+    script.push_str("    DAINI 2 6 0 NM;\n\n");
     
     // Second pass: assignments and operations
     for (idx, rule) in rules.iter().enumerate() {
         script.push_str(&format!("    {{ Test {}: {} {} {} => {} }}\n", idx, rule.lhs, op_symbol, rule.rhs, rule.result));
-        script.push_str(&format!("    LHS_{} := {};\n", idx, get_cosy_test_value_for_operator(operator_name, &rule.lhs, "LHS")));
-        script.push_str(&format!("    RHS_{} := {};\n", idx, get_cosy_test_value_for_operator(operator_name, &rule.rhs, "RHS")));
+        script.push_str(&format!("    LHS_{} := {};\n", idx, rule.lhs_test_val));
+        script.push_str(&format!("    RHS_{} := {};\n", idx, rule.rhs_test_val));
         script.push_str(&format!("    RESULT_{} := LHS_{} {} RHS_{};\n", idx, idx, op_symbol, idx));
         script.push_str(&format!("    WRITE 6 RESULT_{};\n\n", idx));
     }
     
     script.push_str("ENDPROCEDURE;\n\nRUN;\nEND;\n");
     script
-}
-
-/// Get appropriate test value for a ROSY type.
-/// 
-/// ROSY uses & (concat) to build composite types:
-/// - CM: CM(real & imag) - Complex from real & imaginary
-/// - VE: val1 & val2 & val3 - Vector concatenation
-/// - DA: DA(var_index) - creates DA for differential variable
-/// - CD: DA(1) & DA(2) - Complex DA from two DAs concatenated
-fn get_rosy_test_value(type_name: &str) -> &'static str {
-    match type_name {
-        "RE" => "2.5",
-        "CM" => "CM(1.0 & 2.0)",  // Complex: real & imaginary
-        "VE" => "1.0 & 2.0 & 3.0",  // Vector: concatenate with &
-        "DA" => "DA(1)",  // DA(var_index) creates differential variable
-        "CD" => "DA(1) & DA(2)",  // Complex DA: DA & DA concatenation
-        "LO" => "TRUE",
-        "ST" => "\"test\"",
-        _ => "0.0",
-    }
-}
-
-/// Get appropriate test value for COSY type.
-fn get_cosy_test_value(type_name: &str) -> &'static str {
-    match type_name {
-        "RE" => "2.5",
-        "CM" => "CM(1.0&2.0)",  // COSY complex: CM(real&imaginary)
-        "VE" => "1.0",  // COSY vectors are just scalars
-        "DA" => "DA(1)",  // Use DA(var_index) to create DA variable
-        "CD" => "DA(1)+CM(0&1)*DA(2)",  // Complex DA: real part + i*imaginary part
-        "LO" => "1",
-        "ST" => "'test'",  // COSY uses single quotes for strings
-        _ => "0.0",
-    }
-}
-
-/// Get appropriate test value for COSY type, context-aware for specific operators.
-fn get_cosy_test_value_for_operator(operator_name: &str, type_name: &str, role: &str) -> &'static str {
-    // Special cases for extract operator
-    if operator_name == "extract" {
-        if type_name == "VE" && role == "RHS" {
-            return "1 & 2";  // Two-element vector for range extraction (COSY uses & to build vectors)
-        }
-        if type_name == "RE" && role == "RHS" {
-            return "1";  // Integer index for single element extraction
-        }
-        if type_name == "VE" && role == "LHS" {
-            return "10 & 20 & 30";  // Three-element vector to extract from
-        }
-    }
-    
-    // Default values for all operators
-    get_cosy_test_value(type_name)
 }
 
 /// Get COSY variable size (for VARIABLE X <size>).
@@ -235,7 +188,10 @@ fn get_cosy_var_size(type_name: &str) -> &'static str {
         "VE" => "3",   // Vector of size 3
         "DA" => "100", // DA needs space for coefficients
         "CD" => "100", // Complex DA needs space for DA coefficients
-        _ => "1",      // Everything else is scalar
+        "RE" => "1",   // Real number
+        "LO" => "1",   // Logical (boolean)
+        "ST" => "6",   // String (arbitrary size, use 6 for short strings)
+        _ => panic!("Unknown type for COSY variable size: {}", type_name),
     }
 }
 

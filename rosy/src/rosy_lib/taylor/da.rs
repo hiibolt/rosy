@@ -1,7 +1,7 @@
 //! DA (Differential Algebra) - Taylor series with real coefficients.
 
 use std::collections::HashMap;
-use std::ops::{Add, Neg, Sub};
+use std::ops::{Add, Neg, Sub, Mul};
 use std::fmt;
 use anyhow::{Result, Context};
 
@@ -314,6 +314,111 @@ impl Sub<&DA> for f64 {
 
     fn sub(self, rhs: &DA) -> Self::Output {
         self + &(-rhs)
+    }
+}
+
+// ============================================================================
+// Multiplication Operations
+// ============================================================================
+
+/// Multiplication: DA * DA
+impl Mul<DA> for DA {
+    type Output = Result<DA>;
+
+    fn mul(self, rhs: DA) -> Self::Output {
+        &self * &rhs
+    }
+}
+
+/// Multiplication: &DA * &DA (preferred - implements actual DA multiplication)
+impl Mul<&DA> for &DA {
+    type Output = Result<DA>;
+
+    fn mul(self, rhs: &DA) -> Self::Output {
+        let config = get_config()?;
+        let mut result = HashMap::new();
+
+        // Multiply each term in self by each term in rhs
+        for (m1, &c1) in &self.coeffs {
+            for (m2, &c2) in &rhs.coeffs {
+                let product_monomial = m1.multiply(m2);
+                
+                // Only include terms within the truncation order
+                if product_monomial.within_order(config.max_order) {
+                    *result.entry(product_monomial).or_insert(0.0) += c1 * c2;
+                }
+            }
+        }
+
+        // Remove small coefficients
+        result.retain(|_, &mut coeff| coeff.abs() > config.epsilon);
+
+        Ok(DA { coeffs: result })
+    }
+}
+
+/// Multiplication: DA * &DA
+impl Mul<&DA> for DA {
+    type Output = Result<DA>;
+
+    fn mul(self, rhs: &DA) -> Self::Output {
+        &self * rhs
+    }
+}
+
+/// Multiplication: &DA * DA
+impl Mul<DA> for &DA {
+    type Output = Result<DA>;
+
+    fn mul(self, rhs: DA) -> Self::Output {
+        self * &rhs
+    }
+}
+
+/// Multiplication: DA * f64
+impl Mul<f64> for DA {
+    type Output = Result<DA>;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        &self * rhs
+    }
+}
+
+/// Multiplication: &DA * f64 (scalar multiplication)
+impl Mul<f64> for &DA {
+    type Output = Result<DA>;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        let config = get_config()?;
+        
+        if rhs.abs() <= config.epsilon {
+            return Ok(DA::zero());
+        }
+
+        let coeffs: HashMap<Monomial, f64> = self.coeffs
+            .iter()
+            .map(|(&m, &c)| (m, c * rhs))
+            .collect();
+
+        Ok(DA { coeffs })
+    }
+}
+
+/// Multiplication: f64 * DA
+impl Mul<DA> for f64 {
+    type Output = Result<DA>;
+
+    fn mul(self, rhs: DA) -> Self::Output {
+        &rhs * self
+    }
+}
+
+/// Multiplication: f64 * &DA
+impl Mul<&DA> for f64 {
+    type Output = Result<DA>;
+
+    fn mul(self, rhs: &DA) -> Self::Output {
+        rhs * self
     }
 }
 

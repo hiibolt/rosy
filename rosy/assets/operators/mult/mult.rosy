@@ -5,7 +5,7 @@ BEGIN;
 
     LHS_0 := 1;
     RHS_0 := 1;
-    RESULT_0 := LHS_0 + RHS_0;
+    RESULT_0 := LHS_0 * RHS_0;
     WRITE 6 ST(RESULT_0);
 
     VARIABLE (RE) LHS_1;
@@ -14,7 +14,7 @@ BEGIN;
 
     LHS_1 := 2;
     RHS_1 := CM(0&1);
-    RESULT_1 := LHS_1 + RHS_1;
+    RESULT_1 := LHS_1 * RHS_1;
     WRITE 6 ST(RESULT_1);
 
     VARIABLE (RE) LHS_2;
@@ -23,7 +23,7 @@ BEGIN;
 
     LHS_2 := 1;
     RHS_2 := 1&2;
-    RESULT_2 := LHS_2 + RHS_2;
+    RESULT_2 := LHS_2 * RHS_2;
     WRITE 6 ST(RESULT_2);
 
     VARIABLE (RE) LHS_3;
@@ -32,7 +32,7 @@ BEGIN;
 
     LHS_3 := 3;
     RHS_3 := DA(1);
-    RESULT_3 := LHS_3 + RHS_3;
+    RESULT_3 := LHS_3 * RHS_3;
     WRITE 6 ST(RESULT_3);
 
     VARIABLE (RE) LHS_4;
@@ -41,7 +41,7 @@ BEGIN;
 
     LHS_4 := 4;
     RHS_4 := DA(1)+CM(0&1)*DA(2);
-    RESULT_4 := LHS_4 + RHS_4;
+    RESULT_4 := LHS_4 * RHS_4;
     WRITE 6 ST(RESULT_4);
 
     VARIABLE (LO) LHS_5;
@@ -50,7 +50,7 @@ BEGIN;
 
     LHS_5 := LO(1);
     RHS_5 := LO(0);
-    RESULT_5 := LHS_5 + RHS_5;
+    RESULT_5 := LHS_5 * RHS_5;
     WRITE 6 ST(RESULT_5);
 
     VARIABLE (CM) LHS_6;
@@ -59,7 +59,7 @@ BEGIN;
 
     LHS_6 := CM(0&1);
     RHS_6 := 5;
-    RESULT_6 := LHS_6 + RHS_6;
+    RESULT_6 := LHS_6 * RHS_6;
     WRITE 6 ST(RESULT_6);
 
     VARIABLE (CM) LHS_7;
@@ -68,7 +68,7 @@ BEGIN;
 
     LHS_7 := CM(2&3);
     RHS_7 := CM(4&5);
-    RESULT_7 := LHS_7 + RHS_7;
+    RESULT_7 := LHS_7 * RHS_7;
     WRITE 6 ST(RESULT_7);
 
     VARIABLE (CM) LHS_8;
@@ -77,7 +77,7 @@ BEGIN;
 
     LHS_8 := CM(0&1);
     RHS_8 := DA(1);
-    RESULT_8 := LHS_8 + RHS_8;
+    RESULT_8 := LHS_8 * RHS_8;
     WRITE 6 ST(RESULT_8);
 
     VARIABLE (CM) LHS_9;
@@ -86,7 +86,7 @@ BEGIN;
 
     LHS_9 := CM(0&1);
     RHS_9 := DA(1)+CM(2&3)*DA(2);
-    RESULT_9 := LHS_9 + RHS_9;
+    RESULT_9 := LHS_9 * RHS_9;
     WRITE 6 ST(RESULT_9);
 
     VARIABLE (VE) LHS_10;
@@ -95,7 +95,7 @@ BEGIN;
 
     LHS_10 := 1&2;
     RHS_10 := 6;
-    RESULT_10 := LHS_10 + RHS_10;
+    RESULT_10 := LHS_10 * RHS_10;
     WRITE 6 ST(RESULT_10);
 
     VARIABLE (VE) LHS_11;
@@ -104,7 +104,7 @@ BEGIN;
 
     LHS_11 := 1&2;
     RHS_11 := 3&4;
-    RESULT_11 := LHS_11 + RHS_11;
+    RESULT_11 := LHS_11 * RHS_11;
     WRITE 6 ST(RESULT_11);
 
     VARIABLE (DA) LHS_12;
@@ -113,7 +113,7 @@ BEGIN;
 
     LHS_12 := DA(1);
     RHS_12 := 7;
-    RESULT_12 := LHS_12 + RHS_12;
+    RESULT_12 := LHS_12 * RHS_12;
     WRITE 6 ST(RESULT_12);
 
     VARIABLE (DA) LHS_13;
@@ -122,7 +122,7 @@ BEGIN;
 
     LHS_13 := DA(1);
     RHS_13 := CM(0&1);
-    RESULT_13 := LHS_13 + RHS_13;
+    RESULT_13 := LHS_13 * RHS_13;
     WRITE 6 ST(RESULT_13);
 
     VARIABLE (DA) LHS_14;
@@ -131,7 +131,7 @@ BEGIN;
 
     LHS_14 := DA(2);
     RHS_14 := DA(3);
-    RESULT_14 := LHS_14 + RHS_14;
+    RESULT_14 := LHS_14 * RHS_14;
     WRITE 6 ST(RESULT_14);
 
     VARIABLE (DA) LHS_15;
@@ -140,7 +140,7 @@ BEGIN;
 
     LHS_15 := DA(1);
     RHS_15 := DA(1)+CM(0&1)*DA(2);
-    RESULT_15 := LHS_15 + RHS_15;
+    RESULT_15 := LHS_15 * RHS_15;
     WRITE 6 ST(RESULT_15);
 
     VARIABLE (CD) LHS_16;
@@ -149,7 +149,7 @@ BEGIN;
 
     LHS_16 := DA(1)+CM(0&1)*DA(2);
     RHS_16 := 8;
-    RESULT_16 := LHS_16 + RHS_16;
+    RESULT_16 := LHS_16 * RHS_16;
     WRITE 6 ST(RESULT_16);
 
     VARIABLE (CD) LHS_17;
@@ -158,7 +158,7 @@ BEGIN;
 
     LHS_17 := DA(1)+CM(0&1)*DA(2);
     RHS_17 := CM(2&3);
-    RESULT_17 := LHS_17 + RHS_17;
+    RESULT_17 := LHS_17 * RHS_17;
     WRITE 6 ST(RESULT_17);
 
     VARIABLE (CD) LHS_18;
@@ -167,7 +167,7 @@ BEGIN;
 
     LHS_18 := DA(1)+CM(0&1)*DA(2);
     RHS_18 := DA(3);
-    RESULT_18 := LHS_18 + RHS_18;
+    RESULT_18 := LHS_18 * RHS_18;
     WRITE 6 ST(RESULT_18);
 
     VARIABLE (CD) LHS_19;
@@ -176,7 +176,7 @@ BEGIN;
 
     LHS_19 := DA(1)+CM(0&1)*DA(2);
     RHS_19 := DA(3)+CM(4&5)*DA(6);
-    RESULT_19 := LHS_19 + RHS_19;
+    RESULT_19 := LHS_19 * RHS_19;
     WRITE 6 ST(RESULT_19);
 
 END;

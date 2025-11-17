@@ -3,8 +3,8 @@ BEGIN;
     VARIABLE (RE) RHS_0;
     VARIABLE (VE) RESULT_0;
 
-    LHS_0 := 2.5;
-    RHS_0 := 2.5;
+    LHS_0 := 1;
+    RHS_0 := 1;
     RESULT_0 := LHS_0 & RHS_0;
     WRITE 6 ST(RESULT_0);
 
@@ -12,8 +12,8 @@ BEGIN;
     VARIABLE (VE) RHS_1;
     VARIABLE (VE) RESULT_1;
 
-    LHS_1 := 2.5;
-    RHS_1 := 1.0 & 2.0 & 3.0;
+    LHS_1 := 1;
+    RHS_1 := 1&2&3;
     RESULT_1 := LHS_1 & RHS_1;
     WRITE 6 ST(RESULT_1);
 
@@ -21,8 +21,8 @@ BEGIN;
     VARIABLE (ST) RHS_2;
     VARIABLE (ST) RESULT_2;
 
-    LHS_2 := "test";
-    RHS_2 := "test";
+    LHS_2 := 'Hello';
+    RHS_2 := 'World';
     RESULT_2 := LHS_2 & RHS_2;
     WRITE 6 ST(RESULT_2);
 
@@ -30,8 +30,8 @@ BEGIN;
     VARIABLE (RE) RHS_3;
     VARIABLE (VE) RESULT_3;
 
-    LHS_3 := 1.0 & 2.0 & 3.0;
-    RHS_3 := 2.5;
+    LHS_3 := 1&2;
+    RHS_3 := 3;
     RESULT_3 := LHS_3 & RHS_3;
     WRITE 6 ST(RESULT_3);
 
@@ -39,8 +39,8 @@ BEGIN;
     VARIABLE (VE) RHS_4;
     VARIABLE (VE) RESULT_4;
 
-    LHS_4 := 1.0 & 2.0 & 3.0;
-    RHS_4 := 1.0 & 2.0 & 3.0;
+    LHS_4 := 1&2;
+    RHS_4 := 3&4;
     RESULT_4 := LHS_4 & RHS_4;
     WRITE 6 ST(RESULT_4);
 

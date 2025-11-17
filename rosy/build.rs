@@ -10,6 +10,7 @@ fn main() {
     
     // Generate operator test files
     operator_codegen::codegen_operator("add");
+    operator_codegen::codegen_operator("mult");
     operator_codegen::codegen_operator("concat");
     operator_codegen::codegen_operator("extract");
     

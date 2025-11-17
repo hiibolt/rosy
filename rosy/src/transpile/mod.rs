@@ -48,8 +48,12 @@ impl TypeOf for Expr {
                 .context(format!("...while determining type of variable identifier '{}'", var_expr.identifier.name))?,
             Expr::Add(add_expr) => add_expr.type_of(context)
                 .context("...while determining type of addition expression")?,
+            Expr::Mult(mult_expr) => mult_expr.type_of(context)
+                .context("...while determining type of multiplication expression")?,
             Expr::StringConvert(string_convert_expr) => string_convert_expr.type_of(context)
                 .context("...while determining type of string conversion expression")?,
+            Expr::LogicalConvert(logical_convert_expr) => logical_convert_expr.type_of(context)
+                .context("...while determining type of logical conversion expression")?,
             Expr::FunctionCall(function_call_expr) => function_call_expr.type_of(context)
                 .context(format!("...while determining type of function call expression to '{}'", function_call_expr.name))?,
             Expr::Concat(concat_expr) => concat_expr.type_of(context)

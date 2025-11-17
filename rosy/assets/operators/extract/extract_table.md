@@ -1,7 +1,7 @@
 | Left | Right | Result | Comment |
 |---|---|---|---|
-| ST | RE | ST | Extract the i-th character |
-| ST | VE | ST | Extract character range (two-vector) |
-| CM | RE | RE | Extract component (1: real, 2: imaginary) |
-| VE | RE | RE | Extract the i-th component |
-| VE | VE | VE | Extract component range (two-vector) |
+| ST | RE | ST | 'test' |
+| ST | VE | ST | 'test' |
+| CM | RE | RE | CM(3&4) |
+| VE | RE | RE | 1&2 |
+| VE | VE | VE | 1&2&3 |

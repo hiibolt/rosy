@@ -1,7 +1,7 @@
 //! CD (Complex Differential Algebra) - Taylor series with complex coefficients.
 
 use std::collections::HashMap;
-use std::ops::{Add, Neg, Sub};
+use std::ops::{Add, Neg, Sub, Mul};
 use std::fmt;
 use anyhow::Result;
 use num_complex::Complex64;
@@ -364,6 +364,111 @@ impl Sub<&CD> for Complex64 {
 
     fn sub(self, rhs: &CD) -> Self::Output {
         self + &(-rhs)
+    }
+}
+
+// ============================================================================
+// Multiplication Operations
+// ============================================================================
+
+/// Multiplication: CD * CD
+impl Mul<CD> for CD {
+    type Output = Result<CD>;
+
+    fn mul(self, rhs: CD) -> Self::Output {
+        &self * &rhs
+    }
+}
+
+/// Multiplication: &CD * &CD (preferred - implements actual CD multiplication)
+impl Mul<&CD> for &CD {
+    type Output = Result<CD>;
+
+    fn mul(self, rhs: &CD) -> Self::Output {
+        let config = get_config()?;
+        let mut result = HashMap::new();
+
+        // Multiply each term in self by each term in rhs
+        for (m1, &c1) in &self.coeffs {
+            for (m2, &c2) in &rhs.coeffs {
+                let product_monomial = m1.multiply(m2);
+                
+                // Only include terms within the truncation order
+                if product_monomial.within_order(config.max_order) {
+                    *result.entry(product_monomial).or_insert(Complex64::new(0.0, 0.0)) += c1 * c2;
+                }
+            }
+        }
+
+        // Remove small coefficients
+        result.retain(|_, coeff| coeff.norm() > config.epsilon);
+
+        Ok(CD { coeffs: result })
+    }
+}
+
+/// Multiplication: CD * &CD
+impl Mul<&CD> for CD {
+    type Output = Result<CD>;
+
+    fn mul(self, rhs: &CD) -> Self::Output {
+        &self * rhs
+    }
+}
+
+/// Multiplication: &CD * CD
+impl Mul<CD> for &CD {
+    type Output = Result<CD>;
+
+    fn mul(self, rhs: CD) -> Self::Output {
+        self * &rhs
+    }
+}
+
+/// Multiplication: CD * Complex64
+impl Mul<Complex64> for CD {
+    type Output = Result<CD>;
+
+    fn mul(self, rhs: Complex64) -> Self::Output {
+        &self * rhs
+    }
+}
+
+/// Multiplication: &CD * Complex64 (scalar multiplication)
+impl Mul<Complex64> for &CD {
+    type Output = Result<CD>;
+
+    fn mul(self, rhs: Complex64) -> Self::Output {
+        let config = get_config()?;
+        
+        if rhs.norm() <= config.epsilon {
+            return Ok(CD::zero());
+        }
+
+        let coeffs: HashMap<Monomial, Complex64> = self.coeffs
+            .iter()
+            .map(|(&m, &c)| (m, c * rhs))
+            .collect();
+
+        Ok(CD { coeffs })
+    }
+}
+
+/// Multiplication: Complex64 * CD
+impl Mul<CD> for Complex64 {
+    type Output = Result<CD>;
+
+    fn mul(self, rhs: CD) -> Self::Output {
+        &rhs * self
+    }
+}
+
+/// Multiplication: Complex64 * &CD
+impl Mul<&CD> for Complex64 {
+    type Output = Result<CD>;
+
+    fn mul(self, rhs: &CD) -> Self::Output {
+        rhs * self
     }
 }
 

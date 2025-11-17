@@ -18,7 +18,7 @@ pub use cd::CD;
 /// Set to 16 to handle typical beam physics cases:
 /// - 6D phase space (x, px, y, py, z, pz)
 /// - Additional coupling/parameter variables
-pub const MAX_VARS: usize = 16;
+pub const MAX_VARS: usize = 6;
 
 /// Default epsilon for coefficient truncation.
 pub const DEFAULT_EPSILON: f64 = 1e-15;

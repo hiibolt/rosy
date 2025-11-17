@@ -31,11 +31,11 @@ use crate::rosy_lib::operators::{TypeRule, build_type_registry};
 /// See manual.md Section A.2 "& (Concatenation)" for the authoritative list.
 /// GR (Graphics) type is not yet implemented in ROSY.
 pub const CONCAT_REGISTRY: &[TypeRule] = &[
-    TypeRule::with_comment("RE", "RE", "VE", "Concatenate two Reals to a Vector"),
-    TypeRule::with_comment("RE", "VE", "VE", "Append a Real to the left of a Vector"),
-    TypeRule::with_comment("ST", "ST", "ST", "Concatenate two Strings"),
-    TypeRule::with_comment("VE", "RE", "VE", "Append a Real to the right of a Vector"),
-    TypeRule::with_comment("VE", "VE", "VE", "Concatenate two Vectors"),
+    TypeRule::with_comment("RE", "RE", "VE", "1", "1", "Concatenate two Reals to a Vector"),
+    TypeRule::with_comment("RE", "VE", "VE", "1", "1&2&3", "Prepend a Real to the left of a Vector"),
+    TypeRule::with_comment("ST", "ST", "ST", "'Hello'", "'World'", "Concatenate two Strings"),
+    TypeRule::with_comment("VE", "RE", "VE", "1&2", "3", "Append a Real to the right of a Vector"),
+    TypeRule::with_comment("VE", "VE", "VE", "1&2", "3&4", "Concatenate two Vectors"),
     // GR & GR => GR is in COSY but GR type not implemented in ROSY yet
 ];
 

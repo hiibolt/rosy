@@ -1,8 +1,10 @@
 pub mod add;
+pub mod mult;
 pub mod extract;
 pub mod concat;
 
 pub use add::RosyAdd;
+pub use mult::RosyMult;
 pub use concat::RosyConcat;
 pub use extract::RosyExtract;
 
@@ -18,14 +20,23 @@ pub struct TypeRule {
     pub rhs: &'static str,
     /// Result type
     pub result: &'static str,
+    /// Test values for lhs and rhs
+    pub lhs_test_val: &'static str,
+    pub rhs_test_val: &'static str,
     /// Optional comment for documentation
     pub comment: &'static str,
 }
 
 impl TypeRule {
     /// Create a new type rule without a comment.
-    pub const fn new(lhs: &'static str, rhs: &'static str, result: &'static str) -> Self {
-        Self { lhs, rhs, result, comment: "" }
+    pub const fn new(
+        lhs: &'static str,
+        rhs: &'static str,
+        result: &'static str,
+        lhs_test_val: &'static str,
+        rhs_test_val: &'static str
+    ) -> Self {
+        Self { lhs, rhs, result, lhs_test_val, rhs_test_val, comment: "" }
     }
     
     /// Create a new type rule with a comment.
@@ -33,9 +44,11 @@ impl TypeRule {
         lhs: &'static str,
         rhs: &'static str,
         result: &'static str,
-        comment: &'static str,
+        lhs_test_val: &'static str,
+        rhs_test_val: &'static str,
+        comment: &'static str
     ) -> Self {
-        Self { lhs, rhs, result, comment }
+        Self { lhs, rhs, result, lhs_test_val, rhs_test_val, comment }
     }
 }
 
@@ -133,23 +146,24 @@ pub mod test_utils {
         
         let rosy_script = workspace_root.join(format!("rosy/assets/operators/{}/{}.rosy", operator_name, operator_name));
         let cosy_script = workspace_root.join(format!("rosy/assets/operators/{}/{}.fox", operator_name, operator_name));
-        let rosy_transpiler = workspace_root.join("target/release/rosy_transpiler");
         let cosy_exe = workspace_root.join("cosy");
 
         // Check if executables exist
-        if !rosy_transpiler.exists() {
-            panic!("rosy_transpiler not found at {:?}. Run: cargo build --release -p rosy_transpiler", rosy_transpiler);
-        }
         if !cosy_exe.exists() {
             panic!("cosy executable not found at {:?}", cosy_exe);
         }
 
         // Run ROSY transpiler
-        let transpile_output = Command::new(&rosy_transpiler)
+        let transpile_output = Command::new("cargo")
+            .arg("run")
+            .arg("--release")
+            .arg("-p")
+            .arg("rosy")
+            .arg("--")
             .arg(&rosy_script)
             .current_dir(&workspace_root)
             .output()
-            .expect("Failed to run rosy_transpiler");
+            .expect("Failed to run rosy");
 
         assert!(
             transpile_output.status.success(),

@@ -58,7 +58,7 @@ impl Transpile for ConcatExpr {
             // Then, for each subsequent term, serialize and concatenate
             for (i, term) in terms.into_iter().enumerate() {
                 serialization = format!(
-                    "&mut RosyConcat::rosy_concat(&*{}, &*{})",
+                    "&mut RosyConcat::rosy_concat(&*{}, &*{})?",
                     serialization,
                     match term.transpile(context) {
                         Ok(output) => {
