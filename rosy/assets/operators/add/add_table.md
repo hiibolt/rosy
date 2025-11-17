@@ -1,22 +1,22 @@
 | Left | Right | Result | Comment |
 |---|---|---|---|
-| RE | RE | RE | 1 |
-| RE | CM | CM | 2 |
-| RE | VE | VE | 1 |
-| RE | DA | DA | 3 |
-| RE | CD | CD | 4 |
-| LO | LO | LO | LO(1) |
-| CM | RE | CM | CM(0&1) |
-| CM | CM | CM | CM(2&3) |
-| CM | DA | CD | CM(0&1) |
-| CM | CD | CD | CM(0&1) |
-| VE | RE | VE | 1&2 |
-| VE | VE | VE | 1&2 |
-| DA | RE | DA | DA(1) |
-| DA | CM | CD | DA(1) |
-| DA | DA | DA | DA(2) |
-| DA | CD | CD | DA(1) |
-| CD | RE | CD | DA(1)+CM(0&1)*DA(2) |
-| CD | CM | CD | DA(1)+CM(0&1)*DA(2) |
-| CD | DA | CD | DA(1)+CM(0&1)*DA(2) |
-| CD | CD | CD | DA(1)+CM(0&1)*DA(2) |
+| RE | RE | RE |  |
+| RE | CM | CM |  |
+| RE | VE | VE | Add Real componentwise |
+| RE | DA | DA |  |
+| RE | CD | CD |  |
+| LO | LO | LO | Logical OR |
+| CM | RE | CM |  |
+| CM | CM | CM |  |
+| CM | DA | CD |  |
+| CM | CD | CD |  |
+| VE | RE | VE | Add Real componentwise |
+| VE | VE | VE | Add componentwise |
+| DA | RE | DA |  |
+| DA | CM | CD |  |
+| DA | DA | DA |  |
+| DA | CD | CD |  |
+| CD | RE | CD |  |
+| CD | CM | CD |  |
+| CD | DA | CD |  |
+| CD | CD | CD |  |

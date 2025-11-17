@@ -33,7 +33,7 @@ use crate::rosy_lib::operators::{TypeRule, build_type_registry};
 pub const CONCAT_REGISTRY: &[TypeRule] = &[
     TypeRule::with_comment("RE", "RE", "VE", "1", "1", "Concatenate two Reals to a Vector"),
     TypeRule::with_comment("RE", "VE", "VE", "1", "1&2&3", "Prepend a Real to the left of a Vector"),
-    TypeRule::with_comment("ST", "ST", "ST", "'Hello'", "'World'", "Concatenate two Strings"),
+    TypeRule::with_comment("ST", "ST", "ST", "'He'", "'ya!'", "Concatenate two Strings"),
     TypeRule::with_comment("VE", "RE", "VE", "1&2", "3", "Append a Real to the right of a Vector"),
     TypeRule::with_comment("VE", "VE", "VE", "1&2", "3&4", "Concatenate two Vectors"),
     // GR & GR => GR is in COSY but GR type not implemented in ROSY yet
@@ -97,57 +97,11 @@ impl RosyConcat<&VE> for &VE {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    // Note: The test_operator_output_match test is commented out because
-    // ROSY and COSY have different output formats for vectors:
-    // - ROSY: Displays vectors in formatted notation (e.g., "[2.5, 2.5]")
-    // - COSY: Displays vector elements space-separated (e.g., "2.500000  2.500000")
-    // This makes direct output comparison impractical for concat operations.
-    // The unit tests below verify the actual Rust implementation works correctly.
-    
-    // use super::super::test_utils::test_operator_output_match;
-    // #[test]
-    // fn test_rosy_cosy_output_match() {
-    //     test_operator_output_match("concat");
-    // }
+    use super::super::test_utils::test_operator_output_match;
 
     #[test]
-    fn test_re_re() {
-        let a = 2.5;
-        let b = 3.5;
-        let result = (&a).rosy_concat(&b).unwrap();
-        assert_eq!(result, vec![2.5, 3.5]);
-    }
-
-    #[test]
-    fn test_re_ve() {
-        let a = 1.0;
-        let v = vec![2.0, 3.0];
-        let result = (&a).rosy_concat(&v).unwrap();
-        assert_eq!(result, vec![1.0, 2.0, 3.0]);
-    }
-
-    #[test]
-    fn test_st_st() {
-        let a = "Hello".to_string();
-        let b = "World".to_string();
-        let result = (&a).rosy_concat(&b).unwrap();
-        assert_eq!(result, "HelloWorld");
-    }
-
-    #[test]
-    fn test_ve_re() {
-        let v = vec![1.0, 2.0];
-        let a = 3.0;
-        let result = (&v).rosy_concat(&a).unwrap();
-        assert_eq!(result, vec![1.0, 2.0, 3.0]);
-    }
-
-    #[test]
-    fn test_ve_ve() {
-        let v1 = vec![1.0, 2.0];
-        let v2 = vec![3.0, 4.0];
-        let result = (&v1).rosy_concat(&v2).unwrap();
-        assert_eq!(result, vec![1.0, 2.0, 3.0, 4.0]);
+    #[serial_test::serial]
+    fn test_rosy_cosy_output_match() {
+        test_operator_output_match("concat");
     }
 }

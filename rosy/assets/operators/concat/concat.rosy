@@ -21,8 +21,8 @@ BEGIN;
     VARIABLE (ST) RHS_2;
     VARIABLE (ST) RESULT_2;
 
-    LHS_2 := 'Hello';
-    RHS_2 := 'World';
+    LHS_2 := 'He';
+    RHS_2 := 'ya!';
     RESULT_2 := LHS_2 & RHS_2;
     WRITE 6 ST(RESULT_2);
 

@@ -84,40 +84,6 @@ pub fn build_type_registry(rules: &[TypeRule]) -> HashMap<(RosyType, RosyType), 
     m
 }
 
-/// Macro to define operator registries more concisely.
-/// 
-/// # Example
-/// ```ignore
-/// operator_registry! {
-///     ADD => [
-///         RE + RE => RE,
-///         RE + CM => CM,
-///         CM + DA => CD ("Complex DA result"),
-///     ]
-/// }
-/// ```
-#[macro_export]
-macro_rules! operator_registry {
-    // Entry with comment
-    ($lhs:ident + $rhs:ident => $result:ident ($comment:literal)) => {
-        $crate::operators::TypeRule::with_comment(
-            stringify!($lhs),
-            stringify!($rhs),
-            stringify!($result),
-            $comment
-        )
-    };
-    
-    // Entry without comment
-    ($lhs:ident + $rhs:ident => $result:ident) => {
-        $crate::operators::TypeRule::new(
-            stringify!($lhs),
-            stringify!($rhs),
-            stringify!($result)
-        )
-    };
-}
-
 #[cfg(test)]
 pub mod test_utils {
     use std::process::Command;

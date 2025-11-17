@@ -64,7 +64,7 @@ fn parse_type_rule_new(line: &str) -> Option<TypeRule> {
         result: captures.get(3)?.as_str().to_string(),
         lhs_test_val: captures.get(4)?.as_str().to_string(),
         rhs_test_val: captures.get(5)?.as_str().to_string(),
-        comment: captures.get(4)?.as_str().to_string(),
+        comment: String::new()
     })
 }
 
@@ -83,7 +83,7 @@ fn parse_type_rule_with_comment(line: &str) -> Option<TypeRule> {
         result: captures.get(3)?.as_str().to_string(),
         lhs_test_val: captures.get(4)?.as_str().to_string(),
         rhs_test_val: captures.get(5)?.as_str().to_string(),
-        comment: captures.get(4)?.as_str().to_string(),
+        comment: captures.get(6)?.as_str().to_string(),
     })
 }
 
@@ -185,7 +185,7 @@ pub fn generate_cosy_script(operator_name: &str, rules: &[TypeRule]) -> String {
 fn get_cosy_var_size(type_name: &str) -> &'static str {
     match type_name {
         "CM" => "2",   // Complex needs 2 slots (real + imaginary)
-        "VE" => "3",   // Vector of size 3
+        "VE" => "6",   // Vector of size 3
         "DA" => "100", // DA needs space for coefficients
         "CD" => "100", // Complex DA needs space for DA coefficients
         "RE" => "1",   // Real number

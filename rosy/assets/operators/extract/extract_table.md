@@ -1,7 +1,7 @@
 | Left | Right | Result | Comment |
 |---|---|---|---|
-| ST | RE | ST | 'test' |
-| ST | VE | ST | 'test' |
-| CM | RE | RE | CM(3&4) |
-| VE | RE | RE | 1&2 |
-| VE | VE | VE | 1&2&3 |
+| ST | RE | ST | Extract i-th character |
+| ST | VE | ST | Extract substring by range |
+| CM | RE | RE | Extract real part |
+| VE | RE | RE | Extract i-th component |
+| VE | VE | VE | Extract subvector by range |
