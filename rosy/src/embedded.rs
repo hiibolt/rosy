@@ -49,7 +49,6 @@ edition = "2024"
 anyhow = "1.0"
 mpi = "0.8"
 bincode = "2.0"
-dace = "0.2"
 serial_test = "3.2"
 num-complex = "0.4"
 "#;
@@ -71,7 +70,6 @@ edition = "2024"
 anyhow = "1.0"
 rosy_lib = { path = "./vendored/rosy_lib" }
 mpi = "0.8"
-dace = "0.2"
 "#
 }
 

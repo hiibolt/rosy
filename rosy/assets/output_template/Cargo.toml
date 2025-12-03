@@ -7,4 +7,3 @@ edition = "2024"
 anyhow.workspace = true
 rosy_lib.workspace = true
 mpi.workspace = true
-dace.workspace = true

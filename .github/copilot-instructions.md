@@ -174,7 +174,6 @@ PLOOP constructs distribute iterations across MPI ranks (`rosy/src/transpile/sta
 DA = Differential Algebra (real Taylor series), CD = Complex DA
 - Must call `taylor::init_taylor(order, nvars)` before using DA/CD
 - Template includes: `taylor::init_taylor(10, 6)?;`
-- DA operations use DACE library bindings (`dace` crate)
 
 ## Test-Driven Development via COSY/ROSY Diffing
 
@@ -251,4 +250,4 @@ If a request is vague (e.g., "add support for X"), probe:
 ```bash
 nix develop  # Enter dev shell with all dependencies
 ```
-Required for MPI/DACE bindings which need system libraries.
+Required for MPI bindings which need system libraries.
