@@ -452,8 +452,8 @@ impl Div<&DA> for &DA {
         // h = 1/g, then h_{n+1} = h_n * (2 - g * h_n)
         let mut h = DA::constant(1.0 / g0);
         
-        // Perform a few Newton iterations
-        for _ in 0..10 {
+        // Perform Newton iterations (20 iterations for high precision)
+        for _ in 0..20 {
             let gh = (rhs * &h)?;
             let two_minus_gh = (&DA::constant(2.0) - &gh)?;
             let new_h = (&h * &two_minus_gh)?;

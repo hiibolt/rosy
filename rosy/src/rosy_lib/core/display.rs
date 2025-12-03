@@ -14,50 +14,71 @@ fn sci(x: f64) -> (f64, i32) {
         (base, -exp)
     }
 }
+fn display_re (
+    num: RE,
+    precision: usize,
+    exponent_precision: usize,
+    spaces: usize
+) -> String {
+    if num.abs() < 1f64 && num != 0f64 {
+        let (mantissa, exponent) = sci(num.abs());
+
+        if num.is_sign_positive() {
+            format!(
+                "0.{}{}",
+                format!("{:.precision$}", mantissa, precision=precision)
+                    .chars()
+                    .skip(2) // Skip "0."
+                    .take(precision)
+                    .collect::<String>(),
+                if exponent != 0 {
+                    format!(
+                        "E{:+0exponent_precision$}",
+                        exponent,
+                        exponent_precision=exponent_precision
+                    )
+                } else {
+                    " ".repeat(spaces)
+                }
+            )
+        } else {
+            format!(
+                "-.{}{}",
+                format!("{:.precision$}", mantissa, precision=precision)
+                    .chars()
+                    .skip(2) // Skip "0."
+                    .take(precision)
+                    .collect::<String>(),
+                if exponent != 0 {
+                    format!(
+                        "E{:+0exponent_precision$}",
+                        exponent,
+                        exponent_precision=exponent_precision
+                    )
+                } else {
+                    " ".repeat(spaces)
+                }
+            )
+        }
+    } else {
+        format!(
+            "{}{}{}",
+            if num.is_sign_negative() {"-"} else {" "},
+            format!(
+                "{:.precision$}",
+                num.abs(),
+                precision=precision
+            ).chars().take(precision + 1).collect::<String>(),
+            " ".repeat(spaces),
+        )
+    }
+}
 pub trait RosyDisplay {
     fn rosy_display(self) -> String;
 }
 impl RosyDisplay for &RE {
     fn rosy_display(self) -> String {
-        if self.abs() < 1f64 && self != &0f64 {
-            let (mantissa, exponent) = sci(self.abs());
-
-            if self.is_sign_positive() {
-                format!(
-                    "0.{}{}",
-                    format!("{:.16}", mantissa)
-                        .chars()
-                        .skip(2) // Skip "0."
-                        .take(16) // Take up to 16 digits after decimal
-                        .collect::<String>(),
-                    if exponent != 0 {
-                        format!("E{:+03}", exponent)
-                    } else {
-                        "    ".to_string()
-                    }
-                )
-            } else {
-                format!(
-                    "-.{}{}",
-                    format!("{:.16}", mantissa)
-                        .chars()
-                        .skip(2) // Skip "0."
-                        .take(16) // Take up to 16 digits after decimal
-                        .collect::<String>(),
-                    if exponent != 0 {
-                        format!("E{:+03}", exponent)
-                    } else {
-                        "    ".to_string()
-                    }
-                )
-            }
-        } else {
-            format!(
-                "{}{}    ",
-                if self.is_sign_negative() {"-"} else {" "},
-                format!("{:.15}", self.abs()).chars().take(17).collect::<String>()
-            )
-        }
+        display_re(*self, 16, 3, 4)
     }
 }
 
@@ -77,15 +98,9 @@ impl RosyDisplay for &CM {
     fn rosy_display(self) -> String {
         // COSY format: (  real     ,  imag     )
         format!(
-            " ( {}     , {}     )", 
-            self.0.rosy_display()
-                .chars()
-                .take(11)
-                .collect::<String>(),
-            self.1.rosy_display()
-                .chars()
-                .take(11)
-                .collect::<String>()
+            " ( {}, {})", 
+            display_re(self.0, 9, 4, 5),
+            display_re(self.1, 9, 4, 5)
         )
     }
 }
