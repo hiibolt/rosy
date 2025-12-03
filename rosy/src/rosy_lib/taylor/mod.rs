@@ -6,12 +6,19 @@
 mod monomial;
 mod config;
 mod da;
-mod cd;
 
 pub use monomial::Monomial;
 pub use config::{TaylorConfig, init_taylor, get_config};
-pub use da::DA;
-pub use cd::CD;
+pub use da::DACoefficient;
+
+// Core generic differential algebra type
+use num_complex::Complex64;
+
+/// Real differential algebra (f64 coefficients) - traditional DA
+pub type DA = da::DA<f64>;
+
+/// Complex differential algebra (Complex64 coefficients) - replaces CD
+pub type CD = da::DA<Complex64>;
 
 /// Maximum number of variables supported.
 /// 

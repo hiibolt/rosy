@@ -142,7 +142,7 @@ impl RosyAdd<&CD> for &RE {
     type Output = CD;
     fn rosy_add(self, other: &CD) -> Result<Self::Output> {
         // Create DA from real, then CD from that DA
-        let self_da = DA::constant(*self);
+        let self_da = DA::from_coeff(*self);
         let self_cd = CD::from_da(&self_da);
         self_cd.rosy_add(other)
     }
@@ -166,7 +166,7 @@ impl RosyAdd<&DA> for &CM {
         // Create CD from the DA (which becomes the real part)
         let da_cd = CD::from_da(other);
         // Add them
-        &cm_cd + &da_cd
+        Ok((&cm_cd + &da_cd)?)
     }
 }
 

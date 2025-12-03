@@ -9,12 +9,7 @@ pub use intrinsics::*;
 pub use core::*;
 pub use mpi::*;
 
-// Re-export dace types (legacy - will be replaced by taylor module)
-pub use dace::DA as DaceDA;
-
-// New taylor types
 pub use taylor::{DA, CD};
-
 pub type RE = f64;
 pub type ST = String;
 pub type LO = bool;

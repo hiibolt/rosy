@@ -73,6 +73,20 @@ fn display_re (
         )
     }
 }
+fn build_exp_str (
+    exps: &[u8],
+) -> String {
+    exps.iter()
+        .enumerate()
+        .fold(String::new(), |mut acc, (i, exp)| {
+            if i % 2 == 0 {
+                acc.push_str(&format!("{:>2}", exp));
+            } else {
+                acc.push_str(&format!("{:>2} ", exp));
+            }
+            acc
+        })
+}
 pub trait RosyDisplay {
     fn rosy_display(self) -> String;
 }
@@ -149,19 +163,10 @@ impl RosyDisplay for &DA {
                 // For 6 exponents, should match: '1 0  1 0  0 0'
                 let exps = &monomial.exponents;
 
-                exps.iter()
-                    .enumerate()
-                    .fold(String::new(), |mut acc, (i, exp)| {
-                        if i % 2 == 0 {
-                            acc.push_str(&format!("{}", exp));
-                        } else {
-                            acc.push_str(&format!("{:>2}  ", exp));
-                        }
-                        acc
-                    })
+                build_exp_str(exps)
             };
             output.push_str(&format!(
-                "{}  {} {}   {}\n", 
+                "{}  {} {}  {}\n", 
                 idx + 1,
                 coeff.rosy_display(),
                 format!("{:>3}", order),
@@ -226,16 +231,7 @@ impl RosyDisplay for &CD {
                 // For 6 exponents, should match: '1 0  1 0  0 0'
                 let exps = &monomial.exponents;
 
-                exps.iter()
-                    .enumerate()
-                    .fold(String::new(), |mut acc, (i, exp)| {
-                        if i % 2 == 0 {
-                            acc.push_str(&format!("{:>2}", exp));
-                        } else {
-                            acc.push_str(&format!("{:>2} ", exp));
-                        }
-                        acc
-                    })
+                build_exp_str(exps)
             };
             output.push_str(&format!(
                 "     {} {} {} {:>3}  {}\n",
