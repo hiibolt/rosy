@@ -1,11 +1,63 @@
 use crate::rosy_lib::{RE, ST, LO, CM, VE, DA, CD};
 
+fn sci(x: f64) -> (f64, i32) {
+    if x == 0.0 {
+        return (0.0, 0);
+    }
+
+    if x >= 1.0 {
+        // No exponent shifting needed for your rules.
+        (x, 0)
+    } else {
+        let exp = (-x.log10()).floor() as i32;
+        let base = x * 10f64.powi(exp);
+        (base, -exp)
+    }
+}
 pub trait RosyDisplay {
     fn rosy_display(self) -> String;
 }
 impl RosyDisplay for &RE {
     fn rosy_display(self) -> String {
-        format!(" {}{:17.15}     ", if self.is_sign_negative() {"-"} else {" "}, self.abs() )
+        if self.abs() < 1f64 && self != &0f64 {
+            let (mantissa, exponent) = sci(self.abs());
+
+            if self.is_sign_positive() {
+                format!(
+                    "0.{}{}",
+                    format!("{:.16}", mantissa)
+                        .chars()
+                        .skip(2) // Skip "0."
+                        .take(16) // Take up to 16 digits after decimal
+                        .collect::<String>(),
+                    if exponent != 0 {
+                        format!("E{:+03}", exponent)
+                    } else {
+                        "    ".to_string()
+                    }
+                )
+            } else {
+                format!(
+                    "-.{}{}",
+                    format!("{:.16}", mantissa)
+                        .chars()
+                        .skip(2) // Skip "0."
+                        .take(16) // Take up to 16 digits after decimal
+                        .collect::<String>(),
+                    if exponent != 0 {
+                        format!("E{:+03}", exponent)
+                    } else {
+                        "    ".to_string()
+                    }
+                )
+            }
+        } else {
+            format!(
+                "{}{}    ",
+                if self.is_sign_negative() {"-"} else {" "},
+                format!("{:.15}", self.abs()).chars().take(17).collect::<String>()
+            )
+        }
     }
 }
 
@@ -25,14 +77,14 @@ impl RosyDisplay for &CM {
     fn rosy_display(self) -> String {
         // COSY format: (  real     ,  imag     )
         format!(
-            " ({}     ,{}     )", 
+            " ( {}     , {}     )", 
             self.0.rosy_display()
                 .chars()
-                .take(12)
+                .take(11)
                 .collect::<String>(),
             self.1.rosy_display()
                 .chars()
-                .take(12)
+                .take(11)
                 .collect::<String>()
         )
     }
@@ -41,9 +93,9 @@ impl RosyDisplay for &CM {
 impl RosyDisplay for &VE {
     fn rosy_display(self) -> String {
         let elements: Vec<String> = self.iter()
-            .map(|x| format!(" {}", x.rosy_display().chars().take(10).collect::<String>()))
+            .map(|x| format!(" {}", x.rosy_display().chars().take(9).collect::<String>()))
             .collect();
-        format!("{}", elements.join("    ") )
+        format!("{}", elements.join("     ") )
     }
 }
 
@@ -85,19 +137,21 @@ impl RosyDisplay for &DA {
                 exps.iter()
                     .enumerate()
                     .fold(String::new(), |mut acc, (i, exp)| {
-                        if i > 0 && i % 2 == 0 {
-                            acc.push_str(" "); // Double space between variable pairs
-                        }
-                        acc.push_str(&format!("{}", exp));
-                        if i < exps.len() - 1 {
-                            acc.push(' ');
+                        if i % 2 == 0 {
+                            acc.push_str(&format!("{}", exp));
+                        } else {
+                            acc.push_str(&format!("{:>2}  ", exp));
                         }
                         acc
                     })
-
             };
-            output.push_str(&format!("{}  {:18.15}       {}   {}\n", 
-                idx + 1, coeff, order, exp_str));
+            output.push_str(&format!(
+                "{}  {} {}   {}\n", 
+                idx + 1,
+                coeff.rosy_display(),
+                format!("{:>3}", order),
+                exp_str.trim_end()
+            ));
         }
 
         let last_line_length = output.lines().last().unwrap_or("").len();
@@ -160,19 +214,22 @@ impl RosyDisplay for &CD {
                 exps.iter()
                     .enumerate()
                     .fold(String::new(), |mut acc, (i, exp)| {
-                        if i > 0 && i % 2 == 0 {
-                            acc.push_str(" "); // Double space between variable pairs
-                        }
-                        acc.push_str(&format!("{}", exp));
-                        if i < exps.len() - 1 {
-                            acc.push(' ');
+                        if i % 2 == 0 {
+                            acc.push_str(&format!("{:>2}", exp));
+                        } else {
+                            acc.push_str(&format!("{:>2} ", exp));
                         }
                         acc
                     })
-
             };
-            output.push_str(&format!("     {} {:18.15}     {:18.15}       {}   {}\n",
-                idx + 1, real_coeff, imag_coeff, order, exp_str));
+            output.push_str(&format!(
+                "     {} {} {} {:>3}  {}\n",
+                idx + 1, 
+                real_coeff.rosy_display(), 
+                imag_coeff.rosy_display(),
+                order,
+                exp_str.trim_end()
+            ));
         }
         output.push_str("                                      ");
         output

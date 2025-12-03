@@ -3,7 +3,9 @@ mod concat;
 mod complex;
 mod extract;
 mod add;
+mod sub;
 mod mult;
+mod div;
 mod string_convert;
 mod logical_convert;
 mod function_call;
@@ -42,9 +44,17 @@ impl Transpile for Expr {
                 .map_err(|e| e.into_iter().map(|err| {
                     err.context("...while transpiling addition expression")
                 }).collect::<Vec<Error>>()),
+            Expr::Sub(sub_expr) => sub_expr.transpile(context)
+                .map_err(|e| e.into_iter().map(|err| {
+                    err.context("...while transpiling subtraction expression")
+                }).collect::<Vec<Error>>()),
             Expr::Mult(mult_expr) => mult_expr.transpile(context)
                 .map_err(|e| e.into_iter().map(|err| {
                     err.context("...while transpiling multiplication expression")
+                }).collect::<Vec<Error>>()),
+            Expr::Div(div_expr) => div_expr.transpile(context)
+                .map_err(|e| e.into_iter().map(|err| {
+                    err.context("...while transpiling division expression")
                 }).collect::<Vec<Error>>()),
             Expr::StringConvert(string_convert_expr) => string_convert_expr.transpile(context)
                 .map_err(|e| e.into_iter().map(|err| {

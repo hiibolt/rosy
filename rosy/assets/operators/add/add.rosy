@@ -3,7 +3,7 @@ BEGIN;
     VARIABLE (RE) RHS_0;
     VARIABLE (RE) RESULT_0;
 
-    LHS_0 := 1;
+    LHS_0 := -2;
     RHS_0 := 1;
     RESULT_0 := LHS_0 + RHS_0;
     WRITE 6 ST(RESULT_0);
@@ -148,7 +148,7 @@ BEGIN;
     VARIABLE (CD) RESULT_16;
 
     LHS_16 := DA(1)+CM(0&1)*DA(2);
-    RHS_16 := 8;
+    RHS_16 := -8;
     RESULT_16 := LHS_16 + RHS_16;
     WRITE 6 ST(RESULT_16);
 

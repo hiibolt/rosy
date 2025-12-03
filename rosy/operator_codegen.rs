@@ -111,7 +111,9 @@ pub fn generate_doc_table(rules: &[TypeRule]) -> String {
 fn get_operator_symbol(operator_name: &str) -> &'static str {
     match operator_name {
         "add" => "+",
+        "sub" => "-",
         "mult" => "*",
+        "div" => "/",
         "concat" => "&",
         "extract" => "|",
         _ => panic!("Unknown operator name: {}", operator_name),
@@ -165,8 +167,8 @@ pub fn generate_cosy_script(operator_name: &str, rules: &[TypeRule]) -> String {
     
     // Initialize DA system (needed for DA/CD types)
     script.push_str("\n    { Initialize DA system for tests that use DA/CD types }\n");
-    script.push_str("    { DAINI: order 2, number_of_variables 6, mode 0 (see COSY manual) }\n");
-    script.push_str("    DAINI 2 6 0 NM;\n\n");
+    script.push_str("    { DAINI: order 10, number_of_variables 6, mode 0 (see COSY manual) }\n");
+    script.push_str("    DAINI 10 6 0 NM;\n\n");
     
     // Second pass: assignments and operations
     for (idx, rule) in rules.iter().enumerate() {
@@ -184,13 +186,13 @@ pub fn generate_cosy_script(operator_name: &str, rules: &[TypeRule]) -> String {
 /// Get COSY variable size (for VARIABLE X <size>).
 fn get_cosy_var_size(type_name: &str) -> &'static str {
     match type_name {
-        "CM" => "2",   // Complex needs 2 slots (real + imaginary)
-        "VE" => "6",   // Vector of size 3
-        "DA" => "100", // DA needs space for coefficients
-        "CD" => "100", // Complex DA needs space for DA coefficients
-        "RE" => "1",   // Real number
-        "LO" => "1",   // Logical (boolean)
-        "ST" => "6",   // String (arbitrary size, use 6 for short strings)
+        "CM" => "2",     // Complex needs 2 slots (real + imaginary)
+        "VE" => "6",     // Vector of size 3
+        "DA" => "2000",  // DA needs space for coefficients at order 10
+        "CD" => "4000",  // Complex DA needs 2x DA space for real+imaginary parts
+        "RE" => "1",     // Real number
+        "LO" => "1",     // Logical (boolean)
+        "ST" => "6",     // String (arbitrary size, use 6 for short strings)
         _ => panic!("Unknown type for COSY variable size: {}", type_name),
     }
 }

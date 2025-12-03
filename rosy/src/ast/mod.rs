@@ -21,10 +21,10 @@ lazy_static::lazy_static! {
             .op(Op::infix(concat, Left))
             // Extraction (|)
             .op(Op::infix(extract, Left))
-            // Addition
-            .op(Op::infix(add, Left))
-            // Multiplication
-            .op(Op::infix(mult, Left))
+            // Addition and Subtraction (same precedence)
+            .op(Op::infix(add, Left) | Op::infix(sub, Left))
+            // Multiplication and Division (same precedence)
+            .op(Op::infix(mult, Left) | Op::infix(div, Left))
     };
 }
 
@@ -160,7 +160,17 @@ pub struct AddExpr {
     pub right: Box<Expr>,
 }
 #[derive(Debug, Clone, PartialEq)]
+pub struct SubExpr {
+    pub left: Box<Expr>,
+    pub right: Box<Expr>,
+}
+#[derive(Debug, Clone, PartialEq)]
 pub struct MultExpr {
+    pub left: Box<Expr>,
+    pub right: Box<Expr>,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct DivExpr {
     pub left: Box<Expr>,
     pub right: Box<Expr>,
 }
@@ -188,7 +198,9 @@ pub enum Expr {
     Boolean(bool),
     Var(VarExpr),
     Add(AddExpr),
+    Sub(SubExpr),
     Mult(MultExpr),
+    Div(DivExpr),
     Concat(ConcatExpr),
     Extract(ExtractExpr),
     Complex(ComplexExpr),
@@ -375,7 +387,15 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                 left: Box::new(left?),
                 right: Box::new(right?),
             })),
+            Rule::sub => Ok(Expr::Sub(SubExpr {
+                left: Box::new(left?),
+                right: Box::new(right?),
+            })),
             Rule::mult => Ok(Expr::Mult(MultExpr {
+                left: Box::new(left?),
+                right: Box::new(right?),
+            })),
+            Rule::div => Ok(Expr::Div(DivExpr {
                 left: Box::new(left?),
                 right: Box::new(right?),
             })),

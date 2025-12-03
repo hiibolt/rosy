@@ -1,7 +1,7 @@
 //! CD (Complex Differential Algebra) - Taylor series with complex coefficients.
 
 use std::collections::HashMap;
-use std::ops::{Add, Neg, Sub, Mul};
+use std::ops::{Add, Neg, Sub, Mul, Div};
 use std::fmt;
 use anyhow::Result;
 use num_complex::Complex64;
@@ -469,6 +469,111 @@ impl Mul<&CD> for Complex64 {
 
     fn mul(self, rhs: &CD) -> Self::Output {
         rhs * self
+    }
+}
+
+// ============================================================================
+// Division
+// ============================================================================
+
+/// Division: CD / CD
+impl Div<CD> for CD {
+    type Output = Result<CD>;
+
+    fn div(self, rhs: CD) -> Self::Output {
+        &self / &rhs
+    }
+}
+
+/// Division: &CD / &CD (preferred - avoids clones)
+impl Div<&CD> for &CD {
+    type Output = Result<CD>;
+
+    fn div(self, rhs: &CD) -> Self::Output {
+        // For complex Taylor series division, we use: f/g = f * (1/g)
+        let g0 = rhs.constant_part();
+        
+        if g0.norm() < 1e-15 {
+            anyhow::bail!("Division by zero: divisor has zero constant term");
+        }
+        
+        // Simple implementation: compute 1/g via Newton iteration
+        // h = 1/g, then h_{n+1} = h_n * (2 - g * h_n)
+        let mut h = CD::complex_constant(Complex64::new(1.0, 0.0) / g0);
+        
+        // Perform a few Newton iterations
+        for _ in 0..10 {
+            let gh = (rhs * &h)?;
+            let two_minus_gh = (&CD::constant(2.0) - &gh)?;
+            let new_h = (&h * &two_minus_gh)?;
+            h = new_h;
+        }
+        
+        // Multiply self by the reciprocal
+        self * &h
+    }
+}
+
+/// Division: &CD / CD
+impl Div<CD> for &CD {
+    type Output = Result<CD>;
+
+    fn div(self, rhs: CD) -> Self::Output {
+        self / &rhs
+    }
+}
+
+/// Division: CD / &CD
+impl Div<&CD> for CD {
+    type Output = Result<CD>;
+
+    fn div(self, rhs: &CD) -> Self::Output {
+        &self / rhs
+    }
+}
+
+/// Division: CD / Complex64
+impl Div<Complex64> for CD {
+    type Output = Result<CD>;
+
+    fn div(self, rhs: Complex64) -> Self::Output {
+        &self / rhs
+    }
+}
+
+/// Division: &CD / Complex64 (preferred - avoids clones)
+impl Div<Complex64> for &CD {
+    type Output = Result<CD>;
+
+    fn div(self, rhs: Complex64) -> Self::Output {
+        if rhs.norm() < 1e-15 {
+            anyhow::bail!("Division by zero");
+        }
+        
+        let coeffs: HashMap<Monomial, Complex64> = self.coeffs
+            .iter()
+            .map(|(&m, &c)| (m, c / rhs))
+            .collect();
+
+        Ok(CD { coeffs })
+    }
+}
+
+/// Division: Complex64 / CD
+impl Div<CD> for Complex64 {
+    type Output = Result<CD>;
+
+    fn div(self, rhs: CD) -> Self::Output {
+        &CD::complex_constant(self) / &rhs
+    }
+}
+
+/// Division: Complex64 / &CD
+impl Div<&CD> for Complex64 {
+    type Output = Result<CD>;
+
+    fn div(self, rhs: &CD) -> Self::Output {
+        &CD::complex_constant(self) / rhs
     }
 }
 

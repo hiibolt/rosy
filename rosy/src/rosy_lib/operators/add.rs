@@ -27,7 +27,7 @@ use crate::rosy_lib::operators::{TypeRule, build_type_registry};
 /// - COSY test script (`add.fox`)
 /// - Integration tests
 pub const ADD_REGISTRY: &[TypeRule] = &[
-    TypeRule::new("RE", "RE", "RE", "1", "1"),
+    TypeRule::new("RE", "RE", "RE", "-2", "1"),
     TypeRule::new("RE", "CM", "CM", "2", "CM(0&1)"),
     TypeRule::with_comment("RE", "VE", "VE", "1", "1&2", "Add Real componentwise"),
     TypeRule::new("RE", "DA", "DA", "3", "DA(1)"),
@@ -43,7 +43,7 @@ pub const ADD_REGISTRY: &[TypeRule] = &[
     TypeRule::new("DA", "CM", "CD", "DA(1)", "CM(0&1)"),
     TypeRule::new("DA", "DA", "DA", "DA(2)", "DA(3)"),
     TypeRule::new("DA", "CD", "CD", "DA(1)", "DA(1)+CM(0&1)*DA(2)"),
-    TypeRule::new("CD", "RE", "CD", "DA(1)+CM(0&1)*DA(2)", "8"),
+    TypeRule::new("CD", "RE", "CD", "DA(1)+CM(0&1)*DA(2)", "-8"),
     TypeRule::new("CD", "CM", "CD", "DA(1)+CM(0&1)*DA(2)", "CM(2&3)"),
     TypeRule::new("CD", "DA", "CD", "DA(1)+CM(0&1)*DA(2)", "DA(3)"),
     TypeRule::new("CD", "CD", "CD", "DA(1)+CM(0&1)*DA(2)", "DA(3)+CM(4&5)*DA(6)"),

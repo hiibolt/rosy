@@ -1,0 +1,17 @@
+BEGIN;
+    VARIABLE (RE) A;
+    VARIABLE (RE) B;
+    VARIABLE (RE) RESULT_SUB;
+    VARIABLE (RE) RESULT_DIV;
+    
+    A := 10;
+    B := 3;
+    
+    RESULT_SUB := A - B;
+    RESULT_DIV := A / B;
+    
+    WRITE 6 ST(A);
+    WRITE 6 ST(B);
+    WRITE 6 ST(RESULT_SUB);
+    WRITE 6 ST(RESULT_DIV);
+END;

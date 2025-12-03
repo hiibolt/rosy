@@ -1,10 +1,14 @@
 pub mod add;
+pub mod sub;
 pub mod mult;
+pub mod div;
 pub mod extract;
 pub mod concat;
 
 pub use add::RosyAdd;
+pub use sub::RosySub;
 pub use mult::RosyMult;
+pub use div::RosyDiv;
 pub use concat::RosyConcat;
 pub use extract::RosyExtract;
 

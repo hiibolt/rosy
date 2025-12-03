@@ -1,0 +1,35 @@
+BEGIN;
+    { Test subtraction and division with different types }
+    VARIABLE (RE) A;
+    VARIABLE (RE) B;
+    VARIABLE (VE) V1;
+    VARIABLE (VE) V2;
+    VARIABLE (VE) V_SUB;
+    VARIABLE (VE) V_DIV;
+    VARIABLE (CM) C1;
+    VARIABLE (CM) C2;
+    VARIABLE (CM) C_SUB;
+    VARIABLE (CM) C_DIV;
+    
+    { Test with Real numbers }
+    A := 20;
+    B := 4;
+    WRITE 6 ST(A - B);
+    WRITE 6 ST(A / B);
+    
+    { Test with Vectors }
+    V1 := 10&20&30;
+    V2 := 2&4&5;
+    V_SUB := V1 - V2;
+    V_DIV := V1 / V2;
+    WRITE 6 ST(V_SUB);
+    WRITE 6 ST(V_DIV);
+    
+    { Test with Complex numbers }
+    C1 := CM(5&3);
+    C2 := CM(2&1);
+    C_SUB := C1 - C2;
+    C_DIV := C1 / C2;
+    WRITE 6 ST(C_SUB);
+    WRITE 6 ST(C_DIV);
+END;

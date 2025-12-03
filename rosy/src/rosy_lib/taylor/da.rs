@@ -1,7 +1,7 @@
 //! DA (Differential Algebra) - Taylor series with real coefficients.
 
 use std::collections::HashMap;
-use std::ops::{Add, Neg, Sub, Mul};
+use std::ops::{Add, Neg, Sub, Mul, Div};
 use std::fmt;
 use anyhow::{Result, Context};
 
@@ -419,6 +419,112 @@ impl Mul<&DA> for f64 {
 
     fn mul(self, rhs: &DA) -> Self::Output {
         rhs * self
+    }
+}
+
+// ============================================================================
+// Division
+// ============================================================================
+
+/// Division: DA / DA
+impl Div<DA> for DA {
+    type Output = Result<DA>;
+
+    fn div(self, rhs: DA) -> Self::Output {
+        &self / &rhs
+    }
+}
+
+/// Division: &DA / &DA (preferred - avoids clones)
+impl Div<&DA> for &DA {
+    type Output = Result<DA>;
+
+    fn div(self, rhs: &DA) -> Self::Output {
+        // For Taylor series division, we use: f/g = f * (1/g)
+        // The reciprocal 1/g can be computed using Newton iteration or series inversion
+        let g0 = rhs.constant_part();
+        
+        if g0.abs() < 1e-15 {
+            anyhow::bail!("Division by zero: divisor has zero constant term");
+        }
+        
+        // Simple implementation: compute 1/g via Newton iteration
+        // h = 1/g, then h_{n+1} = h_n * (2 - g * h_n)
+        let mut h = DA::constant(1.0 / g0);
+        
+        // Perform a few Newton iterations
+        for _ in 0..10 {
+            let gh = (rhs * &h)?;
+            let two_minus_gh = (&DA::constant(2.0) - &gh)?;
+            let new_h = (&h * &two_minus_gh)?;
+            h = new_h;
+        }
+        
+        // Multiply self by the reciprocal
+        self * &h
+    }
+}
+
+/// Division: &DA / DA
+impl Div<DA> for &DA {
+    type Output = Result<DA>;
+
+    fn div(self, rhs: DA) -> Self::Output {
+        self / &rhs
+    }
+}
+
+/// Division: DA / &DA
+impl Div<&DA> for DA {
+    type Output = Result<DA>;
+
+    fn div(self, rhs: &DA) -> Self::Output {
+        &self / rhs
+    }
+}
+
+/// Division: DA / f64
+impl Div<f64> for DA {
+    type Output = Result<DA>;
+
+    fn div(self, rhs: f64) -> Self::Output {
+        &self / rhs
+    }
+}
+
+/// Division: &DA / f64 (preferred - avoids clones)
+impl Div<f64> for &DA {
+    type Output = Result<DA>;
+
+    fn div(self, rhs: f64) -> Self::Output {
+        if rhs.abs() < 1e-15 {
+            anyhow::bail!("Division by zero");
+        }
+        
+        let coeffs: HashMap<Monomial, f64> = self.coeffs
+            .iter()
+            .map(|(&m, &c)| (m, c / rhs))
+            .collect();
+
+        Ok(DA { coeffs })
+    }
+}
+
+/// Division: f64 / DA
+impl Div<DA> for f64 {
+    type Output = Result<DA>;
+
+    fn div(self, rhs: DA) -> Self::Output {
+        &DA::constant(self) / &rhs
+    }
+}
+
+/// Division: f64 / &DA
+impl Div<&DA> for f64 {
+    type Output = Result<DA>;
+
+    fn div(self, rhs: &DA) -> Self::Output {
+        &DA::constant(self) / rhs
     }
 }
 
