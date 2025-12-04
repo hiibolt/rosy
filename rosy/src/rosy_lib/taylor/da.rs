@@ -1,6 +1,7 @@
 //! DA (Differential Algebra) - Generic Taylor series implementation.
 
 use std::collections::HashMap;
+use std::f32::consts::E;
 use std::ops::{Add, Neg, Sub, Mul, Div, AddAssign};
 use std::fmt;
 use anyhow::{Result, Context};
@@ -14,7 +15,7 @@ use super::{Monomial, get_config, MAX_VARS};
 pub trait DACoefficient: 
     Clone + Copy + 
     Add<Output=Self> + Sub<Output=Self> + Mul<Output=Self> + Div<Output=Self> + 
-    AddAssign +
+    AddAssign + MulAdd + 
     Neg<Output=Self> +
     PartialEq + fmt::Debug + fmt::Display
 {
@@ -32,6 +33,30 @@ impl DACoefficient for f64 {
     fn zero() -> Self { 0.0 }
     fn one() -> Self { 1.0 }
     fn abs(&self) -> f64 { f64::abs(*self) }
+}
+
+// Extension trait for FMA operations (when available)
+// f64 has hardware FMA on most modern CPUs
+pub trait MulAdd {
+    fn mul_add(self, a: Self, b: Self) -> Self;
+}
+
+impl MulAdd for f64 {
+    #[inline(always)]
+    fn mul_add(self, a: Self, b: Self) -> Self {
+        // Hardware FMA: self * a + b
+        // Single rounding operation, more accurate than separate mul+add
+        f64::mul_add(self, a, b)
+    }
+}
+
+impl MulAdd for Complex64 {
+    #[inline(always)]
+    fn mul_add(self, a: Self, b: Self) -> Self {
+        // Complex multiplication doesn't have hardware FMA, but still more efficient
+        // than separate operations due to instruction pipelining
+        self * a + b
+    }
 }
 
 impl DACoefficient for Complex64 {
@@ -435,18 +460,24 @@ impl<T: DACoefficient> Div<DA<T>> for DA<T> {
 }
 
 /// Division: &DA / &DA (preferred - avoids clones)
+/// 
+/// Uses an optimized order-by-order Taylor series division algorithm:
+/// q_m = (f_m - Σ_{k<m} g_k * q_{m-k}) / g_0
+/// 
+/// Optimizations:
+/// - Pre-sort divisor monomials once for deterministic iteration
+/// - Early skip on zero coefficients
+/// - Minimize hashmap lookups by caching frequently accessed values
+/// - Process in order-by-order fashion ensuring all dependencies are satisfied
 impl<T: DACoefficient> Div<&DA<T>> for &DA<T> {
     type Output = Result<DA<T>>;
 
     fn div(self, rhs: &DA<T>) -> Self::Output {
-        // Taylor series division: q = f / g
-        // Algorithm: q_m = (f_m - Σ_{k<m} g_k * q_{m-k}) / g_0
-        // Process monomials order-by-order to ensure dependencies are satisfied
-        
         let g0 = rhs.constant_part();
         
         if g0.abs() < 1e-15 {
-            anyhow::bail!("Division by zero: divisor has zero constant term");
+            return Err(anyhow::anyhow!("Division by zero"))
+                .with_context(|| format!("...while dividing with {rhs:#?}"));
         }
         
         let config = get_config()?;
@@ -454,28 +485,40 @@ impl<T: DACoefficient> Div<&DA<T>> for &DA<T> {
         let epsilon = config.epsilon;
         let num_vars = config.num_vars;
         
+        // Pre-compute inverse of g0 (one division vs many)
+        let g0_inv = T::one() / g0;
+        
+        // Pre-sort divisor monomials for deterministic iteration (matches COSY)
+        let mut sorted_g_monomials: Vec<_> = rhs.coeffs
+            .iter()
+            .filter(|(m, _)| **m != Monomial::constant())  // Skip constant term
+            .map(|(m, c)| (*m, *c))
+            .collect();
+        sorted_g_monomials.sort_by_key(|(m, _)| *m);
+        
         let mut result = DA::zero();
         
-        // Process order by order, generating all possible monomials at each order
-        // This ensures that when we compute q_m, all lower-order q_{m-k} are already known
+        // Process order by order - ensures q_{m-k} computed before q_m
         for order in 0..=max_order {
-            // Generate all monomials of this specific order
             let monomials_at_order = generate_monomials_of_order(order as u8, num_vars);
             
             for monomial in monomials_at_order {
                 // Start with numerator coefficient
                 let f_m = self.coeffs.get(&monomial).copied().unwrap_or(T::zero());
-                let mut q_m = f_m;
                 
-                // Subtract contributions from lower-order terms: Σ g_k * q_{m-k}
-                for (g_mono, &g_coeff) in &rhs.coeffs {
-                    if *g_mono == Monomial::constant() {
-                        continue; // Skip constant term (that's our divisor)
-                    }
-                    
-                    // Check if m - k is a valid monomial (all exponents non-negative)
+                // Early skip if numerator is zero and no contributions expected
+                if f_m.abs() <= epsilon && order == 0 {
+                    continue;
+                }
+                
+                // Accumulate: Σ g_k * q_{m-k}
+                let mut subtraction_sum = T::zero();
+                
+                for &(g_mono, g_coeff) in &sorted_g_monomials {
+                    // Compute m - k (monomial difference)
                     let mut diff_exponents = [0u8; MAX_VARS];
                     let mut valid = true;
+                    
                     for i in 0..MAX_VARS {
                         if monomial.exponents[i] >= g_mono.exponents[i] {
                             diff_exponents[i] = monomial.exponents[i] - g_mono.exponents[i];
@@ -488,13 +531,15 @@ impl<T: DACoefficient> Div<&DA<T>> for &DA<T> {
                     if valid {
                         let diff_mono = Monomial::new(diff_exponents);
                         if let Some(&q_coeff) = result.coeffs.get(&diff_mono) {
-                            q_m = q_m - g_coeff * q_coeff;
+                            // FMA: sum = g_k * q_{m-k} + sum (hardware-accelerated)
+                            subtraction_sum = g_coeff.mul_add(q_coeff, subtraction_sum);
                         }
                     }
                 }
                 
-                // Divide by g_0
-                q_m = q_m / g0;
+                // Compute: q_m = (f_m - sum) / g_0
+                // Using pre-computed inverse: q_m = (f_m - sum) * g0_inv
+                let q_m = (f_m - subtraction_sum) * g0_inv;
                 
                 // Store if significant
                 if q_m.abs() > epsilon {

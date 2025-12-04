@@ -110,7 +110,7 @@ impl Transpile for ProcedureStatement {
         };
 
         let serialization = format!(
-            "fn {} ( {} ) {{\n{}\n}}",
+            "fn {} ( {} ) -> Result<()> {{\n{}\n\n\tOk(())\n}}",
             self.name, serialized_args.join(", "), indent(serialized_statements.join("\n"))
         );
         if errors.is_empty() {

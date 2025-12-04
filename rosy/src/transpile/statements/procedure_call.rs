@@ -78,8 +78,8 @@ impl Transpile for ProcedureCallStatement {
 
         // Serialize the entire procedure
         let serialization = format!(
-            "{}({});",
-            self.name, serialized_args.join(", ")
+            "{}({}).context(\"...while calling procedure '{}'\")?;",
+            self.name, serialized_args.join(", "), self.name
         );
         if errors.is_empty() {
             Ok(TranspilationOutput {

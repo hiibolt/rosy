@@ -78,8 +78,8 @@ impl Transpile for FunctionCallStatement {
 
         // Serialize the entire function
         let serialization = format!(
-            "{}({})",
-            self.name, serialized_args.join(", ")
+            "{}({}).context(\"...while calling function '{}'\")?",
+            self.name, serialized_args.join(", "), self.name
         );
         if errors.is_empty() {
             Ok(TranspilationOutput {

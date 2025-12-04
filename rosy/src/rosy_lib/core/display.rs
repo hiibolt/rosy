@@ -61,13 +61,17 @@ fn display_re (
             )
         }
     } else {
+        // Round at the last visible digit
+        let num_int_chs = num.trunc().to_string().chars().count();
+        let rounded_num = (num * 10f64.powi(precision as i32 - num_int_chs as i32 + 1)).round()
+            / 10f64.powi(precision as i32 - num_int_chs as i32 + 1);
+
         format!(
             "{}{}{}",
             if num.is_sign_negative() {"-"} else {" "},
             format!(
                 "{:.precision$}",
-                num.abs(),
-                precision=precision
+                rounded_num.abs(),
             ).chars().take(precision + 1).collect::<String>(),
             " ".repeat(spaces),
         )
