@@ -153,7 +153,13 @@ fn main() -> Result<()> {
             info!("Running ROSY script: {}", source.display());
             let binary_path = rosy(&source, output_dir, release)?;
             info!("Compilation successful! Binary remains at: {}", binary_path.display());
-            info!("To execute, run: {}", binary_path.display());
+            
+            // Run the binary, piping stdout and stderr
+            let mut run_command = Command::new(&binary_path);
+            let status = run_command
+                .status()
+                .with_context(|| format!("Failed to run binary at `{}`!", binary_path.display()))?;
+            ensure!(status.success(), "Execution failed with exit code: {:?}", status.code());
         }
         
         Commands::Build { source, output, output_dir, release } => {
