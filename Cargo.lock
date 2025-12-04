@@ -746,6 +746,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bincode",
+ "clap",
  "impls",
  "lazy_static",
  "mpi",

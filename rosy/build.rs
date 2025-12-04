@@ -2,19 +2,22 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::io::Write;
 
-mod operator_codegen;
+mod codegen;
 
 fn main() {
     // Re-run if rosy_lib changes
     println!("cargo:rerun-if-changed=src/rosy_lib");
     
     // Generate operator test files
-    operator_codegen::codegen_operator("add");
-    operator_codegen::codegen_operator("sub");
-    operator_codegen::codegen_operator("mult");
-    operator_codegen::codegen_operator("div");
-    operator_codegen::codegen_operator("concat");
-    operator_codegen::codegen_operator("extract");
+    codegen::codegen_operator("add");
+    codegen::codegen_operator("sub");
+    codegen::codegen_operator("mult");
+    codegen::codegen_operator("div");
+    codegen::codegen_operator("concat");
+    codegen::codegen_operator("extract");
+    
+    // Generate intrinsic function test files
+    //codegen::codegen_intrinsic("length");
     
     // Generate the embedded files at compile time
     let out_dir = std::env::var("OUT_DIR").unwrap();

@@ -123,14 +123,20 @@ pub mod test_utils {
             panic!("cosy executable not found at {:?}", cosy_exe);
         }
 
-        // Run ROSY transpiler
+        // Use isolated build directory for this test to allow parallel execution
+        let test_build_dir = workspace_root.join(format!(".rosy_test_cache/{}", operator_name));
+
+        // Run ROSY transpiler with isolated build directory
         let transpile_output = Command::new("cargo")
             .arg("run")
             .arg("--release")
             .arg("-p")
             .arg("rosy")
             .arg("--")
+            .arg("run")
             .arg(&rosy_script)
+            .arg("-d")
+            .arg(&test_build_dir)
             .current_dir(&workspace_root)
             .output()
             .expect("Failed to run rosy");
@@ -141,10 +147,10 @@ pub mod test_utils {
             String::from_utf8_lossy(&transpile_output.stderr)
         );
 
-        // Run the transpiled ROSY code
+        // Run the transpiled ROSY code from the isolated build directory
         let rosy_output = Command::new("cargo")
-            .args(&["run", "--release"])
-            .current_dir(workspace_root.join(".rosy_output"))
+            .args(&["run"])
+            .current_dir(&test_build_dir)
             .output()
             .expect("Failed to run transpiled ROSY code");
 

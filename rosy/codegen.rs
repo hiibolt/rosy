@@ -237,3 +237,157 @@ pub fn codegen_operator(operator_name: &str) {
     
     println!("cargo:warning=Generated test files for operator '{}'", operator_name);
 }
+
+/// Represents a parsed intrinsic type rule from the source code.
+#[derive(Debug, Clone)]
+pub struct IntrinsicTypeRule {
+    pub input: String,
+    pub result: String,
+    pub test_val: String,
+}
+
+/// Parse intrinsic function registry from source code.
+pub fn parse_intrinsic_registry_from_source(source_path: &Path) -> Vec<IntrinsicTypeRule> {
+    let content = fs::read_to_string(source_path)
+        .expect("Failed to read intrinsic source file");
+    
+    let mut rules = Vec::new();
+    
+    // Look for IntrinsicTypeRule::new() patterns
+    for line in content.lines() {
+        if line.trim_start().starts_with("IntrinsicTypeRule::new(") {
+            if let Some(rule) = parse_intrinsic_type_rule_new(line) {
+                rules.push(rule);
+            }
+        }
+    }
+    
+    rules
+}
+
+fn parse_intrinsic_type_rule_new(line: &str) -> Option<IntrinsicTypeRule> {
+    // Parse: IntrinsicTypeRule::new("RE", "RE", "1.5"),
+    let re = Regex::new(
+        r#"IntrinsicTypeRule::new\s*\(\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*\)"#
+    ).ok()?;
+    
+    let captures = re.captures(line)?;
+    
+    Some(IntrinsicTypeRule {
+        input: captures.get(1)?.as_str().to_string(),
+        result: captures.get(2)?.as_str().to_string(),
+        test_val: captures.get(3)?.as_str().to_string().replace("\\\"", "\""),
+    })
+}
+
+/// Generate ROSY test script for intrinsic function.
+pub fn generate_intrinsic_rosy_script(intrinsic_name: &str, rules: &[IntrinsicTypeRule]) -> String {
+    let mut script = String::from("BEGIN;\n");
+    
+    for (idx, rule) in rules.iter().enumerate() {
+        script.push_str(&format!("    VARIABLE ({}) INPUT_{};\n", rule.input, idx));
+        script.push_str(&format!("    VARIABLE ({}) RESULT_{};\n\n", rule.result, idx));
+        
+        // Initialize with type-appropriate test values
+        script.push_str(&format!("    INPUT_{} := {};\n", idx, rule.test_val));
+        
+        // Call intrinsic function
+        script.push_str(&format!("    RESULT_{} := {}(INPUT_{});\n", idx, intrinsic_name.to_uppercase(), idx));
+        
+        // Write the result
+        script.push_str(&format!("    WRITE 6 ST(RESULT_{});\n\n", idx));
+    }
+    
+    script.push_str("END;\n");
+    script
+}
+
+/// Generate COSY INFINITY test script for intrinsic function.
+pub fn generate_intrinsic_cosy_script(intrinsic_name: &str, rules: &[IntrinsicTypeRule]) -> String {
+    let mut script = String::from("BEGIN;\n\nPROCEDURE RUN;\n");
+    
+    // FOX/COSY requires ALL variable declarations at procedure start
+    script.push_str("    { All variable declarations must come first in FOX/COSY }\n");
+    script.push_str("    VARIABLE NM 1;\n");
+    
+    // First pass: declare all variables
+    for (idx, rule) in rules.iter().enumerate() {
+        script.push_str(&format!("    VARIABLE INPUT_{} {};\n", idx, get_cosy_var_size(&rule.input)));
+        script.push_str(&format!("    VARIABLE RESULT_{} {};\n", idx, get_cosy_var_size(&rule.result)));
+    }
+    
+    // Initialize DA system (needed for DA/CD types)
+    script.push_str("\n    { Initialize DA system for tests that use DA/CD types }\n");
+    script.push_str("    { DAINI: order 10, number_of_variables 6, mode 0 (see COSY manual) }\n");
+    script.push_str("    DAINI 10 6 0 NM;\n\n");
+    
+    // Second pass: assignments and function calls
+    for (idx, rule) in rules.iter().enumerate() {
+        script.push_str(&format!("    {{ Test {}: {}({}) => {} }}\n", idx, intrinsic_name.to_uppercase(), rule.input, rule.result));
+        script.push_str(&format!("    INPUT_{} := {};\n", idx, rule.test_val));
+        script.push_str(&format!("    RESULT_{} := {}(INPUT_{});\n", idx, intrinsic_name.to_uppercase(), idx));
+        script.push_str(&format!("    WRITE 6 RESULT_{};\n\n", idx));
+    }
+    
+    script.push_str("ENDPROCEDURE;\n\nRUN;\nEND;\n");
+    script
+}
+
+/// Generate documentation table for intrinsic function.
+pub fn generate_intrinsic_doc_table(rules: &[IntrinsicTypeRule]) -> String {
+    let mut table = String::from(
+        "| Input | Result |\n\
+         |---|---|\n"
+    );
+    
+    for rule in rules {
+        table.push_str(&format!(
+            "| {} | {} |\n",
+            rule.input,
+            rule.result
+        ));
+    }
+    
+    table
+}
+
+/// Run all code generation for an intrinsic function.
+pub fn codegen_intrinsic(intrinsic_name: &str) {
+    let src_path = Path::new("src/rosy_lib/intrinsics")
+        .join(format!("{}.rs", intrinsic_name));
+    
+    let intrinsic_dir = Path::new("assets/intrinsics").join(intrinsic_name);
+    
+    // Create the assets directory if it doesn't exist
+    fs::create_dir_all(&intrinsic_dir)
+        .expect("Failed to create assets directory");
+    
+    println!("cargo:rerun-if-changed={}", src_path.display());
+    
+    // Parse registry from source
+    let rules = parse_intrinsic_registry_from_source(&src_path);
+    
+    if rules.is_empty() {
+        println!("cargo:warning=No registry found in {}", src_path.display());
+        return;
+    }
+    
+    println!("cargo:warning=Generating {} tests for intrinsic '{}'", rules.len(), intrinsic_name);
+    
+    // Generate documentation table
+    let doc_table = generate_intrinsic_doc_table(&rules);
+    fs::write(intrinsic_dir.join(format!("{}_table.md", intrinsic_name)), doc_table)
+        .expect("Failed to write doc table");
+    
+    // Generate ROSY script
+    let rosy_script = generate_intrinsic_rosy_script(intrinsic_name, &rules);
+    fs::write(intrinsic_dir.join(format!("{}.rosy", intrinsic_name)), rosy_script)
+        .expect("Failed to write ROSY script");
+    
+    // Generate COSY script
+    let cosy_script = generate_intrinsic_cosy_script(intrinsic_name, &rules);
+    fs::write(intrinsic_dir.join(format!("{}.fox", intrinsic_name)), cosy_script)
+        .expect("Failed to write COSY script");
+    
+    println!("cargo:warning=Generated test files for intrinsic '{}'", intrinsic_name);
+}

@@ -67,7 +67,9 @@ impl TypeOf for Expr {
             Expr::Complex(complex_expr) => complex_expr.type_of(context)
                 .context("...while determining type of complex conversion expression")?,
             Expr::DA(da_expr) => da_expr.type_of(context)
-                .context("...while determining type of DA expression")?
+                .context("...while determining type of DA expression")?,
+            Expr::Length(length_expr) => length_expr.type_of(context)
+                .context("...while determining type of LENGTH expression")?,
         })
     }
 }

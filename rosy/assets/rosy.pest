@@ -29,7 +29,7 @@ read = { "READ" ~ unit ~ variable_identifier ~ semicolon }
 var_decl = { "VARIABLE" ~ type ~ variable_name ~ semicolon }
 
 /// Keywords - define all reserved words
-keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" | "IF" | "ELSEIF" | "ELSE" | "ENDIF" | "TRUE" | "FALSE" | "DAINI" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
+keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" | "IF" | "ELSEIF" | "ELSE" | "ENDIF" | "TRUE" | "FALSE" | "DAINI" | "LENGTH" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
 
 /// [ IF / ELSEIF / ELSE / ENDIF ]
 if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
@@ -78,7 +78,7 @@ endif = { "ENDIF" ~ semicolon }
   end_ploop = { "ENDPLOOP" ~ unit? ~ variable_identifier ~ semicolon }
 
 /// [ INTRINSIC FUNCTIONS ]
-  builtin_function = _{ cm | st | lo | da }
+  builtin_function = _{ cm | st | lo | da | length }
   /// CM
   cm = { "CM(" ~ expr ~ ")" }
   /// ST - String conversion
@@ -87,6 +87,8 @@ endif = { "ENDIF" ~ semicolon }
   lo = { "LO(" ~ expr ~ ")" }
   /// DA - Create DA identity vector
   da = { "DA" ~ "(" ~ expr ~ ")" }
+  /// LENGTH - Get memory size
+  length = { "LENGTH(" ~ expr ~ ")" }
 
 /// [ INTRINSIC PROCEDURES ]
   /// [ DA ]

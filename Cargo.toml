@@ -4,7 +4,7 @@ members = [
     "rosy",
     "rosy_ide_tools/vscode_extension_generator"
 ]
-exclude = [ ".rosy_output" ]
+exclude = [ ".rosy_output", ".rosy_test_cache" ]
 
 [workspace.dependencies]
 anyhow = "1.0"

@@ -105,7 +105,7 @@ impl Transpile for FunctionStatement {
 
         // Serialize the entire function
         let serialization = format!(
-            "fn {} ( {} ) -> Result<{}> {{\n{}\n\t{}\n}}",
+            "fn {} ( {} ) -> Result<{}> {{\n{}\n\tOk({})\n}}",
             self.name, serialized_args.join(", "), 
             serialized_return_type,
             indent(serialized_statements.join("\n")),

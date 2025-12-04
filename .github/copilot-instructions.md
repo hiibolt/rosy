@@ -116,14 +116,27 @@ impl TypeOf for AddExpr {
 # Build transpiler
 cargo build --release
 
-# Transpile a ROSY script (generates .rosy_output/ and copies binary to ./rosy_output)
-cargo run --bin rosy examples/basic.rosy
+# Run a ROSY script (quick compilation, binary stays in .rosy_output/)
+cargo run --bin rosy -- run examples/basic.rosy
 
-# Run the generated binary
-./rosy_output
+# Build a ROSY script and copy binary to PWD
+cargo run --bin rosy -- build examples/basic.rosy
+# Creates ./basic in current directory
 
-# Enable verbose logging
-RUST_LOG=info cargo run --bin rosy examples/basic.rosy
+# Build with custom output name
+cargo run --bin rosy -- build examples/basic.rosy -o my_program
+
+# Build with optimizations (release mode)
+cargo run --bin rosy -- build examples/basic.rosy --release
+
+# Custom build directory (default: .rosy_output)
+cargo run --bin rosy -- build examples/basic.rosy -d /tmp/build
+
+# Enable verbose logging (works with all commands)
+RUST_LOG=info cargo run --bin rosy -- run examples/basic.rosy
+
+# View CLI help
+cargo run --bin rosy -- help
 ```
 
 ### Adding New Operators (TDD Workflow)
@@ -190,8 +203,8 @@ DA = Differential Algebra (real Taylor series), CD = Complex DA
    - `assets/operators/add/add_table.md` - Documentation
 3. **Run both and compare outputs**:
    ```bash
-   cargo run --bin rosy assets/operators/add/add.rosy
-   ./rosy_output > rosy_output.txt
+   cargo run --bin rosy -- build assets/operators/add/add.rosy
+   ./add > rosy_output.txt
    cosy add.fox > cosy_output.txt
    diff rosy_output.txt cosy_output.txt  # Should be identical
    ```

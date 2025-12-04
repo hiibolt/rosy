@@ -1,11 +1,11 @@
 /target
 /.direnv
+/cosy_examples
 .envrc
 */target
-/outputs
 .rosy_output
+.rosy_test_cache
 rosy_output
-cosy-spec.md
 manual.md
 *.out
 *.lis

@@ -187,6 +187,10 @@ pub struct DAExpr {
     pub index: Box<Expr>,
 }
 #[derive(Debug, Clone, PartialEq)]
+pub struct LengthExpr {
+    pub expr: Box<Expr>,
+}
+#[derive(Debug, Clone, PartialEq)]
 pub struct FunctionCallExpr {
     pub name: String,
     pub args: Vec<Expr>,
@@ -207,6 +211,7 @@ pub enum Expr {
     StringConvert(StringConvertExpr),
     LogicalConvert(LogicalConvertExpr),
     DA(DAExpr),
+    Length(LengthExpr),
     FunctionCall(FunctionCallExpr),
 }
 
@@ -374,6 +379,13 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                     .context("Missing inner expression for `DA`!")?;
                 let index = Box::new(build_expr(expr_pair)?);
                 Ok(Expr::DA(DAExpr { index }))
+            },
+            Rule::length => {
+                let mut inner = primary.into_inner();
+                let expr_pair = inner.next()
+                    .context("Missing inner expression for `LENGTH`!")?;
+                let expr = Box::new(build_expr(expr_pair)?);
+                Ok(Expr::Length(LengthExpr { expr }))
             },
             Rule::expr => build_expr(primary),
             _ => bail!("Unexpected primary expr: {:?}", primary.as_rule()),

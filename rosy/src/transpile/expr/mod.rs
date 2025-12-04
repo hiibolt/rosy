@@ -10,6 +10,7 @@ mod string_convert;
 mod logical_convert;
 mod function_call;
 mod da;
+mod length;
 
 use crate::ast::*;
 use super::{Transpile, TranspilationInputContext, TranspilationOutput};
@@ -83,6 +84,10 @@ impl Transpile for Expr {
             Expr::DA(da_expr) => da_expr.transpile(context)
                 .map_err(|e| e.into_iter().map(|err| {
                     err.context("...while transpiling DA expression")
+                }).collect::<Vec<Error>>()),
+            Expr::Length(length_expr) => length_expr.transpile(context)
+                .map_err(|e| e.into_iter().map(|err| {
+                    err.context("...while transpiling LENGTH expression")
                 }).collect::<Vec<Error>>()),
         }
     }

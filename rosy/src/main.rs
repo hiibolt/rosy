@@ -10,11 +10,57 @@ use anyhow::{ensure, Context, Result, anyhow};
 use pest::Parser;
 use tracing::info;
 use tracing_subscriber;
+use clap::{Parser as ClapParser, Subcommand};
+
+/// ROSY Transpiler - Converts ROSY source code to executable Rust programs
+#[derive(ClapParser)]
+#[command(name = "rosy")]
+#[command(about = "ROSY Transpiler for beam physics calculations", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Run a ROSY script directly without copying binary to PWD
+    Run {
+        /// Path to the ROSY source file
+        source: PathBuf,
+        
+        /// Output directory for build artifacts (default: .rosy_output)
+        #[arg(short = 'd', long)]
+        output_dir: Option<PathBuf>,
+        
+        /// Build in release mode with optimizations
+        #[arg(short, long)]
+        release: bool,
+    },
+    
+    /// Build a ROSY script and place the binary in PWD
+    Build {
+        /// Path to the ROSY source file
+        source: PathBuf,
+        
+        /// Output binary name (default: source filename without extension)
+        #[arg(short, long)]
+        output: Option<String>,
+        
+        /// Output directory for build artifacts (default: .rosy_output)
+        #[arg(short = 'd', long)]
+        output_dir: Option<PathBuf>,
+        
+        /// Build in release mode with optimizations
+        #[arg(short, long)]
+        release: bool,
+    },
+}
 
 fn rosy (
     script_path: &PathBuf,
-    output_dir: Option<PathBuf>
-) -> Result<()> {
+    output_dir: Option<PathBuf>,
+    release: bool,
+) -> Result<PathBuf> {
     info!("Loading script...");
     let script = std::fs::read_to_string(&script_path)
         .with_context(|| format!("Failed to read script file from `{}`!", script_path.display()))?;
@@ -67,8 +113,13 @@ fn rosy (
     //  via `info!` so that if there are any
     //  compilation errors, they are visible
     //  in the logs.
+    let mut cargo_args = vec!["build", "--bin", "rosy_output"];
+    if release {
+        cargo_args.push("--release");
+    }
+    
     let output = Command::new("cargo")
-        .args(&["build", "--release", "--bin", "rosy_output"])
+        .args(&cargo_args)
         .current_dir(&rosy_output_path)
         .output()
         .context("Failed to spawn cargo build process")?;
@@ -78,16 +129,11 @@ fn rosy (
     info!("Cargo stderr:\n{}", stderr);
     ensure!(output.status.success(), "Compilation failed with exit code: {:?} with stdout:\n{stdout} and stderr:\n{stderr}", output.status.code());
 
-    let binary_path = rosy_output_path.join("target/release/rosy_output");
+    let build_profile = if release { "release" } else { "debug" };
+    let binary_path = rosy_output_path.join(format!("target/{}/rosy_output", build_profile));
     info!("Build complete! Binary at: {}", binary_path.display());
 
-    // Copy the binary to the current directory
-    let destination = PathBuf::from("rosy_output");
-    std::fs::copy(&binary_path, &destination)
-        .context("Failed to copy binary to current directory")?;
-    info!("Copied binary to: {}", destination.display());
-
-    Ok(())
+    Ok(binary_path)
 }
 
 fn main() -> Result<()> {
@@ -100,11 +146,36 @@ fn main() -> Result<()> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    let script_path = PathBuf::from(std::env::args()
-        .nth(1)
-        .unwrap_or("examples/basic.rosy".to_string()));
+    let cli = Cli::parse();
 
-    // For now, use None for output_dir (will use temp directory)
-    // In the future, we can add --output-dir flag here
-    rosy(&script_path, None)
+    match cli.command {
+        Commands::Run { source, output_dir, release } => {
+            info!("Running ROSY script: {}", source.display());
+            let binary_path = rosy(&source, output_dir, release)?;
+            info!("Compilation successful! Binary remains at: {}", binary_path.display());
+            info!("To execute, run: {}", binary_path.display());
+        }
+        
+        Commands::Build { source, output, output_dir, release } => {
+            info!("Building ROSY script: {}", source.display());
+            let binary_path = rosy(&source, output_dir, release)?;
+            
+            // Determine output name
+            let output_name = output.unwrap_or_else(|| {
+                source
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("rosy_output")
+                    .to_string()
+            });
+            
+            // Copy binary to PWD
+            let destination = PathBuf::from(&output_name);
+            std::fs::copy(&binary_path, &destination)
+                .context("Failed to copy binary to current directory")?;
+            info!("Binary copied to: {}", destination.display());
+        }
+    }
+
+    Ok(())
 }
