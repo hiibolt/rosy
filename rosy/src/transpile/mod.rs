@@ -70,6 +70,8 @@ impl TypeOf for Expr {
                 .context("...while determining type of DA expression")?,
             Expr::Length(length_expr) => length_expr.type_of(context)
                 .context("...while determining type of LENGTH expression")?,
+            Expr::Sin(sin_expr) => sin_expr.type_of(context)
+                .context("...while determining type of SIN expression")?,
         })
     }
 }

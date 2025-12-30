@@ -13,7 +13,7 @@ impl Transpile for VariableData {
             RosyBaseType::RE => "0.0",
             RosyBaseType::ST => "\"\".to_string()",
             RosyBaseType::LO => "false",
-            RosyBaseType::CM => "(0.0, 0.0)",
+            RosyBaseType::CM => "Complex64::new(0.0, 0.0)",
             RosyBaseType::VE => "vec![]",
             RosyBaseType::DA => "DA::zero()",
             RosyBaseType::CD => "CD::zero()"

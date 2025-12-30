@@ -117,8 +117,8 @@ impl RosyDisplay for &CM {
         // COSY format: (  real     ,  imag     )
         format!(
             " ( {}, {})", 
-            display_re(self.0, 9, 4, 5),
-            display_re(self.1, 9, 4, 5)
+            display_re(self.re, 9, 4, 5),
+            display_re(self.im, 9, 4, 5)
         )
     }
 }

@@ -13,7 +13,7 @@ pub use taylor::{DA, CD};
 pub type RE = f64;
 pub type ST = String;
 pub type LO = bool;
-pub type CM = (f64, f64);
+pub type CM = num_complex::Complex64;
 pub type VE = Vec<f64>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -105,7 +105,7 @@ impl RosyType {
             RosyBaseType::RE => "f64",
             RosyBaseType::ST => "String",
             RosyBaseType::LO => "bool",
-            RosyBaseType::CM => "(f64, f64)",
+            RosyBaseType::CM => "num_complex::Complex64",
             RosyBaseType::VE => "Vec<f64>",
             RosyBaseType::DA => "DA",
             RosyBaseType::CD => "CD",

@@ -7,3 +7,4 @@ edition = "2024"
 anyhow.workspace = true
 rosy_lib.workspace = true
 mpi.workspace = true
+num-complex = "0.4"

@@ -29,7 +29,8 @@ pub trait RosyCM {
 // RE -> CM
 impl RosyCM for &RE {
     fn rosy_cm(self) -> Result<CM> {
-        Ok((*self, 0.0))
+        use num_complex::Complex64;
+        Ok(Complex64::new(*self, 0.0))
     }
 }
 // CM -> CM
@@ -41,16 +42,16 @@ impl RosyCM for &CM {
 // VE -> CM
 impl RosyCM for &VE {
     fn rosy_cm(self) -> Result<CM> {
+        use num_complex::Complex64;
         ensure!(self.len() == 2, "Cannot convert vector of length {} to CM (complex), must have exactly 2 elements!", self.len());
 
-        Ok((self[0], self[1]))
+        Ok(Complex64::new(self[0], self[1]))
     }
 }
 
 // CD -> CM (extract constant part)
 impl RosyCM for &CD {
     fn rosy_cm(self) -> Result<CM> {
-        let c = self.constant_part();
-        Ok((c.re, c.im))
+        Ok(self.constant_part())
     }
 }

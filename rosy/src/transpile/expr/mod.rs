@@ -11,6 +11,7 @@ mod logical_convert;
 mod function_call;
 mod da;
 mod length;
+mod sin;
 
 use crate::ast::*;
 use super::{Transpile, TranspilationInputContext, TranspilationOutput};
@@ -88,6 +89,10 @@ impl Transpile for Expr {
             Expr::Length(length_expr) => length_expr.transpile(context)
                 .map_err(|e| e.into_iter().map(|err| {
                     err.context("...while transpiling LENGTH expression")
+                }).collect::<Vec<Error>>()),
+            Expr::Sin(sin_expr) => sin_expr.transpile(context)
+                .map_err(|e| e.into_iter().map(|err| {
+                    err.context("...while transpiling SIN expression")
                 }).collect::<Vec<Error>>()),
         }
     }

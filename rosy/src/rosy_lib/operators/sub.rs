@@ -14,6 +14,7 @@
 //! `assets/operators/sub/sub.fox` for equivalent COSY INFINITY code.
 
 use anyhow::Result;
+use num_complex::Complex64;
 use crate::rosy_lib::RosyType;
 use crate::rosy_lib::{RE, CM, VE, DA, CD};
 use crate::rosy_lib::operators::{TypeRule, build_type_registry};
@@ -70,7 +71,7 @@ impl RosySub<&RE> for &RE {
 impl RosySub<&CM> for &RE {
     type Output = CM;
     fn rosy_sub(self, other: &CM) -> Result<Self::Output> {
-        Ok((self - other.0, -other.1))
+        Ok(Complex64::new(self - other.re, -other.im))
     }
 }
 
@@ -105,7 +106,7 @@ impl RosySub<&CD> for &RE {
 impl RosySub<&RE> for &CM {
     type Output = CM;
     fn rosy_sub(self, other: &RE) -> Result<Self::Output> {
-        Ok((self.0 - other, self.1))
+        Ok(Complex64::new(self.re - other, self.im))
     }
 }
 
@@ -113,7 +114,7 @@ impl RosySub<&RE> for &CM {
 impl RosySub<&CM> for &CM {
     type Output = CM;
     fn rosy_sub(self, other: &CM) -> Result<Self::Output> {
-        Ok((self.0 - other.0, self.1 - other.1))
+        Ok(self - other)
     }
 }
 
@@ -121,9 +122,8 @@ impl RosySub<&CM> for &CM {
 impl RosySub<&DA> for &CM {
     type Output = CD;
     fn rosy_sub(self, other: &DA) -> Result<Self::Output> {
-        use num_complex::Complex64;
         // Create CD from the complex number
-        let cm_cd = CD::complex_constant(Complex64::new(self.0, self.1));
+        let cm_cd = CD::complex_constant(*self);
         // Create CD from the DA (which becomes the real part)
         let da_cd = CD::from_da(other);
         // Subtract them
@@ -135,8 +135,7 @@ impl RosySub<&DA> for &CM {
 impl RosySub<&CD> for &CM {
     type Output = CD;
     fn rosy_sub(self, other: &CD) -> Result<Self::Output> {
-        use num_complex::Complex64;
-        let self_cd = CD::complex_constant(Complex64::new(self.0, self.1));
+        let self_cd = CD::complex_constant(*self);
         &self_cd - other
     }
 }
@@ -172,9 +171,8 @@ impl RosySub<&RE> for &DA {
 impl RosySub<&CM> for &DA {
     type Output = CD;
     fn rosy_sub(self, other: &CM) -> Result<Self::Output> {
-        use num_complex::Complex64;
         // Create CD from the complex number
-        let cm_cd = CD::complex_constant(Complex64::new(other.0, other.1));
+        let cm_cd = CD::complex_constant(*other);
         // Create CD from the DA (which becomes the real part)
         let da_cd = CD::from_da(self);
         // Subtract them
@@ -214,7 +212,7 @@ impl RosySub<&CM> for &CD {
     type Output = CD;
     fn rosy_sub(self, other: &CM) -> Result<Self::Output> {
         use num_complex::Complex64;
-        self - Complex64::new(other.0, other.1)
+        self - *other
     }
 }
 

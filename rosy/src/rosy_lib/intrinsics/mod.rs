@@ -3,12 +3,14 @@ pub mod st;
 pub mod lo;
 pub mod from_st;
 pub mod length;
+pub mod sin;
 
 pub use cm::RosyCM;
 pub use st::RosyST;
 pub use lo::RosyLO;
 pub use from_st::RosyFromST;
 pub use length::RosyLENGTH;
+pub use sin::RosySIN;
 
 /// Represents a parsed intrinsic type rule from the source code.
 #[derive(Debug, Clone)]

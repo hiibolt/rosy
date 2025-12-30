@@ -102,8 +102,8 @@ impl RosyExtract<&RE> for &CM {
     
     fn rosy_extract(self, index: &RE) -> Result<Self::Output> {
         match *index as i32 {
-            1 => Ok(self.0), // Real part
-            2 => Ok(self.1), // Imaginary part
+            1 => Ok(self.re), // Real part
+            2 => Ok(self.im), // Imaginary part
             _ => bail!("Complex number index must be 1 (real) or 2 (imaginary), found {}", index),
         }
     }

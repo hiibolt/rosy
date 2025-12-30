@@ -71,7 +71,7 @@ impl RosyMult<&RE> for &RE {
 impl RosyMult<&CM> for &RE {
     type Output = CM;
     fn rosy_mult(self, other: &CM) -> Result<Self::Output> {
-        Ok((self * other.0, self * other.1))
+        Ok(self * other)
     }
 }
 
@@ -95,7 +95,7 @@ impl RosyMult<&DA> for &RE {
 impl RosyMult<&RE> for &CM {
     type Output = CM;
     fn rosy_mult(self, other: &RE) -> Result<Self::Output> {
-        Ok((self.0 * other, self.1 * other))
+        Ok(self * other)
     }
 }
 
@@ -104,10 +104,7 @@ impl RosyMult<&CM> for &CM {
     type Output = CM;
     fn rosy_mult(self, other: &CM) -> Result<Self::Output> {
         // (a + bi)(c + di) = (ac - bd) + (ad + bc)i
-        Ok((
-            self.0 * other.0 - self.1 * other.1,
-            self.0 * other.1 + self.1 * other.0
-        ))
+        Ok(self * other)
     }
 }
 
@@ -169,9 +166,8 @@ impl RosyMult<&LO> for &LO {
 impl RosyMult<&DA> for &CM {
     type Output = CD;
     fn rosy_mult(self, other: &DA) -> Result<Self::Output> {
-        use num_complex::Complex64;
         // Create CD from the complex number
-        let cm_cd = CD::complex_constant(Complex64::new(self.0, self.1));
+        let cm_cd = CD::complex_constant(*self);
         // Create CD from the DA (which becomes the real part)
         let da_cd = CD::from_da(other);
         // Multiply them
@@ -183,8 +179,7 @@ impl RosyMult<&DA> for &CM {
 impl RosyMult<&CD> for &CM {
     type Output = CD;
     fn rosy_mult(self, other: &CD) -> Result<Self::Output> {
-        use num_complex::Complex64;
-        other * Complex64::new(self.0, self.1)
+        other * *self
     }
 }
 
@@ -192,9 +187,8 @@ impl RosyMult<&CD> for &CM {
 impl RosyMult<&CM> for &DA {
     type Output = CD;
     fn rosy_mult(self, other: &CM) -> Result<Self::Output> {
-        use num_complex::Complex64;
         // Create CD from the complex number
-        let cm_cd = CD::complex_constant(Complex64::new(other.0, other.1));
+        let cm_cd = CD::complex_constant(*other);
         // Create CD from the DA (which becomes the real part)
         let da_cd = CD::from_da(self);
         // Multiply them
@@ -226,7 +220,7 @@ impl RosyMult<&CM> for &CD {
     type Output = CD;
     fn rosy_mult(self, other: &CM) -> Result<Self::Output> {
         use num_complex::Complex64;
-        self * Complex64::new(other.0, other.1)
+        self * *other
     }
 }
 

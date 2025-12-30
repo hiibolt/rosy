@@ -70,6 +70,7 @@ edition = "2024"
 anyhow = "1.0"
 rosy_lib = { path = "./vendored/rosy_lib" }
 mpi = "0.8"
+num-complex = "0.4"
 "#
 }
 

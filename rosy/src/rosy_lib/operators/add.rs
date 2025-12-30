@@ -14,6 +14,7 @@
 //! `assets/operators/add/add.fox` for equivalent COSY INFINITY code.
 
 use anyhow::Result;
+use num_complex::Complex64;
 use crate::rosy_lib::RosyType;
 use crate::rosy_lib::{RE, CM, VE, DA, CD, LO};
 use crate::rosy_lib::operators::{TypeRule, build_type_registry};
@@ -69,7 +70,7 @@ impl RosyAdd<&RE> for &RE {
 impl RosyAdd<&CM> for &RE {
     type Output = CM;
     fn rosy_add(self, other: &CM) -> Result<Self::Output> {
-        Ok((self + other.0, other.1))
+        Ok(CM::new(self + other.re, other.im))
     }
 }
 // RE + VE
@@ -92,14 +93,14 @@ impl RosyAdd<&DA> for &RE {
 impl RosyAdd<&RE> for &CM {
     type Output = CM;
     fn rosy_add(self, other: &RE) -> Result<Self::Output> {
-        Ok((self.0 + other, self.1))
+        Ok(CM::new(self.re + other, self.im))
     }
 }
 // CM + CM
 impl RosyAdd<&CM> for &CM {
     type Output = CM;
     fn rosy_add(self, other: &CM) -> Result<Self::Output> {
-        Ok((self.0 + other.0, self.1 + other.1))
+        Ok(self + other)
     }
 }
 
@@ -160,9 +161,8 @@ impl RosyAdd<&LO> for &LO {
 impl RosyAdd<&DA> for &CM {
     type Output = CD;
     fn rosy_add(self, other: &DA) -> Result<Self::Output> {
-        use num_complex::Complex64;
         // Create CD from the complex number
-        let cm_cd = CD::complex_constant(Complex64::new(self.0, self.1));
+        let cm_cd = CD::complex_constant(*self);
         // Create CD from the DA (which becomes the real part)
         let da_cd = CD::from_da(other);
         // Add them
@@ -174,8 +174,7 @@ impl RosyAdd<&DA> for &CM {
 impl RosyAdd<&CD> for &CM {
     type Output = CD;
     fn rosy_add(self, other: &CD) -> Result<Self::Output> {
-        use num_complex::Complex64;
-        other + Complex64::new(self.0, self.1)
+        other + *self
     }
 }
 
@@ -185,8 +184,10 @@ impl RosyAdd<&CM> for &DA {
     fn rosy_add(self, other: &CM) -> Result<Self::Output> {
         use num_complex::Complex64;
         // Create CD from the complex number
-        let cm_cd = CD::complex_constant(Complex64::new(other.0, other.1));
+        let cm_cd = CD::complex_constant(*other);
+
         // Create CD from the DA (which becomes the real part)
+
         let da_cd = CD::from_da(self);
         // Add them
         &da_cd + &cm_cd
@@ -207,7 +208,6 @@ impl RosyAdd<&CD> for &DA {
 impl RosyAdd<&RE> for &CD {
     type Output = CD;
     fn rosy_add(self, other: &RE) -> Result<Self::Output> {
-        use num_complex::Complex64;
         self + Complex64::new(*other, 0.0)
     }
 }
@@ -216,8 +216,7 @@ impl RosyAdd<&RE> for &CD {
 impl RosyAdd<&CM> for &CD {
     type Output = CD;
     fn rosy_add(self, other: &CM) -> Result<Self::Output> {
-        use num_complex::Complex64;
-        self + Complex64::new(other.0, other.1)
+        self + *other
     }
 }
 

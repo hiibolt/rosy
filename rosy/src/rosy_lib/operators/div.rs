@@ -71,8 +71,7 @@ impl RosyDiv<&CM> for &RE {
     type Output = CM;
     fn rosy_div(self, other: &CM) -> Result<Self::Output> {
         // Division by complex: a / (b + ci) = a(b - ci) / (b^2 + c^2)
-        let denom = other.0 * other.0 + other.1 * other.1;
-        Ok((self * other.0 / denom, -self * other.1 / denom))
+        Ok(self / other)
     }
 }
 
@@ -107,7 +106,7 @@ impl RosyDiv<&CD> for &RE {
 impl RosyDiv<&RE> for &CM {
     type Output = CM;
     fn rosy_div(self, other: &RE) -> Result<Self::Output> {
-        Ok((self.0 / other, self.1 / other))
+        Ok(self / other)
     }
 }
 
@@ -116,11 +115,7 @@ impl RosyDiv<&CM> for &CM {
     type Output = CM;
     fn rosy_div(self, other: &CM) -> Result<Self::Output> {
         // (a + bi) / (c + di) = ((ac + bd) + (bc - ad)i) / (c^2 + d^2)
-        let denom = other.0 * other.0 + other.1 * other.1;
-        Ok((
-            (self.0 * other.0 + self.1 * other.1) / denom,
-            (self.1 * other.0 - self.0 * other.1) / denom
-        ))
+        Ok(self / other)
     }
 }
 
@@ -128,9 +123,8 @@ impl RosyDiv<&CM> for &CM {
 impl RosyDiv<&DA> for &CM {
     type Output = CD;
     fn rosy_div(self, other: &DA) -> Result<Self::Output> {
-        use num_complex::Complex64;
         // Create CD from the complex number
-        let cm_cd = CD::complex_constant(Complex64::new(self.0, self.1));
+        let cm_cd = CD::complex_constant(*self);
         // Create CD from the DA (which becomes the real part)
         let da_cd = CD::from_da(other);
         // Divide them
@@ -142,8 +136,7 @@ impl RosyDiv<&DA> for &CM {
 impl RosyDiv<&CD> for &CM {
     type Output = CD;
     fn rosy_div(self, other: &CD) -> Result<Self::Output> {
-        use num_complex::Complex64;
-        let self_cd = CD::complex_constant(Complex64::new(self.0, self.1));
+        let self_cd = CD::complex_constant(*self);
         &self_cd / other
     }
 }
@@ -179,9 +172,8 @@ impl RosyDiv<&RE> for &DA {
 impl RosyDiv<&CM> for &DA {
     type Output = CD;
     fn rosy_div(self, other: &CM) -> Result<Self::Output> {
-        use num_complex::Complex64;
         // Create CD from the complex number
-        let cm_cd = CD::complex_constant(Complex64::new(other.0, other.1));
+        let cm_cd = CD::complex_constant(*other);
         // Create CD from the DA (which becomes the real part)
         let da_cd = CD::from_da(self);
         // Divide them
@@ -221,7 +213,7 @@ impl RosyDiv<&CM> for &CD {
     type Output = CD;
     fn rosy_div(self, other: &CM) -> Result<Self::Output> {
         use num_complex::Complex64;
-        self / Complex64::new(other.0, other.1)
+        self / *other
     }
 }
 

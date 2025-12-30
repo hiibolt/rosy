@@ -7,6 +7,7 @@
 
 use rosy_lib::*;
 use anyhow::{Result, Context, ensure, bail};
+use num_complex::Complex64;
 
 fn main_wrapper() -> Result<()> {
 	let start = std::time::Instant::now();
