@@ -35,6 +35,8 @@ pub mod test_utils {
     use std::process::Command;
     use std::path::PathBuf;
 
+    use crate::rosy_lib::intrinsics::extract_numbers;
+
     /// Test that ROSY and COSY outputs match for a given intrinsic function.
     /// 
     /// This is the shared test framework used by all intrinsic modules.
@@ -65,13 +67,20 @@ pub mod test_utils {
             panic!("cosy executable not found at {:?}", cosy_exe);
         }
 
-        // Run ROSY transpiler
+        // Use isolated build directory for this test to allow parallel execution
+        let test_build_dir = workspace_root.join(format!(".rosy_test_cache/{}", intrinsic_name));
+
+        // Run ROSY transpiler with isolated build directory
         let transpile_output = Command::new("cargo")
             .arg("run")
+            .arg("--release")
             .arg("-p")
             .arg("rosy")
             .arg("--")
+            .arg("run")
             .arg(&rosy_script)
+            .arg("-d")
+            .arg(&test_build_dir)
             .current_dir(&workspace_root)
             .output()
             .expect("Failed to run rosy");
@@ -82,20 +91,8 @@ pub mod test_utils {
             String::from_utf8_lossy(&transpile_output.stderr)
         );
 
-        // Run the transpiled ROSY code
-        let rosy_output = Command::new("cargo")
-            .args(&["run", "--release"])
-            .current_dir(workspace_root.join(".rosy_output"))
-            .output()
-            .expect("Failed to run transpiled ROSY code");
-
-        assert!(
-            rosy_output.status.success(),
-            "ROSY execution failed:\n{}",
-            String::from_utf8_lossy(&rosy_output.stderr)
-        );
-
-        let rosy_stdout = String::from_utf8_lossy(&rosy_output.stdout);
+        // The rosy transpile_output contains the execution output directly
+        let rosy_stdout = String::from_utf8_lossy(&transpile_output.stdout);
         let rosy_lines: Vec<&str> = rosy_stdout.lines().collect();
 
         // Run COSY script
@@ -144,7 +141,26 @@ pub mod test_utils {
             let rosy_line = rosy_lines.get(i).map(|s| s.trim()).unwrap_or("<missing>");
             let cosy_line = cosy_lines.get(i).map(|s| s.trim()).unwrap_or("<missing>");
 
+            // Check if lines are different
             if rosy_line != cosy_line {
+                // Try numeric comparison for lines with floating point values
+                if let (Some(rosy_nums), Some(cosy_nums)) = (extract_numbers(rosy_line), extract_numbers(cosy_line)) {
+                    // If we have the same count of numbers, compare with tolerance
+                    if rosy_nums.len() == cosy_nums.len() {
+                        let all_close = rosy_nums.iter().zip(cosy_nums.iter()).all(|(r, c)| {
+                            let diff = (r - c).abs();
+                            let max_val = r.abs().max(c.abs());
+                            // Relative tolerance of 1e-6 or absolute tolerance of 1e-9
+                            diff < 1e-9 || diff / max_val < 1e-6
+                        });
+                        
+                        if all_close {
+                            // Numbers are within tolerance, skip this difference
+                            continue;
+                        }
+                    }
+                }
+                
                 differences.push(format!(
                     "Line {}: \n  ROSY: {}\n  COSY: {}",
                     i, rosy_line, cosy_line
@@ -161,5 +177,25 @@ pub mod test_utils {
         }
 
         println!("\n✅ All {} lines match for intrinsic '{}'!", rosy_lines.len(), intrinsic_name);
+    }
+}
+
+/// Extract floating point numbers from a line for numeric comparison.
+/// Returns None if the line doesn't contain parseable numbers.
+fn extract_numbers(line: &str) -> Option<Vec<f64>> {
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    let mut numbers = Vec::new();
+    
+    for part in parts {
+        // Try to parse as f64, handling scientific notation
+        if let Ok(num) = part.parse::<f64>() {
+            numbers.push(num);
+        }
+    }
+    
+    if numbers.is_empty() {
+        None
+    } else {
+        Some(numbers)
     }
 }

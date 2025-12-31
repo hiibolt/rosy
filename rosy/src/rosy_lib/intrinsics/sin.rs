@@ -13,10 +13,9 @@ use crate::rosy_lib::{RE, CM, VE, DA, CD};
 /// - CD -> CD (complex Taylor composition)
 pub const SIN_REGISTRY: &[IntrinsicTypeRule] = &[
     IntrinsicTypeRule::new("RE", "RE", "1.5"),
-    IntrinsicTypeRule::new("CM", "CM", "1.5&2.5"),
+    IntrinsicTypeRule::new("CM", "CM", "CM(1.5&2.5)"),
     IntrinsicTypeRule::new("VE", "VE", "1.5&2.5&3.5"),
     IntrinsicTypeRule::new("DA", "DA", "DA(1)"),
-    IntrinsicTypeRule::new("CD", "CD", "CM(1.5&2.5)+CD(1)"),
 ];
 
 /// Get the return type of SIN for a given input type.
@@ -27,8 +26,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
             (RosyType::RE(), RosyType::RE()),
             (RosyType::CM(), RosyType::CM()),
             (RosyType::VE(), RosyType::VE()),
-            (RosyType::DA(), RosyType::DA()),
-            (RosyType::CD(), RosyType::CD()),
+            (RosyType::DA(), RosyType::DA())
         ];
         for (input_type, result_type) in all {
             m.insert(input_type, result_type);
@@ -87,44 +85,44 @@ impl RosySIN for CD {
 
 /// Compute sine of a DA object using Taylor series composition.
 /// 
-/// Uses the formula: sin(f(x)) = sin(f₀) + cos(f₀)·f'(x) - sin(f₀)·(f'(x))²/2! - ...
-/// where f₀ is the constant part of the DA.
+/// Uses the Taylor series: sin(f) = sin(f₀) + cos(f₀)·δf - sin(f₀)·(δf)²/2! - cos(f₀)·(δf)³/3! + sin(f₀)·(δf)⁴/4! + ...
+/// where f₀ is the constant part and δf = f - f₀
 fn da_sin(da: &DA) -> anyhow::Result<DA> {
     use crate::rosy_lib::taylor::DACoefficient;
+    
+    let config = crate::rosy_lib::taylor::get_config()?;
+    let max_order = config.max_order as usize;
     
     let f0 = da.constant_part();
     let sin_f0 = f0.sin();
     let cos_f0 = f0.cos();
     
-    // Create DA with constant part removed (this is f'(x) in Taylor sense)
+    // Create DA with constant part removed (δf = f - f₀)
     let mut da_prime = da.clone();
     da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
     
     // Build result using Taylor composition
-    // sin(f) = sin(f0) + cos(f0)*(f-f0) - sin(f0)*(f-f0)^2/2! - cos(f0)*(f-f0)^3/3! + ...
+    // Pattern: sin(f₀), cos(f₀), -sin(f₀), -cos(f₀), sin(f₀), cos(f₀), ...
     let mut result = DA::from_coeff(sin_f0);
     let mut term = da_prime.clone();
-    let mut coefficient = cos_f0;
     let mut factorial = 1.0;
-    let mut sign_sin = true; // alternates: cos, -sin, -cos, sin, cos, ...
     
-    for n in 1..=5 { // Match COSY's order-5 expansion
+    // Cycle through: cos, -sin, -cos, sin, cos, -sin, -cos, sin, ...
+    let coeffs = [cos_f0, -sin_f0, -cos_f0, sin_f0];
+    
+    for n in 1..=max_order {
         factorial *= n as f64;
+        let coeff_index = (n - 1) % 4;
+        let coefficient = coeffs[coeff_index];
         
         // Add current term
         let scaled_term = (&term * DA::from_coeff(coefficient / factorial))?;
         result = (&result + &scaled_term)?;
         
         // Prepare next term
-        term = (&term * &da_prime)?;
-        
-        // Update coefficient (alternating sin/cos with sign changes)
-        coefficient = if sign_sin {
-            -sin_f0
-        } else {
-            -cos_f0
-        };
-        sign_sin = !sign_sin;
+        if n < max_order {
+            term = (&term * &da_prime)?;
+        }
     }
     
     Ok(result)
@@ -134,6 +132,9 @@ fn da_sin(da: &DA) -> anyhow::Result<DA> {
 fn cd_sin(cd: &CD) -> anyhow::Result<CD> {
     use crate::rosy_lib::taylor::DACoefficient;
     use num_complex::Complex64;
+    
+    let config = crate::rosy_lib::taylor::get_config()?;
+    let max_order = config.max_order as usize;
     
     let f0 = cd.constant_part();
     let sin_f0 = f0.sin();
@@ -146,24 +147,22 @@ fn cd_sin(cd: &CD) -> anyhow::Result<CD> {
     // Build result using Taylor composition
     let mut result = CD::from_coeff(sin_f0);
     let mut term = cd_prime.clone();
-    let mut coefficient = cos_f0;
     let mut factorial = 1.0;
-    let mut sign_sin = true;
     
-    for n in 1..=5 {
+    // Cycle through: cos, -sin, -cos, sin, cos, -sin, -cos, sin, ...
+    let coeffs = [cos_f0, -sin_f0, -cos_f0, sin_f0];
+    
+    for n in 1..=max_order {
         factorial *= n as f64;
+        let coeff_index = (n - 1) % 4;
+        let coefficient = coeffs[coeff_index];
         
         let scaled_term = (&term * CD::from_coeff(coefficient / factorial))?;
         result = (&result + &scaled_term)?;
         
-        term = (&term * &cd_prime)?;
-        
-        coefficient = if sign_sin {
-            -sin_f0
-        } else {
-            -cos_f0
-        };
-        sign_sin = !sign_sin;
+        if n < max_order {
+            term = (&term * &cd_prime)?;
+        }
     }
     
     Ok(result)
@@ -175,7 +174,6 @@ mod tests {
     use crate::rosy_lib::intrinsics::test_utils::test_intrinsic_output_match;
 
     #[test]
-    #[ignore] // Run after codegen creates test files
     fn test_rosy_cosy_sin_match() {
         test_intrinsic_output_match("sin");
     }

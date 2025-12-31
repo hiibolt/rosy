@@ -17,7 +17,8 @@ fn main() {
     codegen::codegen_operator("extract");
     
     // Generate intrinsic function test files
-    //codegen::codegen_intrinsic("length");
+    codegen::codegen_intrinsic("length");
+    codegen::codegen_intrinsic("sin");
     
     // Generate the embedded files at compile time
     let out_dir = std::env::var("OUT_DIR").unwrap();
