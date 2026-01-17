@@ -1,11 +1,25 @@
+use crate::ast::{FromRule, Rule};
 use crate::transpile::*;
 use crate::program::expressions::Expr;
 use crate::rosy_lib::RosyType;
-use anyhow::{Result, Error, anyhow};
+use anyhow::{Result, Error, anyhow, Context};
 
 #[derive(Debug, PartialEq)]
 pub struct StringConvertExpr {
     pub expr: Box<Expr>,
+}
+
+impl FromRule for StringConvertExpr {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
+        anyhow::ensure!(pair.as_rule() == Rule::st, "Expected st rule, got {:?}", pair.as_rule());
+        let mut inner = pair.into_inner();
+        let expr_pair = inner.next()
+            .context("Missing inner expression for `ST`!")?;
+        let expr = Box::new(Expr::from_rule(expr_pair)
+            .context("Failed to build expression for `ST`")?
+            .ok_or_else(|| anyhow::anyhow!("Expected expression for `ST`"))?);
+        Ok(Some(StringConvertExpr { expr }))
+    }
 }
 
 impl TranspileWithType for StringConvertExpr {}

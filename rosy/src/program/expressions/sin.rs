@@ -1,3 +1,4 @@
+use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
 use crate::rosy_lib::RosyType;
@@ -9,6 +10,18 @@ pub struct SinExpr {
     pub expr: Box<Expr>,
 }
 
+impl FromRule for SinExpr {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
+        anyhow::ensure!(pair.as_rule() == Rule::sin, "Expected sin rule, got {:?}", pair.as_rule());
+        let mut inner = pair.into_inner();
+        let expr_pair = inner.next()
+            .context("Missing inner expression for `SIN`!")?;
+        let expr = Box::new(Expr::from_rule(expr_pair)
+            .context("Failed to build expression for `SIN`")?
+            .ok_or_else(|| anyhow::anyhow!("Expected expression for `SIN`"))?);
+        Ok(Some(SinExpr { expr }))
+    }
+}
 impl TranspileWithType for SinExpr {}
 impl Transpile for SinExpr {
     fn transpile(

@@ -1,7 +1,8 @@
+use crate::ast::{FromRule, Rule};
 use crate::transpile::TranspileWithType;
 use crate::program::expressions::Expr;
 use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
-use anyhow::{Result, Error, anyhow};
+use anyhow::{Result, Error, anyhow, Context};
 use crate::rosy_lib::RosyType;
 
 #[derive(Debug, PartialEq)]
@@ -9,6 +10,18 @@ pub struct LogicalConvertExpr {
     pub expr: Box<Expr>,
 }
 
+impl FromRule for LogicalConvertExpr {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
+        anyhow::ensure!(pair.as_rule() == Rule::lo, "Expected lo rule, got {:?}", pair.as_rule());
+        let mut inner = pair.into_inner();
+        let expr_pair = inner.next()
+            .context("Missing inner expression for `LO`!")?;
+        let expr = Box::new(Expr::from_rule(expr_pair)
+            .context("Failed to build expression for `LO`")?
+            .ok_or_else(|| anyhow::anyhow!("Expected expression for `LO`"))?);
+        Ok(Some(LogicalConvertExpr { expr }))
+    }
+}
 impl TranspileWithType for LogicalConvertExpr {}
 impl TypeOf for LogicalConvertExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {

@@ -1,3 +1,4 @@
+use crate::ast::{FromRule, Rule};
 use crate::program::expressions::variable_identifier::VariableIdentifier;
 use crate::transpile::TranspileWithType;
 use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, VariableScope, };
@@ -9,6 +10,15 @@ pub struct VarExpr {
     pub identifier: VariableIdentifier,
 }
 
+impl FromRule for VarExpr {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
+        anyhow::ensure!(pair.as_rule() == Rule::variable_identifier, "Expected variable_identifier rule, got {:?}", pair.as_rule());
+        let identifier = VariableIdentifier::from_rule(pair)
+            .context("Failed to build variable identifier!")?
+            .ok_or_else(|| anyhow::anyhow!("Expected variable identifier"))?;
+        Ok(Some(VarExpr { identifier }))
+    }
+}
 impl TranspileWithType for VarExpr {}
 impl TypeOf for VarExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {

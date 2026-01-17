@@ -1,7 +1,8 @@
+use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::TranspileWithType;
 use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
-use anyhow::{Result, Error};
+use anyhow::{Result, Error, Context};
 use crate::rosy_lib::RosyType;
 
 #[derive(Debug, PartialEq)]
@@ -9,6 +10,18 @@ pub struct ComplexConvertExpr {
     pub expr: Box<Expr>,
 }
 
+impl FromRule for ComplexConvertExpr {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
+        anyhow::ensure!(pair.as_rule() == Rule::cm, "Expected cm rule, got {:?}", pair.as_rule());
+        let mut inner = pair.into_inner();
+        let expr_pair = inner.next()
+            .context("Missing inner expression for `CM`!")?;
+        let expr = Box::new(Expr::from_rule(expr_pair)
+            .context("Failed to build expression for `CM`")?
+            .ok_or_else(|| anyhow::anyhow!("Expected expression for `CM`"))?);
+        Ok(Some(ComplexConvertExpr { expr }))
+    }
+}
 impl TranspileWithType for ComplexConvertExpr {}
 impl TypeOf for ComplexConvertExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {

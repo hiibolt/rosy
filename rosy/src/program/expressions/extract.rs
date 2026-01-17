@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::TranspileWithType;
 use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
@@ -10,6 +11,13 @@ use crate::rosy_lib::RosyType;
 pub struct ExtractExpr {
     pub object: Box<Expr>,
     pub index: Box<Expr>,
+}
+
+impl FromRule for ExtractExpr {
+    fn from_rule(_pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
+        // ExtractExpr is created by the infix parser, not directly from a rule
+        anyhow::bail!("ExtractExpr should be created by infix parser, not FromRule")
+    }
 }
 
 impl TranspileWithType for ExtractExpr {}

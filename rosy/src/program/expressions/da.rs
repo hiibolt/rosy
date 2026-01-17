@@ -1,5 +1,9 @@
-use crate::{program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf}};
-use anyhow::Error;
+use crate::{
+    ast::{FromRule, Rule},
+    program::expressions::Expr,
+    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf}
+};
+use anyhow::{Error, Context};
 use crate::rosy_lib::RosyType;
 
 #[derive(Debug, PartialEq)]
@@ -7,6 +11,18 @@ pub struct DAExpr {
     pub index: Box<Expr>,
 }
 
+impl FromRule for DAExpr {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> anyhow::Result<Option<Self>> {
+        anyhow::ensure!(pair.as_rule() == Rule::da, "Expected da rule, got {:?}", pair.as_rule());
+        let mut inner = pair.into_inner();
+        let expr_pair = inner.next()
+            .context("Missing inner expression for `DA`!")?;
+        let index = Box::new(Expr::from_rule(expr_pair)
+            .context("Failed to build expression for `DA`")?
+            .ok_or_else(|| anyhow::anyhow!("Expected expression for `DA`"))?);
+        Ok(Some(DAExpr { index }))
+    }
+}
 impl TranspileWithType for DAExpr {}
 impl TypeOf for DAExpr {
     fn type_of(&self, _context: &TranspilationInputContext) -> anyhow::Result<RosyType> {

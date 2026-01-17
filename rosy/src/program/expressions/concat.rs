@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::TranspileWithType;
 use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
@@ -11,6 +12,12 @@ pub struct ConcatExpr {
     pub terms: Vec<Expr>
 }
 
+impl FromRule for ConcatExpr {
+    fn from_rule(_pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
+        // ConcatExpr is created by the infix parser, not directly from a rule
+        anyhow::bail!("ConcatExpr should be created by infix parser, not FromRule")
+    }
+}
 impl TranspileWithType for ConcatExpr {}
 impl TypeOf for ConcatExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {

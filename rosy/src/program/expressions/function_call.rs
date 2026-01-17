@@ -1,8 +1,9 @@
 use std::collections::BTreeSet;
+use crate::ast::{FromRule, Rule};
 use crate::transpile::*;
 use crate::rosy_lib::RosyType;
 use crate::program::expressions::Expr;
-use anyhow::{Result, Error, anyhow};
+use anyhow::{Result, Error, anyhow, Context};
 
 #[derive(Debug, PartialEq)]
 pub struct FunctionCallExpr {
@@ -10,6 +11,32 @@ pub struct FunctionCallExpr {
     pub args: Vec<Expr>,
 }
 
+impl FromRule for FunctionCallExpr {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
+        anyhow::ensure!(pair.as_rule() == Rule::function_call, "Expected function_call rule, got {:?}", pair.as_rule());
+        let mut inner = pair.into_inner();
+        let name = inner.next()
+            .context("Missing function name in function call!")?
+            .as_str().to_string();
+        
+        let args = {
+            let mut args = Vec::new();
+            while let Some(arg_pair) = inner.next() {
+                if arg_pair.as_rule() == Rule::semicolon {
+                    break;
+                }
+                
+                let expr = Expr::from_rule(arg_pair)
+                    .context("Failed to build expression in function call!")?
+                    .ok_or_else(|| anyhow::anyhow!("Expected expression in function call"))?;
+                args.push(expr);
+            }
+            args
+        };
+
+        Ok(Some(FunctionCallExpr { name, args }))
+    }
+}
 impl TranspileWithType for FunctionCallExpr {}
 impl TypeOf for FunctionCallExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {

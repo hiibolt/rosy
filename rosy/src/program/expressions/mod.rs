@@ -17,7 +17,7 @@ pub mod string;
 pub mod boolean;
 pub mod variable_identifier;
 
-use crate::{ast::{FromRule, PRATT_PARSER, Rule}, program::expressions::variable_identifier::VariableIdentifier, rosy_lib::RosyType, transpile::{TranspileWithType, TypeOf, add_context_to_all}};
+use crate::{ast::{FromRule, PRATT_PARSER, Rule}, rosy_lib::RosyType, transpile::{TranspileWithType, TypeOf, add_context_to_all}};
 use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 use crate::program::expressions::var_expr::VarExpr;
 use crate::program::expressions::function_call::FunctionCallExpr;
@@ -70,143 +70,89 @@ impl FromRule for Expr {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Expr>> {
         let result = PRATT_PARSER
             .map_primary(|primary| match primary.as_rule() {
-                Rule::variable_identifier => Ok(Expr {
-                    enum_variant: ExprEnum::Var,
-                    inner: Box::new(VarExpr {
-                        identifier: VariableIdentifier::from_rule(primary)
-                            .context("Failed to build variable identifier!")?
-                            .ok_or_else(|| anyhow::anyhow!("Expected variable identifier"))?,
+                Rule::variable_identifier => {
+                    let var_expr = VarExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Var,
+                        inner: Box::new(var_expr.ok_or_else(|| anyhow::anyhow!("Expected VarExpr"))?),
                     })
-                }),
+                },
                 Rule::function_call => {
-                    let mut inner = primary.into_inner();
-                    let name = inner.next()
-                        .context("Missing function name in function call!")?
-                        .as_str().to_string();
-                    
-                    let args = {
-                        let mut args = Vec::new();
-                        while let Some(arg_pair) = inner.next() {
-                            if arg_pair.as_rule() == Rule::semicolon {
-                                break;
-                            }
-                            
-                            let expr = Expr::from_rule(arg_pair)
-                                .context("Failed to build expression in function call!")?
-                                .ok_or_else(|| anyhow::anyhow!("Expected expression in function call"))?;
-                            args.push(expr);
-                        }
-                        args
-                    };
-
+                    let func_expr = FunctionCallExpr::from_rule(primary)?;
                     Ok(Expr {
                         enum_variant: ExprEnum::FunctionCall,
-                        inner: Box::new(FunctionCallExpr { name, args })
+                        inner: Box::new(func_expr.ok_or_else(|| anyhow::anyhow!("Expected FunctionCallExpr"))?),
                     })
                 },
                 Rule::number => {
-                    let n = primary.as_str().parse::<f64>()?;
+                    let n = f64::from_rule(primary)?;
                     Ok(Expr {
                         enum_variant: ExprEnum::Number,
-                        inner: Box::new(n)
+                        inner: Box::new(n.ok_or_else(|| anyhow::anyhow!("Expected number"))?),
                     })
                 }
                 Rule::boolean => {
-                    let b = match primary.as_str() {
-                        "TRUE" => true,
-                        "FALSE" => false,
-                        _ => bail!("Unexpected boolean value: {}", primary.as_str()),
-                    };
+                    let b = bool::from_rule(primary)?;
                     Ok(Expr {
                         enum_variant: ExprEnum::Boolean,
-                        inner: Box::new(b)
+                        inner: Box::new(b.ok_or_else(|| anyhow::anyhow!("Expected boolean"))?),
                     })
                 },
                 Rule::string => {
-                    let s = primary.as_str();
-                    // Remove the surrounding quotes
-                    let s = &s[1..s.len()-1];
+                    let s = String::from_rule(primary)?;
                     Ok(Expr {
                         enum_variant: ExprEnum::String,
-                        inner: Box::new(s.to_string())
+                        inner: Box::new(s.ok_or_else(|| anyhow::anyhow!("Expected string"))?),
                     })
                 },
                 Rule::cm => {
-                    let mut inner = primary.into_inner();
-                    let expr_pair = inner.next()
-                        .context("Missing inner expression for `CM`!")?;
-                    let expr = Box::new(Expr::from_rule(expr_pair)
-                        .context("Failed to build expression for `CM`")?
-                        .ok_or_else(|| anyhow::anyhow!("Expected expression for `CM`"))?);
+                    let cm_expr = ComplexConvertExpr::from_rule(primary)?;
                     Ok(Expr {
                         enum_variant: ExprEnum::Complex,
-                        inner: Box::new(ComplexConvertExpr { expr })
+                        inner: Box::new(cm_expr.ok_or_else(|| anyhow::anyhow!("Expected ComplexConvertExpr"))?),
                     })
                 },
                 Rule::st => {
-                    let mut inner = primary.into_inner();
-                    let expr_pair = inner.next()
-                        .context("Missing inner expression for `ST`!")?;
-                    let expr = Box::new(Expr::from_rule(expr_pair)
-                        .context("Failed to build expression for `ST`")?
-                        .ok_or_else(|| anyhow::anyhow!("Expected expression for `ST`"))?);
+                    let st_expr = StringConvertExpr::from_rule(primary)?;
                     Ok(Expr {
                         enum_variant: ExprEnum::StringConvert,
-                        inner: Box::new(StringConvertExpr { expr })
+                        inner: Box::new(st_expr.ok_or_else(|| anyhow::anyhow!("Expected StringConvertExpr"))?),
                     })
                 },
                 Rule::lo => {
-                    let mut inner = primary.into_inner();
-                    let expr_pair = inner.next()
-                        .context("Missing inner expression for `LO`!")?;
-                    let expr = Box::new(Expr::from_rule(expr_pair)
-                        .context("Failed to build expression for `LO`")?
-                        .ok_or_else(|| anyhow::anyhow!("Expected expression for `LO`"))?);
+                    let lo_expr = LogicalConvertExpr::from_rule(primary)?;
                     Ok(Expr {
                         enum_variant: ExprEnum::LogicalConvert,
-                        inner: Box::new(LogicalConvertExpr { expr })
+                        inner: Box::new(lo_expr.ok_or_else(|| anyhow::anyhow!("Expected LogicalConvertExpr"))?),
                     })
                 },
                 Rule::da => {
-                    let mut inner = primary.into_inner();
-                    let expr_pair = inner.next()
-                        .context("Missing inner expression for `DA`!")?;
-                    let index = Box::new(Expr::from_rule(expr_pair)
-                        .context("Failed to build expression for `DA`")?
-                        .ok_or_else(|| anyhow::anyhow!("Expected expression for `DA`"))?);
+                    let da_expr = DAExpr::from_rule(primary)?;
                     Ok(Expr {
                         enum_variant: ExprEnum::DA,
-                        inner: Box::new(DAExpr { index })
+                        inner: Box::new(da_expr.ok_or_else(|| anyhow::anyhow!("Expected DAExpr"))?),
                     })
                 },
                 Rule::length => {
-                    let mut inner = primary.into_inner();
-                    let expr_pair = inner.next()
-                        .context("Missing inner expression for `LENGTH`!")?;
-                    let expr = Box::new(Expr::from_rule(expr_pair)
-                        .context("Failed to build expression for `LENGTH`")?
-                        .ok_or_else(|| anyhow::anyhow!("Expected expression for `LENGTH`"))?);
+                    let length_expr = LengthExpr::from_rule(primary)?;
                     Ok(Expr {
                         enum_variant: ExprEnum::Length,
-                        inner: Box::new(LengthExpr { expr })
+                        inner: Box::new(length_expr.ok_or_else(|| anyhow::anyhow!("Expected LengthExpr"))?),
                     })
                 },
                 Rule::sin => {
-                    let mut inner = primary.into_inner();
-                    let expr_pair = inner.next()
-                        .context("Missing inner expression for `SIN`!")?;
-                    let expr = Box::new(Expr::from_rule(expr_pair)
-                        .context("Failed to build expression for `SIN`")?
-                        .ok_or_else(|| anyhow::anyhow!("Expected expression for `SIN`"))?);
+                    let sin_expr = SinExpr::from_rule(primary)?;
                     Ok(Expr {
                         enum_variant: ExprEnum::Sin,
-                        inner: Box::new(SinExpr { expr })
+                        inner: Box::new(sin_expr.ok_or_else(|| anyhow::anyhow!("Expected SinExpr"))?),
                     })
                 },
-                /*
-                Rule::expr => Ok(Expr::from_rule(primary)
-                    .context("Failed to build expression for `expr`")?
-                    .ok_or_else(|| anyhow::anyhow!("Expected expression for `expr`"))?), */
+                Rule::expr => {
+                    // handle parenthesized expressions by recursively parsing
+                    Expr::from_rule(primary)
+                        .context("Failed to build expression for parenthesized `expr`")?
+                        .ok_or_else(|| anyhow::anyhow!("Expected expression for parenthesized `expr`"))
+                },
                 _ => bail!("Unexpected primary expr: {:?}", primary.as_rule()),
             })
             .map_infix(|
@@ -214,37 +160,53 @@ impl FromRule for Expr {
                 op,
                 right
             | match op.as_rule() {
-                Rule::add => Ok(Expr {
-                    enum_variant: ExprEnum::Add,
-                    inner: Box::new(AddExpr {
-                        left: Box::new(left?),
-                        right: Box::new(right?),
+                Rule::add => {
+                    let left = left.context("...while transpiling left-hand side of `add` expression")?;
+                    let right = right.context("...while transpiling right-hand side of `add` expression")?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Add,
+                        inner: Box::new(AddExpr {
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        })
                     })
-                }),
-                Rule::sub => Ok(Expr {
-                    enum_variant: ExprEnum::Sub,
-                    inner: Box::new(SubExpr {
-                        left: Box::new(left?),
-                        right: Box::new(right?),
+                },
+                Rule::sub => {
+                    let left = left.context("...while transpiling left-hand side of `sub` expression")?;
+                    let right = right.context("...while transpiling right-hand side of `sub` expression")?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Sub,
+                        inner: Box::new(SubExpr {
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        })
                     })
-                }),
-                Rule::mult => Ok(Expr {
-                    enum_variant: ExprEnum::Mult,
-                    inner: Box::new(MultExpr {
-                        left: Box::new(left?),
-                        right: Box::new(right?),
+                },
+                Rule::mult => {
+                    let left = left.context("...while transpiling left-hand side of `mult` expression")?;
+                    let right = right.context("...while transpiling right-hand side of `mult` expression")?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Mult,
+                        inner: Box::new(MultExpr {
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        })
                     })
-                }),
-                Rule::div => Ok(Expr {
-                    enum_variant: ExprEnum::Div,
-                    inner: Box::new(DivExpr {
-                        left: Box::new(left?),
-                        right: Box::new(right?),
+                },
+                Rule::div => {
+                    let left = left.context("...while transpiling left-hand side of `div` expression")?;
+                    let right = right.context("...while transpiling right-hand side of `div` expression")?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Div,
+                        inner: Box::new(DivExpr {
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        })
                     })
-                }),
+                },
                 Rule::concat => {
-                    let left = left?;
-                    let right = right?;
+                    let left = left.context("...while transpiling left-hand side of `concat` expression")?;
+                    let right = right.context("...while transpiling right-hand side of `concat` expression")?;
 
                     // If left is already a Concat, extend its terms instead of nesting
                     if left.enum_variant == ExprEnum::Concat {
@@ -268,13 +230,17 @@ impl FromRule for Expr {
                         })
                     }
                 },
-                Rule::extract => Ok(Expr {
-                    enum_variant: ExprEnum::Extract,
-                    inner: Box::new(ExtractExpr {
-                        object: Box::new(left?),
-                        index: Box::new(right?),
+                Rule::extract => {
+                    let left = left.context("...while transpiling object of `extract` expression")?;
+                    let right = right.context("...while transpiling index of `extract` expression")?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Extract,
+                        inner: Box::new(ExtractExpr {
+                            object: Box::new(left),
+                            index: Box::new(right),
+                        })
                     })
-                }),
+                },
                 _ => bail!("Unexpected infix operator: {:?}", op.as_rule()),
             })
             .parse(pair.into_inner());
