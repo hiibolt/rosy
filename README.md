@@ -2,16 +2,192 @@
 
 A modern Rust implementation of a transpiler for the ROSY programming language, designed for scientific computing and beam physics applications.
 
-## Overview
+## What is Rosy?
 
-Rosy is a complete transpiler toolchain that converts ROSY source code to executable Rust programs. ROSY is a scientific programming language originally developed for the COSY INFINITY beam physics simulation environment, featuring:
+Rosy is a complete transpiler toolchain that converts ROSY source code into native executable Rust programs. ROSY is a scientific programming language originally developed for the COSY INFINITY beam physics simulation environment, now reimplemented as a modern transpiler with several key design decisions:
 
-- **Strong static typing** with types like `RE` (real), `ST` (string), `LO` (logical), `CM` (complex), and `VE` (vector)
-- **Procedures and functions** with parameter passing
-- **Control flow constructs** including `IF/ELSE`, `LOOP`, and `WHILE`
-- **Multi-dimensional arrays** with dynamic sizing
-- **Built-in mathematical operations** optimized for scientific computing
-- **Comprehensive type checking** at transpilation time
+**Transpilation, Not Interpretation**: Rather than executing scripts directly, Rosy generates self-contained Rust programs that compile to native binaries. This provides:
+- **Rust's memory safety guarantees** without runtime overhead
+- **Performance comparable to hand-written Rust** for numerical computing
+- **Zero runtime dependencies** - generated binaries are fully standalone
+- **Compile-time type checking** catches errors before execution
+
+**Registry-Based Type System**: All operators use a `TypeRule` registry as the single source of truth for:
+- Type compatibility validation during transpilation
+- Runtime dispatch to optimized implementations
+- Automatic test generation for comprehensive validation
+
+**Built for Scientific Computing**: Native support for:
+- **Differential Algebra (DA/CD types)** for automatic differentiation and Taylor series
+- **MPI parallelization** with built-in `PLOOP` constructs for distributed computing
+- **Multi-dimensional arrays** with arbitrary dimensions `(RE ** 2 ** 3)` 
+- **Complex numbers, vectors, and matrices** as first-class types
+- **Strong type safety** with compile-time checking of all operations
+
+**Test-Driven Development**: Every language feature is validated against COSY INFINITY's reference implementation through automated output comparison, ensuring behavioral compatibility.
+
+## Language Features & Syntax
+
+```rosy
+BEGIN;
+    {Function to compute factorial}
+    FUNCTION (RE) FACTORIAL N (RE);
+        VARIABLE (RE) result;
+        result := 1;
+        
+        LOOP i 1 N;
+            result := result * i;
+        ENDLOOP;
+        
+        FACTORIAL := result;
+    ENDFUNCTION;
+    
+    {Procedure demonstrating conditionals}
+    PROCEDURE CONDITIONAL_DEMO value (RE);
+        IF value > 10;
+            WRITE 6 "Value is large: " ST(value);
+        ELSEIF value > 5;
+            WRITE 6 "Value is medium: " ST(value);
+        ELSE;
+            WRITE 6 "Value is small: " ST(value);
+        ENDIF;
+    ENDPROCEDURE;
+    
+    {Procedure demonstrating vectors and arrays}
+    PROCEDURE VECTOR_DEMO;
+        VARIABLE (VE) vec;
+        VARIABLE (RE 2 3) matrix;  {2x3 matrix}
+        
+        {Concatenate values into vector}
+        vec := 1 & 2 & 3 & 4 & 5;
+        WRITE 6 "Vector: " ST(vec);
+        
+        {Access and assign array elements}
+        matrix[1, 2] := 42;
+        WRITE 6 "Matrix element: " ST(matrix[1, 2]);
+    ENDPROCEDURE;
+    
+    {Main entry point}
+    PROCEDURE RUN;
+        VARIABLE (RE) x;
+        x := 5;
+        
+        WRITE 6 "Factorial of " ST(x) " is " ST(FACTORIAL(x));
+        CONDITIONAL_DEMO(x);
+        VECTOR_DEMO;
+    ENDPROCEDURE;
+    
+    RUN;
+END;
+```
+
+### Key Language Features
+
+- **Strong Static Typing**: `(RE)` real, `(ST)` string, `(LO)` logical/boolean, `(CM)` complex, `(VE)` vector, `(DA)` differential algebra, `(CD)` complex DA
+- **Multi-dimensional Arrays**: `(RE 2 3 4)` declares a 2×3×4 array of reals
+- **Concatenation Operator**: `&` builds vectors from scalars: `1 & 2 & 3` creates a vector
+- **Extraction Operator**: `|` extracts vector length for iteration
+- **Type Conversion**: `ST()` converts to string, `CM()` to complex, `LO()` to logical
+- **Procedures & Functions**: Procedures have no return value, functions return typed values
+- **Comments**: `{This is a comment}` using curly braces
+- **Output**: `WRITE 6 <expr>+` writes to stdout (unit 6)
+
+## Installation
+
+### Prerequisites
+
+- **Rust toolchain** (1.70+): Install from [rustup.rs](https://rustup.rs/)
+- **(Optional) Nix**: For reproducible development environment with MPI support
+
+### Building from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/rosy.git
+cd rosy
+
+# Build the transpiler
+cargo build --release
+
+# The binary will be at target/release/rosy
+# Optionally, install to your PATH
+cargo install --path rosy
+```
+
+### Using Nix (Recommended for MPI features)
+
+```bash
+# Enter the development shell with all dependencies
+nix develop
+
+# Build and run normally
+cargo build --release
+```
+
+The Nix environment provides MPI libraries and LLVM required for full functionality.
+
+## Quick Start
+
+### Running a ROSY Script
+
+The quickest way to test a script is with `rosy run`:
+
+```bash
+# Run a script directly (compiled binary stays in .rosy_output/)
+rosy run examples/basic.rosy
+
+# Run with optimizations
+rosy run examples/basic.rosy --release
+
+# Use custom build directory
+rosy run examples/basic.rosy -d /tmp/my_build
+
+# Enable verbose logging
+RUST_LOG=info rosy run examples/basic.rosy
+```
+
+### Building an Executable
+
+To create a standalone binary:
+
+```bash
+# Build and copy binary to current directory
+rosy build examples/basic.rosy
+# Creates ./basic executable
+
+# Specify output name
+rosy build examples/basic.rosy -o my_program
+
+# Build with optimizations (slower compile, faster execution)
+rosy build examples/basic.rosy --release
+
+# Custom build directory
+rosy build examples/basic.rosy -d /tmp/build
+```
+
+### Workflow
+
+1. **Write** your ROSY source code (`.rosy` extension)
+2. **Transpile** with `rosy build script.rosy`
+3. **Execute** the generated binary `./script`
+
+The transpiler generates a complete Rust project in `.rosy_output/`, compiles it with cargo, and produces a self-contained executable.
+
+## Examples
+
+The `examples/` directory contains various demonstrations:
+
+- **`basic.rosy`** - Functions, procedures, loops, and vector operations
+- **`vectors_arrays.rosy`** - Multi-dimensional array indexing and manipulation
+- **`if_statements.rosy`** - Conditional branching with IF/ELSEIF/ELSE
+- **`da_test.rosy`** - Differential algebra for automatic differentiation
+- **`ploop.rosy`** - Parallel loops with MPI distribution
+- **`global_vars.rosy`** - Variable scoping and closure capture
+
+Run any example with:
+```bash
+rosy run examples/<example>.rosy
+```
 
 ## Project Structure
 
