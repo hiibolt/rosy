@@ -6,8 +6,14 @@ use crate::{
     transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput}
 };
 
-impl StatementFromRule for ReadStatement {
-    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
+#[derive(Debug)]
+pub struct ReadStatement {
+    pub unit: u8,
+    pub identifier: VariableIdentifier
+}
+
+impl FromRule for ReadStatement {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
         ensure!(pair.as_rule() == Rule::read, 
             "Expected `read` rule when building read statement, found: {:?}", pair.as_rule());
         
@@ -24,10 +30,7 @@ impl StatementFromRule for ReadStatement {
             .context("Missing second token `variable_identifier`!")?
         ).context("...while building variable identifier for read statement")?;
 
-        Ok(Some(Statement {
-            enum_variant: StatementEnum::Read,
-            inner: Box::new(ReadStatement { unit, identifier })
-        }))
+        Ok(Some(ReadStatement { unit, identifier }))
     }
 }
 

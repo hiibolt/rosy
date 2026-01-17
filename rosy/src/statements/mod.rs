@@ -10,3 +10,16 @@ pub mod function_call;
 pub mod procedure_call;
 pub mod function;
 pub mod procedure;
+
+pub use assign::AssignStatement;
+pub use var_decl::{VarDeclStatement, VariableDeclarationData};
+pub use write::WriteStatement;
+pub use read::ReadStatement;
+pub use da_init::DAInitStatement;
+pub use r#loop::LoopStatement;
+pub use ploop::PLoopStatement;
+pub use r#if::IfStatement;
+pub use function_call::FunctionCallStatement;
+pub use procedure_call::ProcedureCallStatement;
+pub use function::FunctionStatement;
+pub use procedure::ProcedureStatement;

@@ -2,11 +2,24 @@ use anyhow::{Result, Context, Error, anyhow, ensure};
 
 use crate::{
     ast::*,
+    rosy_lib::RosyType,
     transpile::{Transpile, TranspilationInputContext, TranspilationOutput, ScopedVariableData, VariableData, VariableScope}
 };
 
-impl StatementFromRule for VarDeclStatement {
-    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
+#[derive(Debug)]
+pub struct VariableDeclarationData {
+    pub name: String,
+    pub r#type: RosyType,
+    pub dimension_exprs: Vec<Expr>
+}
+
+#[derive(Debug)]
+pub struct VarDeclStatement {
+    pub data: VariableDeclarationData
+}
+
+impl FromRule for VarDeclStatement {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
         ensure!(pair.as_rule() == Rule::var_decl, 
             "Expected `var_decl` rule when building variable declaration, found: {:?}", pair.as_rule());
         
@@ -27,10 +40,7 @@ impl StatementFromRule for VarDeclStatement {
             dimension_exprs
         };
 
-        Ok(Some(Statement {
-            enum_variant: StatementEnum::VarDecl,
-            inner: Box::new(VarDeclStatement { data })
-        }))
+        Ok(Some(VarDeclStatement { data }))
     }
 }
 

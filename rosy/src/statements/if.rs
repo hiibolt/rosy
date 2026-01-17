@@ -7,8 +7,22 @@ use crate::{
     transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, indent}
 };
 
-impl StatementFromRule for IfStatement {
-    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
+#[derive(Debug)]
+pub struct IfStatement {
+    pub condition: Expr,
+    pub then_body: Vec<Statement>,
+    pub elseif_clauses: Vec<ElseIfClause>,
+    pub else_body: Option<Vec<Statement>>,
+}
+
+#[derive(Debug)]
+pub struct ElseIfClause {
+    pub condition: Expr,
+    pub body: Vec<Statement>,
+}
+
+impl FromRule for IfStatement {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
         ensure!(pair.as_rule() == Rule::if_statement, 
             "Expected `if_statement` rule when building if statement, found: {:?}", pair.as_rule());
         
@@ -94,10 +108,7 @@ impl StatementFromRule for IfStatement {
             }
         }
         
-        Ok(Some(Statement {
-            enum_variant: StatementEnum::If,
-            inner: Box::new(IfStatement { condition, then_body, elseif_clauses, else_body })
-        }))
+        Ok(Some(IfStatement { condition, then_body, elseif_clauses, else_body }))
     }
 }
 

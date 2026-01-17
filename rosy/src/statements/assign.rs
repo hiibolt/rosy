@@ -4,8 +4,14 @@ use crate::{ast::*, transpile::{TypeOf, VariableScope}};
 use super::super::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Context, Error, anyhow, ensure};
 
-impl StatementFromRule for AssignStatement {
-    fn from_rule(pair: pest::iterators::Pair<crate::ast::Rule>) -> Result<Option<Statement>> {
+#[derive(Debug)]
+pub struct AssignStatement {
+    pub identifier: VariableIdentifier,
+    pub value: Expr,
+}
+
+impl FromRule for AssignStatement {
+    fn from_rule(pair: pest::iterators::Pair<crate::ast::Rule>) -> Result<Option<Self>> {
         ensure!(pair.as_rule() == crate::ast::Rule::assignment, 
             "Expected `assignment` rule when building assignment statement, found: {:?}", pair.as_rule());
         let mut inner = pair.into_inner();
@@ -19,12 +25,9 @@ impl StatementFromRule for AssignStatement {
             .context("Missing second token `expr`!")?;
         let expr = build_expr(expr_pair)?;
 
-        Ok(Some(Statement {
-            enum_variant: StatementEnum::Assign,
-            inner: Box::new(AssignStatement { 
-                identifier,
-                value: expr
-            })
+        Ok(Some(AssignStatement { 
+            identifier,
+            value: expr
         }))
     }
 }

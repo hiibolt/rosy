@@ -7,8 +7,17 @@ use crate::{
     transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, ScopedVariableData, VariableData, VariableScope, indent}
 };
 
-impl StatementFromRule for LoopStatement {
-    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
+#[derive(Debug)]
+pub struct LoopStatement {
+    pub iterator: String,
+    pub start: Expr,
+    pub end: Expr,
+    pub step: Option<Expr>,
+    pub body: Vec<Statement>,
+}
+
+impl FromRule for LoopStatement {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
         ensure!(pair.as_rule() == Rule::r#loop, 
             "Expected `loop` rule when building loop statement, found: {:?}", pair.as_rule());
         
@@ -61,10 +70,7 @@ impl StatementFromRule for LoopStatement {
             }
         }
 
-        Ok(Some(Statement {
-            enum_variant: StatementEnum::Loop,
-            inner: Box::new(LoopStatement { iterator, start, end, step, body })
-        }))
+        Ok(Some(LoopStatement { iterator, start, end, step, body }))
     }
 }
 

@@ -6,8 +6,14 @@ use crate::{
     transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, VariableScope}
 };
 
-impl StatementFromRule for ProcedureCallStatement {
-    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
+#[derive(Debug)]
+pub struct ProcedureCallStatement {
+    pub name: String,
+    pub args: Vec<Expr>,
+}
+
+impl FromRule for ProcedureCallStatement {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
         ensure!(pair.as_rule() == Rule::procedure_call, 
             "Expected `procedure_call` rule when building procedure call statement, found: {:?}", pair.as_rule());
         
@@ -28,10 +34,7 @@ impl StatementFromRule for ProcedureCallStatement {
             args.push(expr);
         }
         
-        Ok(Some(Statement {
-            enum_variant: StatementEnum::ProcedureCall,
-            inner: Box::new(ProcedureCallStatement { name, args })
-        }))
+        Ok(Some(ProcedureCallStatement { name, args }))
     }
 }
 

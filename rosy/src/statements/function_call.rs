@@ -5,8 +5,14 @@ use crate::{
     transpile::{Transpile, TranspilationInputContext, TranspilationOutput, shared::function_call::function_call_transpile_helper}
 };
 
-impl StatementFromRule for FunctionCallStatement {
-    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
+#[derive(Debug)]
+pub struct FunctionCallStatement {
+    pub name: String,
+    pub args: Vec<Expr>,
+}
+
+impl FromRule for FunctionCallStatement {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
         ensure!(pair.as_rule() == Rule::function_call, 
             "Expected `function_call` rule when building function call statement, found: {:?}", pair.as_rule());
         
@@ -27,10 +33,7 @@ impl StatementFromRule for FunctionCallStatement {
             args.push(expr);
         }
 
-        Ok(Some(Statement {
-            enum_variant: StatementEnum::FunctionCall,
-            inner: Box::new(FunctionCallStatement { name, args })
-        }))
+        Ok(Some(FunctionCallStatement { name, args }))
     }
 }
 

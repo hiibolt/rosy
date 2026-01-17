@@ -5,8 +5,14 @@ use crate::{
     transpile::{Transpile, TranspilationInputContext, TranspilationOutput}
 };
 
-impl StatementFromRule for DAInitStatement {
-    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
+#[derive(Debug)]
+pub struct DAInitStatement {
+    pub order: Expr,
+    pub number_of_variables: Expr,
+}
+
+impl FromRule for DAInitStatement {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
         ensure!(pair.as_rule() == Rule::daini, 
             "Expected `daini` rule when building DA init, found: {:?}", pair.as_rule());
         
@@ -24,12 +30,9 @@ impl StatementFromRule for DAInitStatement {
         let num_vars_expr = build_expr(num_vars_pair)
             .context("Failed to build number of variables expression in DAINI statement!")?;
         
-        Ok(Some(Statement {
-            enum_variant: StatementEnum::DAInit,
-            inner: Box::new(DAInitStatement {
-                order: order_expr,
-                number_of_variables: num_vars_expr,
-            })
+        Ok(Some(DAInitStatement {
+            order: order_expr,
+            number_of_variables: num_vars_expr,
         }))
     }
 }

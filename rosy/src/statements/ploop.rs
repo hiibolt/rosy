@@ -7,8 +7,18 @@ use crate::{
     transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, ScopedVariableData, VariableData, VariableScope, indent}
 };
 
-impl StatementFromRule for PLoopStatement {
-    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
+#[derive(Debug)]
+pub struct PLoopStatement {
+    pub iterator: String,
+    pub start: Expr,
+    pub end: Expr,
+    pub body: Vec<Statement>,
+    pub commutivity_rule: Option<u8>,
+    pub output: VariableIdentifier
+}
+
+impl FromRule for PLoopStatement {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
         ensure!(pair.as_rule() == Rule::ploop, 
             "Expected `ploop` rule when building ploop statement, found: {:?}", pair.as_rule());
         
@@ -82,16 +92,13 @@ impl StatementFromRule for PLoopStatement {
             }
         };
 
-        Ok(Some(Statement {
-            enum_variant: StatementEnum::PLoop,
-            inner: Box::new(PLoopStatement {
-                iterator,
-                start,
-                end,
-                commutivity_rule,
-                body,
-                output
-            })
+        Ok(Some(PLoopStatement {
+            iterator,
+            start,
+            end,
+            commutivity_rule,
+            body,
+            output
         }))
     }
 }

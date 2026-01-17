@@ -3,11 +3,20 @@ use anyhow::{Result, Context, Error, anyhow, ensure};
 
 use crate::{
     ast::*,
+    rosy_lib::RosyType,
     transpile::{Transpile, TranspilationInputContext, TranspilationOutput, VariableData, TranspilationInputFunctionContext, ScopedVariableData, VariableScope, indent}
 };
 
-impl StatementFromRule for FunctionStatement {
-    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
+#[derive(Debug)]
+pub struct FunctionStatement {
+    pub name: String,
+    pub args: Vec<VariableDeclarationData>,
+    pub return_type: RosyType,
+    pub body: Vec<Statement>
+}
+
+impl FromRule for FunctionStatement {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
         ensure!(pair.as_rule() == Rule::function, 
             "Expected `function` rule when building function statement, found: {:?}", pair.as_rule());
         
@@ -87,10 +96,7 @@ impl StatementFromRule for FunctionStatement {
             statements
         };
 
-        Ok(Some(Statement {
-            enum_variant: StatementEnum::Function,
-            inner: Box::new(FunctionStatement { name, args, return_type, body })
-        }))
+        Ok(Some(FunctionStatement { name, args, return_type, body }))
     }
 }
 

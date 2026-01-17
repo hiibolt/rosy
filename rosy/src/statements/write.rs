@@ -6,8 +6,14 @@ use crate::{
     transpile::{Transpile, TranspilationInputContext, TranspilationOutput, add_context_to_all, shared::string_convert::string_convert_transpile_helper}
 };
 
-impl StatementFromRule for WriteStatement {
-    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
+#[derive(Debug)]
+pub struct WriteStatement {
+    pub unit: u8,
+    pub exprs: Vec<Expr>,
+}
+
+impl FromRule for WriteStatement {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
         ensure!(pair.as_rule() == Rule::write, 
             "Expected `write` rule when building write statement, found: {:?}", pair.as_rule());
         
@@ -33,10 +39,7 @@ impl StatementFromRule for WriteStatement {
             exprs
         };
 
-        Ok(Some(Statement {
-            enum_variant: StatementEnum::Write,
-            inner: Box::new(WriteStatement { unit, exprs })
-        }))
+        Ok(Some(WriteStatement { unit, exprs }))
     }
 }
 

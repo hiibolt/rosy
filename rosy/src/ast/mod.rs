@@ -26,8 +26,8 @@ lazy_static::lazy_static! {
     };
 }
 
-pub trait StatementFromRule {
-    fn from_rule ( pair: pest::iterators::Pair<Rule> ) -> Result<Option<Statement>>;
+pub trait FromRule: Sized {
+    fn from_rule ( pair: pest::iterators::Pair<Rule> ) -> Result<Option<Self>>;
 }
 
 #[derive(Debug)]
@@ -35,88 +35,22 @@ pub struct Program {
     pub statements: Vec<Statement>,
 }
 
-#[derive(Debug)]
-pub struct VariableDeclarationData {
-    pub name: String,
-    pub r#type: RosyType,
-    pub dimension_exprs: Vec<Expr>
-}
-#[derive(Debug)]
-pub struct VarDeclStatement {
-    pub data: VariableDeclarationData
-}
-#[derive(Debug)]
-pub struct ProcedureStatement {
-    pub name: String,
-    pub args: Vec<VariableDeclarationData>,
-    pub body: Vec<Statement>
-}
-#[derive(Debug)]
-pub struct FunctionStatement {
-    pub name: String,
-    pub args: Vec<VariableDeclarationData>,
-    pub return_type: RosyType,
-    pub body: Vec<Statement>
-}
+// Re-export statement structs from the statements module
+pub use crate::statements::{
+    VariableDeclarationData, VarDeclStatement,
+    WriteStatement, ReadStatement, AssignStatement,
+    DAInitStatement, LoopStatement, PLoopStatement,
+    IfStatement,
+    FunctionCallStatement, ProcedureCallStatement,
+    FunctionStatement, ProcedureStatement
+};
+
 #[derive(Debug, PartialEq)]
 pub struct VariableIdentifier {
     pub name: String,
     pub indicies: Vec<Expr>
 }
-#[derive(Debug)]
-pub struct AssignStatement {
-    pub identifier: VariableIdentifier,
-    pub value: Expr,
-}
-#[derive(Debug)]
-pub struct WriteStatement {
-    pub unit: u8,
-    pub exprs: Vec<Expr>,
-}
-#[derive(Debug)]
-pub struct FunctionCallStatement {
-    pub name: String,
-    pub args: Vec<Expr>,
-}
-#[derive(Debug)]
-pub struct ProcedureCallStatement {
-    pub name: String,
-    pub args: Vec<Expr>,
-}
-#[derive(Debug)]
-pub struct LoopStatement {
-    pub iterator: String,
-    pub start: Expr,
-    pub end: Expr,
-    pub step: Option<Expr>,
-    pub body: Vec<Statement>,
-}
-#[derive(Debug)]
-pub struct IfStatement {
-    pub condition: Expr,
-    pub then_body: Vec<Statement>,
-    pub elseif_clauses: Vec<ElseIfClause>,
-    pub else_body: Option<Vec<Statement>>,
-}
-#[derive(Debug)]
-pub struct ReadStatement {
-    pub unit: u8,
-    pub identifier: VariableIdentifier
-}
-#[derive(Debug)]
-pub struct PLoopStatement {
-    pub iterator: String,
-    pub start: Expr,
-    pub end: Expr,
-    pub body: Vec<Statement>,
-    pub commutivity_rule: Option<u8>,
-    pub output: VariableIdentifier
-}
-#[derive(Debug)]
-pub struct DAInitStatement {
-    pub order: Expr,
-    pub number_of_variables: Expr,
-}
+
 #[derive(Debug)]
 pub struct Statement {
     pub enum_variant: StatementEnum,
@@ -136,12 +70,6 @@ pub enum StatementEnum {
     Loop,
     PLoop,
     If,
-}
-
-#[derive(Debug)]
-pub struct ElseIfClause {
-    pub condition: Expr,
-    pub body: Vec<Statement>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -280,18 +208,78 @@ pub fn build_statement (
     pair: pest::iterators::Pair<Rule>
 ) -> Result<Option<Statement>> {
     match pair.as_rule() {
-        Rule::daini => DAInitStatement::from_rule(pair).context("...while building DA initialization statement!"),
-        Rule::var_decl => VarDeclStatement::from_rule(pair).context("...while building variable declaration!"),
-        Rule::write => WriteStatement::from_rule(pair).context("...while building write statement!"),
-        Rule::read => ReadStatement::from_rule(pair).context("...while building read statement!"),
-        Rule::assignment => AssignStatement::from_rule(pair).context("...while building assignment statement!"),
-        Rule::r#loop => LoopStatement::from_rule(pair).context("...while building loop statement!"),
-        Rule::ploop => PLoopStatement::from_rule(pair).context("...while building ploop statement!"),
-        Rule::procedure => ProcedureStatement::from_rule(pair).context("...while building procedure declaration!"),
-        Rule::procedure_call => ProcedureCallStatement::from_rule(pair).context("...while building procedure call!"),
-        Rule::function => FunctionStatement::from_rule(pair).context("...while building function declaration!"),
-        Rule::function_call => FunctionCallStatement::from_rule(pair).context("...while building function call!"),
-        Rule::if_statement => IfStatement::from_rule(pair).context("...while building if statement!"),
+        Rule::daini => DAInitStatement::from_rule(pair)
+            .context("...while building DA initialization statement!")
+            .map(|opt| opt.map(|stmt| Statement {
+                enum_variant: StatementEnum::DAInit,
+                inner: Box::new(stmt)
+            })),
+        Rule::var_decl => VarDeclStatement::from_rule(pair)
+            .context("...while building variable declaration!")
+            .map(|opt| opt.map(|stmt| Statement {
+                enum_variant: StatementEnum::VarDecl,
+                inner: Box::new(stmt)
+            })),
+        Rule::write => WriteStatement::from_rule(pair)
+            .context("...while building write statement!")
+            .map(|opt| opt.map(|stmt| Statement {
+                enum_variant: StatementEnum::Write,
+                inner: Box::new(stmt)
+            })),
+        Rule::read => ReadStatement::from_rule(pair)
+            .context("...while building read statement!")
+            .map(|opt| opt.map(|stmt| Statement {
+                enum_variant: StatementEnum::Read,
+                inner: Box::new(stmt)
+            })),
+        Rule::assignment => AssignStatement::from_rule(pair)
+            .context("...while building assignment statement!")
+            .map(|opt| opt.map(|stmt| Statement {
+                enum_variant: StatementEnum::Assign,
+                inner: Box::new(stmt)
+            })),
+        Rule::r#loop => LoopStatement::from_rule(pair)
+            .context("...while building loop statement!")
+            .map(|opt| opt.map(|stmt| Statement {
+                enum_variant: StatementEnum::Loop,
+                inner: Box::new(stmt)
+            })),
+        Rule::ploop => PLoopStatement::from_rule(pair)
+            .context("...while building ploop statement!")
+            .map(|opt| opt.map(|stmt| Statement {
+                enum_variant: StatementEnum::PLoop,
+                inner: Box::new(stmt)
+            })),
+        Rule::procedure => ProcedureStatement::from_rule(pair)
+            .context("...while building procedure declaration!")
+            .map(|opt| opt.map(|stmt| Statement {
+                enum_variant: StatementEnum::Procedure,
+                inner: Box::new(stmt)
+            })),
+        Rule::procedure_call => ProcedureCallStatement::from_rule(pair)
+            .context("...while building procedure call!")
+            .map(|opt| opt.map(|stmt| Statement {
+                enum_variant: StatementEnum::ProcedureCall,
+                inner: Box::new(stmt)
+            })),
+        Rule::function => FunctionStatement::from_rule(pair)
+            .context("...while building function declaration!")
+            .map(|opt| opt.map(|stmt| Statement {
+                enum_variant: StatementEnum::Function,
+                inner: Box::new(stmt)
+            })),
+        Rule::function_call => FunctionCallStatement::from_rule(pair)
+            .context("...while building function call!")
+            .map(|opt| opt.map(|stmt| Statement {
+                enum_variant: StatementEnum::FunctionCall,
+                inner: Box::new(stmt)
+            })),
+        Rule::if_statement => IfStatement::from_rule(pair)
+            .context("...while building if statement!")
+            .map(|opt| opt.map(|stmt| Statement {
+                enum_variant: StatementEnum::If,
+                inner: Box::new(stmt)
+            })),
 
         // Ignored
         Rule::begin | Rule::end | Rule::EOI | Rule::end_procedure | 

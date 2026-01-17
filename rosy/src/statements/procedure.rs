@@ -6,8 +6,15 @@ use crate::{
     transpile::{Transpile, TranspilationInputContext, TranspilationOutput, VariableData, TranspilationInputProcedureContext, ScopedVariableData, VariableScope, indent}
 };
 
-impl StatementFromRule for ProcedureStatement {
-    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
+#[derive(Debug)]
+pub struct ProcedureStatement {
+    pub name: String,
+    pub args: Vec<VariableDeclarationData>,
+    pub body: Vec<Statement>
+}
+
+impl FromRule for ProcedureStatement {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
         ensure!(pair.as_rule() == Rule::procedure, 
             "Expected `procedure` rule when building procedure statement, found: {:?}", pair.as_rule());
         
@@ -71,10 +78,7 @@ impl StatementFromRule for ProcedureStatement {
             statements
         };
 
-        Ok(Some(Statement {
-            enum_variant: StatementEnum::Procedure,
-            inner: Box::new(ProcedureStatement { name, args, body })
-        }))
+        Ok(Some(ProcedureStatement { name, args, body }))
     }
 }
 
