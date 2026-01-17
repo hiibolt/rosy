@@ -1,8 +1,9 @@
-use crate::ast::*;
+use crate::{ast::*, transpile::TranspileWithType};
 use super::super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, VariableScope, };
 use anyhow::{Result, Context, Error};
 use crate::rosy_lib::RosyType;
 
+impl TranspileWithType for VarExpr {}
 impl TypeOf for VarExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         self.identifier.type_of(context)

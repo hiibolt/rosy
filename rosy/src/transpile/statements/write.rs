@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::ast::*;
+use crate::{ast::*, transpile::{add_context_to_all, shared::string_convert::string_convert_transpile_helper}};
 use super::super::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error, anyhow};
 
@@ -10,17 +10,16 @@ impl Transpile for WriteStatement {
         let mut serialized_exprs = Vec::new();
         let mut requested_variables = BTreeSet::new();
         for expr in &self.exprs {
-            // Second, transpile the expression
-            let expr_as_st = Expr::StringConvert(StringConvertExpr { 
-                expr: Box::new(expr.clone()) 
-            });
             let TranspilationOutput {
                 serialization: serialized_expr,
                 requested_variables: expr_requested_variables
-            } = expr_as_st.transpile(context)
-                .map_err(|e| e.into_iter().map(|err| {
-                    err.context("...while transpiling expression in WRITE statement")
-                }).collect::<Vec<Error>>())?;
+            } = string_convert_transpile_helper(expr, context)
+                .map_err(|err_vec| {
+                    add_context_to_all(err_vec, format!(
+                        "...while transpiling expression '{:?}' for WRITE statement", expr
+                    ))
+                })?;
+
             serialized_exprs.push(serialized_expr);
             requested_variables.extend(expr_requested_variables);
         }

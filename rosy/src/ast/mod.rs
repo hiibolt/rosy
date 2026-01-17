@@ -3,7 +3,7 @@ mod statements;
 use pest::pratt_parser::PrattParser;
 use pest_derive::Parser;
 use anyhow::{bail, ensure, Context, Result};
-use crate::rosy_lib::{RosyBaseType, RosyType};
+use crate::{rosy_lib::{RosyBaseType, RosyType}, transpile::TranspileWithType};
 
 #[derive(Parser)]
 #[grammar = "../assets/rosy.pest"]
@@ -33,30 +33,30 @@ pub struct Program {
     pub statements: Vec<Statement>,
 }
 
-#[derive(Debug, Clone)]
-pub struct VariableData {
+#[derive(Debug)]
+pub struct VariableDeclarationData {
     pub name: String,
     pub r#type: RosyType,
     pub dimension_exprs: Vec<Expr>
 }
 #[derive(Debug)]
 pub struct VarDeclStatement {
-    pub data: VariableData
+    pub data: VariableDeclarationData
 }
 #[derive(Debug)]
 pub struct ProcedureStatement {
     pub name: String,
-    pub args: Vec<VariableData>,
+    pub args: Vec<VariableDeclarationData>,
     pub body: Vec<Statement>
 }
 #[derive(Debug)]
 pub struct FunctionStatement {
     pub name: String,
-    pub args: Vec<VariableData>,
+    pub args: Vec<VariableDeclarationData>,
     pub return_type: RosyType,
     pub body: Vec<Statement>
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct VariableIdentifier {
     pub name: String,
     pub indicies: Vec<Expr>
@@ -137,87 +137,98 @@ pub struct ElseIfClause {
     pub body: Vec<Statement>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct ConcatExpr {
     pub terms: Vec<Expr>
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct ExtractExpr {
     pub object: Box<Expr>,
     pub index: Box<Expr>,
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct ComplexExpr {
     pub expr: Box<Expr>,
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct VarExpr {
     pub identifier: VariableIdentifier,
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct AddExpr {
     pub left: Box<Expr>,
     pub right: Box<Expr>,
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct SubExpr {
     pub left: Box<Expr>,
     pub right: Box<Expr>,
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct MultExpr {
     pub left: Box<Expr>,
     pub right: Box<Expr>,
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct DivExpr {
     pub left: Box<Expr>,
     pub right: Box<Expr>,
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct StringConvertExpr {
     pub expr: Box<Expr>,
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct LogicalConvertExpr {
     pub expr: Box<Expr>,
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct DAExpr {
     pub index: Box<Expr>,
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct LengthExpr {
     pub expr: Box<Expr>,
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct SinExpr {
     pub expr: Box<Expr>,
 }
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct FunctionCallExpr {
     pub name: String,
     pub args: Vec<Expr>,
 }
-#[derive(Debug, Clone, PartialEq)]
-pub enum Expr {
-    Number(f64),
-    String(String),
-    Boolean(bool),
-    Var(VarExpr),
-    Add(AddExpr),
-    Sub(SubExpr),
-    Mult(MultExpr),
-    Div(DivExpr),
-    Concat(ConcatExpr),
-    Extract(ExtractExpr),
-    Complex(ComplexExpr),
-    StringConvert(StringConvertExpr),
-    LogicalConvert(LogicalConvertExpr),
-    DA(DAExpr),
-    Length(LengthExpr),
-    Sin(SinExpr),
-    FunctionCall(FunctionCallExpr),
+
+#[derive(Debug)]
+pub struct Expr {
+    pub enum_variant: ExprEnum,
+    pub inner: Box<dyn TranspileWithType + 'static>,
+}
+impl PartialEq for Expr {
+    fn eq(&self, other: &Self) -> bool {
+        self.enum_variant == other.enum_variant
+    }
+}
+#[derive(Debug, PartialEq)]
+pub enum ExprEnum {
+    Number,
+    String,
+    Boolean,
+    Var,
+    Add,
+    Sub,
+    Mult,
+    Div,
+    Concat,
+    Extract,
+    Complex,
+    StringConvert,
+    LogicalConvert,
+    DA,
+    Length,
+    Sin,
+    FunctionCall,
 }
 
 fn build_type (pair: pest::iterators::Pair<Rule>) -> Result<(RosyType, Vec<Expr>)> {
@@ -313,10 +324,13 @@ fn build_variable_identifier(pair: pest::iterators::Pair<Rule>) -> Result<Variab
 fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
-            Rule::variable_identifier => Ok(Expr::Var(VarExpr {
-                identifier: build_variable_identifier(primary)
-                    .context("Failed to build variable identifier!")?
-            })),
+            Rule::variable_identifier => Ok(Expr {
+                enum_variant: ExprEnum::Var,
+                inner: Box::new(VarExpr {
+                    identifier: build_variable_identifier(primary)
+                        .context("Failed to build variable identifier!")?
+                })
+            }),
             Rule::function_call => {
                 let mut inner = primary.into_inner();
                 let name = inner.next()
@@ -337,11 +351,17 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                     args
                 };
 
-                Ok(Expr::FunctionCall(FunctionCallExpr { name, args }))
+                Ok(Expr {
+                    enum_variant: ExprEnum::FunctionCall,
+                    inner: Box::new(FunctionCallExpr { name, args })
+                })
             },
             Rule::number => {
                 let n = primary.as_str().parse::<f64>()?;
-                Ok(Expr::Number(n))
+                Ok(Expr {
+                    enum_variant: ExprEnum::Number,
+                    inner: Box::new(n)
+                })
             }
             Rule::boolean => {
                 let b = match primary.as_str() {
@@ -349,55 +369,79 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
                     "FALSE" => false,
                     _ => bail!("Unexpected boolean value: {}", primary.as_str()),
                 };
-                Ok(Expr::Boolean(b))
+                Ok(Expr {
+                    enum_variant: ExprEnum::Boolean,
+                    inner: Box::new(b)
+                })
             },
             Rule::string => {
                 let s = primary.as_str();
                 // Remove the surrounding quotes
                 let s = &s[1..s.len()-1];
-                Ok(Expr::String(s.to_string()))
+                Ok(Expr {
+                    enum_variant: ExprEnum::String,
+                    inner: Box::new(s.to_string())
+                })
             },
             Rule::cm => {
                 let mut inner = primary.into_inner();
                 let expr_pair = inner.next()
                     .context("Missing inner expression for `CM`!")?;
                 let expr = Box::new(build_expr(expr_pair)?);
-                Ok(Expr::Complex(ComplexExpr { expr }))
+                Ok(Expr {
+                    enum_variant: ExprEnum::Complex,
+                    inner: Box::new(ComplexExpr { expr })
+                })
             },
             Rule::st => {
                 let mut inner = primary.into_inner();
                 let expr_pair = inner.next()
                     .context("Missing inner expression for `ST`!")?;
                 let expr = Box::new(build_expr(expr_pair)?);
-                Ok(Expr::StringConvert(StringConvertExpr { expr }))
+                Ok(Expr {
+                    enum_variant: ExprEnum::StringConvert,
+                    inner: Box::new(StringConvertExpr { expr })
+                })
             },
             Rule::lo => {
                 let mut inner = primary.into_inner();
                 let expr_pair = inner.next()
                     .context("Missing inner expression for `LO`!")?;
                 let expr = Box::new(build_expr(expr_pair)?);
-                Ok(Expr::LogicalConvert(LogicalConvertExpr { expr }))
+                Ok(Expr {
+                    enum_variant: ExprEnum::LogicalConvert,
+                    inner: Box::new(LogicalConvertExpr { expr })
+                })
             },
             Rule::da => {
                 let mut inner = primary.into_inner();
                 let expr_pair = inner.next()
                     .context("Missing inner expression for `DA`!")?;
                 let index = Box::new(build_expr(expr_pair)?);
-                Ok(Expr::DA(DAExpr { index }))
+                Ok(Expr {
+                    enum_variant: ExprEnum::DA,
+                    inner: Box::new(DAExpr { index })
+                })
             },
             Rule::length => {
                 let mut inner = primary.into_inner();
                 let expr_pair = inner.next()
                     .context("Missing inner expression for `LENGTH`!")?;
                 let expr = Box::new(build_expr(expr_pair)?);
-                Ok(Expr::Length(LengthExpr { expr }))
+                Ok(Expr {
+                    enum_variant: ExprEnum::Length,
+                    inner: Box::new(LengthExpr { expr })
+                })
             },
             Rule::sin => {
                 let mut inner = primary.into_inner();
                 let expr_pair = inner.next()
                     .context("Missing inner expression for `SIN`!")?;
                 let expr = Box::new(build_expr(expr_pair)?);
-                Ok(Expr::Sin(SinExpr { expr }))
+                Ok(Expr {
+                    enum_variant: ExprEnum::Sin,
+                    inner: Box::new(SinExpr { expr })
+                })
             },
             Rule::expr => build_expr(primary),
             _ => bail!("Unexpected primary expr: {:?}", primary.as_rule()),
@@ -407,39 +451,67 @@ fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
             op,
             right
         | match op.as_rule() {
-            Rule::add => Ok(Expr::Add(AddExpr {
-                left: Box::new(left?),
-                right: Box::new(right?),
-            })),
-            Rule::sub => Ok(Expr::Sub(SubExpr {
-                left: Box::new(left?),
-                right: Box::new(right?),
-            })),
-            Rule::mult => Ok(Expr::Mult(MultExpr {
-                left: Box::new(left?),
-                right: Box::new(right?),
-            })),
-            Rule::div => Ok(Expr::Div(DivExpr {
-                left: Box::new(left?),
-                right: Box::new(right?),
-            })),
+            Rule::add => Ok(Expr {
+                enum_variant: ExprEnum::Add,
+                inner: Box::new(AddExpr {
+                    left: Box::new(left?),
+                    right: Box::new(right?),
+                })
+            }),
+            Rule::sub => Ok(Expr {
+                enum_variant: ExprEnum::Sub,
+                inner: Box::new(SubExpr {
+                    left: Box::new(left?),
+                    right: Box::new(right?),
+                })
+            }),
+            Rule::mult => Ok(Expr {
+                enum_variant: ExprEnum::Mult,
+                inner: Box::new(MultExpr {
+                    left: Box::new(left?),
+                    right: Box::new(right?),
+                })
+            }),
+            Rule::div => Ok(Expr {
+                enum_variant: ExprEnum::Div,
+                inner: Box::new(DivExpr {
+                    left: Box::new(left?),
+                    right: Box::new(right?),
+                })
+            }),
             Rule::concat => {
                 let left = left?;
                 let right = right?;
 
-                let terms = if let Expr::Concat(ConcatExpr { mut terms }) = left {
-                    terms.push(right);
-                    terms
+                // If left is already a Concat, extend its terms instead of nesting
+                if left.enum_variant == ExprEnum::Concat {
+                    // Downcast through Any trait to take ownership of the ConcatExpr
+                    let left_any: Box<dyn std::any::Any> = left.inner;
+                    if let Ok(concat_expr) = left_any.downcast::<ConcatExpr>() {
+                        let mut terms = concat_expr.terms;
+                        terms.push(right);
+                        Ok(Expr {
+                            enum_variant: ExprEnum::Concat,
+                            inner: Box::new(ConcatExpr { terms })
+                        })
+                    } else {
+                        bail!("Failed to downcast Concat expression - internal inconsistency")
+                    }
                 } else {
-                    vec![left, right]
-                };
-
-                Ok(Expr::Concat(ConcatExpr { terms }))
+                    let terms = vec![left, right];
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Concat,
+                        inner: Box::new(ConcatExpr { terms })
+                    })
+                }
             },
-            Rule::extract => Ok(Expr::Extract(ExtractExpr {
-                object: Box::new(left?),
-                index: Box::new(right?),
-            })),
+            Rule::extract => Ok(Expr {
+                enum_variant: ExprEnum::Extract,
+                inner: Box::new(ExtractExpr {
+                    object: Box::new(left?),
+                    index: Box::new(right?),
+                })
+            }),
             _ => bail!("Unexpected infix operator: {:?}", op.as_rule()),
         })
         .parse(pair.into_inner())

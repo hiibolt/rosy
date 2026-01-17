@@ -1,10 +1,11 @@
 mod expr;
 mod core;
 mod statements;
+mod shared;
 
 use crate::ast::*;
-use std::collections::{BTreeSet, HashMap};
-use anyhow::{Result, Context, Error};
+use std::{any::Any, collections::{BTreeSet, HashMap}};
+use anyhow::{Result, Error};
 use crate::rosy_lib::RosyType;
 
 fn indent ( st: String ) -> String {
@@ -19,6 +20,7 @@ fn add_context_to_all ( arr: Vec<Error>, context: String ) -> Vec<Error> {
         .collect()
 }
 
+pub trait TranspileWithType: Transpile + TypeOf + Send + Sync + std::fmt::Debug + Any + 'static {}
 pub trait TypeOf {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType>;
 }
@@ -40,39 +42,7 @@ impl TypeOf for VariableIdentifier {
 }
 impl TypeOf for Expr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
-        Ok(match self {
-            Expr::Number(_) => RosyType::RE(),
-            Expr::String(_) => RosyType::ST(),
-            Expr::Boolean(_) => RosyType::LO(),
-            Expr::Var(var_expr) => var_expr.type_of(context)
-                .context(format!("...while determining type of variable identifier '{}'", var_expr.identifier.name))?,
-            Expr::Add(add_expr) => add_expr.type_of(context)
-                .context("...while determining type of addition expression")?,
-            Expr::Sub(sub_expr) => sub_expr.type_of(context)
-                .context("...while determining type of subtraction expression")?,
-            Expr::Mult(mult_expr) => mult_expr.type_of(context)
-                .context("...while determining type of multiplication expression")?,
-            Expr::Div(div_expr) => div_expr.type_of(context)
-                .context("...while determining type of division expression")?,
-            Expr::StringConvert(string_convert_expr) => string_convert_expr.type_of(context)
-                .context("...while determining type of string conversion expression")?,
-            Expr::LogicalConvert(logical_convert_expr) => logical_convert_expr.type_of(context)
-                .context("...while determining type of logical conversion expression")?,
-            Expr::FunctionCall(function_call_expr) => function_call_expr.type_of(context)
-                .context(format!("...while determining type of function call expression to '{}'", function_call_expr.name))?,
-            Expr::Concat(concat_expr) => concat_expr.type_of(context)
-                .context("...while determining type of concatention expression")?,
-            Expr::Extract(extract_expr) => extract_expr.type_of(context)
-                .context("...while determining type of extraction expression")?,
-            Expr::Complex(complex_expr) => complex_expr.type_of(context)
-                .context("...while determining type of complex conversion expression")?,
-            Expr::DA(da_expr) => da_expr.type_of(context)
-                .context("...while determining type of DA expression")?,
-            Expr::Length(length_expr) => length_expr.type_of(context)
-                .context("...while determining type of LENGTH expression")?,
-            Expr::Sin(sin_expr) => sin_expr.type_of(context)
-                .context("...while determining type of SIN expression")?,
-        })
+        self.inner.type_of(context)
     }
 }
 
@@ -81,6 +51,12 @@ pub enum VariableScope {
     Local,
     Arg,
     Higher
+}
+#[derive(Debug, Clone)]
+pub struct VariableData {
+    pub name: String,
+    pub r#type: RosyType,
+    pub total_dimensions: usize
 }
 #[derive(Debug, Clone)]
 pub struct ScopedVariableData {
@@ -98,7 +74,7 @@ pub struct TranspilationInputProcedureContext {
     pub args: Vec<VariableData>,
     pub requested_variables: BTreeSet<String>
 }
-#[derive(Clone, Default)]
+#[derive(Default, Clone)]
 pub struct TranspilationInputContext {
     pub variables:  HashMap<String, ScopedVariableData>,
     pub functions:  HashMap<String, TranspilationInputFunctionContext>,

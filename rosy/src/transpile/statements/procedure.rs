@@ -1,18 +1,24 @@
 use std::collections::BTreeSet;
 
 use crate::{ast::*};
-use super::super::{Transpile, TranspilationInputContext, TranspilationOutput, TranspilationInputProcedureContext, ScopedVariableData, VariableScope, indent};
+use super::super::{Transpile, TranspilationInputContext, VariableData, TranspilationInputProcedureContext, TranspilationOutput, ScopedVariableData, VariableScope, indent};
 use anyhow::{Result, Error, anyhow};
 
 
 impl Transpile for ProcedureStatement {
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         // Insert the procedure signature, but check it doesn't already exist
-        if context.functions.contains_key(&self.name) ||
+        if context.functions.contains_key(&self.name) || 
             matches!(context.procedures.insert(
                 self.name.clone(),
                 TranspilationInputProcedureContext {
-                    args: self.args.clone(),
+                    args: self.args.iter()
+                        .map(|arg| VariableData {
+                            name: arg.name.clone(),
+                            r#type: arg.r#type.clone(),
+                            total_dimensions: arg.dimension_exprs.len(),
+                        })
+                        .collect(),
                     requested_variables: BTreeSet::new()
                 }
             ), Some(_))
@@ -36,7 +42,11 @@ impl Transpile for ProcedureStatement {
         for arg in &self.args {
             if matches!(inner_context.variables.insert(arg.name.clone(), ScopedVariableData {
                 scope: VariableScope::Arg,
-                data: arg.clone()
+                data: VariableData {
+                    name: arg.name.clone(),
+                    r#type: arg.r#type.clone(),
+                    total_dimensions: arg.dimension_exprs.len(),
+                }
             }), Some(_)) {
                 errors.push(anyhow!("Argument '{}' is already defined!", arg.name));
             }

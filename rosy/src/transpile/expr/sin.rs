@@ -1,9 +1,10 @@
 use crate::ast::SinExpr;
-use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
 use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
 use std::collections::BTreeSet;
 
+impl TranspileWithType for SinExpr {}
 impl Transpile for SinExpr {
     fn transpile(
         &self,
@@ -28,7 +29,6 @@ impl Transpile for SinExpr {
         })
     }
 }
-
 impl TypeOf for SinExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         use crate::rosy_lib::intrinsics::sin;

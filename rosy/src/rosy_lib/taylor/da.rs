@@ -382,7 +382,8 @@ impl<T: DACoefficient> Mul<&DA<T>> for &DA<T> {
                 
                 // Only include terms within the truncation order
                 if product_monomial.within_order(config.max_order) {
-                    *result.entry(product_monomial).or_insert(T::zero()) += c1 * c2;
+                    *result.entry(product_monomial)
+                        .or_insert(T::zero()) += c1 * c2;
                 }
             }
         }

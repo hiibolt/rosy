@@ -1,6 +1,6 @@
 use anyhow::{Result, Context};
 
-use super::super::{Rule, Statement, VariableData, VarDeclStatement, build_type};
+use super::super::{Rule, Statement, VariableDeclarationData, VarDeclStatement, build_type};
 
 pub fn build_var_decl(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
     let mut inner = pair.into_inner();
@@ -13,13 +13,11 @@ pub fn build_var_decl(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statem
         .context("Missing second token `variable_name`!")?
         .as_str().to_string();
 
-    let variable_data = VariableData {
+    let data = VariableDeclarationData {
         name,
         r#type,
         dimension_exprs
     };
 
-    Ok(Some(Statement::VarDecl(VarDeclStatement {
-        data: variable_data
-    })))
+    Ok(Some(Statement::VarDecl(VarDeclStatement { data })))
 }

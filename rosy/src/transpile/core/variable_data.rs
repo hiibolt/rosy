@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Error};
 use crate::rosy_lib::{RosyBaseType, RosyType};
 
-impl Transpile for VariableData {
+impl Transpile for VariableDeclarationData {
     // note that this transpiles as the default value for the type
     fn transpile (
         &self, context: &mut TranspilationInputContext

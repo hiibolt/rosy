@@ -1,9 +1,10 @@
 use crate::ast::LengthExpr;
-use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
 use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
 use std::collections::BTreeSet;
 
+impl TranspileWithType for LengthExpr {}
 impl Transpile for LengthExpr {
     fn transpile(
         &self,
@@ -28,7 +29,6 @@ impl Transpile for LengthExpr {
         })
     }
 }
-
 impl TypeOf for LengthExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         use crate::rosy_lib::intrinsics::length;

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::{ast::*};
-use super::super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, ScopedVariableData, VariableScope, indent};
+use super::super::{Transpile, TypeOf, ScopedVariableData, VariableData, VariableScope, TranspilationInputContext, TranspilationOutput, indent};
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
 
@@ -45,7 +45,7 @@ impl Transpile for LoopStatement {
             data: VariableData { 
                 name: self.iterator.clone(),
                 r#type: RosyType::RE(),
-                dimension_exprs: vec![]
+                total_dimensions: 0
             }
         }), Some(_)) {
             return Err(vec!(anyhow!(

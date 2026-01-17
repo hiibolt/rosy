@@ -1,20 +1,22 @@
 use std::collections::BTreeSet;
 
-use crate::ast::*;
+use crate::{ast::*, transpile::TranspileWithType};
 use super::super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
-use anyhow::{Result, Error, anyhow};
+use anyhow::{Result, Context, Error, anyhow};
 use crate::rosy_lib::RosyType;
 
+impl TranspileWithType for ConcatExpr {}
 impl TypeOf for ConcatExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
-        let mut terms = self.terms.clone();
+        let mut r#type = self.terms.last()
+            .ok_or(anyhow::anyhow!("Cannot concatenate zero terms!"))?
+            .type_of(context)
+            .context("...while determining type of last term in concatenation")?;
 
-        let mut r#type = match terms.pop() {
-            Some(term) => term.type_of(context)?,
-            None => return Err(anyhow::anyhow!("Cannot concatenate zero terms!"))
-        };
-        while let Some(term_expr) = terms.pop() {
-            let term_type = term_expr.type_of(context)?;
+        for term_expr in self.terms.iter().rev().skip(1) {
+            let term_type = term_expr.type_of(context)
+                .context("...while determining type of term in concatenation")?;
+
             r#type = crate::rosy_lib::operators::concat::get_return_type(&r#type, &term_type)
                 .ok_or(anyhow::anyhow!(
                     "Cannot concatenate types '{}' and '{}' together!",
@@ -36,12 +38,9 @@ impl Transpile for ConcatExpr {
         let mut requested_variables = BTreeSet::new();
         let mut errors = Vec::new();
         let serialization = {
-            let mut terms = self.terms.clone();
-
             // Serialize the first term as a base
-            let _ = terms.get(0)
+            let first_term = self.terms.get(0)
                 .ok_or(vec!(anyhow!("Concatenation expression must have at least one term!")))?;
-            let first_term = terms.remove(0);
             let mut serialization = match first_term.transpile(context) {
                 Ok(output) => {
                     requested_variables.extend(output.requested_variables);
@@ -56,7 +55,7 @@ impl Transpile for ConcatExpr {
             };
 
             // Then, for each subsequent term, serialize and concatenate
-            for (i, term) in terms.into_iter().enumerate() {
+            for (i, term) in self.terms.iter().skip(1).enumerate() {
                 serialization = format!(
                     "&mut RosyConcat::rosy_concat(&*{}, &*{})?",
                     serialization,

@@ -1,10 +1,11 @@
 use std::collections::BTreeSet;
 
-use crate::ast::*;
+use crate::{ast::*, transpile::TranspileWithType};
 use super::super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error};
 use crate::rosy_lib::RosyType;
 
+impl TranspileWithType for ExtractExpr {}
 impl TypeOf for ExtractExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         let object_type = self.object.type_of(context)

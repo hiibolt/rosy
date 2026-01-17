@@ -1,14 +1,14 @@
 use crate::ast::DAExpr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, TypeOf};
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
 use anyhow::Error;
 use crate::rosy_lib::RosyType;
 
+impl TranspileWithType for DAExpr {}
 impl TypeOf for DAExpr {
     fn type_of(&self, _context: &TranspilationInputContext) -> anyhow::Result<RosyType> {
         Ok(RosyType::DA())
     }
 }
-
 impl Transpile for DAExpr {
     fn transpile(
         &self,

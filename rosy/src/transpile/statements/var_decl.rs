@@ -1,5 +1,5 @@
-use crate::ast::*;
-use super::super::{Transpile, TranspilationInputContext, TranspilationOutput, ScopedVariableData, VariableScope};
+use crate::{ast::*, transpile::{ScopedVariableData, VariableData, VariableScope}};
+use super::super::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error, anyhow};
 
 impl Transpile for VarDeclStatement {
@@ -7,11 +7,13 @@ impl Transpile for VarDeclStatement {
         // Insert the declaration, but check it doesn't already exist
         if matches!(context.variables.insert(self.data.name.clone(), ScopedVariableData { 
             scope: VariableScope::Local,
-            data: self.data.clone()
+            data: VariableData { 
+                name: self.data.name.clone(),
+                r#type: self.data.r#type.clone(),
+                total_dimensions: self.data.dimension_exprs.len(),
+            }
         }), Some(_)) {
-            return Err(vec!(anyhow!(
-                "Variable '{}' is already defined in this scope!", self.data.name
-            )));
+            return Err(vec!(anyhow!("Variable '{}' is already defined in this scope!", self.data.name)));
         }
 
         let TranspilationOutput { 

@@ -1,8 +1,9 @@
-use crate::ast::*;
+use crate::{ast::*, transpile::{TranspileWithType, shared::function_call::function_call_transpile_helper}};
 use super::super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error};
 use crate::rosy_lib::RosyType;
 
+impl TranspileWithType for FunctionCallExpr {}
 impl TypeOf for FunctionCallExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         Ok(context.functions.get(&self.name)
@@ -13,17 +14,6 @@ impl TypeOf for FunctionCallExpr {
 }
 impl Transpile for FunctionCallExpr {
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
-        let function_call_statement = FunctionCallStatement {
-            name: self.name.clone(),
-            args: self.args.clone()
-        };
-
-        let mut output = function_call_statement
-            .transpile(context)
-            .map_err(|e| e.into_iter().map(|err| {
-                err.context(format!("...while transpiling function call to '{}'", self.name))
-            }).collect::<Vec<Error>>())?;
-        output.serialization = format!("&{}", output.serialization);
-        Ok(output)
+        function_call_transpile_helper(&self.name, &self.args, context)
     }
 }

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::ast::*;
-use super::super::{Transpile, TranspilationInputContext, TranspilationOutput, ScopedVariableData, VariableScope, TranspilationInputFunctionContext, indent};
+use super::super::{Transpile, TranspilationInputContext, VariableData, TranspilationInputFunctionContext, TranspilationOutput, ScopedVariableData, VariableScope, indent};
 use anyhow::{Result, Error, anyhow};
 
 
@@ -10,13 +10,19 @@ impl Transpile for FunctionStatement {
         // Insert the function signature, but check it doesn't already exist
         if context.functions.contains_key(&self.name) ||
             matches!(context.functions.insert(
-                self.name.clone(),
-                TranspilationInputFunctionContext {
-                    return_type: self.return_type.clone(),
-                    args: self.args.clone(),
-                    requested_variables: BTreeSet::new()
-                }
-            ), Some(_))
+                    self.name.clone(),
+                    TranspilationInputFunctionContext {
+                        return_type: self.return_type.clone(),
+                        args: self.args.iter()
+                            .map(|arg| VariableData {
+                                name: arg.name.clone(),
+                                r#type: arg.r#type.clone(),
+                                total_dimensions: arg.dimension_exprs.len(),
+                            })
+                            .collect(),
+                        requested_variables: BTreeSet::new()
+                    }
+                ), Some(_))
         {
             return Err(vec!(anyhow!("Function '{}' is already defined in this scope!", self.name)));
         }
@@ -35,9 +41,13 @@ impl Transpile for FunctionStatement {
             }
         }
         for arg in &self.args {
-            if matches!(inner_context.variables.insert(arg.name.clone(), ScopedVariableData {
+                if matches!(inner_context.variables.insert(arg.name.clone(), ScopedVariableData {
                 scope: VariableScope::Arg,
-                data: arg.clone()
+                data: VariableData {
+                    name: arg.name.clone(),
+                    r#type: arg.r#type.clone(),
+                    total_dimensions: arg.dimension_exprs.len(),
+                }
             }), Some(_)) {
                 errors.push(anyhow!("Argument '{}' is already defined!", arg.name));
             }

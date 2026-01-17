@@ -1,6 +1,6 @@
 use anyhow::{Result, Context, ensure};
 
-use super::super::{Rule, Statement, VariableData, VarDeclStatement, FunctionStatement, build_statement, build_type};
+use super::super::{Rule, Statement, VariableDeclarationData, VarDeclStatement, FunctionStatement, build_statement, build_type};
 
 pub fn build_function(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
     let mut inner = pair.into_inner();
@@ -37,7 +37,7 @@ pub fn build_function(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statem
                     .context(format!("Missing type for function argument: {}", name))?
             ).context("...while building function argument type")?;
 
-            let argument_data = VariableData {
+            let argument_data = VariableDeclarationData {
                 name: name.to_string(),
                 r#type: argument_type,
                 dimension_exprs: argument_dimensions,
@@ -50,7 +50,7 @@ pub fn build_function(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statem
 
     let body = {
         let mut statements = vec!(
-            Statement::VarDecl(VarDeclStatement { data: VariableData {
+            Statement::VarDecl(VarDeclStatement { data: VariableDeclarationData {
                 name: name.clone(),
                 r#type: return_type.clone(),
                 dimension_exprs: Vec::new(),
