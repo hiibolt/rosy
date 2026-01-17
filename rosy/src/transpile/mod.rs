@@ -55,8 +55,7 @@ pub enum VariableScope {
 #[derive(Debug, Clone)]
 pub struct VariableData {
     pub name: String,
-    pub r#type: RosyType,
-    pub total_dimensions: usize
+    pub r#type: RosyType
 }
 #[derive(Debug, Clone)]
 pub struct ScopedVariableData {

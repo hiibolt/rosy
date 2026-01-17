@@ -16,8 +16,7 @@ impl Transpile for FunctionStatement {
                         args: self.args.iter()
                             .map(|arg| VariableData {
                                 name: arg.name.clone(),
-                                r#type: arg.r#type.clone(),
-                                total_dimensions: arg.dimension_exprs.len(),
+                                r#type: arg.r#type.clone()
                             })
                             .collect(),
                         requested_variables: BTreeSet::new()
@@ -45,8 +44,7 @@ impl Transpile for FunctionStatement {
                 scope: VariableScope::Arg,
                 data: VariableData {
                     name: arg.name.clone(),
-                    r#type: arg.r#type.clone(),
-                    total_dimensions: arg.dimension_exprs.len(),
+                    r#type: arg.r#type.clone()
                 }
             }), Some(_)) {
                 errors.push(anyhow!("Argument '{}' is already defined!", arg.name));

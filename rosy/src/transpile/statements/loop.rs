@@ -44,8 +44,7 @@ impl Transpile for LoopStatement {
             scope: VariableScope::Local,
             data: VariableData { 
                 name: self.iterator.clone(),
-                r#type: RosyType::RE(),
-                total_dimensions: 0
+                r#type: RosyType::RE()
             }
         }), Some(_)) {
             return Err(vec!(anyhow!(

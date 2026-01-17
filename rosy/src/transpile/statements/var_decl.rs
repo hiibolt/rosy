@@ -9,8 +9,7 @@ impl Transpile for VarDeclStatement {
             scope: VariableScope::Local,
             data: VariableData { 
                 name: self.data.name.clone(),
-                r#type: self.data.r#type.clone(),
-                total_dimensions: self.data.dimension_exprs.len(),
+                r#type: self.data.r#type.clone()
             }
         }), Some(_)) {
             return Err(vec!(anyhow!("Variable '{}' is already defined in this scope!", self.data.name)));
