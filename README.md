@@ -30,33 +30,45 @@ Rosy is a complete transpiler toolchain that converts ROSY source code into nati
 
 ```rosy
 BEGIN;
-    {Function to compute factorial}
-    FUNCTION (RE) FACTORIAL N (RE);
-        VARIABLE (RE) result;
-        result := 1;
-        
-        LOOP i 1 N;
-            result := result * i;
-        ENDLOOP;
-        
-        FACTORIAL := result;
+    {Function to add two numbers}
+    FUNCTION (RE) ADD_TWO a (RE) b (RE);
+        ADD_TWO := a + b;
+    ENDFUNCTION;
+    
+    {Function to multiply and add}
+    FUNCTION (RE) COMPUTE x (RE) y (RE);
+        VARIABLE (RE) temp;
+        temp := x * y;
+        COMPUTE := temp + 10;
     ENDFUNCTION;
     
     {Procedure demonstrating conditionals}
-    PROCEDURE CONDITIONAL_DEMO value (RE);
-        IF value > 10;
-            WRITE 6 "Value is large: " ST(value);
-        ELSEIF value > 5;
-            WRITE 6 "Value is medium: " ST(value);
+    PROCEDURE CONDITIONAL_DEMO;
+        VARIABLE (LO) is_true;
+        VARIABLE (LO) is_false;
+        
+        is_true := TRUE;
+        is_false := FALSE;
+        
+        IF is_true;
+            WRITE 6 "First condition is TRUE";
+        ELSEIF is_false;
+            WRITE 6 "Second condition is TRUE";
         ELSE;
-            WRITE 6 "Value is small: " ST(value);
+            WRITE 6 "Neither condition is TRUE";
+        ENDIF;
+        
+        IF is_false;
+            WRITE 6 "This should not print";
+        ELSE;
+            WRITE 6 "ELSE clause works!";
         ENDIF;
     ENDPROCEDURE;
     
     {Procedure demonstrating vectors and arrays}
     PROCEDURE VECTOR_DEMO;
         VARIABLE (VE) vec;
-        VARIABLE (RE 2 3) matrix;  {2x3 matrix}
+        VARIABLE (RE 2 3) matrix;
         
         {Concatenate values into vector}
         vec := 1 & 2 & 3 & 4 & 5;
@@ -64,17 +76,38 @@ BEGIN;
         
         {Access and assign array elements}
         matrix[1, 2] := 42;
-        WRITE 6 "Matrix element: " ST(matrix[1, 2]);
+        WRITE 6 "Matrix[1,2] = " ST(matrix[1, 2]);
+    ENDPROCEDURE;
+    
+    {Procedure demonstrating loops}
+    PROCEDURE LOOP_DEMO;
+        VARIABLE (RE) sum;
+        sum := 0;
+        
+        LOOP i 1 5;
+            sum := sum + i;
+            WRITE 6 "i = " ST(i) ", sum = " ST(sum);
+        ENDLOOP;
     ENDPROCEDURE;
     
     {Main entry point}
     PROCEDURE RUN;
         VARIABLE (RE) x;
-        x := 5;
+        VARIABLE (RE) y;
+        VARIABLE (RE) result;
         
-        WRITE 6 "Factorial of " ST(x) " is " ST(FACTORIAL(x));
-        CONDITIONAL_DEMO(x);
+        x := 3;
+        y := 4;
+        
+        result := ADD_TWO(x, y);
+        WRITE 6 "Adding " ST(x) " + " ST(y) " = " ST(result);
+        
+        result := COMPUTE(x, y);
+        WRITE 6 "Computing " ST(x) " * " ST(y) " + 10 = " ST(result);
+        
+        CONDITIONAL_DEMO;
         VECTOR_DEMO;
+        LOOP_DEMO;
     ENDPROCEDURE;
     
     RUN;
