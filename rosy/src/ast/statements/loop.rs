@@ -1,5 +1,7 @@
 use anyhow::{Result, Context};
 
+use crate::ast::StatementEnum;
+
 use super::super::{Rule, Statement, LoopStatement, build_expr, build_statement};
 
 pub fn build_loop(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
@@ -52,5 +54,8 @@ pub fn build_loop(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>
         }
     }
 
-    Ok(Some(Statement::Loop(LoopStatement { iterator, start, end, step, body })))  
+    Ok(Some(Statement {
+        enum_variant: StatementEnum::Loop,
+        inner: Box::new(LoopStatement { iterator, start, end, step, body })
+    }))
 }

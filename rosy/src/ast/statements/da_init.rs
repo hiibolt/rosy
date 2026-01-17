@@ -1,6 +1,6 @@
 use pest::iterators::Pair;
 use anyhow::{Context, Result, ensure};
-use crate::ast::{Rule, Statement, DAInitStatement, build_expr};
+use crate::ast::{DAInitStatement, Rule, Statement, StatementEnum, build_expr};
 
 pub fn build_da_init(pair: Pair<Rule>) -> Result<Option<Statement>> {
     ensure!(pair.as_rule() == Rule::daini, 
@@ -20,8 +20,11 @@ pub fn build_da_init(pair: Pair<Rule>) -> Result<Option<Statement>> {
     let num_vars_expr = build_expr(num_vars_pair)
         .context("Failed to build number of variables expression in DAINI statement!")?;
     
-    Ok(Some(Statement::DAInit(DAInitStatement {
-        order: order_expr,
-        number_of_variables: num_vars_expr,
-    })))
+    Ok(Some(Statement {
+        enum_variant: StatementEnum::DAInit,
+        inner: Box::new(DAInitStatement {
+            order: order_expr,
+            number_of_variables: num_vars_expr,
+        })
+    }))
 }

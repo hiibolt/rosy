@@ -1,5 +1,7 @@
 use anyhow::{Result, Context};
 
+use crate::ast::StatementEnum;
+
 use super::super::{Rule, Statement, VariableDeclarationData, VarDeclStatement, build_type};
 
 pub fn build_var_decl(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
@@ -19,5 +21,8 @@ pub fn build_var_decl(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statem
         dimension_exprs
     };
 
-    Ok(Some(Statement::VarDecl(VarDeclStatement { data })))
+    Ok(Some(Statement {
+        enum_variant: StatementEnum::VarDecl,
+        inner: Box::new(VarDeclStatement { data })
+    }))
 }

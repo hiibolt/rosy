@@ -1,5 +1,7 @@
 use anyhow::{Result, Context, ensure};
 
+use crate::ast::StatementEnum;
+
 use super::super::{Rule, Statement, VariableDeclarationData, ProcedureStatement, build_statement, build_type};
 
 pub fn build_procedure(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
@@ -31,7 +33,7 @@ pub fn build_procedure(pair: pest::iterators::Pair<Rule>) -> Result<Option<State
                 arg_inner.next()
                     .context("Missing procedure argument type!")?
             ).context("...while building procedure argument type")?;
-            
+
             let variable_data = VariableDeclarationData {
                 name: name.to_string(),
                 r#type,
@@ -63,5 +65,8 @@ pub fn build_procedure(pair: pest::iterators::Pair<Rule>) -> Result<Option<State
         statements
     };
 
-    Ok(Some(Statement::Procedure(ProcedureStatement { name, args, body })))
+    Ok(Some(Statement {
+        enum_variant: StatementEnum::Procedure,
+        inner: Box::new(ProcedureStatement { name, args, body })
+    }))
 }

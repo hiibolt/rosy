@@ -1,5 +1,7 @@
 use anyhow::{Result, Context, bail};
 
+use crate::ast::StatementEnum;
+
 use super::super::{Rule, Statement, IfStatement, ElseIfClause, build_expr, build_statement};
 
 pub fn build_if(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>>{
@@ -85,5 +87,8 @@ pub fn build_if(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>>{
         }
     }
     
-    Ok(Some(Statement::If(IfStatement { condition, then_body, elseif_clauses, else_body })))
+    Ok(Some(Statement {
+        enum_variant: StatementEnum::If,
+        inner: Box::new(IfStatement { condition, then_body, elseif_clauses, else_body })
+    }))
 }

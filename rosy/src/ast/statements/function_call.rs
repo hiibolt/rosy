@@ -1,5 +1,7 @@
 use anyhow::{Result, Context};
 
+use crate::ast::StatementEnum;
+
 use super::super::{Rule, Statement, FunctionCallStatement, build_expr};
 
 pub fn build_function_call(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
@@ -20,5 +22,8 @@ pub fn build_function_call(pair: pest::iterators::Pair<Rule>) -> Result<Option<S
         args.push(expr);
     }
 
-    Ok(Some(Statement::FunctionCall(FunctionCallStatement { name, args })))
+    Ok(Some(Statement {
+        enum_variant: StatementEnum::FunctionCall,
+        inner: Box::new(FunctionCallStatement { name, args })
+    }))
 }

@@ -84,7 +84,7 @@ pub struct TranspilationOutput {
     pub serialization: String,
     requested_variables: BTreeSet<String>
 }
-pub trait Transpile {
+pub trait Transpile: std::fmt::Debug {
     fn transpile ( 
         &self, context: &mut TranspilationInputContext
     ) -> Result<TranspilationOutput, Vec<Error>>;
@@ -122,127 +122,10 @@ impl Transpile for Program {
 }
 impl Transpile for Statement {
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
-        // Handle analyzing the specific statement
-        match &self {
-            Statement::DAInit(da_init_stmt) => match da_init_stmt.transpile(context) {
-                Ok(output) => Ok(output),
-                Err(vec_err) => Err(add_context_to_all(
-                    vec_err,
-                    format!(
-                        "...while transpiling DA initialization statement"
-                    )
-                ))
-            },
-            Statement::VarDecl(var_decl_stmt) => match var_decl_stmt.transpile(context) {
-                Ok(output) => Ok(output),
-                Err(vec_err) => Err(add_context_to_all(
-                    vec_err,
-                    format!(
-                        "...while transpiling variable declaration for variable {}",
-                        var_decl_stmt.data.name
-                    )
-                ))
-            },
-            Statement::Procedure(procedure_stmt) => match procedure_stmt.transpile(context) {
-                Ok(output) => Ok(output),
-                Err(vec_err) => Err(add_context_to_all(
-                    vec_err,
-                    format!(
-                        "...while transpiling procedure {}",
-                        procedure_stmt.name
-                    )
-                ))
-            },
-            Statement::Assign(assign_stmt) => match assign_stmt.transpile(context) {
-                Ok(output) => Ok(output),
-                Err(vec_err) => Err(add_context_to_all(
-                    vec_err,
-                    format!(
-                        "...while transpiling assignment to variable {}",
-                        assign_stmt.identifier.name
-                    )
-                ))
-            },
-            Statement::Function(function_stmt) => match function_stmt.transpile(context) {
-                Ok(output) => Ok(output),
-                Err(vec_err) => Err(add_context_to_all(
-                    vec_err,
-                    format!(
-                        "...while transpiling function {}",
-                        function_stmt.name
-                    )
-                ))
-            },
-            Statement::Write(write_stmt) => match write_stmt.transpile(context) {
-                Ok(output) => Ok(output),
-                Err(vec_err) => Err(add_context_to_all(
-                    vec_err,
-                    format!(
-                        "...while transpiling WRITE statement to unit {}",
-                        write_stmt.unit
-                    )
-                ))
-            },
-            Statement::FunctionCall(function_call_stmt) => match function_call_stmt.transpile(context) {
-                Ok(output) => Ok(output),
-                Err(vec_err) => Err(add_context_to_all(
-                    vec_err,
-                    format!(
-                        "...while transpiling function call to function {}",
-                        function_call_stmt.name
-                    )
-                ))
-            },
-            Statement::ProcedureCall(procedure_call_stmt) => match procedure_call_stmt.transpile(context) {
-                Ok(output) => Ok(output),
-                Err(vec_err) => Err(add_context_to_all(
-                    vec_err,
-                    format!(
-                        "...while transpiling procedure call to procedure {}",
-                        procedure_call_stmt.name
-                    )
-                ))
-            },
-            Statement::Loop(loop_stmt) => match loop_stmt.transpile(context) {
-                Ok(output) => Ok(output),
-                Err(vec_err) => Err(add_context_to_all(
-                    vec_err,
-                    format!(
-                        "...while transpiling loop with iterator {}",
-                        loop_stmt.iterator
-                    )
-                ))
-            },
-            Statement::If(if_stmt) => match if_stmt.transpile(context) {
-                Ok(output) => Ok(output),
-                Err(vec_err) => Err(add_context_to_all(
-                    vec_err,
-                    format!(
-                        "...while transpiling IF statement"
-                    )
-                ))
-            },
-            Statement::Read(read_stmt) => match read_stmt.transpile(context) {
-                Ok(output) => Ok(output),
-                Err(vec_err) => Err(add_context_to_all(
-                    vec_err,
-                    format!(
-                        "...while transpiling READ statement from unit {}",
-                        read_stmt.unit
-                    )
-                ))
-            },
-            Statement::PLoop(ploop_stmt) => match ploop_stmt.transpile(context) {
-                Ok(output) => Ok(output),
-                Err(vec_err) => Err(add_context_to_all(
-                    vec_err,
-                    format!(
-                        "...while transpiling parallel loop with iterator {}",
-                        ploop_stmt.iterator
-                    )
-                ))
-            }
-        }
+        self.inner.transpile(context)
+            .map_err(|err_vec| {
+                add_context_to_all(err_vec, format!("...while transpiling statement: {:?}", self.enum_variant))
+            })
     }
 }
 impl Transpile for VariableIdentifier {

@@ -1,5 +1,7 @@
 use anyhow::{Result, Context};
 
+use crate::ast::StatementEnum;
+
 use super::super::{Rule, Statement, ReadStatement, build_variable_identifier};
 
 pub fn build_read(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
@@ -16,5 +18,8 @@ pub fn build_read(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>
         .context("Missing second token `variable_identifier`!")?
     ).context("...while building variable identifier for read statement")?;
 
-    Ok(Some(Statement::Read(ReadStatement { unit, identifier })))
+    Ok(Some(Statement {
+        enum_variant: StatementEnum::Read,
+        inner: Box::new(ReadStatement { unit, identifier })
+    }))
 }

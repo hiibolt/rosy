@@ -3,7 +3,7 @@ mod statements;
 use pest::pratt_parser::PrattParser;
 use pest_derive::Parser;
 use anyhow::{bail, ensure, Context, Result};
-use crate::{rosy_lib::{RosyBaseType, RosyType}, transpile::TranspileWithType};
+use crate::{rosy_lib::{RosyBaseType, RosyType}, transpile::{Transpile, TranspileWithType}};
 
 #[derive(Parser)]
 #[grammar = "../assets/rosy.pest"]
@@ -116,19 +116,24 @@ pub struct DAInitStatement {
     pub number_of_variables: Expr,
 }
 #[derive(Debug)]
-pub enum Statement {
-    DAInit(DAInitStatement),
-    VarDecl(VarDeclStatement),
-    Write(WriteStatement),
-    Read(ReadStatement),
-    Assign(AssignStatement),
-    Procedure(ProcedureStatement),
-    ProcedureCall(ProcedureCallStatement),
-    Function(FunctionStatement),
-    FunctionCall(FunctionCallStatement),
-    Loop(LoopStatement),
-    PLoop(PLoopStatement),
-    If(IfStatement),
+pub struct Statement {
+    pub enum_variant: StatementEnum,
+    pub inner: Box<dyn Transpile>,
+}
+#[derive(Debug)]
+pub enum StatementEnum {
+    DAInit,
+    VarDecl,
+    Write,
+    Read,
+    Assign,
+    Procedure,
+    ProcedureCall,
+    Function,
+    FunctionCall,
+    Loop,
+    PLoop,
+    If,
 }
 
 #[derive(Debug)]
@@ -203,7 +208,7 @@ pub struct FunctionCallExpr {
 #[derive(Debug)]
 pub struct Expr {
     pub enum_variant: ExprEnum,
-    pub inner: Box<dyn TranspileWithType + 'static>,
+    pub inner: Box<dyn TranspileWithType>,
 }
 impl PartialEq for Expr {
     fn eq(&self, other: &Self) -> bool {

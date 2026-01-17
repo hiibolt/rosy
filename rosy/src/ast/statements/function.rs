@@ -1,5 +1,7 @@
 use anyhow::{Result, Context, ensure};
 
+use crate::ast::StatementEnum;
+
 use super::super::{Rule, Statement, VariableDeclarationData, VarDeclStatement, FunctionStatement, build_statement, build_type};
 
 pub fn build_function(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
@@ -50,11 +52,16 @@ pub fn build_function(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statem
 
     let body = {
         let mut statements = vec!(
-            Statement::VarDecl(VarDeclStatement { data: VariableDeclarationData {
-                name: name.clone(),
-                r#type: return_type.clone(),
-                dimension_exprs: Vec::new(),
-            }})
+            Statement {
+                enum_variant: StatementEnum::VarDecl,
+                inner: Box::new(VarDeclStatement {
+                    data: VariableDeclarationData {
+                        name: name.clone(),
+                        r#type: return_type.clone(),
+                        dimension_exprs: Vec::new(),
+                    }
+                })
+            }
         );
 
         // Process remaining elements (statements and end_function)
@@ -74,5 +81,8 @@ pub fn build_function(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statem
         statements
     };
 
-    Ok(Some(Statement::Function(FunctionStatement { name, args, return_type, body })))
+    Ok(Some(Statement {
+        enum_variant: StatementEnum::Function,
+        inner: Box::new(FunctionStatement { name, args, return_type, body })
+    }))
 }

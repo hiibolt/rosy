@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 
-use crate::ast::build_variable_identifier;
+use crate::ast::{StatementEnum, build_variable_identifier};
 
 use super::super::{Rule, Statement, PLoopStatement, build_expr, build_statement};
 
@@ -75,12 +75,15 @@ pub fn build_ploop(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement
         }
     };
 
-    Ok(Some(Statement::PLoop(PLoopStatement {
-        iterator,
-        start,
-        end,
-        commutivity_rule,
-        body,
-        output
-    })))  
+    Ok(Some(Statement {
+        enum_variant: StatementEnum::PLoop,
+        inner: Box::new(PLoopStatement {
+            iterator,
+            start,
+            end,
+            commutivity_rule,
+            body,
+            output
+        })
+    }))
 }
