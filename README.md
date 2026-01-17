@@ -235,27 +235,29 @@ The project is organized as a Rust workspace with several interconnected crates:
 
 ### Adding a New Expression
 
-1. Grammar definition added to `rosy/assets/rosy.pest` (either as `term` for primaries or `infix_op` for binary operators)
-2. Infix operators added to Pratt parser precedence table in `rosy/src/ast.rs`
-3. New struct created in `rosy/src/program/expressions/<name>.rs` with parsing logic
-4. Module declaration added to `rosy/src/program/expressions/mod.rs`
-5. Enum variant added to `ExprEnum`
-6. Pratt parser mapping implemented (`map_primary` for terms, `map_infix` for operators)
-7. Traits implemented: `TranspileWithType`, `TypeOf`, and `Transpile`
-8. For operators: `TypeRule` registry defined in `rosy/src/rosy_lib/operators/<name>.rs` with test values
-9. Build triggers codegen (`cargo build`) to generate test files
-10. COSY/ROSY output comparison validates behavior matches reference implementation
+1. **Read `manual.md`** - Find the operator/function definition in Appendix A, noting type tables (left type + right type → result type) and example usage
+2. Grammar definition added to `rosy/assets/rosy.pest` (either as `term` for primaries or `infix_op` for binary operators)
+3. Infix operators added to Pratt parser precedence table in `rosy/src/ast.rs`
+4. New struct created in `rosy/src/program/expressions/<name>.rs` with parsing logic
+5. Module declaration added to `rosy/src/program/expressions/mod.rs`
+6. Enum variant added to `ExprEnum`
+7. Pratt parser mapping implemented (`map_primary` for terms, `map_infix` for operators)
+8. Traits implemented: `TranspileWithType`, `TypeOf`, and `Transpile`
+9. For operators: `TypeRule` registry defined in `rosy/src/rosy_lib/operators/<name>.rs` with test values from manual
+10. Build triggers codegen (`cargo build`) to generate test files
+11. COSY/ROSY output comparison validates behavior matches reference implementation
 
 ### Adding a New Statement
 
-1. Grammar rule added to `rosy/assets/rosy.pest` under `statement` production
-2. New struct created in `rosy/src/program/statements/<name>.rs`
-3. Module declaration added to `rosy/src/program/statements/mod.rs`
-4. Enum variant added to `StatementEnum`
-5. Pattern matching case added to `Statement::from_rule` in `mod.rs`
-6. Traits implemented: `FromRule` and `Transpile`
-7. Integration tests added to `examples/` directory
-8. COSY/ROSY output comparison validates end-to-end behavior
+1. **Read `manual.md`** - Find the statement/procedure definition with syntax, arguments, and examples in the appropriate section
+2. Grammar rule added to `rosy/assets/rosy.pest` under `statement` production
+3. New struct created in `rosy/src/program/statements/<name>.rs`
+4. Module declaration added to `rosy/src/program/statements/mod.rs`
+5. Enum variant added to `StatementEnum`
+6. Pattern matching case added to `Statement::from_rule` in `mod.rs`
+7. Traits implemented: `FromRule` and `Transpile`
+8. Integration tests added to `examples/` directory
+9. COSY/ROSY output comparison validates end-to-end behavior
 
 ### Test-Driven Development
 

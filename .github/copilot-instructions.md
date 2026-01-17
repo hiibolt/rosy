@@ -256,27 +256,29 @@ If a request is vague (e.g., "add support for X"), probe:
 
 ### Adding New Expressions
 
-1. Grammar rule defined in `rosy/assets/rosy.pest` (as `term` or `infix_op`)
-2. Infix operators registered in Pratt parser precedence table (`rosy/src/ast.rs`)
-3. Struct created in `rosy/src/program/expressions/<name>.rs`
-4. Module declared in `rosy/src/program/expressions/mod.rs`
-5. `ExprEnum` variant added
-6. Pratt parser mapping implemented (`map_primary` or `map_infix`)
-7. `TranspileWithType`, `TypeOf`, and `Transpile` traits implemented
-8. For operators: `TypeRule` registry defined with test values in `rosy/src/rosy_lib/operators/<name>.rs`
-9. Codegen triggered via `cargo build` generates test scaffolding
-10. COSY/ROSY output diff validates correctness
+1. **Read `manual.md`** - Locate operator/function in Appendix A, extract type compatibility tables (left + right → result), review examples
+2. Grammar rule defined in `rosy/assets/rosy.pest` (as `term` or `infix_op`)
+3. Infix operators registered in Pratt parser precedence table (`rosy/src/ast.rs`)
+4. Struct created in `rosy/src/program/expressions/<name>.rs`
+5. Module declared in `rosy/src/program/expressions/mod.rs`
+6. `ExprEnum` variant added
+7. Pratt parser mapping implemented (`map_primary` or `map_infix`)
+8. `TranspileWithType`, `TypeOf`, and `Transpile` traits implemented
+9. For operators: `TypeRule` registry defined with test values from manual in `rosy/src/rosy_lib/operators/<name>.rs`
+10. Codegen triggered via `cargo build` generates test scaffolding
+11. COSY/ROSY output diff validates correctness
 
 ### Adding New Statements
 
-1. Grammar rule added to `rosy/assets/rosy.pest` under `statement`
-2. Struct created in `rosy/src/program/statements/<name>.rs`
-3. Module declared in `rosy/src/program/statements/mod.rs`
-4. `StatementEnum` variant added
-5. `Statement::from_rule` pattern match case added
-6. `FromRule` and `Transpile` traits implemented
-7. Integration tests added to `examples/`
-8. End-to-end COSY/ROSY comparison validates behavior
+1. **Read `manual.md`** - Find statement/procedure specification with syntax description, argument types, and usage examples
+2. Grammar rule added to `rosy/assets/rosy.pest` under `statement`
+3. Struct created in `rosy/src/program/statements/<name>.rs`
+4. Module declared in `rosy/src/program/statements/mod.rs`
+5. `StatementEnum` variant added
+6. `Statement::from_rule` pattern match case added
+7. `FromRule` and `Transpile` traits implemented
+8. Integration tests added to `examples/`
+9. End-to-end COSY/ROSY comparison validates behavior
 
 ## Testing Strategy
 - Examples in `examples/*.rosy` serve as integration tests
