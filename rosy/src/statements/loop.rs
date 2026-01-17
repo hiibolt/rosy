@@ -1,13 +1,75 @@
 use std::collections::BTreeSet;
+use anyhow::{Result, Context, Error, anyhow, ensure};
 
-use crate::{ast::*};
-use super::super::{Transpile, TypeOf, ScopedVariableData, VariableData, VariableScope, TranspilationInputContext, TranspilationOutput, indent};
-use anyhow::{Result, Error, anyhow};
-use crate::rosy_lib::RosyType;
+use crate::{
+    ast::*,
+    rosy_lib::RosyType,
+    transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, ScopedVariableData, VariableData, VariableScope, indent}
+};
 
+impl StatementFromRule for LoopStatement {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
+        ensure!(pair.as_rule() == Rule::r#loop, 
+            "Expected `loop` rule when building loop statement, found: {:?}", pair.as_rule());
+        
+        let mut inner = pair.into_inner();
+        let (iterator, start, end, step) = {
+            let mut start_loop_inner = inner
+                .next()
+                .context("Missing first token `start_loop`!")?
+                .into_inner();
+
+            let iterator = start_loop_inner.next()
+                .context("Missing first token `variable_name`!")?
+                .as_str().to_string();
+            let start_pair = start_loop_inner.next()
+                .context("Missing second token `start_expr`!")?;
+            let start = build_expr(start_pair)
+                .context("Failed to build `start` expression in `loop` statement!")?;
+            let end_pair = start_loop_inner.next()
+                .context("Missing third token `end_expr`!")?;
+            let end = build_expr(end_pair)
+                .context("Failed to build `end` expression in `loop` statement!")?;
+            
+            // Optional step expression
+            let step = if let Some(step_pair) = start_loop_inner.next() {
+                if step_pair.as_rule() == Rule::expr {
+                    Some(build_expr(step_pair)
+                        .context("Failed to build `step` expression in `loop` statement!")?)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            (iterator, start, end, step)
+        };
+
+        let mut body = Vec::new();
+        // Process remaining elements (statements and end)
+        while let Some(element) = inner.next() {
+            // Skip the end element
+            if element.as_rule() == Rule::end_loop {
+                break;
+            }
+
+            let pair_input = element.as_str();
+            if let Some(stmt) = build_statement(element)
+                .with_context(|| format!("Failed to build statement from:\n{}", pair_input))? {
+                body.push(stmt);
+            }
+        }
+
+        Ok(Some(Statement {
+            enum_variant: StatementEnum::Loop,
+            inner: Box::new(LoopStatement { iterator, start, end, step, body })
+        }))
+    }
+}
 
 impl Transpile for LoopStatement {
-    fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         // Verify the start, end, and step expressions are REs
         let start_type = self.start.type_of(context)
             .map_err(|e| vec!(e))?;

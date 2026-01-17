@@ -1,6 +1,7 @@
 mod transpile;
 mod ast;
 mod embedded;
+mod statements;
 #[allow(unused_imports, dead_code)]
 mod rosy_lib;
 

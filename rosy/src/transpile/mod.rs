@@ -1,20 +1,19 @@
 mod expr;
 mod core;
-mod statements;
-mod shared;
+pub mod shared;
 
 use crate::ast::*;
 use std::{any::Any, collections::{BTreeSet, HashMap}};
 use anyhow::{Result, Error};
 use crate::rosy_lib::RosyType;
 
-fn indent ( st: String ) -> String {
+pub fn indent ( st: String ) -> String {
     st.lines()
         .map(|line| format!("\t{}", line))
         .collect::<Vec<String>>()
         .join("\n")
 }
-fn add_context_to_all ( arr: Vec<Error>, context: String ) -> Vec<Error> {
+pub fn add_context_to_all ( arr: Vec<Error>, context: String ) -> Vec<Error> {
     arr.into_iter()
         .map(|err| err.context(context.clone()))
         .collect()
@@ -82,7 +81,7 @@ pub struct TranspilationInputContext {
 #[derive(Default)]
 pub struct TranspilationOutput {
     pub serialization: String,
-    requested_variables: BTreeSet<String>
+    pub requested_variables: BTreeSet<String>
 }
 pub trait Transpile: std::fmt::Debug {
     fn transpile ( 

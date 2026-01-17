@@ -1,9 +1,33 @@
 use std::collections::BTreeSet;
 
-use crate::ast::*;
-use super::super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, VariableScope};
-use anyhow::{Result, Error, anyhow};
+use crate::{ast::*, transpile::{TypeOf, VariableScope}};
+use super::super::{Transpile, TranspilationInputContext, TranspilationOutput};
+use anyhow::{Result, Context, Error, anyhow, ensure};
 
+impl StatementFromRule for AssignStatement {
+    fn from_rule(pair: pest::iterators::Pair<crate::ast::Rule>) -> Result<Option<Statement>> {
+        ensure!(pair.as_rule() == crate::ast::Rule::assignment, 
+            "Expected `assignment` rule when building assignment statement, found: {:?}", pair.as_rule());
+        let mut inner = pair.into_inner();
+
+        let lhs = inner.next()
+            .context("Missing first token `variable_name`!")?;
+        let identifier = build_variable_identifier(lhs)
+            .context("...while building variable identifier for assignment statement")?;
+
+        let expr_pair = inner.next()
+            .context("Missing second token `expr`!")?;
+        let expr = build_expr(expr_pair)?;
+
+        Ok(Some(Statement {
+            enum_variant: StatementEnum::Assign,
+            inner: Box::new(AssignStatement { 
+                identifier,
+                value: expr
+            })
+        }))
+    }
+}
 impl Transpile for AssignStatement {
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         // Get the variable type and ensure the value type is compatible

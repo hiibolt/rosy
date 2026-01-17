@@ -1,12 +1,42 @@
 use std::collections::BTreeSet;
+use anyhow::{Result, Context, Error, anyhow, ensure};
 
-use crate::ast::*;
-use super::super::{Transpile, TranspilationInputContext, TypeOf, TranspilationOutput, VariableScope};
-use anyhow::{Result, Error, anyhow};
+use crate::{
+    ast::*,
+    transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, VariableScope}
+};
 
+impl StatementFromRule for ProcedureCallStatement {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
+        ensure!(pair.as_rule() == Rule::procedure_call, 
+            "Expected `procedure_call` rule when building procedure call statement, found: {:?}", pair.as_rule());
+        
+        let mut inner = pair.into_inner();
+        let name = inner.next()
+            .context("Missing procedure name in procedure call!")?
+            .as_str().to_string();
+        
+        let mut args = Vec::new();
+        // Collect all remaining arguments (expressions)
+        while let Some(arg_pair) = inner.next() {
+            if arg_pair.as_rule() == Rule::semicolon {
+                break;
+            }
+            
+            let expr = build_expr(arg_pair)
+                .context("Failed to build expression in procedure call!")?;
+            args.push(expr);
+        }
+        
+        Ok(Some(Statement {
+            enum_variant: StatementEnum::ProcedureCall,
+            inner: Box::new(ProcedureCallStatement { name, args })
+        }))
+    }
+}
 
 impl Transpile for ProcedureCallStatement {
-    fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         // Start by checking that the procedure exists
         let proc_context = match context.procedures.get(&self.name) {
             Some(ctx) => ctx,

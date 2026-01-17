@@ -1,5 +1,3 @@
-mod statements;
-
 use pest::pratt_parser::PrattParser;
 use pest_derive::Parser;
 use anyhow::{bail, ensure, Context, Result};
@@ -26,6 +24,10 @@ lazy_static::lazy_static! {
             // Multiplication and Division (same precedence)
             .op(Op::infix(mult, Left) | Op::infix(div, Left))
     };
+}
+
+pub trait StatementFromRule {
+    fn from_rule ( pair: pest::iterators::Pair<Rule> ) -> Result<Option<Statement>>;
 }
 
 #[derive(Debug)]
@@ -236,7 +238,7 @@ pub enum ExprEnum {
     FunctionCall,
 }
 
-fn build_type (pair: pest::iterators::Pair<Rule>) -> Result<(RosyType, Vec<Expr>)> {
+pub fn build_type (pair: pest::iterators::Pair<Rule>) -> Result<(RosyType, Vec<Expr>)> {
     ensure!(pair.as_rule() == Rule::r#type, 
         "Expected `type` rule when building type, found: {:?}", pair.as_rule());
         
@@ -274,22 +276,22 @@ pub fn build_ast(pair: pest::iterators::Pair<Rule>) -> Result<Program> {
     Ok(Program { statements })
 }
 
-fn build_statement (
+pub fn build_statement (
     pair: pest::iterators::Pair<Rule>
 ) -> Result<Option<Statement>> {
     match pair.as_rule() {
-        Rule::daini => statements::build_da_init(pair).context("...while building DA initialization statement!"),
-        Rule::var_decl => statements::build_var_decl(pair).context("...while building variable declaration!"),
-        Rule::write => statements::build_write(pair).context("...while building write statement!"),
-        Rule::read => statements::build_read(pair).context("...while building read statement!"),
-        Rule::assignment => statements::build_assignment(pair).context("...while building assignment statement!"),
-        Rule::r#loop => statements::build_loop(pair).context("...while building loop statement!"),
-        Rule::ploop => statements::build_ploop(pair).context("...while building ploop statement!"),
-        Rule::procedure => statements::build_procedure(pair).context("...while building procedure declaration!"),
-        Rule::procedure_call => statements::build_procedure_call(pair).context("...while building procedure call!"),
-        Rule::function => statements::build_function(pair).context("...while building function declaration!"),
-        Rule::function_call => statements::build_function_call(pair).context("...while building function call!"),
-        Rule::if_statement => statements::build_if(pair).context("...while building if statement!"),
+        Rule::daini => DAInitStatement::from_rule(pair).context("...while building DA initialization statement!"),
+        Rule::var_decl => VarDeclStatement::from_rule(pair).context("...while building variable declaration!"),
+        Rule::write => WriteStatement::from_rule(pair).context("...while building write statement!"),
+        Rule::read => ReadStatement::from_rule(pair).context("...while building read statement!"),
+        Rule::assignment => AssignStatement::from_rule(pair).context("...while building assignment statement!"),
+        Rule::r#loop => LoopStatement::from_rule(pair).context("...while building loop statement!"),
+        Rule::ploop => PLoopStatement::from_rule(pair).context("...while building ploop statement!"),
+        Rule::procedure => ProcedureStatement::from_rule(pair).context("...while building procedure declaration!"),
+        Rule::procedure_call => ProcedureCallStatement::from_rule(pair).context("...while building procedure call!"),
+        Rule::function => FunctionStatement::from_rule(pair).context("...while building function declaration!"),
+        Rule::function_call => FunctionCallStatement::from_rule(pair).context("...while building function call!"),
+        Rule::if_statement => IfStatement::from_rule(pair).context("...while building if statement!"),
 
         // Ignored
         Rule::begin | Rule::end | Rule::EOI | Rule::end_procedure | 
@@ -298,7 +300,7 @@ fn build_statement (
     }
 }
 
-fn build_variable_identifier(pair: pest::iterators::Pair<Rule>) -> Result<VariableIdentifier> {
+pub fn build_variable_identifier(pair: pest::iterators::Pair<Rule>) -> Result<VariableIdentifier> {
     ensure!(pair.as_rule() == Rule::variable_identifier, 
         "Expected `variable_identifier` rule when building variable identifier, found: {:?}", pair.as_rule());
         
@@ -326,7 +328,7 @@ fn build_variable_identifier(pair: pest::iterators::Pair<Rule>) -> Result<Variab
     })
 }
 
-fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
+pub fn build_expr(pair: pest::iterators::Pair<Rule>) -> Result<Expr> {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
             Rule::variable_identifier => Ok(Expr {

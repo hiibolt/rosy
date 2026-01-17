@@ -1,12 +1,38 @@
 use std::collections::BTreeSet;
+use anyhow::{Result, Context, Error, anyhow, ensure};
 
-use crate::ast::*;
-use super::super::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
-use anyhow::{Result, Error, anyhow};
+use crate::{
+    ast::*,
+    transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput}
+};
 
+impl StatementFromRule for ReadStatement {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
+        ensure!(pair.as_rule() == Rule::read, 
+            "Expected `read` rule when building read statement, found: {:?}", pair.as_rule());
+        
+        let mut inner = pair.into_inner();
+
+        let unit = inner.next()
+            .context("Missing first token `unit`!")?
+            .as_str()
+            .parse::<u8>()
+            .context("Failed to parse `unit` as u8 in `read` statement!")?;
+
+        let identifier = build_variable_identifier(
+            inner.next()
+            .context("Missing second token `variable_identifier`!")?
+        ).context("...while building variable identifier for read statement")?;
+
+        Ok(Some(Statement {
+            enum_variant: StatementEnum::Read,
+            inner: Box::new(ReadStatement { unit, identifier })
+        }))
+    }
+}
 
 impl Transpile for ReadStatement {
-    fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
         let mut errors = Vec::new();
         
