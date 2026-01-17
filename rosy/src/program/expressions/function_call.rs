@@ -128,8 +128,8 @@ pub fn function_call_transpile_helper (
 
     // Serialize the entire function
     let serialization = format!(
-        "{}({}).context(\"...while calling function '{}'\")?",
-        name, serialized_args.join(", "), name
+        "&mut ({}({}).context(\"...while calling function '{}'\")? as {})",
+        name, serialized_args.join(", "), name, func_context.return_type.as_rust_type()
     );
     if errors.is_empty() {
         Ok(TranspilationOutput {
