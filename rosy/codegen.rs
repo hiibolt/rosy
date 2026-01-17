@@ -34,11 +34,11 @@ pub fn parse_registry_from_source(source_path: &Path) -> Vec<TypeRule> {
     // Simple parser: look for TypeRule::new("X", "Y", "Z") patterns
     for line in content.lines() {
         if line.trim_start().starts_with("TypeRule::new(") {
-            if let Some(rule) = parse_type_rule_new(line) {
+            if let Some(rule) = parse_typefrom_rule_new(line) {
                 rules.push(rule);
             }
         } else if line.trim_start().starts_with("TypeRule::with_comment(") {
-            if let Some(rule) = parse_type_rule_with_comment(line) {
+            if let Some(rule) = parse_typefrom_rule_with_comment(line) {
                 rules.push(rule);
             } else {
                 println!("cargo:warning=Failed to parse line with comment: {}", line);
@@ -49,7 +49,7 @@ pub fn parse_registry_from_source(source_path: &Path) -> Vec<TypeRule> {
     rules
 }
 
-fn parse_type_rule_new(line: &str) -> Option<TypeRule> {
+fn parse_typefrom_rule_new(line: &str) -> Option<TypeRule> {
     // Parse: TypeRule::new("RE", "CM", "VE", "1", "2"),
     // Using regex to properly handle comments with parentheses, commas, etc.
     let re = Regex::new(
@@ -68,7 +68,7 @@ fn parse_type_rule_new(line: &str) -> Option<TypeRule> {
     })
 }
 
-fn parse_type_rule_with_comment(line: &str) -> Option<TypeRule> {
+fn parse_typefrom_rule_with_comment(line: &str) -> Option<TypeRule> {
     // Parse: TypeRule::with_comment("RE", "VE", "VE", "Add Real componentwise"),
     // Using regex to properly handle comments with parentheses, commas, etc.
     let re = Regex::new(
@@ -256,7 +256,7 @@ pub fn parse_intrinsic_registry_from_source(source_path: &Path) -> Vec<Intrinsic
     // Look for IntrinsicTypeRule::new() patterns
     for line in content.lines() {
         if line.trim_start().starts_with("IntrinsicTypeRule::new(") {
-            if let Some(rule) = parse_intrinsic_type_rule_new(line) {
+            if let Some(rule) = parse_intrinsic_typefrom_rule_new(line) {
                 rules.push(rule);
             }
         }
@@ -265,7 +265,7 @@ pub fn parse_intrinsic_registry_from_source(source_path: &Path) -> Vec<Intrinsic
     rules
 }
 
-fn parse_intrinsic_type_rule_new(line: &str) -> Option<IntrinsicTypeRule> {
+fn parse_intrinsic_typefrom_rule_new(line: &str) -> Option<IntrinsicTypeRule> {
     // Parse: IntrinsicTypeRule::new("RE", "RE", "1.5"),
     let re = Regex::new(
         r#"IntrinsicTypeRule::new\s*\(\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*\)"#

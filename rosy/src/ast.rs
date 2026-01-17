@@ -1,0 +1,56 @@
+use pest::pratt_parser::PrattParser;
+use pest_derive::Parser;
+use anyhow::{ensure, Context, Result};
+use crate::{program::expressions::Expr, rosy_lib::{RosyBaseType, RosyType}};
+
+#[derive(Parser)]
+#[grammar = "../assets/rosy.pest"]
+pub struct CosyParser;
+
+// Create a static PrattParser for expressions
+lazy_static::lazy_static! {
+    pub static ref PRATT_PARSER: PrattParser<Rule> = {
+        use pest::pratt_parser::{Assoc::*, Op};
+        use Rule::*;
+
+        // Precedence is defined from lowest to highest priority
+        PrattParser::new()
+            // Lowest precedence: concatenation (&)
+            .op(Op::infix(concat, Left))
+            // Extraction (|)
+            .op(Op::infix(extract, Left))
+            // Addition and Subtraction (same precedence)
+            .op(Op::infix(add, Left) | Op::infix(sub, Left))
+            // Multiplication and Division (same precedence)
+            .op(Op::infix(mult, Left) | Op::infix(div, Left))
+    };
+}
+
+pub trait FromRule: Sized {
+    fn from_rule ( pair: pest::iterators::Pair<Rule> ) -> Result<Option<Self>>;
+}
+// helper to build RosyType from type rule
+pub fn build_type (pair: pest::iterators::Pair<Rule>) -> Result<(RosyType, Vec<Expr>)> {
+    ensure!(pair.as_rule() == Rule::r#type, 
+        "Expected `type` rule when building type, found: {:?}", pair.as_rule());
+        
+    let mut inner_pair = pair.into_inner();
+    let type_str = inner_pair.next()
+        .context("Missing type string when building var decl!")?
+        .as_str().to_string();
+    let mut dimensions: Vec<Expr> = Vec::new();
+    while let Some(dim_pair) = inner_pair.next() {
+        let expr = Expr::from_rule(dim_pair)
+            .context("Failed to build dimension expression in variable declaration!")?
+            .ok_or_else(|| anyhow::anyhow!("Expected expression in variable declaration"))?;
+        dimensions.push(expr);
+    }
+
+    let base_type: RosyBaseType = type_str
+        .as_str()
+        .try_into()
+        .with_context(|| format!("Unknown type: {type_str}"))?;
+    let r#type = RosyType::new(base_type, dimensions.len()); 
+
+    Ok((r#type, dimensions))
+}

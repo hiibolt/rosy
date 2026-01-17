@@ -1,11 +1,11 @@
 mod transpile;
 mod ast;
 mod embedded;
-mod statements;
+mod program;
 #[allow(unused_imports, dead_code)]
 mod rosy_lib;
 
-use crate::{transpile::{TranspilationInputContext, TranspilationOutput, Transpile}, ast::build_ast};
+use crate::{ast::FromRule, program::Program, transpile::*};
 use std::{fs::write, path::PathBuf, process::Command};
 use anyhow::{ensure, Context, Result, anyhow};
 use pest::Parser;
@@ -73,8 +73,9 @@ fn rosy (
         .context("Expected a program")?;
 
     info!("Stage 2 - AST Generation");
-    let ast = build_ast(program)
-        .context("Failed to build AST!")?;
+    let ast = Program::from_rule(program)
+        .context("Failed to build AST!")?
+        .context("Expected a program")?;
 
     info!("Stage 3 - Transpilation");
     let TranspilationOutput { serialization, .. } = ast
