@@ -12,6 +12,7 @@ statement   = _{
   | assignment 
   | function
   | loop
+  | while_loop
   | ploop
   | procedure
   | procedure_call
@@ -29,7 +30,7 @@ read = { "READ" ~ unit ~ variable_identifier ~ semicolon }
 var_decl = { "VARIABLE" ~ type ~ variable_name ~ semicolon }
 
 /// Keywords - define all reserved words
-keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" | "IF" | "ELSEIF" | "ELSE" | "ENDIF" | "TRUE" | "FALSE" | "DAINI" | "LENGTH" | "SIN" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
+keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" | "IF" | "ELSEIF" | "ELSE" | "ENDIF" | "WHILE" | "ENDWHILE" | "TRUE" | "FALSE" | "DAINI" | "LENGTH" | "SIN" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
 
 /// [ IF / ELSEIF / ELSE / ENDIF ]
 if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
@@ -76,6 +77,10 @@ endif = { "ENDIF" ~ semicolon }
   ploop = { start_ploop ~ statement+ ~ end_ploop }
   start_ploop = { "PLOOP" ~ variable_name ~ expr ~ expr ~ semicolon }
   end_ploop = { "ENDPLOOP" ~ unit? ~ variable_identifier ~ semicolon }
+  /// [ WHILE ]
+  while_loop = { start_while ~ statement* ~ end_while }
+  start_while = { "WHILE" ~ expr ~ semicolon }
+  end_while = { "ENDWHILE" ~ semicolon }
 
 /// [ INTRINSIC FUNCTIONS ]
   builtin_function = _{ cm | st | lo | da | length | sin }

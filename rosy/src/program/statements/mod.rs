@@ -4,6 +4,7 @@ pub mod write;
 pub mod read;
 pub mod da_init;
 pub mod r#loop;
+pub mod while_loop;
 pub mod ploop;
 pub mod r#if;
 pub mod function_call;
@@ -17,6 +18,7 @@ pub use write::WriteStatement;
 pub use read::ReadStatement;
 pub use da_init::DAInitStatement;
 pub use r#loop::LoopStatement;
+pub use while_loop::WhileStatement;
 pub use ploop::PLoopStatement;
 pub use r#if::IfStatement;
 pub use function_call::FunctionCallStatement;
@@ -44,6 +46,7 @@ pub enum StatementEnum {
     Function,
     FunctionCall,
     Loop,
+    WhileLoop,
     PLoop,
     If,
 }
@@ -89,6 +92,12 @@ impl FromRule for Statement {
                     enum_variant: StatementEnum::Loop,
                     inner: Box::new(stmt)
                 })),
+            Rule::while_loop => WhileStatement::from_rule(pair)
+                .context("...while building while statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::WhileLoop,
+                    inner: Box::new(stmt)
+                })),
             Rule::ploop => PLoopStatement::from_rule(pair)
                 .context("...while building ploop statement!")
                 .map(|opt| opt.map(|stmt| Statement {
@@ -128,7 +137,7 @@ impl FromRule for Statement {
 
             // Ignored
             Rule::begin | Rule::end | Rule::EOI | Rule::end_procedure | 
-            Rule::end_function | Rule::end_loop | Rule::endif => Ok(None),
+            Rule::end_function | Rule::end_loop | Rule::end_while | Rule::endif => Ok(None),
             other => bail!("Unexpected statement: {:?}", other),
         }
     }
