@@ -15,6 +15,8 @@ fn main() {
     codegen::codegen_operator("div");
     codegen::codegen_operator("concat");
     codegen::codegen_operator("extract");
+    codegen::codegen_operator("eq");
+    codegen::codegen_operator("neq");
     
     // Generate intrinsic function test files
     codegen::codegen_intrinsic("length");

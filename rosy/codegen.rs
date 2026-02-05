@@ -116,6 +116,8 @@ fn get_operator_symbol(operator_name: &str) -> &'static str {
         "div" => "/",
         "concat" => "&",
         "extract" => "|",
+        "eq" => "=",
+        "neq" => "#",
         _ => panic!("Unknown operator name: {}", operator_name),
     }
 }

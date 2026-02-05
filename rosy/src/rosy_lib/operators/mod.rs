@@ -4,6 +4,8 @@ pub mod mult;
 pub mod div;
 pub mod extract;
 pub mod concat;
+pub mod eq;
+pub mod neq;
 
 pub use add::RosyAdd;
 pub use sub::RosySub;
@@ -11,6 +13,8 @@ pub use mult::RosyMult;
 pub use div::RosyDiv;
 pub use concat::RosyConcat;
 pub use extract::RosyExtract;
+pub use eq::RosyEq;
+pub use neq::RosyNeq;
 
 use std::collections::HashMap;
 use crate::rosy_lib::{RosyType, RosyBaseType};

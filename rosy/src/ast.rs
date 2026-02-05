@@ -14,15 +14,21 @@ lazy_static::lazy_static! {
         use Rule::*;
 
         // Precedence is defined from lowest to highest priority
+        // Following COSY INFINITY priorities:
+        // - Priority 2: Concatenation (&), Equality (=), Not-Equals (#), Less/Greater
+        // - Priority 3: Addition (+), Subtraction (-)
+        // - Priority 4: Multiplication (*), Division (/)
+        // - Priority 5: Exponentiation (^)
+        // - Priority 6: Extraction (|)
         PrattParser::new()
-            // Lowest precedence: concatenation (&)
-            .op(Op::infix(concat, Left))
-            // Extraction (|)
-            .op(Op::infix(extract, Left))
-            // Addition and Subtraction (same precedence)
+            // Lowest precedence (Priority 2): concatenation, equality, not-equals
+            .op(Op::infix(concat, Left) | Op::infix(eq, Left) | Op::infix(neq, Left))
+            // Priority 3: Addition and Subtraction
             .op(Op::infix(add, Left) | Op::infix(sub, Left))
-            // Multiplication and Division (same precedence)
+            // Priority 4: Multiplication and Division
             .op(Op::infix(mult, Left) | Op::infix(div, Left))
+            // Priority 6: Extraction (|)
+            .op(Op::infix(extract, Left))
     };
 }
 

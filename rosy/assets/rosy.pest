@@ -124,13 +124,17 @@ term = _{
 boolean = { "TRUE" | "FALSE" }
 
 // Infix operators
-infix_op    = _{ extract | mult | div | add | sub | concat }
+// Note: eq/neq must come before other operators to avoid `=` being parsed as part of `:=`
+// We support both COSY syntax (= and #) and modern syntax (== and <>/!=)
+infix_op    = _{ extract | mult | div | add | sub | concat | eq | neq }
 extract     = { "|" }
 add         = { "+" }
 sub         = { "-" }
 mult        = { "*" }
 div         = { "/" }
 concat      = { "&" }
+eq          = { "==" | "=" }
+neq         = { "<>" | "!=" | "#" }
 
 variable_identifier = { variable_name ~ variable_indexing? }
 variable_indexing = { "[" ~ expr ~ ("," ~ expr)* ~ "]" }

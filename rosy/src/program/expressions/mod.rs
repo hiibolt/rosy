@@ -6,6 +6,8 @@ pub mod add;
 pub mod sub;
 pub mod mult;
 pub mod div;
+pub mod eq;
+pub mod neq;
 pub mod string_convert;
 pub mod logical_convert;
 pub mod function_call;
@@ -31,6 +33,8 @@ use crate::program::expressions::add::AddExpr;
 use crate::program::expressions::sub::SubExpr;
 use crate::program::expressions::mult::MultExpr;
 use crate::program::expressions::div::DivExpr;
+use crate::program::expressions::eq::EqExpr;
+use crate::program::expressions::neq::NeqExpr;
 use crate::program::expressions::concat::ConcatExpr;
 use crate::program::expressions::extract::ExtractExpr;
 use anyhow::{Context, Error, Result, bail};
@@ -55,6 +59,8 @@ pub enum ExprEnum {
     Sub,
     Mult,
     Div,
+    Eq,
+    Neq,
     Concat,
     Extract,
     Complex,
@@ -238,6 +244,28 @@ impl FromRule for Expr {
                         inner: Box::new(ExtractExpr {
                             object: Box::new(left),
                             index: Box::new(right),
+                        })
+                    })
+                },
+                Rule::eq => {
+                    let left = left.context("...while transpiling left-hand side of `eq` expression")?;
+                    let right = right.context("...while transpiling right-hand side of `eq` expression")?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Eq,
+                        inner: Box::new(EqExpr {
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        })
+                    })
+                },
+                Rule::neq => {
+                    let left = left.context("...while transpiling left-hand side of `neq` expression")?;
+                    let right = right.context("...while transpiling right-hand side of `neq` expression")?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Neq,
+                        inner: Box::new(NeqExpr {
+                            left: Box::new(left),
+                            right: Box::new(right),
                         })
                     })
                 },

@@ -1,0 +1,29 @@
+BEGIN;
+    VARIABLE (RE) LHS_0;
+    VARIABLE (RE) RHS_0;
+    VARIABLE (LO) RESULT_0;
+
+    LHS_0 := 3.14159;
+    RHS_0 := 2.71828;
+    RESULT_0 := LHS_0 # RHS_0;
+    WRITE 6 ST(RESULT_0);
+
+    VARIABLE (ST) LHS_1;
+    VARIABLE (ST) RHS_1;
+    VARIABLE (LO) RESULT_1;
+
+    LHS_1 := 'hello';
+    RHS_1 := 'world';
+    RESULT_1 := LHS_1 # RHS_1;
+    WRITE 6 ST(RESULT_1);
+
+    VARIABLE (LO) LHS_2;
+    VARIABLE (LO) RHS_2;
+    VARIABLE (LO) RESULT_2;
+
+    LHS_2 := TRUE;
+    RHS_2 := FALSE;
+    RESULT_2 := LHS_2 # RHS_2;
+    WRITE 6 ST(RESULT_2);
+
+END;

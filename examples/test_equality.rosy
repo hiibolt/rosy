@@ -1,0 +1,72 @@
+BEGIN;
+    { Test equality operators }
+    VARIABLE (RE) x;
+    VARIABLE (RE) y;
+    VARIABLE (LO) result1;
+    VARIABLE (LO) result2;
+    VARIABLE (ST) s1;
+    VARIABLE (ST) s2;
+    VARIABLE (LO) result3;
+    VARIABLE (LO) result4;
+
+    { Test RE = RE (equal values) }
+    x := 3.14159;
+    y := 3.14159;
+    result1 := x = y;
+    WRITE 6 "RE == RE (equal): " & ST(result1);
+
+    { Test RE = RE (different values) }
+    x := 1.0;
+    y := 2.0;
+    result2 := x = y;
+    WRITE 6 "RE == RE (different): " & ST(result2);
+
+    { Test RE # RE (different values) }
+    result1 := x # y;
+    WRITE 6 "RE # RE (different): " & ST(result1);
+
+    { Test RE # RE (equal values) }
+    y := 1.0;
+    result2 := x # y;
+    WRITE 6 "RE # RE (equal): " & ST(result2);
+
+    { Test ST = ST }
+    s1 := "hello";
+    s2 := "hello";
+    result3 := s1 = s2;
+    WRITE 6 "ST == ST (equal): " & ST(result3);
+
+    s2 := "world";
+    result4 := s1 = s2;
+    WRITE 6 "ST == ST (different): " & ST(result4);
+
+    { Test ST # ST }
+    result3 := s1 # s2;
+    WRITE 6 "ST # ST (different): " & ST(result3);
+
+    s2 := "hello";
+    result4 := s1 # s2;
+    WRITE 6 "ST # ST (equal): " & ST(result4);
+
+    { Test modern syntax variants }
+    x := 5.0;
+    y := 5.0;
+    result1 := x == y;
+    WRITE 6 "RE == RE (modern syntax): " & ST(result1);
+
+    result2 := x <> y;
+    WRITE 6 "RE <> RE (modern syntax): " & ST(result2);
+
+    result3 := x != y;
+    WRITE 6 "RE != RE (modern syntax): " & ST(result3);
+
+    { Test comparison in IF statement }
+    IF x = y;
+        WRITE 6 "IF x = y: TRUE";
+    ENDIF;
+
+    IF x # 10.0;
+        WRITE 6 "IF x # 10: TRUE";
+    ENDIF;
+
+END;
