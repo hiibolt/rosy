@@ -112,6 +112,7 @@ assignment  = { variable_identifier ~ ":=" ~ expr ~ semicolon }
 // Expression parsing using Pratt parser
 expr = { term ~ (infix_op ~ term)* }
 term = _{ 
+    not_expr |
     builtin_function | 
     function_call |
     boolean |
@@ -123,10 +124,14 @@ term = _{
 // Boolean literals
 boolean = { "TRUE" | "FALSE" }
 
+// NOT expression (prefix unary operator) - ROSY extension
+// Use `!` directly adjacent to operand
+not_expr = { "!" ~ (boolean | variable_identifier | "(" ~ expr ~ ")") }
+
 // Infix operators
-// Note: eq/neq must come before other operators to avoid `=` being parsed as part of `:=`
+// Note: lte/gte must come before lt/gt to avoid `<=` being parsed as `<` then `=`
 // We support both COSY syntax (= and #) and modern syntax (== and <>/!=)
-infix_op    = _{ extract | mult | div | add | sub | concat | eq | neq }
+infix_op    = _{ extract | mult | div | add | sub | concat | eq | neq | lte | gte | lt | gt }
 extract     = { "|" }
 add         = { "+" }
 sub         = { "-" }
@@ -135,6 +140,10 @@ div         = { "/" }
 concat      = { "&" }
 eq          = { "==" | "=" }
 neq         = { "<>" | "!=" | "#" }
+lt          = { "<" }
+gt          = { ">" }
+lte         = { "<=" }
+gte         = { ">=" }
 
 variable_identifier = { variable_name ~ variable_indexing? }
 variable_indexing = { "[" ~ expr ~ ("," ~ expr)* ~ "]" }

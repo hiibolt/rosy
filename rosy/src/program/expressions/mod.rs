@@ -8,6 +8,11 @@ pub mod mult;
 pub mod div;
 pub mod eq;
 pub mod neq;
+pub mod lt;
+pub mod gt;
+pub mod lte;
+pub mod gte;
+pub mod not;
 pub mod string_convert;
 pub mod logical_convert;
 pub mod function_call;
@@ -35,6 +40,11 @@ use crate::program::expressions::mult::MultExpr;
 use crate::program::expressions::div::DivExpr;
 use crate::program::expressions::eq::EqExpr;
 use crate::program::expressions::neq::NeqExpr;
+use crate::program::expressions::lt::LtExpr;
+use crate::program::expressions::gt::GtExpr;
+use crate::program::expressions::lte::LteExpr;
+use crate::program::expressions::gte::GteExpr;
+use crate::program::expressions::not::NotExpr;
 use crate::program::expressions::concat::ConcatExpr;
 use crate::program::expressions::extract::ExtractExpr;
 use anyhow::{Context, Error, Result, bail};
@@ -61,6 +71,11 @@ pub enum ExprEnum {
     Div,
     Eq,
     Neq,
+    Lt,
+    Gt,
+    Lte,
+    Gte,
+    Not,
     Concat,
     Extract,
     Complex,
@@ -76,6 +91,47 @@ impl FromRule for Expr {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Expr>> {
         let result = PRATT_PARSER
             .map_primary(|primary| match primary.as_rule() {
+                Rule::not_expr => {
+                    // NOT expression: parse the inner operand
+                    // The inner can be: boolean, variable_identifier, or expr (parenthesized)
+                    let mut inner = primary.into_inner();
+                    let operand_pair = inner.next()
+                        .ok_or_else(|| anyhow::anyhow!("NOT expression missing operand"))?;
+                    
+                    // Handle different operand types
+                    let operand = match operand_pair.as_rule() {
+                        Rule::boolean => {
+                            let b = bool::from_rule(operand_pair)?
+                                .ok_or_else(|| anyhow::anyhow!("Expected boolean"))?;
+                            Expr {
+                                enum_variant: ExprEnum::Boolean,
+                                inner: Box::new(b),
+                            }
+                        },
+                        Rule::variable_identifier => {
+                            let var_expr = VarExpr::from_rule(operand_pair)?
+                                .ok_or_else(|| anyhow::anyhow!("Expected VarExpr"))?;
+                            Expr {
+                                enum_variant: ExprEnum::Var,
+                                inner: Box::new(var_expr),
+                            }
+                        },
+                        Rule::expr => {
+                            Expr::from_rule(operand_pair)?
+                                .ok_or_else(|| anyhow::anyhow!("Failed to parse NOT operand expression"))?
+                        },
+                        other => {
+                            return Err(anyhow::anyhow!("Unexpected NOT operand type: {:?}", other));
+                        }
+                    };
+                    
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Not,
+                        inner: Box::new(NotExpr {
+                            operand: Box::new(operand),
+                        }),
+                    })
+                },
                 Rule::variable_identifier => {
                     let var_expr = VarExpr::from_rule(primary)?;
                     Ok(Expr {
@@ -264,6 +320,50 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Neq,
                         inner: Box::new(NeqExpr {
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        })
+                    })
+                },
+                Rule::lt => {
+                    let left = left.context("...while transpiling left-hand side of `lt` expression")?;
+                    let right = right.context("...while transpiling right-hand side of `lt` expression")?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Lt,
+                        inner: Box::new(LtExpr {
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        })
+                    })
+                },
+                Rule::gt => {
+                    let left = left.context("...while transpiling left-hand side of `gt` expression")?;
+                    let right = right.context("...while transpiling right-hand side of `gt` expression")?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Gt,
+                        inner: Box::new(GtExpr {
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        })
+                    })
+                },
+                Rule::lte => {
+                    let left = left.context("...while transpiling left-hand side of `lte` expression")?;
+                    let right = right.context("...while transpiling right-hand side of `lte` expression")?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Lte,
+                        inner: Box::new(LteExpr {
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        })
+                    })
+                },
+                Rule::gte => {
+                    let left = left.context("...while transpiling left-hand side of `gte` expression")?;
+                    let right = right.context("...while transpiling right-hand side of `gte` expression")?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Gte,
+                        inner: Box::new(GteExpr {
                             left: Box::new(left),
                             right: Box::new(right),
                         })

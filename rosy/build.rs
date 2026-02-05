@@ -17,6 +17,11 @@ fn main() {
     codegen::codegen_operator("extract");
     codegen::codegen_operator("eq");
     codegen::codegen_operator("neq");
+    codegen::codegen_operator("lt");
+    codegen::codegen_operator("gt");
+    codegen::codegen_operator("lte");
+    codegen::codegen_operator("gte");
+    // Note: NOT is a unary operator and doesn't use the standard codegen
     
     // Generate intrinsic function test files
     codegen::codegen_intrinsic("length");

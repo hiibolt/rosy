@@ -118,6 +118,10 @@ fn get_operator_symbol(operator_name: &str) -> &'static str {
         "extract" => "|",
         "eq" => "=",
         "neq" => "#",
+        "lt" => "<",
+        "gt" => ">",
+        "lte" => "<=",
+        "gte" => ">=",
         _ => panic!("Unknown operator name: {}", operator_name),
     }
 }
