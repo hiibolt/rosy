@@ -11,6 +11,7 @@ pub mod function_call;
 pub mod procedure_call;
 pub mod function;
 pub mod procedure;
+pub mod break_statement;
 
 pub use assign::AssignStatement;
 pub use var_decl::{VarDeclStatement, VariableDeclarationData};
@@ -25,6 +26,7 @@ pub use function_call::FunctionCallStatement;
 pub use procedure_call::ProcedureCallStatement;
 pub use function::FunctionStatement;
 pub use procedure::ProcedureStatement;
+pub use break_statement::BreakStatement;
 
 use crate::{ast::{FromRule, Rule}, transpile::*};
 use anyhow::{Context, Error, Result, bail};
@@ -49,6 +51,7 @@ pub enum StatementEnum {
     WhileLoop,
     PLoop,
     If,
+    Break,
 }
 
 impl FromRule for Statement {
@@ -132,6 +135,12 @@ impl FromRule for Statement {
                 .context("...while building if statement!")
                 .map(|opt| opt.map(|stmt| Statement {
                     enum_variant: StatementEnum::If,
+                    inner: Box::new(stmt)
+                })),
+            Rule::break_statement => BreakStatement::from_rule(pair)
+                .context("...while building break statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Break,
                     inner: Box::new(stmt)
                 })),
 

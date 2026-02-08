@@ -1,0 +1,30 @@
+BEGIN ;
+
+{ Test 1: BREAK in a WHILE loop }
+VARIABLE (RE) counter ;
+counter := 0 ;
+
+WHILE counter < 10 ;
+  counter := counter + 1 ;
+  WRITE 6 counter ;
+  IF counter = 5 ;
+    BREAK ;
+  ENDIF ;
+ENDWHILE ;
+
+WRITE 6 'After while, counter =' counter ;
+
+{ Test 2: BREAK in a LOOP }
+VARIABLE (RE) total ;
+total := 0 ;
+
+LOOP I 1 20 ;
+  total := total + I ;
+  IF I = 7 ;
+    BREAK ;
+  ENDIF ;
+ENDLOOP ;
+
+WRITE 6 'After loop, total =' total ;
+
+END ;

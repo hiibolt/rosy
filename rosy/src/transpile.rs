@@ -43,7 +43,8 @@ pub struct TranspilationInputProcedureContext {
 pub struct TranspilationInputContext {
     pub variables:  HashMap<String, ScopedVariableData>,
     pub functions:  HashMap<String, TranspilationInputFunctionContext>,
-    pub procedures: HashMap<String, TranspilationInputProcedureContext>
+    pub procedures: HashMap<String, TranspilationInputProcedureContext>,
+    pub in_loop: bool,
 }
 #[derive(Default)]
 pub struct TranspilationOutput {
