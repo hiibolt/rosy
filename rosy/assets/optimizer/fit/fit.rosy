@@ -1,0 +1,62 @@
+BEGIN ;
+
+VARIABLE (RE) X ;
+VARIABLE (RE) Y ;
+VARIABLE (RE) OBJ ;
+VARIABLE (RE) EPS ;
+
+EPS := 0.0000000001 ;
+
+{ Test 1: Simplex optimizer - find min of (X-3)^2 + (Y-7)^2 }
+X := 0 ;
+Y := 0 ;
+
+FIT X Y ;
+  OBJ := (X - 3)*(X - 3) + (Y - 7)*(Y - 7) ;
+ENDFIT EPS 1000 1 OBJ ;
+
+WRITE 6 'SIMPLEX:' ;
+WRITE 6 X ;
+WRITE 6 Y ;
+WRITE 6 OBJ ;
+
+{ Test 2: LMDIF optimizer }
+X := 0 ;
+Y := 0 ;
+
+FIT X Y ;
+  OBJ := (X - 3)*(X - 3) + (Y - 7)*(Y - 7) ;
+ENDFIT EPS 1000 4 OBJ ;
+
+WRITE 6 'LMDIF:' ;
+WRITE 6 X ;
+WRITE 6 Y ;
+WRITE 6 OBJ ;
+
+{ Test 3: SA optimizer }
+X := 0 ;
+Y := 0 ;
+
+FIT X Y ;
+  OBJ := (X - 3)*(X - 3) + (Y - 7)*(Y - 7) ;
+ENDFIT EPS 1000 3 OBJ ;
+
+WRITE 6 'SA:' ;
+WRITE 6 X ;
+WRITE 6 Y ;
+WRITE 6 OBJ ;
+
+{ Test 4: NO-OPT (max=0) }
+X := 5 ;
+Y := 10 ;
+
+FIT X Y ;
+  OBJ := (X - 3)*(X - 3) + (Y - 7)*(Y - 7) ;
+ENDFIT EPS 0 1 OBJ ;
+
+WRITE 6 'NO-OPT:' ;
+WRITE 6 X ;
+WRITE 6 Y ;
+WRITE 6 OBJ ;
+
+END ;

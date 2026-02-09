@@ -12,6 +12,7 @@ pub mod procedure_call;
 pub mod function;
 pub mod procedure;
 pub mod break_statement;
+pub mod fit;
 
 pub use assign::AssignStatement;
 pub use var_decl::{VarDeclStatement, VariableDeclarationData};
@@ -27,6 +28,7 @@ pub use procedure_call::ProcedureCallStatement;
 pub use function::FunctionStatement;
 pub use procedure::ProcedureStatement;
 pub use break_statement::BreakStatement;
+pub use fit::FitStatement;
 
 use crate::{ast::{FromRule, Rule}, transpile::*};
 use anyhow::{Context, Error, Result, bail};
@@ -52,6 +54,7 @@ pub enum StatementEnum {
     PLoop,
     If,
     Break,
+    Fit,
 }
 
 impl FromRule for Statement {
@@ -143,10 +146,17 @@ impl FromRule for Statement {
                     enum_variant: StatementEnum::Break,
                     inner: Box::new(stmt)
                 })),
+            Rule::fit_statement => FitStatement::from_rule(pair)
+                .context("...while building FIT statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Fit,
+                    inner: Box::new(stmt)
+                })),
 
             // Ignored
             Rule::begin | Rule::end | Rule::EOI | Rule::end_procedure | 
-            Rule::end_function | Rule::end_loop | Rule::end_while | Rule::endif => Ok(None),
+            Rule::end_function | Rule::end_loop | Rule::end_while | Rule::endif |
+            Rule::end_fit => Ok(None),
             other => bail!("Unexpected statement: {:?}", other),
         }
     }

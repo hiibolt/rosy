@@ -3,6 +3,7 @@ pub mod intrinsics;
 pub mod core;
 pub mod mpi;
 pub mod taylor;
+pub mod optimizer;
 
 pub use operators::*;
 pub use intrinsics::*;
