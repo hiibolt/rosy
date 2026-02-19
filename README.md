@@ -247,6 +247,10 @@ The project is organized as a Rust workspace with several interconnected crates:
 10. Build triggers codegen (`cargo build`) to generate test files
 11. COSY/ROSY output comparison validates behavior matches reference implementation
 
+### Differences between COSY and Rosy
+- PLOOP does not revert to LOOP behavior when `NP == 1`
+- Rosy offers a `BREAK` statement, while COSY does not
+
 ### Adding a New Statement
 
 1. **Read `manual.md`** - Find the statement/procedure definition with syntax, arguments, and examples in the appropriate section
