@@ -75,6 +75,7 @@ impl Transpile for WhileStatement {
         }
 
         let mut inner_context: TranspilationInputContext = context.clone();
+        inner_context.in_loop = true;
         let mut requested_variables = BTreeSet::new();
         let mut serialized_statements = Vec::new();
         let mut errors = Vec::new();
