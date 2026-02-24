@@ -10,7 +10,11 @@ use crate::{
 pub struct VariableDeclarationData {
     pub name: String,
     pub r#type: Option<RosyType>,
-    pub dimension_exprs: Vec<Expr>
+    pub dimension_exprs: Vec<Expr>,
+    /// COSY-style memory size expression (e.g. `VARIABLE X 100 ;`)
+    /// Parsed for backwards compatibility but never evaluated —
+    /// Rosy handles memory allocation automatically.
+    pub _memory_size_expr: Option<Expr>,
 }
 impl VariableDeclarationData {
     /// Helper to unwrap the type or return a descriptive error.
@@ -117,10 +121,29 @@ impl FromRule for VarDeclStatement {
             (None, Vec::new(), name)
         };
 
+        // Parse optional COSY-style memory size expression (e.g. `VARIABLE X 100 ;`)
+        let _memory_size_expr = if let Some(mem_pair) = inner.next() {
+            if mem_pair.as_rule() == Rule::memory_size {
+                let mem_inner = mem_pair.into_inner().next()
+                    .context("Missing expression in memory_size")?;
+                let expr = Expr::from_rule(mem_inner)
+                    .context("...while building memory size expression in variable declaration!")?;
+                if expr.is_some() {
+                    eprintln!("Warning: COSY-style memory size in VARIABLE declaration for '{}' is ignored — Rosy handles memory automatically.", name);
+                }
+                expr
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         let data = VariableDeclarationData {
             name,
             r#type,
-            dimension_exprs
+            dimension_exprs,
+            _memory_size_expr,
         };
 
         Ok(Some(VarDeclStatement { data }))

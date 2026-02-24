@@ -74,6 +74,7 @@ impl FromRule for FunctionStatement {
                     name: arg_name.to_string(),
                     r#type: argument_type,
                     dimension_exprs: argument_dimensions,
+                    _memory_size_expr: None,
                 };
                 args.push(argument_data);
             }
@@ -90,6 +91,7 @@ impl FromRule for FunctionStatement {
                             name: name.clone(),
                             r#type: return_type.clone(),
                             dimension_exprs: Vec::new(),
+                            _memory_size_expr: None,
                         }
                     })
                 }

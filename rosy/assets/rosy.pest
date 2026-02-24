@@ -32,7 +32,10 @@ write = { "WRITE" ~ unit ~ expr+ ~ semicolon }
 read = { "READ" ~ unit ~ variable_identifier ~ semicolon }
 
 /// VARIABLE
-var_decl = { "VARIABLE" ~ type? ~ variable_name ~ semicolon }
+/// Supports both Rosy-style `VARIABLE (RE) name ;` and COSY-style `VARIABLE name expr ;`
+/// The COSY memory size expression is parsed but ignored (Rosy handles memory automatically)
+var_decl = { "VARIABLE" ~ type? ~ variable_name ~ memory_size? ~ semicolon }
+memory_size = { expr }
 
 /// Keywords - define all reserved words
 keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" | "IF" | "ELSEIF" | "ELSE" | "ENDIF" | "WHILE" | "ENDWHILE" | "TRUE" | "FALSE" | "DAINI" | "LENGTH" | "SIN" | "BREAK" | "FIT" | "ENDFIT" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }

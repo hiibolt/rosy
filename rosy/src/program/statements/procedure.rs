@@ -52,7 +52,8 @@ impl FromRule for ProcedureStatement {
                 let variable_data = VariableDeclarationData {
                     name: name.to_string(),
                     r#type,
-                    dimension_exprs
+                    dimension_exprs,
+                    _memory_size_expr: None,
                 };
                 args.push(variable_data);
             }
