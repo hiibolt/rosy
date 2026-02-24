@@ -30,6 +30,7 @@ use std::collections::{HashMap, HashSet};
 use anyhow::Result;
 use crate::rosy_lib::RosyType;
 use crate::program::Program;
+use crate::program::statements::SourceLocation;
 
 // ─── Type Slot ──────────────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ enum ExprRecipe {
 
 #[derive(Debug, Clone, Copy)]
 enum BinaryOpKind {
-    Add, Sub, Mult, Div, Extract,
+    Add, Sub, Mult, Div, Extract, Derive,
 }
 
 // ─── Dependency Graph Node ──────────────────────────────────────────────────
@@ -134,6 +135,10 @@ struct GraphNode {
     depends_on: HashSet<TypeSlot>,
     /// The resolved type (filled in during topological traversal).
     resolved: Option<RosyType>,
+    /// Where this slot was declared (VARIABLE statement source location).
+    declared_at: Option<SourceLocation>,
+    /// Where the assignment that established the type inference rule is.
+    assigned_at: Option<SourceLocation>,
 }
 
 // ─── Scope Context (used during graph construction) ─────────────────────────
@@ -186,13 +191,15 @@ impl TypeResolver {
     // ─── Graph Infrastructure ───────────────────────────────────────────
 
     /// Insert a node for a slot. If it has an explicit type, mark it resolved.
-    fn insert_slot(&mut self, slot: TypeSlot, explicit_type: Option<&RosyType>) {
+    fn insert_slot(&mut self, slot: TypeSlot, explicit_type: Option<&RosyType>, declared_at: Option<SourceLocation>) {
         if let Some(t) = explicit_type {
             self.nodes.insert(slot.clone(), GraphNode {
                 slot,
                 rule: ResolutionRule::Explicit(t.clone()),
                 depends_on: HashSet::new(),
                 resolved: Some(t.clone()),
+                declared_at,
+                assigned_at: None,
             });
         } else {
             // Placeholder — rule and deps will be set by discover_dependencies
@@ -201,6 +208,8 @@ impl TypeResolver {
                 rule: ResolutionRule::Unresolved,
                 depends_on: HashSet::new(),
                 resolved: None,
+                declared_at,
+                assigned_at: None,
             });
         }
     }

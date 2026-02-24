@@ -39,7 +39,7 @@ impl Transpile for LengthExpr {
 
         // Generate the transpiled code
         let serialization = format!(
-            "&mut {}.rosy_length()",
+            "&mut RosyLENGTH::rosy_length(&*{})",
             inner_output.serialization
         );
 

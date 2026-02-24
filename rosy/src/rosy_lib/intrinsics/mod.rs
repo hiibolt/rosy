@@ -4,6 +4,10 @@ pub mod lo;
 pub mod from_st;
 pub mod length;
 pub mod sin;
+pub mod sqr;
+pub mod vmax;
+pub mod mem_size;
+pub mod derive;
 
 pub use cm::RosyCM;
 pub use st::RosyST;
@@ -11,6 +15,10 @@ pub use lo::RosyLO;
 pub use from_st::RosyFromST;
 pub use length::RosyLENGTH;
 pub use sin::RosySIN;
+pub use sqr::RosySQR;
+pub use vmax::RosyVMAX;
+pub use mem_size::{RosyLST, RosyLCM, RosyLCD};
+pub use derive::RosyDerive;
 
 /// Represents a parsed intrinsic type rule from the source code.
 #[derive(Debug, Clone)]

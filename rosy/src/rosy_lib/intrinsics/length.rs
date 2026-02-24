@@ -59,12 +59,10 @@ impl RosyLENGTH for RE {
     }
 }
 
-/// LENGTH for strings - depends on string length
+/// LENGTH for strings - returns the number of characters
 impl RosyLENGTH for ST {
     fn rosy_length(&self) -> RE {
-        // Strings use 1 block per 8 bytes
-        let byte_len = self.len() as f64;
-        (byte_len / 8.0).ceil()
+        self.len() as f64
     }
 }
 

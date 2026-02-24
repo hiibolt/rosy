@@ -19,7 +19,7 @@ lazy_static::lazy_static! {
         // - Priority 3: Addition (+), Subtraction (-)
         // - Priority 4: Multiplication (*), Division (/)
         // - Priority 5: Exponentiation (^)
-        // - Priority 6: Extraction (|)
+        // - Priority 6: Extraction (|), Derivation (%)
         PrattParser::new()
             // Lowest precedence (Priority 2): concatenation, equality, not-equals, comparisons
             .op(Op::infix(concat, Left) | Op::infix(eq, Left) | Op::infix(neq, Left) 
@@ -28,8 +28,8 @@ lazy_static::lazy_static! {
             .op(Op::infix(add, Left) | Op::infix(sub, Left))
             // Priority 4: Multiplication and Division
             .op(Op::infix(mult, Left) | Op::infix(div, Left))
-            // Priority 6: Extraction (|)
-            .op(Op::infix(extract, Left))
+            // Priority 6: Extraction (|) and Derivation (%)
+            .op(Op::infix(extract, Left) | Op::infix(derive, Left))
     };
 }
 

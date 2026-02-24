@@ -39,7 +39,7 @@ impl Transpile for SinExpr {
 
         // Generate the transpiled code
         let serialization = format!(
-            "&mut {}.rosy_sin()?",
+            "&mut RosySIN::rosy_sin(&*{})?",
             inner_output.serialization
         );
 

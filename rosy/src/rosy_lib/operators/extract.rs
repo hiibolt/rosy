@@ -16,8 +16,9 @@
 use anyhow::{Result, bail};
 
 use crate::rosy_lib::RosyType;
-use crate::rosy_lib::{RE, ST, VE, CM};
+use crate::rosy_lib::{RE, ST, VE, CM, DA, CD};
 use crate::rosy_lib::operators::{TypeRule, build_type_registry};
+use crate::rosy_lib::taylor::monomial::Monomial;
 
 /// Type compatibility registry for extraction operator.
 /// 
@@ -29,19 +30,17 @@ use crate::rosy_lib::operators::{TypeRule, build_type_registry};
 /// - Integration tests
 /// 
 /// This registry matches COSY INFINITY's | operator capabilities exactly,
-/// as documented in manual.md Section A.2. Note that we currently skip:
-/// - RE | RE => RE (no effect)
-/// - RE | VE => RE (no effect)
-/// - DA | RE => RE (DA type not fully integrated)
-/// - DA | VE => RE (DA type not fully integrated)
-/// - CD | RE => CM (CD type not fully integrated)
-/// - CD | VE => CM (CD type not fully integrated)
+/// as documented in manual.md Section A.2.
 pub const EXTRACT_REGISTRY: &[TypeRule] = &[
     TypeRule::with_comment("ST", "RE", "ST", "'test'", "2", "Extract i-th character"),
     TypeRule::with_comment("ST", "VE", "ST", "'test'", "2&3", "Extract substring by range"),
     TypeRule::with_comment("CM", "RE", "RE", "CM(3&4)", "1", "Extract real part"),
     TypeRule::with_comment("VE", "RE", "RE", "1&2", "2", "Extract i-th component"),
     TypeRule::with_comment("VE", "VE", "VE", "1&2&3", "2&3", "Extract subvector by range"),
+    TypeRule::with_comment("DA", "RE", "RE", "DA(1)", "1", "Extract DA coefficient by flat index"),
+    TypeRule::with_comment("DA", "VE", "RE", "DA(1)", "0&1", "Extract DA coefficient by exponent vector"),
+    TypeRule::with_comment("CD", "RE", "CM", "CD(1)", "1", "Extract CD coefficient by flat index"),
+    TypeRule::with_comment("CD", "VE", "CM", "CD(1)", "0&1", "Extract CD coefficient by exponent vector"),
 ];
 
 pub fn get_return_type(base: &RosyType, index: &RosyType) -> Option<RosyType> {
@@ -142,6 +141,96 @@ impl RosyExtract<&VE> for &VE {
         
         // ROSY uses 1-based indexing
         Ok(self[start - 1..end].to_vec())
+    }
+}
+
+// DA | RE -> RE (extract DA coefficient by flat monomial index — not commonly used)
+impl RosyExtract<&RE> for &DA {
+    type Output = RE;
+
+    fn rosy_extract(self, _index: &RE) -> Result<Self::Output> {
+        // Flat index extraction for DA is rarely used in practice.
+        // COSY's flat index maps to monomials in graded lexicographic order.
+        // For now, index 0 returns the constant part.
+        let idx = *_index as usize;
+        if idx == 0 {
+            return Ok(self.constant_part());
+        }
+        // For other flat indices, enumerate monomials in graded lex order
+        let config = crate::rosy_lib::taylor::get_config()
+            .map_err(|e| anyhow::anyhow!("DA extraction requires initialized Taylor: {}", e))?;
+        let all_monomials = crate::rosy_lib::taylor::monomial::enumerate_monomials(
+            config.max_order, config.num_vars as u32
+        );
+        if idx >= all_monomials.len() {
+            bail!("DA flat index {} out of bounds (0-{})", idx, all_monomials.len() - 1);
+        }
+        Ok(self.get_coeff(&all_monomials[idx]))
+    }
+}
+
+// DA | VE -> RE (extract DA coefficient by exponent vector)
+impl RosyExtract<&VE> for &DA {
+    type Output = RE;
+
+    fn rosy_extract(self, index: &VE) -> Result<Self::Output> {
+        let config = crate::rosy_lib::taylor::get_config()
+            .map_err(|e| anyhow::anyhow!("DA extraction requires initialized Taylor: {}", e))?;
+        if index.len() > config.num_vars as usize {
+            bail!(
+                "Exponent vector length {} exceeds number of DA variables {}",
+                index.len(), config.num_vars
+            );
+        }
+        let mut exponents = [0u8; crate::rosy_lib::taylor::MAX_VARS];
+        for (i, &val) in index.iter().enumerate() {
+            exponents[i] = val as u8;
+        }
+        let monomial = Monomial::new(exponents);
+        Ok(self.get_coeff(&monomial))
+    }
+}
+
+// CD | RE -> CM (extract CD coefficient by flat monomial index)
+impl RosyExtract<&RE> for &CD {
+    type Output = CM;
+
+    fn rosy_extract(self, _index: &RE) -> Result<Self::Output> {
+        let idx = *_index as usize;
+        if idx == 0 {
+            return Ok(self.constant_part());
+        }
+        let config = crate::rosy_lib::taylor::get_config()
+            .map_err(|e| anyhow::anyhow!("CD extraction requires initialized Taylor: {}", e))?;
+        let all_monomials = crate::rosy_lib::taylor::monomial::enumerate_monomials(
+            config.max_order, config.num_vars as u32
+        );
+        if idx >= all_monomials.len() {
+            bail!("CD flat index {} out of bounds (0-{})", idx, all_monomials.len() - 1);
+        }
+        Ok(self.get_coeff(&all_monomials[idx]))
+    }
+}
+
+// CD | VE -> CM (extract CD coefficient by exponent vector)
+impl RosyExtract<&VE> for &CD {
+    type Output = CM;
+
+    fn rosy_extract(self, index: &VE) -> Result<Self::Output> {
+        let config = crate::rosy_lib::taylor::get_config()
+            .map_err(|e| anyhow::anyhow!("CD extraction requires initialized Taylor: {}", e))?;
+        if index.len() > config.num_vars as usize {
+            bail!(
+                "Exponent vector length {} exceeds number of CD variables {}",
+                index.len(), config.num_vars
+            );
+        }
+        let mut exponents = [0u8; crate::rosy_lib::taylor::MAX_VARS];
+        for (i, &val) in index.iter().enumerate() {
+            exponents[i] = val as u8;
+        }
+        let monomial = Monomial::new(exponents);
+        Ok(self.get_coeff(&monomial))
     }
 }
 

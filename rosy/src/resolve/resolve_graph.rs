@@ -123,6 +123,13 @@ impl TypeResolver {
                 for dep in &dep_names {
                     msg.push_str(&format!("\n│        → {}", dep));
                 }
+                // Include source locations if available
+                if let Some(loc) = &node.declared_at {
+                    msg.push_str(&format!("\n│        📍 Declared at: {}", loc));
+                }
+                if let Some(loc) = &node.assigned_at {
+                    msg.push_str(&format!("\n│        📍 Assigned at: {}", loc));
+                }
                 // Include the resolution rule reason if available
                 if let Some(reason) = Self::rule_reason(&node.rule) {
                     msg.push_str(&format!("\n│        ({})", reason));
@@ -147,12 +154,15 @@ impl TypeResolver {
                     } else {
                         format!("'{}'", scope.join(" > "))
                     };
+                    let decl_hint = node.declared_at.as_ref()
+                        .map(|loc| format!("\n\x20   • Declared at: {}", loc))
+                        .unwrap_or_default();
                     format!(
                         "  ✗ Could not determine the type of variable '{}' (in {})\n\
-                         \x20   • It is declared but never assigned a value with a known type.{}\n\
+                         \x20   • It is declared but never assigned a value with a known type.{}{}\n\
                          \x20   • Try assigning it a value (e.g. {} := 0;) or adding an explicit type.\n\
                          \x20   → Add an explicit type: VARIABLE (RE) {} ;",
-                        name, scope_str, reason_hint, name, name
+                        name, scope_str, decl_hint, reason_hint, name, name
                     )
                 }
                 TypeSlot::FunctionReturn(_, name) => {
@@ -219,8 +229,13 @@ impl TypeResolver {
                     ))?
             }
             ResolutionRule::Unresolved => {
-                // No rule was ever established — leave as None
-                return Ok(());
+                // No rule was ever established — default to RE (COSY behavior:
+                // all untyped variables that are never assigned default to RE).
+                tracing::debug!(
+                    "Defaulting unresolved slot {} to RE (COSY default)",
+                    slot
+                );
+                RosyType::RE()
             }
         };
 
@@ -251,6 +266,14 @@ impl TypeResolver {
                     BinaryOpKind::Mult => crate::rosy_lib::operators::mult::get_return_type(&left_type, &right_type),
                     BinaryOpKind::Div => crate::rosy_lib::operators::div::get_return_type(&left_type, &right_type),
                     BinaryOpKind::Extract => crate::rosy_lib::operators::extract::get_return_type(&left_type, &right_type),
+                    BinaryOpKind::Derive => {
+                        // Derive preserves the object type: DA%RE -> DA, CD%RE -> CD
+                        match left_type {
+                            t if t == RosyType::DA() => Some(RosyType::DA()),
+                            t if t == RosyType::CD() => Some(RosyType::CD()),
+                            _ => None,
+                        }
+                    }
                 };
                 result.ok_or_else(|| anyhow!(
                     "No operator rule for {:?}({}, {})", op, left_type, right_type

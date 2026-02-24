@@ -15,6 +15,9 @@ impl FromRule for String {
         // Remove the surrounding quotes
         let s = &s[1..s.len()-1];
 
+        // Handle escaped single quotes: '' -> '
+        let s = s.replace("''", "'");
+
         Ok(Some(s.to_string()))
     }
 }

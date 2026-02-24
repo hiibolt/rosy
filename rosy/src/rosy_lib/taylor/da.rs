@@ -169,7 +169,7 @@ impl<T: DACoefficient> DA<T> {
     }
 
     /// Create a DA from raw coefficients (used internally).
-    pub(crate) fn from_coeffs(coeffs: HashMap<Monomial, T>) -> Self {
+    pub fn from_coeffs(coeffs: HashMap<Monomial, T>) -> Self {
         Self { coeffs }
     }
 

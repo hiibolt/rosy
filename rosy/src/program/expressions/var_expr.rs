@@ -46,7 +46,7 @@ impl Transpile for VarExpr {
             .ok_or(vec!(anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.identifier.name)))? 
             .scope
         {
-            VariableScope::Local => "&mut ",
+            VariableScope::Local => "&",
             VariableScope::Arg => "",
             VariableScope::Higher => ""
         };

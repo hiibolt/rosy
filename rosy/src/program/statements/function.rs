@@ -93,7 +93,12 @@ impl FromRule for FunctionStatement {
                             dimension_exprs: Vec::new(),
                             _memory_size_expr: None,
                         }
-                    })
+                    }),
+                    source_location: SourceLocation {
+                        line: 0,
+                        col: 0,
+                        snippet: format!("(implicit return variable for FUNCTION {})", name),
+                    },
                 }
             );
 

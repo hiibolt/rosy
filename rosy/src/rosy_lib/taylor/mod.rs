@@ -3,12 +3,12 @@
 //! This module provides DA (real) and CD (complex) differential algebra types
 //! for automatic differentiation and polynomial manipulation in beam physics simulations.
 
-mod monomial;
+pub mod monomial;
 mod config;
-mod da;
+pub mod da;
 
-pub use monomial::Monomial;
-pub use config::{TaylorConfig, init_taylor, get_config};
+pub use monomial::{Monomial, enumerate_monomials};
+pub use config::{TaylorConfig, init_taylor, cleanup_taylor, get_config};
 pub use da::DACoefficient;
 
 // Core generic differential algebra type

@@ -52,7 +52,7 @@ impl TypeResolver {
                     ctx.scope_path.clone(),
                     var_decl.data.name.clone(),
                 );
-                self.insert_slot(slot.clone(), var_decl.data.r#type.as_ref());
+                self.insert_slot(slot.clone(), var_decl.data.r#type.as_ref(), Some(stmt.source_location.clone()));
                 ctx.variables.insert(var_decl.data.name.clone(), slot);
             }
             StatementEnum::Function => {
@@ -65,7 +65,7 @@ impl TypeResolver {
                     ctx.scope_path.clone(),
                     func.name.clone(),
                 );
-                self.insert_slot(ret_slot.clone(), func.return_type.as_ref());
+                self.insert_slot(ret_slot.clone(), func.return_type.as_ref(), Some(stmt.source_location.clone()));
 
                 // Argument slots
                 let mut arg_slots = Vec::new();
@@ -75,7 +75,7 @@ impl TypeResolver {
                         func.name.clone(),
                         arg.name.clone(),
                     );
-                    self.insert_slot(arg_slot.clone(), arg.r#type.as_ref());
+                    self.insert_slot(arg_slot.clone(), arg.r#type.as_ref(), Some(stmt.source_location.clone()));
                     arg_slots.push((arg.name.clone(), arg_slot));
                 }
 
@@ -113,7 +113,7 @@ impl TypeResolver {
                     func.name.clone(),
                 );
                 // If the return type is known explicitly, the inner return var is also known
-                self.insert_slot(inner_ret_var_slot.clone(), func.return_type.as_ref());
+                self.insert_slot(inner_ret_var_slot.clone(), func.return_type.as_ref(), Some(stmt.source_location.clone()));
                 inner_ctx.variables.insert(func.name.clone(), inner_ret_var_slot.clone());
 
                 self.discover_slots(&func.body, &mut inner_ctx)?;
@@ -145,7 +145,7 @@ impl TypeResolver {
                         proc.name.clone(),
                         arg.name.clone(),
                     );
-                    self.insert_slot(arg_slot.clone(), arg.r#type.as_ref());
+                    self.insert_slot(arg_slot.clone(), arg.r#type.as_ref(), Some(stmt.source_location.clone()));
                     arg_slots.push((arg.name.clone(), arg_slot));
                 }
 
@@ -211,18 +211,28 @@ impl TypeResolver {
                         let explicit_type = node.resolved.as_ref().unwrap().clone();
                         if let Ok(new_type) = self.evaluate_recipe(&recipe) {
                             if new_type != explicit_type {
+                                let scope_str = if ctx.scope_path.is_empty() {
+                                    "global scope".to_string()
+                                } else {
+                                    format!("'{}'", ctx.scope_path.join(" > "))
+                                };
+                                let decl_hint = node.declared_at.as_ref()
+                                    .map(|loc| format!("\n│  📍 Declared at: {}", loc))
+                                    .unwrap_or_default();
+                                let assign_hint = format!("\n│  📍 Assigned at: {}", stmt.source_location);
                                 return Err(anyhow!(
                                     "\n╭─ Type Conflict ──────────────────────────────────────────\n\
                                      │\n\
-                                     │  Variable '{}' is declared as {} but is assigned a\n\
-                                     │  value of type {}.\n\
+                                     │  Variable '{}' (in {}) is declared as {} but is\n\
+                                     │  assigned a value of type {}.{}{}\n\
                                      │\n\
                                      │  💡 Either:\n\
                                      │     • Change the explicit type to match the assignment, or\n\
                                      │     • Split into separate variables: {}_{:?}  and  {}_{:?}\n\
                                      │\n\
                                      ╰──────────────────────────────────────────────────────────",
-                                    var_name, explicit_type, new_type,
+                                    var_name, scope_str, explicit_type, new_type,
+                                    decl_hint, assign_hint,
                                     var_name, explicit_type.base_type, var_name, new_type.base_type,
                                 ));
                             }
@@ -236,20 +246,45 @@ impl TypeResolver {
                 // Check for conflicting re-assignment: if a previous assignment
                 // already established an inference recipe, verify the new one
                 // produces the same type (when both are evaluable).
-                if let Some(node) = self.nodes.get(&var_slot) {
-                    if let ResolutionRule::InferredFrom { recipe: ref old_recipe, .. } = node.rule {
+                let has_existing_rule = matches!(
+                    self.nodes.get(&var_slot).map(|n| &n.rule),
+                    Some(ResolutionRule::InferredFrom { .. })
+                );
+
+                if has_existing_rule {
+                    let old_recipe = if let Some(node) = self.nodes.get(&var_slot) {
+                        if let ResolutionRule::InferredFrom { recipe: ref r, .. } = node.rule {
+                            Some(r.clone())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    if let Some(ref old_recipe) = old_recipe {
                         // Try to evaluate both the old and new recipes
                         if let (Ok(old_type), Ok(new_type)) = (
                             self.evaluate_recipe(old_recipe),
                             self.evaluate_recipe(&recipe),
                         ) {
                             if old_type != new_type {
+                                let scope_str = if ctx.scope_path.is_empty() {
+                                    "global scope".to_string()
+                                } else {
+                                    format!("'{}'", ctx.scope_path.join(" > "))
+                                };
+                                let first_assign_hint = self.nodes.get(&var_slot)
+                                    .and_then(|n| n.assigned_at.as_ref())
+                                    .map(|loc| format!("\n│  📍 First assigned at:  {}", loc))
+                                    .unwrap_or_default();
+                                let second_assign_hint = format!("\n│  📍 Then assigned at:   {}", stmt.source_location);
                                 return Err(anyhow!(
                                     "\n╭─ Type Conflict ──────────────────────────────────────────\n\
                                      │\n\
-                                     │  Variable '{}' is assigned conflicting types:\n\
+                                     │  Variable '{}' (in {}) is assigned conflicting types:\n\
                                      │     • First inferred as:  {}\n\
-                                     │     • Then assigned as:   {}\n\
+                                     │     • Then assigned as:   {}{}{}\n\
                                      │\n\
                                      │  Type elision requires each variable to have exactly one type.\n\
                                      │\n\
@@ -258,21 +293,34 @@ impl TypeResolver {
                                      │     • Split into separate variables: {}_{:?}  and  {}_{:?}\n\
                                      │\n\
                                      ╰──────────────────────────────────────────────────────────",
-                                    var_name, old_type, new_type,
+                                    var_name, scope_str, old_type, new_type,
+                                    first_assign_hint, second_assign_hint,
                                     old_type.base_type, var_name,
                                     var_name, old_type.base_type, var_name, new_type.base_type,
                                 ));
                             }
                         }
                     }
+
+                    // Keep the first (non-self-referential) assignment's recipe.
+                    // Subsequent assignments are mutations — the variable's type
+                    // is established by its first assignment. This prevents false
+                    // cycles when a variable is re-assigned from a value that
+                    // transitively depends on itself (e.g. X1 := f(X3) after
+                    // X3 := g(X1)).
+                    return Ok(());
                 }
 
                 if let Some(node) = self.nodes.get_mut(&var_slot) {
+                    // Remove self-reference from deps if present — the variable's
+                    // type is being established by this very assignment
+                    deps.remove(&var_slot);
                     node.rule = ResolutionRule::InferredFrom {
                         recipe,
                         reason: "inferred from assignment".to_string(),
                     };
                     node.depends_on = deps;
+                    node.assigned_at = Some(stmt.source_location.clone());
                 }
             }
             StatementEnum::Write => {
@@ -323,7 +371,7 @@ impl TypeResolver {
                     ctx.scope_path.clone(),
                     loop_stmt.iterator.clone(),
                 );
-                self.insert_slot(iter_slot.clone(), Some(&RosyType::RE()));
+                self.insert_slot(iter_slot.clone(), Some(&RosyType::RE()), Some(stmt.source_location.clone()));
                 inner_ctx.variables.insert(loop_stmt.iterator.clone(), iter_slot);
                 self.discover_slots(&loop_stmt.body, &mut inner_ctx)?;
             }
@@ -344,8 +392,7 @@ impl TypeResolver {
                     ctx.scope_path.clone(),
                     ploop_stmt.iterator.clone(),
                 );
-                self.insert_slot(iter_slot.clone(), Some(&RosyType::RE()));
-                inner_ctx.variables.insert(ploop_stmt.iterator.clone(), iter_slot);
+                self.insert_slot(iter_slot.clone(), Some(&RosyType::RE()), Some(stmt.source_location.clone()));
                 self.discover_slots(&ploop_stmt.body, &mut inner_ctx)?;
             }
             StatementEnum::Fit => {
@@ -493,7 +540,12 @@ impl TypeResolver {
             ExprEnum::StringConvert => ExprRecipe::Literal(RosyType::ST()),
             ExprEnum::LogicalConvert => ExprRecipe::Literal(RosyType::LO()),
             ExprEnum::DA => ExprRecipe::Literal(RosyType::DA()),
+            ExprEnum::CD => ExprRecipe::Literal(RosyType::CD()),
             ExprEnum::Length => ExprRecipe::Literal(RosyType::RE()),
+            ExprEnum::Vmax => ExprRecipe::Literal(RosyType::RE()),
+            ExprEnum::Lst => ExprRecipe::Literal(RosyType::RE()),
+            ExprEnum::Lcm => ExprRecipe::Literal(RosyType::RE()),
+            ExprEnum::Lcd => ExprRecipe::Literal(RosyType::RE()),
             ExprEnum::Not => ExprRecipe::Literal(RosyType::LO()),
             ExprEnum::Eq | ExprEnum::Neq | ExprEnum::Lt | ExprEnum::Gt |
             ExprEnum::Lte | ExprEnum::Gte => ExprRecipe::Literal(RosyType::LO()),
@@ -561,6 +613,31 @@ impl TypeResolver {
                     ExprRecipe::Unknown
                 }
             }
+            ExprEnum::Sqr => {
+                if let Some(sqr_expr) = expr.inner.as_any()
+                    .downcast_ref::<crate::program::expressions::sqr::SqrExpr>()
+                {
+                    let inner = self.build_expr_recipe(&sqr_expr.expr, ctx, deps);
+                    ExprRecipe::Sin(Box::new(inner)) // Reuse Sin recipe - same shape (unary op)
+                } else {
+                    ExprRecipe::Unknown
+                }
+            }
+            ExprEnum::Derive => {
+                if let Some(derive_expr) = expr.inner.as_any()
+                    .downcast_ref::<crate::program::expressions::derive::DeriveExpr>()
+                {
+                    let left = self.build_expr_recipe(&derive_expr.object, ctx, deps);
+                    let right = self.build_expr_recipe(&derive_expr.index, ctx, deps);
+                    ExprRecipe::BinaryOp {
+                        op: BinaryOpKind::Derive,
+                        left: Box::new(left),
+                        right: Box::new(right),
+                    }
+                } else {
+                    ExprRecipe::Unknown
+                }
+            }
             ExprEnum::Add => self.build_binop_recipe(expr, ctx, deps, BinaryOpKind::Add),
             ExprEnum::Sub => self.build_binop_recipe(expr, ctx, deps, BinaryOpKind::Sub),
             ExprEnum::Mult => self.build_binop_recipe(expr, ctx, deps, BinaryOpKind::Mult),
@@ -617,6 +694,9 @@ impl TypeResolver {
                         right: Box::new(right),
                     };
                 }
+            }
+            BinaryOpKind::Derive => {
+                // Derive is handled inline in build_expr_recipe, not here
             }
         }
         ExprRecipe::Unknown

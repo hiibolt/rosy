@@ -17,8 +17,15 @@ pub mod string_convert;
 pub mod logical_convert;
 pub mod function_call;
 pub mod da;
+pub mod cd;
 pub mod length;
 pub mod sin;
+pub mod sqr;
+pub mod vmax;
+pub mod lst;
+pub mod lcm;
+pub mod lcd;
+pub mod derive;
 pub mod number;
 pub mod string;
 pub mod boolean;
@@ -32,8 +39,14 @@ use crate::program::expressions::complex_convert::ComplexConvertExpr;
 use crate::program::expressions::string_convert::StringConvertExpr;
 use crate::program::expressions::logical_convert::LogicalConvertExpr;
 use crate::program::expressions::da::DAExpr;
+use crate::program::expressions::cd::CDExpr;
 use crate::program::expressions::length::LengthExpr;
 use crate::program::expressions::sin::SinExpr;
+use crate::program::expressions::sqr::SqrExpr;
+use crate::program::expressions::vmax::VmaxExpr;
+use crate::program::expressions::lst::LstExpr;
+use crate::program::expressions::lcm::LcmExpr;
+use crate::program::expressions::lcd::LcdExpr;
 use crate::program::expressions::add::AddExpr;
 use crate::program::expressions::sub::SubExpr;
 use crate::program::expressions::mult::MultExpr;
@@ -47,6 +60,7 @@ use crate::program::expressions::gte::GteExpr;
 use crate::program::expressions::not::NotExpr;
 use crate::program::expressions::concat::ConcatExpr;
 use crate::program::expressions::extract::ExtractExpr;
+use crate::program::expressions::derive::DeriveExpr;
 use anyhow::{Context, Error, Result, bail};
 
 #[derive(Debug)]
@@ -82,8 +96,15 @@ pub enum ExprEnum {
     StringConvert,
     LogicalConvert,
     DA,
+    CD,
     Length,
     Sin,
+    Sqr,
+    Vmax,
+    Lst,
+    Lcm,
+    Lcd,
+    Derive,
     FunctionCall,
 }
 
@@ -195,6 +216,13 @@ impl FromRule for Expr {
                         inner: Box::new(da_expr.ok_or_else(|| anyhow::anyhow!("Expected DAExpr"))?),
                     })
                 },
+                Rule::cd_intrinsic => {
+                    let cd_expr = CDExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::CD,
+                        inner: Box::new(cd_expr.ok_or_else(|| anyhow::anyhow!("Expected CDExpr"))?),
+                    })
+                },
                 Rule::length => {
                     let length_expr = LengthExpr::from_rule(primary)?;
                     Ok(Expr {
@@ -207,6 +235,41 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Sin,
                         inner: Box::new(sin_expr.ok_or_else(|| anyhow::anyhow!("Expected SinExpr"))?),
+                    })
+                },
+                Rule::sqr => {
+                    let sqr_expr = SqrExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Sqr,
+                        inner: Box::new(sqr_expr.ok_or_else(|| anyhow::anyhow!("Expected SqrExpr"))?),
+                    })
+                },
+                Rule::vmax => {
+                    let vmax_expr = VmaxExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Vmax,
+                        inner: Box::new(vmax_expr.ok_or_else(|| anyhow::anyhow!("Expected VmaxExpr"))?),
+                    })
+                },
+                Rule::lst => {
+                    let lst_expr = LstExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Lst,
+                        inner: Box::new(lst_expr.ok_or_else(|| anyhow::anyhow!("Expected LstExpr"))?),
+                    })
+                },
+                Rule::lcm => {
+                    let lcm_expr = LcmExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Lcm,
+                        inner: Box::new(lcm_expr.ok_or_else(|| anyhow::anyhow!("Expected LcmExpr"))?),
+                    })
+                },
+                Rule::lcd => {
+                    let lcd_expr = LcdExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Lcd,
+                        inner: Box::new(lcd_expr.ok_or_else(|| anyhow::anyhow!("Expected LcdExpr"))?),
                     })
                 },
                 Rule::expr => {
@@ -298,6 +361,17 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Extract,
                         inner: Box::new(ExtractExpr {
+                            object: Box::new(left),
+                            index: Box::new(right),
+                        })
+                    })
+                },
+                Rule::derive => {
+                    let left = left.context("...while transpiling object of `derive` (%) expression")?;
+                    let right = right.context("...while transpiling index of `derive` (%) expression")?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Derive,
+                        inner: Box::new(DeriveExpr {
                             object: Box::new(left),
                             index: Box::new(right),
                         })

@@ -78,6 +78,39 @@ impl Monomial {
     }
 }
 
+/// Enumerate all monomials up to a given order with a given number of variables,
+/// sorted in graded lexicographic order.
+pub fn enumerate_monomials(max_order: u32, num_vars: u32) -> Vec<Monomial> {
+    let mut result = Vec::new();
+    enumerate_monomials_recursive(max_order, num_vars as usize, 0, &mut [0u8; MAX_VARS], &mut result);
+    result.sort();
+    result
+}
+
+fn enumerate_monomials_recursive(
+    remaining_order: u32,
+    num_vars: usize,
+    var_idx: usize,
+    current: &mut [u8; MAX_VARS],
+    result: &mut Vec<Monomial>,
+) {
+    if var_idx == num_vars {
+        result.push(Monomial::new(*current));
+        return;
+    }
+    for exp in 0..=remaining_order as u8 {
+        current[var_idx] = exp;
+        enumerate_monomials_recursive(
+            remaining_order - exp as u32,
+            num_vars,
+            var_idx + 1,
+            current,
+            result,
+        );
+    }
+    current[var_idx] = 0;
+}
+
 /// Graded lexicographic ordering: order by total degree first, then lexicographically.
 impl Ord for Monomial {
     fn cmp(&self, other: &Self) -> Ordering {

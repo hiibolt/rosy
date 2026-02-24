@@ -44,4 +44,40 @@ BEGIN;
     RESULT_4 := LHS_4 | RHS_4;
     WRITE 6 ST(RESULT_4);
 
+    VARIABLE (DA) LHS_5;
+    VARIABLE (RE) RHS_5;
+    VARIABLE (RE) RESULT_5;
+
+    LHS_5 := DA(1);
+    RHS_5 := 1;
+    RESULT_5 := LHS_5 | RHS_5;
+    WRITE 6 ST(RESULT_5);
+
+    VARIABLE (DA) LHS_6;
+    VARIABLE (VE) RHS_6;
+    VARIABLE (RE) RESULT_6;
+
+    LHS_6 := DA(1);
+    RHS_6 := 0&1;
+    RESULT_6 := LHS_6 | RHS_6;
+    WRITE 6 ST(RESULT_6);
+
+    VARIABLE (CD) LHS_7;
+    VARIABLE (RE) RHS_7;
+    VARIABLE (CM) RESULT_7;
+
+    LHS_7 := CD(1);
+    RHS_7 := 1;
+    RESULT_7 := LHS_7 | RHS_7;
+    WRITE 6 ST(RESULT_7);
+
+    VARIABLE (CD) LHS_8;
+    VARIABLE (VE) RHS_8;
+    VARIABLE (CM) RESULT_8;
+
+    LHS_8 := CD(1);
+    RHS_8 := 0&1;
+    RESULT_8 := LHS_8 | RHS_8;
+    WRITE 6 ST(RESULT_8);
+
 END;

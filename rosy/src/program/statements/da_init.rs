@@ -31,6 +31,19 @@ impl FromRule for DAInitStatement {
             .context("Failed to build number of variables expression in DAINI statement!")?
             .ok_or_else(|| anyhow::anyhow!("Expected expression for number of variables in DAINI statement"))?;
         
+        // Parse optional 3rd and 4th arguments (COSY compatibility - ignored)
+        if let Some(third_pair) = inner.next() {
+            let _third_expr = Expr::from_rule(third_pair)
+                .context("Failed to build 3rd expression in DAINI statement!")?;
+            eprintln!("[rosy] Note: DAINI 3rd argument (output unit) ignored — Rosy handles this automatically~");
+            
+            if let Some(fourth_pair) = inner.next() {
+                let _fourth_expr = Expr::from_rule(fourth_pair)
+                    .context("Failed to build 4th expression in DAINI statement!")?;
+                eprintln!("[rosy] Note: DAINI 4th argument (num monomials out) ignored — Rosy handles this automatically~");
+            }
+        }
+        
         Ok(Some(DAInitStatement {
             order: order_expr,
             number_of_variables: num_vars_expr,
@@ -59,7 +72,7 @@ impl Transpile for DAInitStatement {
             })?;
         
         let serialization = format!(
-            "DA::init(({}).to_owned() as u32, ({}).to_owned() as u32);", 
+            "taylor::cleanup_taylor();\n\t\ttaylor::init_taylor(({}).to_owned() as u32, ({}).to_owned() as usize)?;", 
             order_output.serialization, 
             num_vars_output.serialization
         );

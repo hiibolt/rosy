@@ -38,7 +38,7 @@ var_decl = { "VARIABLE" ~ type? ~ variable_name ~ memory_size? ~ semicolon }
 memory_size = { expr }
 
 /// Keywords - define all reserved words
-keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" | "IF" | "ELSEIF" | "ELSE" | "ENDIF" | "WHILE" | "ENDWHILE" | "TRUE" | "FALSE" | "DAINI" | "LENGTH" | "SIN" | "BREAK" | "FIT" | "ENDFIT" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
+keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" | "IF" | "ELSEIF" | "ELSE" | "ENDIF" | "WHILE" | "ENDWHILE" | "TRUE" | "FALSE" | "DAINI" | "LENGTH" | "SIN" | "SQR" | "VMAX" | "LST" | "LCM" | "LCD" | "BREAK" | "FIT" | "ENDFIT" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
 
 /// [ IF / ELSEIF / ELSE / ENDIF ]
 if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
@@ -95,7 +95,7 @@ endif = { "ENDIF" ~ semicolon }
   end_fit = { "ENDFIT" ~ expr ~ expr ~ expr ~ variable_name+ ~ semicolon }
 
 /// [ INTRINSIC FUNCTIONS ]
-  builtin_function = _{ cm | st | lo | da | length | sin }
+  builtin_function = _{ cm | st | lo | da | cd_intrinsic | length | sin | sqr | vmax | lst | lcm | lcd }
   /// CM
   cm = { "CM(" ~ expr ~ ")" }
   /// ST - String conversion
@@ -104,14 +104,26 @@ endif = { "ENDIF" ~ semicolon }
   lo = { "LO(" ~ expr ~ ")" }
   /// DA - Create DA identity vector
   da = { "DA" ~ "(" ~ expr ~ ")" }
+  /// CD - Create CD identity vector
+  cd_intrinsic = { "CD" ~ "(" ~ expr ~ ")" }
   /// LENGTH - Get memory size
   length = { "LENGTH(" ~ expr ~ ")" }
   /// SIN - Compute sine
   sin = { "SIN(" ~ expr ~ ")" }
+  /// SQR - Compute square
+  sqr = { "SQR(" ~ expr ~ ")" }
+  /// VMAX - Maximum element of vector
+  vmax = { "VMAX(" ~ expr ~ ")" }
+  /// LST - String memory size estimator (compatibility)
+  lst = { "LST(" ~ expr ~ ")" }
+  /// LCM - Complex memory size estimator (compatibility)
+  lcm = { "LCM(" ~ expr ~ ")" }
+  /// LCD - DA memory size estimator (compatibility)
+  lcd = { "LCD(" ~ expr ~ ")" }
 
 /// [ INTRINSIC PROCEDURES ]
   /// [ DA ]
-  daini = { "DAINI" ~ expr ~ expr ~ semicolon }
+  daini = { "DAINI" ~ expr ~ expr ~ expr? ~ expr? ~ semicolon }
 /// [ INTRINSIC TYPES ]
   type = { "(" ~ inner_type ~ expr* ~ ")"}
   inner_type = {
@@ -148,7 +160,8 @@ not_expr = { "!" ~ (boolean | variable_identifier | "(" ~ expr ~ ")") }
 // Infix operators
 // Note: lte/gte must come before lt/gt to avoid `<=` being parsed as `<` then `=`
 // We support both COSY syntax (= and #) and modern syntax (== and <>/!=)
-infix_op    = _{ extract | mult | div | add | sub | concat | eq | neq | lte | gte | lt | gt }
+infix_op    = _{ derive | extract | mult | div | add | sub | concat | eq | neq | lte | gte | lt | gt }
+derive      = { "%" }
 extract     = { "|" }
 add         = { "+" }
 sub         = { "-" }
@@ -170,5 +183,5 @@ unit        = @{ ASCII_DIGIT+ }
 constant    = @{ ASCII_DIGIT+ }
 string      = { new_string | old_string }
 new_string  = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
-old_string  = @{ "\'" ~ (!"\'" ~ ANY)* ~ "\'" }
+old_string  = @{ "\'" ~ ("\'\'" | !"\'" ~ ANY)* ~ "\'" }
 semicolon   = { ";" }
