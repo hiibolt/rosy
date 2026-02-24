@@ -9,7 +9,7 @@ use crate::{
 pub struct FunctionStatement {
     pub name: String,
     pub args: Vec<VariableDeclarationData>,
-    pub return_type: RosyType,
+    pub return_type: Option<RosyType>,
     pub body: Vec<Statement>
 }
 
@@ -25,19 +25,30 @@ impl FromRule for FunctionStatement {
                 .context("Missing first token `start_function`!")?
                 .into_inner();
 
-            // we choose to ignore the dimensions of the return type for now
-            //  since they can be changed dynamically
-            let (return_type, _) = build_type(
-                start_function_inner.next()
-                    .context("Missing return type for function!")?
-            ).context("...while building function return type")?;
+            // Return type is now optional - peek to see if the next token is a type or a name
+            let first = start_function_inner.next()
+                .context("Missing tokens in function declaration!")?;
 
-            let name = start_function_inner.next()
-                .context("Missing function name!")?
-                .as_str().to_string();
+            let (return_type, name) = if first.as_rule() == Rule::r#type {
+                // we choose to ignore the dimensions of the return type for now
+                //  since they can be changed dynamically
+                let (return_type, _) = build_type(first)
+                    .context("...while building function return type")?;
+                let name = start_function_inner.next()
+                    .context("Missing function name!")?
+                    .as_str().to_string();
+                (Some(return_type), name)
+            } else {
+                // No return type specified, first token is the function name
+                let name = first.as_str().to_string();
+                (None, name)
+            };
 
             let mut args = Vec::new();
             // Collect all remaining argument names and types
+            // With optional types, we peek at each token:
+            //   - function_argument_name followed by type → typed argument
+            //   - function_argument_name followed by another name or semicolon → untyped argument
             while let Some(arg_pair) = start_function_inner.next() {
                 if arg_pair.as_rule() == Rule::semicolon {
                     break;
@@ -45,15 +56,22 @@ impl FromRule for FunctionStatement {
 
                 ensure!(arg_pair.as_rule() == Rule::function_argument_name, 
                     "Expected function argument name, found: {:?}", arg_pair.as_rule());
-                let name = arg_pair.as_str();
+                let arg_name = arg_pair.as_str();
 
-                let (argument_type, argument_dimensions) = build_type(
-                    start_function_inner.next()
-                        .context(format!("Missing type for function argument: {}", name))?
-                ).context("...while building function argument type")?;
+                // Peek at the next token to see if it's a type
+                let next = start_function_inner.peek();
+                let (argument_type, argument_dimensions) = match next {
+                    Some(ref p) if p.as_rule() == Rule::r#type => {
+                        let type_pair = start_function_inner.next().unwrap();
+                        let (t, d) = build_type(type_pair)
+                            .context("...while building function argument type")?;
+                        (Some(t), d)
+                    },
+                    _ => (None, Vec::new())
+                };
 
                 let argument_data = VariableDeclarationData {
-                    name: name.to_string(),
+                    name: arg_name.to_string(),
                     r#type: argument_type,
                     dimension_exprs: argument_dimensions,
                 };
@@ -100,18 +118,39 @@ impl FromRule for FunctionStatement {
 
 impl Transpile for FunctionStatement {
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+        // Resolve the return type (required for transpilation)
+        let resolved_return_type = self.return_type
+            .ok_or_else(|| anyhow!("Type inference is not yet supported - please specify the return type for function '{}'", self.name))
+            .map_err(|e| vec![e])?;
+
+        // Resolve all argument types (required for transpilation)
+        let resolved_arg_data: Vec<VariableData> = {
+            let mut data = Vec::new();
+            let mut errors = Vec::new();
+            for arg in &self.args {
+                match arg.require_type() {
+                    Ok(t) => data.push(VariableData {
+                        name: arg.name.clone(),
+                        r#type: t,
+                    }),
+                    Err(e) => errors.push(e.context(format!(
+                        "...while resolving argument types for function '{}'", self.name
+                    ))),
+                }
+            }
+            if !errors.is_empty() {
+                return Err(errors);
+            }
+            data
+        };
+
         // Insert the function signature, but check it doesn't already exist
         if context.functions.contains_key(&self.name) ||
             matches!(context.functions.insert(
                     self.name.clone(),
                     TranspilationInputFunctionContext {
-                        return_type: self.return_type.clone(),
-                        args: self.args.iter()
-                            .map(|arg| VariableData {
-                                name: arg.name.clone(),
-                                r#type: arg.r#type.clone()
-                            })
-                            .collect(),
+                        return_type: resolved_return_type.clone(),
+                        args: resolved_arg_data.clone(),
                         requested_variables: BTreeSet::new()
                     }
                 ), Some(_))
@@ -133,15 +172,12 @@ impl Transpile for FunctionStatement {
                 VariableScope::Higher => VariableScope::Higher
             }
         }
-        for arg in &self.args {
-                if matches!(inner_context.variables.insert(arg.name.clone(), ScopedVariableData {
+        for arg_data in &resolved_arg_data {
+                if matches!(inner_context.variables.insert(arg_data.name.clone(), ScopedVariableData {
                 scope: VariableScope::Arg,
-                data: VariableData {
-                    name: arg.name.clone(),
-                    r#type: arg.r#type.clone()
-                }
+                data: arg_data.clone()
             }), Some(_)) {
-                errors.push(anyhow!("Argument '{}' is already defined!", arg.name));
+                errors.push(anyhow!("Argument '{}' is already defined!", arg_data.name));
             }
         }
 
@@ -192,18 +228,18 @@ impl Transpile for FunctionStatement {
                     var_data.data.r#type.as_rust_type()
                 ));
             }
-            for var_data in self.args.iter() {
+            for arg_data in &resolved_arg_data {
                 serialized_args.push(format!(
                     "{}: &{}",
-                    var_data.name,
-                    var_data.r#type.as_rust_type()
+                    arg_data.name,
+                    arg_data.r#type.as_rust_type()
                 ));
             }
             serialized_args
         };
 
         // Serialize return type
-        let serialized_return_type = self.return_type.as_rust_type();
+        let serialized_return_type = resolved_return_type.as_rust_type();
 
         // Serialize the entire function
         let serialization = format!(

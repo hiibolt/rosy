@@ -32,7 +32,7 @@ write = { "WRITE" ~ unit ~ expr+ ~ semicolon }
 read = { "READ" ~ unit ~ variable_identifier ~ semicolon }
 
 /// VARIABLE
-var_decl = { "VARIABLE" ~ type ~ variable_name ~ semicolon }
+var_decl = { "VARIABLE" ~ type? ~ variable_name ~ semicolon }
 
 /// Keywords - define all reserved words
 keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" | "IF" | "ELSEIF" | "ELSE" | "ENDIF" | "WHILE" | "ENDWHILE" | "TRUE" | "FALSE" | "DAINI" | "LENGTH" | "SIN" | "BREAK" | "FIT" | "ENDFIT" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
@@ -54,7 +54,7 @@ endif = { "ENDIF" ~ semicolon }
   /// PROCEDURE
   start_procedure = { "PROCEDURE" ~ procedure_name ~ procedure_argument_name_and_type* ~ semicolon }
   procedure_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
-  procedure_argument_name_and_type = { procedure_argument_name ~ type }
+  procedure_argument_name_and_type = { procedure_argument_name ~ type? }
   procedure_argument_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
   /// ENDPROCEDURE
   end_procedure = { "ENDPROCEDURE" ~ semicolon }
@@ -65,9 +65,9 @@ endif = { "ENDIF" ~ semicolon }
   /// Calling - ensure the name is not a keyword
   function_call = { function_name ~ "(" ~ expr ~ ("," ~ expr)* ~ ")"  }
   /// FUNCTION
-  start_function = { "FUNCTION" ~ type ~ function_name ~ function_argument_name_and_type+ ~ semicolon }
+  start_function = { "FUNCTION" ~ type? ~ function_name ~ function_argument_name_and_type+ ~ semicolon }
   function_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
-  function_argument_name_and_type = _{ function_argument_name ~ type }
+  function_argument_name_and_type = _{ function_argument_name ~ type? }
   function_argument_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
   /// ENDFUNCTION
   end_function = { "ENDFUNCTION" ~ semicolon }

@@ -39,10 +39,15 @@ impl FromRule for ProcedureStatement {
                 let name = arg_inner.next()
                     .context("Missing procedure argument name!")?
                     .as_str();
-                let (r#type, dimension_exprs) = build_type(
-                    arg_inner.next()
-                        .context("Missing procedure argument type!")?
-                ).context("...while building procedure argument type")?;
+
+                // Type is now optional
+                let (r#type, dimension_exprs) = if let Some(type_pair) = arg_inner.next() {
+                    let (t, d) = build_type(type_pair)
+                        .context("...while building procedure argument type")?;
+                    (Some(t), d)
+                } else {
+                    (None, Vec::new())
+                };
 
                 let variable_data = VariableDeclarationData {
                     name: name.to_string(),
@@ -81,17 +86,33 @@ impl FromRule for ProcedureStatement {
 
 impl Transpile for ProcedureStatement {
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+        // Resolve all argument types (required for transpilation)
+        let resolved_arg_data: Vec<VariableData> = {
+            let mut data = Vec::new();
+            let mut errors = Vec::new();
+            for arg in &self.args {
+                match arg.require_type() {
+                    Ok(t) => data.push(VariableData {
+                        name: arg.name.clone(),
+                        r#type: t,
+                    }),
+                    Err(e) => errors.push(e.context(format!(
+                        "...while resolving argument types for procedure '{}'", self.name
+                    ))),
+                }
+            }
+            if !errors.is_empty() {
+                return Err(errors);
+            }
+            data
+        };
+
         // Insert the procedure signature, but check it doesn't already exist
         if context.functions.contains_key(&self.name) || 
             matches!(context.procedures.insert(
                 self.name.clone(),
                 TranspilationInputProcedureContext {
-                    args: self.args.iter()
-                        .map(|arg| VariableData {
-                            name: arg.name.clone(),
-                            r#type: arg.r#type.clone()
-                        })
-                        .collect(),
+                    args: resolved_arg_data.clone(),
                     requested_variables: BTreeSet::new()
                 }
             ), Some(_))
@@ -113,15 +134,12 @@ impl Transpile for ProcedureStatement {
                 VariableScope::Higher => VariableScope::Higher
             }
         }
-        for arg in &self.args {
-            if matches!(inner_context.variables.insert(arg.name.clone(), ScopedVariableData {
+        for arg_data in &resolved_arg_data {
+            if matches!(inner_context.variables.insert(arg_data.name.clone(), ScopedVariableData {
                 scope: VariableScope::Arg,
-                data: VariableData {
-                    name: arg.name.clone(),
-                    r#type: arg.r#type.clone()
-                }
+                data: arg_data.clone()
             }), Some(_)) {
-                errors.push(anyhow!("Argument '{}' is already defined!", arg.name));
+                errors.push(anyhow!("Argument '{}' is already defined!", arg_data.name));
             }
         }
 
@@ -182,11 +200,11 @@ impl Transpile for ProcedureStatement {
                     var_data.data.r#type.as_rust_type()
                 ));
             }
-            for var_data in self.args.iter() {
+            for arg_data in &resolved_arg_data {
                 serialized_args.push(format!(
                     "{}: &mut {}",
-                    var_data.name,
-                    var_data.r#type.as_rust_type()
+                    arg_data.name,
+                    arg_data.r#type.as_rust_type()
                 ));
             }
             serialized_args

@@ -9,15 +9,26 @@ use crate::{
 #[derive(Debug)]
 pub struct VariableDeclarationData {
     pub name: String,
-    pub r#type: RosyType,
+    pub r#type: Option<RosyType>,
     pub dimension_exprs: Vec<Expr>
+}
+impl VariableDeclarationData {
+    /// Helper to unwrap the type or return a descriptive error.
+    pub fn require_type(&self) -> Result<RosyType, Error> {
+        self.r#type.ok_or_else(|| anyhow!(
+            "Type inference is not yet supported - please specify the type for '{}'", self.name
+        ))
+    }
 }
 impl Transpile for VariableDeclarationData {
     // note that this transpiles as the default value for the type
     fn transpile (
         &self, context: &mut TranspilationInputContext
     ) -> Result<TranspilationOutput, Vec<Error>> {
-        let base_value = match self.r#type.base_type {
+        let resolved_type = self.require_type()
+            .map_err(|e| vec![e])?;
+
+        let base_value = match resolved_type.base_type {
             RosyBaseType::RE => "0.0",
             RosyBaseType::ST => "\"\".to_string()",
             RosyBaseType::LO => "false",
@@ -86,14 +97,23 @@ impl FromRule for VarDeclStatement {
         
         let mut inner = pair.into_inner();
 
-        let (r#type, dimension_exprs) = build_type(
-            inner.next()
-                .context("Missing first token `type`!")?
-        ).context("...while building variable type in variable declaration!")?;
-        
-        let name = inner.next()
-            .context("Missing second token `variable_name`!")?
-            .as_str().to_string();
+        // Peek at the next token to see if it's a type or a variable name
+        let first = inner.next()
+            .context("Missing tokens in variable declaration!")?;
+
+        let (r#type, dimension_exprs, name) = if first.as_rule() == Rule::r#type {
+            // Type is present: parse type, then name
+            let (r#type, dimension_exprs) = build_type(first)
+                .context("...while building variable type in variable declaration!")?;
+            let name = inner.next()
+                .context("Missing variable name after type in variable declaration!")?
+                .as_str().to_string();
+            (Some(r#type), dimension_exprs, name)
+        } else {
+            // No type: first token is the variable name
+            let name = first.as_str().to_string();
+            (None, Vec::new(), name)
+        };
 
         let data = VariableDeclarationData {
             name,
@@ -107,12 +127,15 @@ impl FromRule for VarDeclStatement {
 
 impl Transpile for VarDeclStatement {
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+        let resolved_type = self.data.require_type()
+            .map_err(|e| vec![e.context(format!("...while transpiling variable declaration for '{}'", self.data.name))])?;
+
         // Insert the declaration, but check it doesn't already exist
         if matches!(context.variables.insert(self.data.name.clone(), ScopedVariableData { 
             scope: VariableScope::Local,
             data: VariableData { 
                 name: self.data.name.clone(),
-                r#type: self.data.r#type.clone()
+                r#type: resolved_type.clone()
             }
         }), Some(_)) {
             return Err(vec!(anyhow!("Variable '{}' is already defined in this scope!", self.data.name)));
@@ -126,7 +149,7 @@ impl Transpile for VarDeclStatement {
         let serialization = format!(
             "let mut {}: {} = {};",
             &self.data.name,
-            self.data.r#type.as_rust_type(),
+            resolved_type.as_rust_type(),
             data_default_serialization
         );
         Ok(TranspilationOutput {
