@@ -377,18 +377,72 @@ impl TypeResolver {
                     None => return Ok(()), // unknown variable, skip
                 };
 
-                // Only add dependency if the slot is still unresolved
+                // Build a recipe for the RHS expression and collect its dependencies
+                let mut deps = HashSet::new();
+                let recipe = self.build_expr_recipe(&assign.value, ctx, &mut deps);
+
                 if let Some(node) = self.nodes.get(&var_slot) {
                     if node.resolved.is_some() {
-                        return Ok(()); // already has explicit type
+                        // Already has an explicit type — check that the new
+                        // assignment is compatible (if evaluable now).
+                        let explicit_type = node.resolved.as_ref().unwrap().clone();
+                        if let Ok(new_type) = self.evaluate_recipe(&recipe) {
+                            if new_type != explicit_type {
+                                return Err(anyhow!(
+                                    "\n╭─ Type Conflict ──────────────────────────────────────────\n\
+                                     │\n\
+                                     │  Variable '{}' is declared as {} but is assigned a\n\
+                                     │  value of type {}.\n\
+                                     │\n\
+                                     │  💡 Either:\n\
+                                     │     • Change the explicit type to match the assignment, or\n\
+                                     │     • Split into separate variables: {}_{:?}  and  {}_{:?}\n\
+                                     │\n\
+                                     ╰──────────────────────────────────────────────────────────",
+                                    var_name, explicit_type, new_type,
+                                    var_name, explicit_type.base_type, var_name, new_type.base_type,
+                                ));
+                            }
+                        }
+                        return Ok(()); // already has explicit type, no inference needed
                     }
                 } else {
                     return Ok(());
                 }
 
-                // Build a recipe for the RHS expression and collect its dependencies
-                let mut deps = HashSet::new();
-                let recipe = self.build_expr_recipe(&assign.value, ctx, &mut deps);
+                // Check for conflicting re-assignment: if a previous assignment
+                // already established an inference recipe, verify the new one
+                // produces the same type (when both are evaluable).
+                if let Some(node) = self.nodes.get(&var_slot) {
+                    if let ResolutionRule::InferredFrom { recipe: ref old_recipe, .. } = node.rule {
+                        // Try to evaluate both the old and new recipes
+                        if let (Ok(old_type), Ok(new_type)) = (
+                            self.evaluate_recipe(old_recipe),
+                            self.evaluate_recipe(&recipe),
+                        ) {
+                            if old_type != new_type {
+                                return Err(anyhow!(
+                                    "\n╭─ Type Conflict ──────────────────────────────────────────\n\
+                                     │\n\
+                                     │  Variable '{}' is assigned conflicting types:\n\
+                                     │     • First inferred as:  {}\n\
+                                     │     • Then assigned as:   {}\n\
+                                     │\n\
+                                     │  Type elision requires each variable to have exactly one type.\n\
+                                     │\n\
+                                     │  💡 Either:\n\
+                                     │     • Add an explicit type:  VARIABLE ({:?}) {} ;\n\
+                                     │     • Split into separate variables: {}_{:?}  and  {}_{:?}\n\
+                                     │\n\
+                                     ╰──────────────────────────────────────────────────────────",
+                                    var_name, old_type, new_type,
+                                    old_type.base_type, var_name,
+                                    var_name, old_type.base_type, var_name, new_type.base_type,
+                                ));
+                            }
+                        }
+                    }
+                }
 
                 if let Some(node) = self.nodes.get_mut(&var_slot) {
                     node.rule = ResolutionRule::InferredFrom {

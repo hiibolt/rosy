@@ -11,6 +11,8 @@ BEGIN;
         VARIABLE Y;
         Y := 4;
 
+        Y := "meow";
+
         WRITE 6 "Result: " ST(ADDTWONUMS(X, Y));
     ENDPROCEDURE;
 
