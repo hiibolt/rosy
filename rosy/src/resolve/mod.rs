@@ -1,17 +1,21 @@
 /// Type Resolution Module
-/// 
-/// This module implements a constraint-based type inference system for Rosy.
+///
+/// This module implements a **dependency-graph-based** type inference system for Rosy.
 /// It runs as a pass between AST construction and transpilation, filling in
 /// any `Option<RosyType>` fields that were left as `None` during parsing.
 ///
 /// The approach:
 ///   1. Walk the AST to discover all "type slots" (variables, function args,
-///      function return types, procedure args)
-///   2. Collect constraints from assignments, operator usage, and call sites
-///   3. Propagate known types through the constraint graph
-///   4. Error if any slots remain unresolved after propagation
+///      function return types, procedure args). Slots with explicit types are
+///      immediately resolved; others become unresolved nodes.
+///   2. Build a dependency graph: for each unresolved slot, determine which
+///      other slots must be resolved first (edges). E.g. `X := Y + Z` means
+///      the slot for `X` depends on the slots for `Y` and `Z`.
+///   3. Topologically sort the graph (Kahn's algorithm) and resolve slots
+///      from leaves inward — each slot is resolved exactly once.
+///   4. If unresolved slots remain, they form a cycle — report a clear error.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use anyhow::{anyhow, Result};
 use crate::rosy_lib::RosyType;
 use crate::program::Program;
@@ -19,41 +23,9 @@ use crate::program::statements::*;
 use crate::program::expressions::*;
 use crate::program::expressions::function_call as expr_function_call;
 
-/// Represents an unresolved type slot with context about what the resolver tried.
-#[derive(Debug)]
-struct UnresolvedSlot {
-    slot: TypeSlot,
-    hints: Vec<String>,
-}
+// ─── Type Slot ──────────────────────────────────────────────────────────────
 
-impl std::fmt::Display for UnresolvedSlot {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "  ✗ Could not determine the type of {}", self.slot)?;
-        if self.hints.is_empty() {
-            write!(f, "\n    No assignments or usages were found to infer the type from.")?;
-        } else {
-            for hint in &self.hints {
-                write!(f, "\n    • {}", hint)?;
-            }
-        }
-        // Suggestion based on slot kind
-        match &self.slot {
-            TypeSlot::Variable(_, name) => {
-                write!(f, "\n    → Add an explicit type: VARIABLE (RE) {} ;", name)?;
-            }
-            TypeSlot::FunctionReturn(_, name) => {
-                write!(f, "\n    → Add an explicit return type: FUNCTION (RE) {} ... ;", name)?;
-            }
-            TypeSlot::Argument(_, callable, arg) => {
-                write!(f, "\n    → Add an explicit type to argument '{}' in '{}': {} (RE)", arg, callable, arg)?;
-            }
-        }
-        Ok(())
-    }
-}
-
-/// A unique identifier for a type slot in the constraint graph.
-/// Scoped by an optional function/procedure name to handle nested scopes.
+/// A unique identifier for a type slot in the dependency graph.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TypeSlot {
     /// A variable declaration: (scope_path, variable_name)
@@ -92,139 +64,156 @@ impl std::fmt::Display for TypeSlot {
     }
 }
 
-/// A constraint saying "this slot must have this type".
+// ─── Resolution Rule ────────────────────────────────────────────────────────
+
+/// Describes *how* to compute a slot's type once all its dependencies are resolved.
 #[derive(Debug, Clone)]
-pub struct TypeConstraint {
-    pub slot: TypeSlot,
-    pub resolved_type: RosyType,
-    pub reason: String,
+enum ResolutionRule {
+    /// The type is already known from an explicit annotation.
+    Explicit(RosyType),
+    /// Inferred from an assignment RHS or call-site argument expression.
+    InferredFrom {
+        recipe: ExprRecipe,
+        reason: String,
+    },
+    /// Mirrors another slot exactly (e.g., return type from implicit return var).
+    Mirror {
+        source: TypeSlot,
+        reason: String,
+    },
+    /// No rule has been established yet — the slot is truly unknown.
+    /// Will remain unresolved and trigger an error if not replaced.
+    Unresolved,
 }
 
-/// Context for tracking known types during resolution.
-/// Maps variable/arg names to their resolved types within a scope.
+/// A lightweight "recipe" for computing the type of an expression.
+/// Stores just enough info to re-derive the type once dependencies are resolved.
+#[derive(Debug, Clone)]
+enum ExprRecipe {
+    /// A literal type — always known.
+    Literal(RosyType),
+    /// A variable reference — look up its slot.
+    Variable(TypeSlot),
+    /// A binary operator applied to two sub-recipes.
+    BinaryOp { op: BinaryOpKind, left: Box<ExprRecipe>, right: Box<ExprRecipe> },
+    /// An n-ary concat of sub-recipes.
+    Concat(Vec<ExprRecipe>),
+    /// A function call — result is the function's return type slot.
+    FunctionCall(TypeSlot),
+    /// SIN intrinsic — result depends on input type.
+    Sin(Box<ExprRecipe>),
+    /// Expression whose type couldn't be determined statically.
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum BinaryOpKind {
+    Add, Sub, Mult, Div, Extract,
+}
+
+// ─── Dependency Graph Node ──────────────────────────────────────────────────
+
+#[derive(Debug)]
+struct GraphNode {
+    slot: TypeSlot,
+    /// How to compute this slot's type once dependencies are met.
+    rule: ResolutionRule,
+    /// Slots that this node depends on (must be resolved first).
+    depends_on: HashSet<TypeSlot>,
+    /// The resolved type (filled in during topological traversal).
+    resolved: Option<RosyType>,
+}
+
+// ─── Scope Context (used during graph construction) ─────────────────────────
+
+/// Tracks what's been declared so far in a scope during the discovery walk.
 #[derive(Debug, Clone, Default)]
 struct ScopeContext {
-    /// Current scope path (e.g., ["RUN", "INNER_FUNC"])
     scope_path: Vec<String>,
-    /// Known variable types in the current scope (name → type)
-    variables: HashMap<String, RosyType>,
-    /// Known function signatures (name → (return_type, arg_types))
-    functions: HashMap<String, (Option<RosyType>, Vec<(String, Option<RosyType>)>)>,
-    /// Known procedure signatures (name → arg_types)
-    procedures: HashMap<String, Vec<(String, Option<RosyType>)>>,
+    /// Maps variable name → its TypeSlot.
+    variables: HashMap<String, TypeSlot>,
+    /// Maps function name → (return_type_slot, vec of (arg_name, arg_slot)).
+    functions: HashMap<String, (TypeSlot, Vec<(String, TypeSlot)>)>,
+    /// Maps procedure name → vec of (arg_name, arg_slot).
+    procedures: HashMap<String, Vec<(String, TypeSlot)>>,
 }
 
-/// The main type resolver.
+// ─── Type Resolver ──────────────────────────────────────────────────────────
+
 pub struct TypeResolver {
-    constraints: Vec<TypeConstraint>,
+    /// All nodes in the dependency graph, keyed by their slot.
+    nodes: HashMap<TypeSlot, GraphNode>,
 }
 
 impl TypeResolver {
     pub fn new() -> Self {
         TypeResolver {
-            constraints: Vec::new(),
+            nodes: HashMap::new(),
         }
     }
 
-    /// Run type resolution on a program. This mutates the AST in place,
-    /// filling in all `None` type fields.
-    ///
-    /// Uses iterative constraint collection: each round applies what we know,
-    /// then re-collects constraints from the (now partially-typed) AST.
-    /// Stops when no new constraints are discovered (fixed point).
+    // ─── Public entry point ─────────────────────────────────────────────
+
+    /// Run type resolution on a program. Mutates the AST in place.
     pub fn resolve(program: &mut Program) -> Result<()> {
-        const MAX_ITERATIONS: usize = 10;
+        let mut resolver = TypeResolver::new();
+        let mut ctx = ScopeContext::default();
 
-        for iteration in 0..MAX_ITERATIONS {
-            let mut resolver = TypeResolver::new();
-            let mut ctx = ScopeContext::default();
+        // Phase 1: Walk AST, discover all slots and build dependency graph
+        resolver.discover_slots(&program.statements, &mut ctx)?;
 
-            // Collect constraints from the current state of the AST
-            resolver.collect_from_statements(&program.statements, &mut ctx)?;
+        // Phase 2: Topological sort + resolve
+        resolver.topological_resolve()?;
 
-            let num_constraints = resolver.constraints.len();
-
-            // Apply constraints to the AST
-            resolver.apply_to_statements(&mut program.statements, &ctx.scope_path)?;
-
-            // Check if we've resolved everything
-            let unresolved = resolver.validate_all_types_resolved(&program.statements, &[]);
-            if unresolved.is_empty() {
-                return Ok(()); // All types resolved!
-            }
-
-            // If no new constraints were found this round, we've hit the fixed point
-            // and can't make further progress
-            if num_constraints == 0 && iteration > 0 {
-                break;
-            }
-
-            // Check if we made progress by seeing if there are still unresolved
-            // slots — if constraint count didn't change, we're stuck
-            if iteration > 0 {
-                let prev_unresolved_count = resolver.validate_all_types_resolved(&program.statements, &[]).len();
-                if prev_unresolved_count == unresolved.len() && num_constraints == 0 {
-                    break;
-                }
-            }
-        }
-
-        // Final validation — produce error message for remaining unresolved types
-        let resolver = TypeResolver::new();
-        let unresolved = resolver.validate_all_types_resolved(&program.statements, &[]);
-        if !unresolved.is_empty() {
-            // Collect all constraints one more time for hint generation
-            let mut hint_resolver = TypeResolver::new();
-            let mut ctx = ScopeContext::default();
-            let _ = hint_resolver.collect_from_statements(&program.statements, &mut ctx);
-
-            let mut msg = format!(
-                "\n╭─ Type Resolution Failed ─────────────────────────────────\n│\n│  {} unresolved type{} found:\n│",
-                unresolved.len(),
-                if unresolved.len() == 1 { "" } else { "s" }
-            );
-            for slot in &unresolved {
-                // Use hint_resolver to gather hints (it has constraints from latest pass)
-                let hints = hint_resolver.gather_hints_for_slot(&slot.slot);
-                let display_slot = UnresolvedSlot { slot: slot.slot.clone(), hints };
-                for line in format!("{}", display_slot).lines() {
-                    msg.push_str(&format!("\n│  {}", line));
-                }
-                msg.push_str("\n│");
-            }
-            msg.push_str("\n│  The type resolver infers types from assignments, call");
-            msg.push_str("\n│  sites, and operator usage. If a variable is declared");
-            msg.push_str("\n│  but never assigned a value with a known type, it can't");
-            msg.push_str("\n│  be resolved automatically.");
-            msg.push_str("\n│");
-            msg.push_str("\n╰──────────────────────────────────────────────────────────");
-            return Err(anyhow!("{}", msg));
-        }
+        // Phase 3: Apply resolved types back to the AST
+        resolver.apply_to_ast(&mut program.statements, &[])?;
 
         Ok(())
     }
 
-    /// Collect type constraints from a list of statements.
-    fn collect_from_statements(
+    // ─── Phase 1: Discovery ─────────────────────────────────────────────
+
+    /// Walk the AST, creating graph nodes for every type slot and recording
+    /// their dependencies.
+    fn discover_slots(
         &mut self,
         statements: &[Statement],
         ctx: &mut ScopeContext,
     ) -> Result<()> {
-        // First pass: register all declarations (variables, functions, procedures)
-        // so we know what exists before processing assignments and calls
+        // First pass: register all declarations so we know what exists
         for stmt in statements {
             self.register_declaration(stmt, ctx)?;
         }
 
-        // Second pass: collect constraints from assignments and call sites
+        // Second pass: discover dependencies from assignments and call sites
         for stmt in statements {
-            self.collect_constraints_from_statement(stmt, ctx)?;
+            self.discover_dependencies(stmt, ctx)?;
         }
 
         Ok(())
     }
 
-    /// Register a declaration (variable, function, procedure) in the scope context.
+    /// Insert a node for a slot. If it has an explicit type, mark it resolved.
+    fn insert_slot(&mut self, slot: TypeSlot, explicit_type: Option<&RosyType>) {
+        if let Some(t) = explicit_type {
+            self.nodes.insert(slot.clone(), GraphNode {
+                slot,
+                rule: ResolutionRule::Explicit(t.clone()),
+                depends_on: HashSet::new(),
+                resolved: Some(t.clone()),
+            });
+        } else {
+            // Placeholder — rule and deps will be set by discover_dependencies
+            self.nodes.entry(slot.clone()).or_insert_with(|| GraphNode {
+                slot,
+                rule: ResolutionRule::Unresolved,
+                depends_on: HashSet::new(),
+                resolved: None,
+            });
+        }
+    }
+
+    /// Register a declaration, creating graph nodes for its type slots.
     fn register_declaration(
         &mut self,
         stmt: &Statement,
@@ -236,85 +225,89 @@ impl TypeResolver {
                     .downcast_ref::<VarDeclStatement>()
                     .ok_or_else(|| anyhow!("Failed to downcast VarDecl statement"))?;
 
-                // If the type is already known, record it
-                if let Some(t) = &var_decl.data.r#type {
-                    ctx.variables.insert(var_decl.data.name.clone(), t.clone());
-                    self.constraints.push(TypeConstraint {
-                        slot: TypeSlot::Variable(ctx.scope_path.clone(), var_decl.data.name.clone()),
-                        resolved_type: t.clone(),
-                        reason: "explicitly declared type".to_string(),
-                    });
-                }
+                let slot = TypeSlot::Variable(
+                    ctx.scope_path.clone(),
+                    var_decl.data.name.clone(),
+                );
+                self.insert_slot(slot.clone(), var_decl.data.r#type.as_ref());
+                ctx.variables.insert(var_decl.data.name.clone(), slot);
             }
             StatementEnum::Function => {
                 let func = stmt.inner.as_any()
                     .downcast_ref::<FunctionStatement>()
                     .ok_or_else(|| anyhow!("Failed to downcast Function statement"))?;
 
-                // Register the function signature
-                let arg_types: Vec<(String, Option<RosyType>)> = func.args.iter()
-                    .map(|a| (a.name.clone(), a.r#type.clone()))
-                    .collect();
-                ctx.functions.insert(func.name.clone(), (func.return_type.clone(), arg_types.clone()));
+                // Return type slot
+                let ret_slot = TypeSlot::FunctionReturn(
+                    ctx.scope_path.clone(),
+                    func.name.clone(),
+                );
+                self.insert_slot(ret_slot.clone(), func.return_type.as_ref());
 
-                // If return type is known, add constraint
-                if let Some(t) = &func.return_type {
-                    self.constraints.push(TypeConstraint {
-                        slot: TypeSlot::FunctionReturn(ctx.scope_path.clone(), func.name.clone()),
-                        resolved_type: t.clone(),
-                        reason: "explicitly declared return type".to_string(),
-                    });
-                    // Also register the implicit return variable
-                    ctx.variables.insert(func.name.clone(), t.clone());
-                }
-
-                // Register arg constraints if known
+                // Argument slots
+                let mut arg_slots = Vec::new();
                 for arg in &func.args {
-                    if let Some(t) = &arg.r#type {
-                        self.constraints.push(TypeConstraint {
-                            slot: TypeSlot::Argument(ctx.scope_path.clone(), func.name.clone(), arg.name.clone()),
-                            resolved_type: t.clone(),
-                            reason: "explicitly declared argument type".to_string(),
-                        });
-                    }
+                    let arg_slot = TypeSlot::Argument(
+                        ctx.scope_path.clone(),
+                        func.name.clone(),
+                        arg.name.clone(),
+                    );
+                    self.insert_slot(arg_slot.clone(), arg.r#type.as_ref());
+                    arg_slots.push((arg.name.clone(), arg_slot));
                 }
 
-                // Recurse into the function body with a new scope
-                let mut inner_ctx = ctx.clone();
-                inner_ctx.scope_path.push(func.name.clone());
-                // Add args to inner scope
-                for arg in &func.args {
-                    if let Some(t) = &arg.r#type {
-                        inner_ctx.variables.insert(arg.name.clone(), t.clone());
-                    }
-                }
-                // Add return variable to inner scope
-                if let Some(t) = &func.return_type {
-                    inner_ctx.variables.insert(func.name.clone(), t.clone());
-                }
-                self.collect_from_statements(&func.body, &mut inner_ctx)?;
+                ctx.functions.insert(
+                    func.name.clone(),
+                    (ret_slot.clone(), arg_slots),
+                );
 
-                // Propagate any constraints discovered inside back to the function signature
-                // (e.g., if we learned arg types from usage inside the body)
-                let inferred_return: Option<RosyType> = if func.return_type.is_none() {
-                    self.constraints.iter()
-                        .find_map(|c| match &c.slot {
-                            TypeSlot::Variable(scope, name)
-                                if scope == &inner_ctx.scope_path && name == &func.name =>
-                            {
-                                Some(c.resolved_type.clone())
-                            }
-                            _ => None,
-                        })
-                } else {
-                    None
+                // Recurse into function body with inner scope
+                let mut inner_ctx = ScopeContext {
+                    scope_path: {
+                        let mut p = ctx.scope_path.clone();
+                        p.push(func.name.clone());
+                        p
+                    },
+                    // Inner scope inherits outer declarations
+                    variables: ctx.variables.clone(),
+                    functions: ctx.functions.clone(),
+                    procedures: ctx.procedures.clone(),
                 };
-                if let Some(ret_type) = inferred_return {
-                    self.constraints.push(TypeConstraint {
-                        slot: TypeSlot::FunctionReturn(ctx.scope_path.clone(), func.name.clone()),
-                        resolved_type: ret_type,
-                        reason: format!("inferred from assignment to return variable '{}'", func.name),
-                    });
+
+                // Add args to inner scope as variable references
+                for arg in &func.args {
+                    let arg_slot = TypeSlot::Argument(
+                        ctx.scope_path.clone(),
+                        func.name.clone(),
+                        arg.name.clone(),
+                    );
+                    inner_ctx.variables.insert(arg.name.clone(), arg_slot);
+                }
+
+                // The implicit return variable inside the function body
+                let inner_ret_var_slot = TypeSlot::Variable(
+                    inner_ctx.scope_path.clone(),
+                    func.name.clone(),
+                );
+                // If the return type is known explicitly, the inner return var is also known
+                self.insert_slot(inner_ret_var_slot.clone(), func.return_type.as_ref());
+                inner_ctx.variables.insert(func.name.clone(), inner_ret_var_slot.clone());
+
+                self.discover_slots(&func.body, &mut inner_ctx)?;
+
+                // If the return type is NOT explicit, it depends on the inner return var
+                if func.return_type.is_none() {
+                    if self.nodes.contains_key(&inner_ret_var_slot) {
+                        let node = self.nodes.get_mut(&ret_slot).unwrap();
+                        node.rule = ResolutionRule::Mirror {
+                            source: inner_ret_var_slot.clone(),
+                            reason: format!(
+                                "inferred from assignment to return variable '{}'",
+                                func.name
+                            ),
+                        };
+                        node.depends_on.insert(inner_ret_var_slot);
+                    }
                 }
             }
             StatementEnum::Procedure => {
@@ -322,40 +315,49 @@ impl TypeResolver {
                     .downcast_ref::<ProcedureStatement>()
                     .ok_or_else(|| anyhow!("Failed to downcast Procedure statement"))?;
 
-                // Register the procedure signature
-                let arg_types: Vec<(String, Option<RosyType>)> = proc.args.iter()
-                    .map(|a| (a.name.clone(), a.r#type.clone()))
-                    .collect();
-                ctx.procedures.insert(proc.name.clone(), arg_types);
-
-                // Register arg constraints if known
+                let mut arg_slots = Vec::new();
                 for arg in &proc.args {
-                    if let Some(t) = &arg.r#type {
-                        self.constraints.push(TypeConstraint {
-                            slot: TypeSlot::Argument(ctx.scope_path.clone(), proc.name.clone(), arg.name.clone()),
-                            resolved_type: t.clone(),
-                            reason: "explicitly declared argument type".to_string(),
-                        });
-                    }
+                    let arg_slot = TypeSlot::Argument(
+                        ctx.scope_path.clone(),
+                        proc.name.clone(),
+                        arg.name.clone(),
+                    );
+                    self.insert_slot(arg_slot.clone(), arg.r#type.as_ref());
+                    arg_slots.push((arg.name.clone(), arg_slot));
                 }
 
-                // Recurse into the procedure body with a new scope
-                let mut inner_ctx = ctx.clone();
-                inner_ctx.scope_path.push(proc.name.clone());
+                ctx.procedures.insert(proc.name.clone(), arg_slots);
+
+                // Recurse into procedure body
+                let mut inner_ctx = ScopeContext {
+                    scope_path: {
+                        let mut p = ctx.scope_path.clone();
+                        p.push(proc.name.clone());
+                        p
+                    },
+                    variables: ctx.variables.clone(),
+                    functions: ctx.functions.clone(),
+                    procedures: ctx.procedures.clone(),
+                };
+
                 for arg in &proc.args {
-                    if let Some(t) = &arg.r#type {
-                        inner_ctx.variables.insert(arg.name.clone(), t.clone());
-                    }
+                    let arg_slot = TypeSlot::Argument(
+                        ctx.scope_path.clone(),
+                        proc.name.clone(),
+                        arg.name.clone(),
+                    );
+                    inner_ctx.variables.insert(arg.name.clone(), arg_slot);
                 }
-                self.collect_from_statements(&proc.body, &mut inner_ctx)?;
+
+                self.discover_slots(&proc.body, &mut inner_ctx)?;
             }
             _ => {}
         }
         Ok(())
     }
 
-    /// Collect constraints from a single statement's usage patterns.
-    fn collect_constraints_from_statement(
+    /// Walk statements looking for assignments and call sites to establish dependencies.
+    fn discover_dependencies(
         &mut self,
         stmt: &Statement,
         ctx: &mut ScopeContext,
@@ -366,19 +368,44 @@ impl TypeResolver {
                     .downcast_ref::<AssignStatement>()
                     .ok_or_else(|| anyhow!("Failed to downcast Assign statement"))?;
 
-                // Try to determine the type of the RHS expression
-                if let Some(rhs_type) = self.try_resolve_expr_type(&assign.value, ctx) {
-                    let var_name = &assign.identifier.name;
+                // Discover function call sites within the RHS expression
+                self.discover_expr_function_calls(&assign.value, ctx)?;
 
-                    // If the variable doesn't have a known type, add a constraint
-                    if !ctx.variables.contains_key(var_name) {
-                        ctx.variables.insert(var_name.clone(), rhs_type.clone());
-                        self.constraints.push(TypeConstraint {
-                            slot: TypeSlot::Variable(ctx.scope_path.clone(), var_name.clone()),
-                            resolved_type: rhs_type,
-                            reason: "inferred from assignment".to_string(),
-                        });
+                let var_name = &assign.identifier.name;
+                let var_slot = match ctx.variables.get(var_name) {
+                    Some(s) => s.clone(),
+                    None => return Ok(()), // unknown variable, skip
+                };
+
+                // Only add dependency if the slot is still unresolved
+                if let Some(node) = self.nodes.get(&var_slot) {
+                    if node.resolved.is_some() {
+                        return Ok(()); // already has explicit type
                     }
+                } else {
+                    return Ok(());
+                }
+
+                // Build a recipe for the RHS expression and collect its dependencies
+                let mut deps = HashSet::new();
+                let recipe = self.build_expr_recipe(&assign.value, ctx, &mut deps);
+
+                if let Some(node) = self.nodes.get_mut(&var_slot) {
+                    node.rule = ResolutionRule::InferredFrom {
+                        recipe,
+                        reason: "inferred from assignment".to_string(),
+                    };
+                    node.depends_on = deps;
+                }
+            }
+            StatementEnum::Write => {
+                let write_stmt = stmt.inner.as_any()
+                    .downcast_ref::<WriteStatement>()
+                    .ok_or_else(|| anyhow!("Failed to downcast Write statement"))?;
+
+                // Discover function call sites within all write expressions
+                for expr in &write_stmt.exprs {
+                    self.discover_expr_function_calls(expr, ctx)?;
                 }
             }
             StatementEnum::ProcedureCall => {
@@ -386,31 +413,26 @@ impl TypeResolver {
                     .downcast_ref::<ProcedureCallStatement>()
                     .ok_or_else(|| anyhow!("Failed to downcast ProcedureCall statement"))?;
 
-                self.collect_constraints_from_call_site(
-                    &call.name, &call.args, false, ctx
-                )?;
+                self.discover_call_site_deps(&call.name, &call.args, false, ctx)?;
             }
             StatementEnum::FunctionCall => {
                 let call = stmt.inner.as_any()
                     .downcast_ref::<FunctionCallStatement>()
                     .ok_or_else(|| anyhow!("Failed to downcast FunctionCall statement"))?;
 
-                self.collect_constraints_from_call_site(
-                    &call.name, &call.args, true, ctx
-                )?;
+                self.discover_call_site_deps(&call.name, &call.args, true, ctx)?;
             }
             StatementEnum::If => {
                 let if_stmt = stmt.inner.as_any()
                     .downcast_ref::<IfStatement>()
                     .ok_or_else(|| anyhow!("Failed to downcast If statement"))?;
 
-                // Recurse into each branch
-                self.collect_from_statements(&if_stmt.then_body, &mut ctx.clone())?;
+                self.discover_slots(&if_stmt.then_body, &mut ctx.clone())?;
                 for elseif in &if_stmt.elseif_clauses {
-                    self.collect_from_statements(&elseif.body, &mut ctx.clone())?;
+                    self.discover_slots(&elseif.body, &mut ctx.clone())?;
                 }
                 if let Some(else_body) = &if_stmt.else_body {
-                    self.collect_from_statements(else_body, &mut ctx.clone())?;
+                    self.discover_slots(else_body, &mut ctx.clone())?;
                 }
             }
             StatementEnum::Loop => {
@@ -418,17 +440,22 @@ impl TypeResolver {
                     .downcast_ref::<LoopStatement>()
                     .ok_or_else(|| anyhow!("Failed to downcast Loop statement"))?;
 
-                // The loop iterator is always RE
                 let mut inner_ctx = ctx.clone();
-                inner_ctx.variables.insert(loop_stmt.iterator.clone(), RosyType::RE());
-                self.collect_from_statements(&loop_stmt.body, &mut inner_ctx)?;
+                // Loop iterator is always RE
+                let iter_slot = TypeSlot::Variable(
+                    ctx.scope_path.clone(),
+                    loop_stmt.iterator.clone(),
+                );
+                self.insert_slot(iter_slot.clone(), Some(&RosyType::RE()));
+                inner_ctx.variables.insert(loop_stmt.iterator.clone(), iter_slot);
+                self.discover_slots(&loop_stmt.body, &mut inner_ctx)?;
             }
             StatementEnum::WhileLoop => {
                 let while_stmt = stmt.inner.as_any()
                     .downcast_ref::<WhileStatement>()
                     .ok_or_else(|| anyhow!("Failed to downcast While statement"))?;
 
-                self.collect_from_statements(&while_stmt.body, &mut ctx.clone())?;
+                self.discover_slots(&while_stmt.body, &mut ctx.clone())?;
             }
             StatementEnum::PLoop => {
                 let ploop_stmt = stmt.inner.as_any()
@@ -436,53 +463,137 @@ impl TypeResolver {
                     .ok_or_else(|| anyhow!("Failed to downcast PLoop statement"))?;
 
                 let mut inner_ctx = ctx.clone();
-                inner_ctx.variables.insert(ploop_stmt.iterator.clone(), RosyType::RE());
-                self.collect_from_statements(&ploop_stmt.body, &mut inner_ctx)?;
+                let iter_slot = TypeSlot::Variable(
+                    ctx.scope_path.clone(),
+                    ploop_stmt.iterator.clone(),
+                );
+                self.insert_slot(iter_slot.clone(), Some(&RosyType::RE()));
+                inner_ctx.variables.insert(ploop_stmt.iterator.clone(), iter_slot);
+                self.discover_slots(&ploop_stmt.body, &mut inner_ctx)?;
             }
             StatementEnum::Fit => {
                 let fit_stmt = stmt.inner.as_any()
                     .downcast_ref::<FitStatement>()
                     .ok_or_else(|| anyhow!("Failed to downcast Fit statement"))?;
 
-                self.collect_from_statements(&fit_stmt.body, &mut ctx.clone())?;
+                self.discover_slots(&fit_stmt.body, &mut ctx.clone())?;
             }
             _ => {}
         }
         Ok(())
     }
 
-    /// Collect constraints from a function/procedure call site.
-    /// If the callee has untyped parameters, we can infer their types from the arguments.
-    fn collect_constraints_from_call_site(
+    /// Recursively walk an expression tree looking for function calls.
+    /// For each one found, wire up call-site argument dependencies.
+    fn discover_expr_function_calls(
+        &mut self,
+        expr: &Expr,
+        ctx: &ScopeContext,
+    ) -> Result<()> {
+        match &expr.enum_variant {
+            ExprEnum::FunctionCall => {
+                if let Some(func_call) = expr.inner.as_any()
+                    .downcast_ref::<expr_function_call::FunctionCallExpr>()
+                {
+                    self.discover_call_site_deps(
+                        &func_call.name, &func_call.args, true, ctx
+                    )?;
+                    // Recurse into the arguments too
+                    for arg in &func_call.args {
+                        self.discover_expr_function_calls(arg, ctx)?;
+                    }
+                }
+            }
+            ExprEnum::Add => {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<add::AddExpr>() {
+                    self.discover_expr_function_calls(&e.left, ctx)?;
+                    self.discover_expr_function_calls(&e.right, ctx)?;
+                }
+            }
+            ExprEnum::Sub => {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<sub::SubExpr>() {
+                    self.discover_expr_function_calls(&e.left, ctx)?;
+                    self.discover_expr_function_calls(&e.right, ctx)?;
+                }
+            }
+            ExprEnum::Mult => {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<mult::MultExpr>() {
+                    self.discover_expr_function_calls(&e.left, ctx)?;
+                    self.discover_expr_function_calls(&e.right, ctx)?;
+                }
+            }
+            ExprEnum::Div => {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<div::DivExpr>() {
+                    self.discover_expr_function_calls(&e.left, ctx)?;
+                    self.discover_expr_function_calls(&e.right, ctx)?;
+                }
+            }
+            ExprEnum::Extract => {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<extract::ExtractExpr>() {
+                    self.discover_expr_function_calls(&e.object, ctx)?;
+                    self.discover_expr_function_calls(&e.index, ctx)?;
+                }
+            }
+            ExprEnum::Concat => {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<concat::ConcatExpr>() {
+                    for term in &e.terms {
+                        self.discover_expr_function_calls(term, ctx)?;
+                    }
+                }
+            }
+            ExprEnum::Sin => {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<sin::SinExpr>() {
+                    self.discover_expr_function_calls(&e.expr, ctx)?;
+                }
+            }
+            ExprEnum::StringConvert => {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<string_convert::StringConvertExpr>() {
+                    self.discover_expr_function_calls(&e.expr, ctx)?;
+                }
+            }
+            // Leaf expressions — no children to recurse into
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// For a call site like `F(X, Y)`, if `F` has untyped parameters, add
+    /// dependencies from the parameter slots to the argument expressions.
+    fn discover_call_site_deps(
         &mut self,
         name: &str,
         args: &[Expr],
         is_function: bool,
-        ctx: &mut ScopeContext,
+        ctx: &ScopeContext,
     ) -> Result<()> {
-        let param_info: Option<Vec<(String, Option<RosyType>)>> = if is_function {
+        let param_slots: Option<Vec<(String, TypeSlot)>> = if is_function {
             ctx.functions.get(name).map(|(_, params)| params.clone())
         } else {
-            ctx.procedures.get(name).cloned()
+            ctx.procedures.get(name).map(|params| params.clone())
         };
 
-        if let Some(params) = param_info {
+        if let Some(params) = param_slots {
             for (i, arg_expr) in args.iter().enumerate() {
-                if let Some((param_name, param_type)) = params.get(i) {
-                    // If the parameter doesn't have a type yet, try to infer from the argument
-                    if param_type.is_none() {
-                        if let Some(arg_type) = self.try_resolve_expr_type(arg_expr, ctx) {
-                            self.constraints.push(TypeConstraint {
-                                slot: TypeSlot::Argument(
-                                    ctx.scope_path.clone(),
-                                    name.to_string(),
-                                    param_name.clone(),
-                                ),
-                                resolved_type: arg_type,
-                                reason: format!("inferred from call site argument {}", i + 1),
-                            });
+                if let Some((_, param_slot)) = params.get(i) {
+                    // Only update if the parameter slot is unresolved
+                    if let Some(param_node) = self.nodes.get(param_slot) {
+                        if param_node.resolved.is_some() {
+                            continue;
                         }
+                    } else {
+                        continue;
                     }
+
+                    // Build recipe for the argument expression
+                    let mut deps = HashSet::new();
+                    let recipe = self.build_expr_recipe(arg_expr, ctx, &mut deps);
+
+                    let node = self.nodes.get_mut(param_slot).unwrap();
+                    node.rule = ResolutionRule::InferredFrom {
+                        recipe,
+                        reason: format!("inferred from argument {} at call site", i + 1),
+                    };
+                    node.depends_on = deps;
                 }
             }
         }
@@ -490,394 +601,455 @@ impl TypeResolver {
         Ok(())
     }
 
-    /// Try to determine the type of an expression from what we already know.
-    /// Returns None if the type can't be determined yet.
-    fn try_resolve_expr_type(
+    /// Build an ExprRecipe from an AST expression, collecting dependency slots.
+    fn build_expr_recipe(
         &self,
         expr: &Expr,
         ctx: &ScopeContext,
-    ) -> Option<RosyType> {
+        deps: &mut HashSet<TypeSlot>,
+    ) -> ExprRecipe {
         match &expr.enum_variant {
-            ExprEnum::Number => Some(RosyType::RE()),
-            ExprEnum::String => Some(RosyType::ST()),
-            ExprEnum::Boolean => Some(RosyType::LO()),
+            ExprEnum::Number => ExprRecipe::Literal(RosyType::RE()),
+            ExprEnum::String => ExprRecipe::Literal(RosyType::ST()),
+            ExprEnum::Boolean => ExprRecipe::Literal(RosyType::LO()),
+            ExprEnum::Complex => ExprRecipe::Literal(RosyType::CM()),
+            ExprEnum::StringConvert => ExprRecipe::Literal(RosyType::ST()),
+            ExprEnum::LogicalConvert => ExprRecipe::Literal(RosyType::LO()),
+            ExprEnum::DA => ExprRecipe::Literal(RosyType::DA()),
+            ExprEnum::Length => ExprRecipe::Literal(RosyType::RE()),
+            ExprEnum::Not => ExprRecipe::Literal(RosyType::LO()),
+            ExprEnum::Eq | ExprEnum::Neq | ExprEnum::Lt | ExprEnum::Gt |
+            ExprEnum::Lte | ExprEnum::Gte => ExprRecipe::Literal(RosyType::LO()),
+
             ExprEnum::Var => {
-                // Look up the variable in the scope context
-                let var_expr = expr.inner.as_any()
-                    .downcast_ref::<var_expr::VarExpr>()?;
-                let ident = &var_expr.identifier;
-                let base_type = ctx.variables.get(&ident.name)?;
-                // Account for indexing reducing dimensions
-                let mut result_type = base_type.clone();
-                result_type.dimensions = result_type.dimensions.checked_sub(ident.indicies.len())?;
-                Some(result_type)
+                if let Some(var_expr) = expr.inner.as_any()
+                    .downcast_ref::<var_expr::VarExpr>()
+                {
+                    let ident = &var_expr.identifier;
+                    if let Some(slot) = ctx.variables.get(&ident.name) {
+                        deps.insert(slot.clone());
+                        ExprRecipe::Variable(slot.clone())
+                    } else {
+                        ExprRecipe::Unknown
+                    }
+                } else {
+                    ExprRecipe::Unknown
+                }
             }
             ExprEnum::FunctionCall => {
-                let func_call = expr.inner.as_any()
-                    .downcast_ref::<expr_function_call::FunctionCallExpr>()?;
-                // Look up the function return type
-                let (return_type, _) = ctx.functions.get(&func_call.name)?;
-                return_type.clone()
-            }
-            ExprEnum::Add => {
-                let add_expr = expr.inner.as_any()
-                    .downcast_ref::<add::AddExpr>()?;
-                let left_type = self.try_resolve_expr_type(&add_expr.left, ctx)?;
-                let right_type = self.try_resolve_expr_type(&add_expr.right, ctx)?;
-                crate::rosy_lib::operators::add::get_return_type(&left_type, &right_type)
-            }
-            ExprEnum::Sub => {
-                let sub_expr = expr.inner.as_any()
-                    .downcast_ref::<sub::SubExpr>()?;
-                let left_type = self.try_resolve_expr_type(&sub_expr.left, ctx)?;
-                let right_type = self.try_resolve_expr_type(&sub_expr.right, ctx)?;
-                crate::rosy_lib::operators::sub::get_return_type(&left_type, &right_type)
-            }
-            ExprEnum::Mult => {
-                let mult_expr = expr.inner.as_any()
-                    .downcast_ref::<mult::MultExpr>()?;
-                let left_type = self.try_resolve_expr_type(&mult_expr.left, ctx)?;
-                let right_type = self.try_resolve_expr_type(&mult_expr.right, ctx)?;
-                crate::rosy_lib::operators::mult::get_return_type(&left_type, &right_type)
-            }
-            ExprEnum::Div => {
-                let div_expr = expr.inner.as_any()
-                    .downcast_ref::<div::DivExpr>()?;
-                let left_type = self.try_resolve_expr_type(&div_expr.left, ctx)?;
-                let right_type = self.try_resolve_expr_type(&div_expr.right, ctx)?;
-                crate::rosy_lib::operators::div::get_return_type(&left_type, &right_type)
-            }
-            ExprEnum::Concat => {
-                let concat_expr = expr.inner.as_any()
-                    .downcast_ref::<concat::ConcatExpr>()?;
-                // Concat is n-ary — fold left to right through the terms
-                let mut iter = concat_expr.terms.iter();
-                let first = iter.next()?;
-                let mut result_type = self.try_resolve_expr_type(first, ctx)?;
-                for term in iter {
-                    let term_type = self.try_resolve_expr_type(term, ctx)?;
-                    result_type = crate::rosy_lib::operators::concat::get_return_type(&result_type, &term_type)?;
+                if let Some(func_call) = expr.inner.as_any()
+                    .downcast_ref::<expr_function_call::FunctionCallExpr>()
+                {
+                    if let Some((ret_slot, param_slots)) = ctx.functions.get(&func_call.name) {
+                        deps.insert(ret_slot.clone());
+
+                        // Also discover call-site arg dependencies inline
+                        for (i, arg_expr) in func_call.args.iter().enumerate() {
+                            if let Some((_, param_slot)) = param_slots.get(i) {
+                                // Only wire up if param is unresolved
+                                let is_unresolved = self.nodes.get(param_slot)
+                                    .map_or(false, |n| n.resolved.is_none());
+
+                                if is_unresolved {
+                                    let mut arg_deps = HashSet::new();
+                                    let recipe = self.build_expr_recipe(arg_expr, ctx, &mut arg_deps);
+
+                                    // We can't mutate nodes here (borrow checker), so
+                                    // just collect the arg expression deps for the
+                                    // outer expression. The actual param slot wiring
+                                    // is done by discover_call_site_deps for statement-
+                                    // level calls and by WRITE/assign discovery for
+                                    // expression-level calls.
+                                    deps.extend(arg_deps);
+                                    let _ = recipe;
+                                }
+                            }
+                        }
+
+                        ExprRecipe::FunctionCall(ret_slot.clone())
+                    } else {
+                        ExprRecipe::Unknown
+                    }
+                } else {
+                    ExprRecipe::Unknown
                 }
-                Some(result_type)
             }
-            ExprEnum::Extract => {
-                let extract_expr = expr.inner.as_any()
-                    .downcast_ref::<extract::ExtractExpr>()?;
-                let object_type = self.try_resolve_expr_type(&extract_expr.object, ctx)?;
-                let index_type = self.try_resolve_expr_type(&extract_expr.index, ctx)?;
-                crate::rosy_lib::operators::extract::get_return_type(&object_type, &index_type)
-            }
-            ExprEnum::Eq | ExprEnum::Neq | ExprEnum::Lt | ExprEnum::Gt |
-            ExprEnum::Lte | ExprEnum::Gte => {
-                // Comparison operators always return LO
-                Some(RosyType::LO())
-            }
-            ExprEnum::Not => {
-                // NOT always returns LO
-                Some(RosyType::LO())
-            }
-            ExprEnum::Complex => Some(RosyType::CM()),
-            ExprEnum::StringConvert => Some(RosyType::ST()),
-            ExprEnum::LogicalConvert => Some(RosyType::LO()),
-            ExprEnum::DA => Some(RosyType::DA()),
-            ExprEnum::Length => Some(RosyType::RE()),
             ExprEnum::Sin => {
-                // SIN return type depends on input type
-                let sin_expr = expr.inner.as_any()
-                    .downcast_ref::<sin::SinExpr>()?;
-                let input_type = self.try_resolve_expr_type(&sin_expr.expr, ctx)?;
-                crate::rosy_lib::intrinsics::sin::get_return_type(&input_type)
+                if let Some(sin_expr) = expr.inner.as_any()
+                    .downcast_ref::<sin::SinExpr>()
+                {
+                    let inner = self.build_expr_recipe(&sin_expr.expr, ctx, deps);
+                    ExprRecipe::Sin(Box::new(inner))
+                } else {
+                    ExprRecipe::Unknown
+                }
+            }
+            ExprEnum::Add => self.build_binop_recipe(expr, ctx, deps, BinaryOpKind::Add),
+            ExprEnum::Sub => self.build_binop_recipe(expr, ctx, deps, BinaryOpKind::Sub),
+            ExprEnum::Mult => self.build_binop_recipe(expr, ctx, deps, BinaryOpKind::Mult),
+            ExprEnum::Div => self.build_binop_recipe(expr, ctx, deps, BinaryOpKind::Div),
+            ExprEnum::Extract => self.build_binop_recipe(expr, ctx, deps, BinaryOpKind::Extract),
+            ExprEnum::Concat => {
+                if let Some(concat_expr) = expr.inner.as_any()
+                    .downcast_ref::<concat::ConcatExpr>()
+                {
+                    let recipes: Vec<ExprRecipe> = concat_expr.terms.iter()
+                        .map(|t| self.build_expr_recipe(t, ctx, deps))
+                        .collect();
+                    ExprRecipe::Concat(recipes)
+                } else {
+                    ExprRecipe::Unknown
+                }
             }
         }
     }
 
-    /// Gather hints about what the resolver knows regarding a particular slot.
-    fn gather_hints_for_slot(&self, slot: &TypeSlot) -> Vec<String> {
-        let mut hints = Vec::new();
+    /// Helper: build a binary operator recipe from an expression.
+    fn build_binop_recipe(
+        &self,
+        expr: &Expr,
+        ctx: &ScopeContext,
+        deps: &mut HashSet<TypeSlot>,
+        op: BinaryOpKind,
+    ) -> ExprRecipe {
+        macro_rules! try_binop {
+            ($type:ty) => {
+                if let Some(binop) = expr.inner.as_any().downcast_ref::<$type>() {
+                    let left = self.build_expr_recipe(&binop.left, ctx, deps);
+                    let right = self.build_expr_recipe(&binop.right, ctx, deps);
+                    return ExprRecipe::BinaryOp {
+                        op,
+                        left: Box::new(left),
+                        right: Box::new(right),
+                    };
+                }
+            };
+        }
+        match op {
+            BinaryOpKind::Add => try_binop!(add::AddExpr),
+            BinaryOpKind::Sub => try_binop!(sub::SubExpr),
+            BinaryOpKind::Mult => try_binop!(mult::MultExpr),
+            BinaryOpKind::Div => try_binop!(div::DivExpr),
+            BinaryOpKind::Extract => {
+                if let Some(ext) = expr.inner.as_any().downcast_ref::<extract::ExtractExpr>() {
+                    let left = self.build_expr_recipe(&ext.object, ctx, deps);
+                    let right = self.build_expr_recipe(&ext.index, ctx, deps);
+                    return ExprRecipe::BinaryOp {
+                        op,
+                        left: Box::new(left),
+                        right: Box::new(right),
+                    };
+                }
+            }
+        }
+        ExprRecipe::Unknown
+    }
 
-        // Check if there are any constraints that were collected for this slot
-        // (there shouldn't be, since it's unresolved, but partial info is useful)
-        let partial_constraints: Vec<&TypeConstraint> = self.constraints.iter()
-            .filter(|c| &c.slot == slot)
+    // ─── Phase 2: Topological Resolution (Kahn's Algorithm) ─────────────
+
+    /// Process nodes whose dependencies are all resolved first, resolve them,
+    /// then process their dependents, and so on. One pass — no iteration.
+    fn topological_resolve(&mut self) -> Result<()> {
+        // Build reverse dependency map: slot → set of slots that depend on it
+        let mut dependents: HashMap<TypeSlot, Vec<TypeSlot>> = HashMap::new();
+        let mut in_degree: HashMap<TypeSlot, usize> = HashMap::new();
+
+        for (slot, node) in &self.nodes {
+            // Only count edges to slots that exist in the graph
+            let real_deps: usize = node.depends_on.iter()
+                .filter(|d| self.nodes.contains_key(d))
+                .count();
+            in_degree.insert(slot.clone(), real_deps);
+
+            for dep in &node.depends_on {
+                if self.nodes.contains_key(dep) {
+                    dependents.entry(dep.clone())
+                        .or_default()
+                        .push(slot.clone());
+                }
+            }
+        }
+
+        // Seed the queue with all nodes that have in-degree 0
+        let mut queue: VecDeque<TypeSlot> = VecDeque::new();
+        for (slot, &degree) in &in_degree {
+            if degree == 0 {
+                queue.push_back(slot.clone());
+            }
+        }
+
+        let mut resolved_count = 0;
+
+        while let Some(slot) = queue.pop_front() {
+            // Resolve this node if not already resolved
+            if self.nodes.get(&slot).map_or(true, |n| n.resolved.is_none()) {
+                self.resolve_node(&slot)?;
+            }
+            resolved_count += 1;
+
+            // Decrement in-degree for all dependents
+            if let Some(deps) = dependents.get(&slot) {
+                for dep_slot in deps {
+                    if let Some(deg) = in_degree.get_mut(dep_slot) {
+                        *deg = deg.saturating_sub(1);
+                        if *deg == 0 {
+                            queue.push_back(dep_slot.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Any remaining unresolved nodes are cycles or truly unresolvable
+        let unresolved: Vec<&GraphNode> = self.nodes.values()
+            .filter(|n| n.resolved.is_none())
             .collect();
 
-        if !partial_constraints.is_empty() {
-            // This shouldn't really happen since we applied successfully,
-            // but just in case:
-            for c in &partial_constraints {
-                hints.push(format!("Found constraint: {} ({})", c.resolved_type, c.reason));
-            }
+        if unresolved.is_empty() {
+            return Ok(());
         }
 
-        // Give contextual guidance based on slot type
-        match slot {
-            TypeSlot::Variable(scope, name) => {
-                if scope.is_empty() {
-                    hints.push(format!(
-                        "Variable '{}' is declared at global scope but is never assigned \
-                         a value whose type could be determined.", name
-                    ));
-                } else {
-                    hints.push(format!(
-                        "Variable '{}' in '{}' is never assigned a value whose type \
-                         could be determined.", name, scope.join(" > ")
-                    ));
+        // ── Build error message ──
+
+        // Partition into cycle nodes (have unresolved deps) vs no-info nodes
+        let cycle_slots: Vec<&TypeSlot> = unresolved.iter()
+            .filter(|n| n.depends_on.iter().any(|d|
+                self.nodes.get(d).map_or(false, |dn| dn.resolved.is_none())
+            ))
+            .map(|n| &n.slot)
+            .collect();
+
+        let no_info_slots: Vec<&TypeSlot> = unresolved.iter()
+            .filter(|n| !n.depends_on.iter().any(|d|
+                self.nodes.get(d).map_or(false, |dn| dn.resolved.is_none())
+            ))
+            .map(|n| &n.slot)
+            .collect();
+
+        let total = unresolved.len();
+        let mut msg = format!(
+            "\n╭─ Type Resolution Failed ─────────────────────────────────\n│\n│  {} unresolved type{} found:\n│",
+            total,
+            if total == 1 { "" } else { "s" }
+        );
+
+        // Report cycle errors
+        if !cycle_slots.is_empty() {
+            msg.push_str("\n│  🔄 Circular dependencies detected:");
+            msg.push_str("\n│");
+            for slot in &cycle_slots {
+                let node = self.nodes.get(slot).unwrap();
+                let dep_names: Vec<String> = node.depends_on.iter()
+                    .filter(|d| self.nodes.get(*d).map_or(false, |n| n.resolved.is_none()))
+                    .map(|d| format!("{}", d))
+                    .collect();
+                msg.push_str(&format!("\n│    ✗ {} depends on:",
+                    slot,
+                ));
+                for dep in &dep_names {
+                    msg.push_str(&format!("\n│        → {}", dep));
                 }
-                hints.push(
-                    "Try assigning it a value (e.g. X := 0;) or adding an explicit type.".to_string()
-                );
             }
-            TypeSlot::FunctionReturn(_, name) => {
-                hints.push(format!(
-                    "Function '{}' has no explicit return type and the resolver \
-                     could not determine it from the function body.", name
-                ));
-                hints.push(
-                    "Try adding a return type to the FUNCTION declaration.".to_string()
-                );
-            }
-            TypeSlot::Argument(_, callable, arg) => {
-                hints.push(format!(
-                    "Argument '{}' of '{}' has no type annotation and is never \
-                     called with a value whose type could be determined.", arg, callable
-                ));
-                hints.push(
-                    "Try adding a type after the argument name, or call the function/procedure \
-                     with typed arguments.".to_string()
-                );
-            }
+            msg.push_str("\n│");
+            msg.push_str("\n│    Break the cycle by adding an explicit type annotation");
+            msg.push_str("\n│    to at least one of the slots above.");
+            msg.push_str("\n│");
         }
 
-        hints
+        // Report no-info errors
+        for slot in &no_info_slots {
+            let hint = match slot {
+                TypeSlot::Variable(scope, name) => {
+                    let scope_str = if scope.is_empty() {
+                        "global scope".to_string()
+                    } else {
+                        format!("'{}'", scope.join(" > "))
+                    };
+                    format!(
+                        "  ✗ Could not determine the type of variable '{}' (in {})\n\
+                         \x20   • It is declared but never assigned a value with a known type.\n\
+                         \x20   • Try assigning it a value (e.g. {} := 0;) or adding an explicit type.\n\
+                         \x20   → Add an explicit type: VARIABLE (RE) {} ;",
+                        name, scope_str, name, name
+                    )
+                }
+                TypeSlot::FunctionReturn(_, name) => {
+                    format!(
+                        "  ✗ Could not determine the return type of function '{}'\n\
+                         \x20   • The function body doesn't assign a known-type value to '{}'.\n\
+                         \x20   → Add an explicit return type: FUNCTION (RE) {} ... ;",
+                        name, name, name
+                    )
+                }
+                TypeSlot::Argument(_, callable, arg) => {
+                    format!(
+                        "  ✗ Could not determine the type of argument '{}' of '{}'\n\
+                         \x20   • No call site passes a value with a known type for this argument.\n\
+                         \x20   → Add an explicit type: {} (RE)",
+                        arg, callable, arg
+                    )
+                }
+            };
+            for line in hint.lines() {
+                msg.push_str(&format!("\n│  {}", line));
+            }
+            msg.push_str("\n│");
+        }
+
+        msg.push_str("\n│  The type resolver builds a dependency graph and resolves");
+        msg.push_str("\n│  types from leaves inward. If a slot has no path to a");
+        msg.push_str("\n│  known type, or is part of a cycle, it cannot be resolved.");
+        msg.push_str("\n│");
+        msg.push_str("\n╰──────────────────────────────────────────────────────────");
+        Err(anyhow!("{}", msg))
     }
 
-    /// Walk the AST after constraint application to find any remaining `None` types.
-    /// Returns a list of unresolved slots with helpful context.
-    fn validate_all_types_resolved(
-        &self,
-        statements: &[Statement],
-        current_scope: &[String],
-    ) -> Vec<UnresolvedSlot> {
-        let mut unresolved = Vec::new();
+    /// Resolve a single node by evaluating its rule.
+    fn resolve_node(&mut self, slot: &TypeSlot) -> Result<()> {
+        let node = self.nodes.get(slot)
+            .ok_or_else(|| anyhow!("No node for slot {}", slot))?;
 
-        for stmt in statements {
-            match stmt.enum_variant {
-                StatementEnum::VarDecl => {
-                    if let Some(var_decl) = stmt.inner.as_any()
-                        .downcast_ref::<VarDeclStatement>()
-                    {
-                        if var_decl.data.r#type.is_none() {
-                            let slot = TypeSlot::Variable(
-                                current_scope.to_vec(),
-                                var_decl.data.name.clone(),
-                            );
-                            let hints = self.gather_hints_for_slot(&slot);
-                            unresolved.push(UnresolvedSlot { slot, hints });
-                        }
-                    }
-                }
-                StatementEnum::Function => {
-                    if let Some(func) = stmt.inner.as_any()
-                        .downcast_ref::<FunctionStatement>()
-                    {
-                        if func.return_type.is_none() {
-                            let slot = TypeSlot::FunctionReturn(
-                                current_scope.to_vec(),
-                                func.name.clone(),
-                            );
-                            let hints = self.gather_hints_for_slot(&slot);
-                            unresolved.push(UnresolvedSlot { slot, hints });
-                        }
-                        for arg in &func.args {
-                            if arg.r#type.is_none() {
-                                let slot = TypeSlot::Argument(
-                                    current_scope.to_vec(),
-                                    func.name.clone(),
-                                    arg.name.clone(),
-                                );
-                                let hints = self.gather_hints_for_slot(&slot);
-                                unresolved.push(UnresolvedSlot { slot, hints });
-                            }
-                        }
-                        // Recurse into function body
-                        let mut inner_scope = current_scope.to_vec();
-                        inner_scope.push(func.name.clone());
-                        unresolved.extend(
-                            self.validate_all_types_resolved(&func.body, &inner_scope)
-                        );
-                    }
-                }
-                StatementEnum::Procedure => {
-                    if let Some(proc) = stmt.inner.as_any()
-                        .downcast_ref::<ProcedureStatement>()
-                    {
-                        for arg in &proc.args {
-                            if arg.r#type.is_none() {
-                                let slot = TypeSlot::Argument(
-                                    current_scope.to_vec(),
-                                    proc.name.clone(),
-                                    arg.name.clone(),
-                                );
-                                let hints = self.gather_hints_for_slot(&slot);
-                                unresolved.push(UnresolvedSlot { slot, hints });
-                            }
-                        }
-                        // Recurse into procedure body
-                        let mut inner_scope = current_scope.to_vec();
-                        inner_scope.push(proc.name.clone());
-                        unresolved.extend(
-                            self.validate_all_types_resolved(&proc.body, &inner_scope)
-                        );
-                    }
-                }
-                StatementEnum::If => {
-                    if let Some(if_stmt) = stmt.inner.as_any()
-                        .downcast_ref::<IfStatement>()
-                    {
-                        unresolved.extend(
-                            self.validate_all_types_resolved(&if_stmt.then_body, current_scope)
-                        );
-                        for elseif in &if_stmt.elseif_clauses {
-                            unresolved.extend(
-                                self.validate_all_types_resolved(&elseif.body, current_scope)
-                            );
-                        }
-                        if let Some(else_body) = &if_stmt.else_body {
-                            unresolved.extend(
-                                self.validate_all_types_resolved(else_body, current_scope)
-                            );
-                        }
-                    }
-                }
-                StatementEnum::Loop => {
-                    if let Some(loop_stmt) = stmt.inner.as_any()
-                        .downcast_ref::<LoopStatement>()
-                    {
-                        unresolved.extend(
-                            self.validate_all_types_resolved(&loop_stmt.body, current_scope)
-                        );
-                    }
-                }
-                StatementEnum::WhileLoop => {
-                    if let Some(while_stmt) = stmt.inner.as_any()
-                        .downcast_ref::<WhileStatement>()
-                    {
-                        unresolved.extend(
-                            self.validate_all_types_resolved(&while_stmt.body, current_scope)
-                        );
-                    }
-                }
-                StatementEnum::PLoop => {
-                    if let Some(ploop_stmt) = stmt.inner.as_any()
-                        .downcast_ref::<PLoopStatement>()
-                    {
-                        unresolved.extend(
-                            self.validate_all_types_resolved(&ploop_stmt.body, current_scope)
-                        );
-                    }
-                }
-                StatementEnum::Fit => {
-                    if let Some(fit_stmt) = stmt.inner.as_any()
-                        .downcast_ref::<FitStatement>()
-                    {
-                        unresolved.extend(
-                            self.validate_all_types_resolved(&fit_stmt.body, current_scope)
-                        );
-                    }
-                }
-                _ => {}
-            }
+        if node.resolved.is_some() {
+            return Ok(());
         }
 
-        unresolved
-    }
-
-    /// Apply collected constraints to the AST, filling in `None` type fields.
-    fn apply_to_statements(
-        &self,
-        statements: &mut [Statement],
-        current_scope: &[String],
-    ) -> Result<()> {
-        // Build a lookup map from constraints: (scope, name) → type
-        let resolved: HashMap<(Vec<String>, String), RosyType> = {
-            let mut map = HashMap::new();
-            for constraint in &self.constraints {
-                let key = match &constraint.slot {
-                    TypeSlot::Variable(scope, name) => (scope.clone(), name.clone()),
-                    TypeSlot::FunctionReturn(scope, name) => {
-                        (scope.clone(), format!("__return__{}", name))
-                    }
-                    TypeSlot::Argument(scope, callable, arg) => {
-                        (scope.clone(), format!("__arg__{}_{}", callable, arg))
-                    }
-                };
-
-                // Check for conflicts
-                if let Some(existing) = map.get(&key) {
-                    if existing != &constraint.resolved_type {
-                        return Err(anyhow!(
-                            "Type conflict for {}: resolved as both '{}' and '{}'. \
-                             Consider splitting into separate variables with explicit types.",
-                            constraint.slot, existing, constraint.resolved_type
-                        ));
-                    }
-                }
-
-                map.insert(key, constraint.resolved_type.clone());
+        let rule = node.rule.clone();
+        let resolved_type = match rule {
+            ResolutionRule::Explicit(t) => t,
+            ResolutionRule::InferredFrom { recipe, .. } => {
+                self.evaluate_recipe(&recipe)?
             }
-            map
+            ResolutionRule::Mirror { source, .. } => {
+                self.nodes.get(&source)
+                    .and_then(|n| n.resolved.clone())
+                    .ok_or_else(|| anyhow!(
+                        "Mirror source {} not resolved when resolving {}",
+                        source, slot
+                    ))?
+            }
+            ResolutionRule::Unresolved => {
+                // No rule was ever established — leave as None
+                return Ok(());
+            }
         };
 
-        self.apply_to_statements_inner(statements, current_scope, &resolved)
+        self.nodes.get_mut(slot).unwrap().resolved = Some(resolved_type);
+        Ok(())
     }
 
-    fn apply_to_statements_inner(
+    /// Evaluate an ExprRecipe using already-resolved slot types.
+    fn evaluate_recipe(&self, recipe: &ExprRecipe) -> Result<RosyType> {
+        match recipe {
+            ExprRecipe::Literal(t) => Ok(t.clone()),
+            ExprRecipe::Variable(slot) => {
+                self.nodes.get(slot)
+                    .and_then(|n| n.resolved.clone())
+                    .ok_or_else(|| anyhow!("Variable slot {} not resolved", slot))
+            }
+            ExprRecipe::FunctionCall(ret_slot) => {
+                self.nodes.get(ret_slot)
+                    .and_then(|n| n.resolved.clone())
+                    .ok_or_else(|| anyhow!("Function return slot {} not resolved", ret_slot))
+            }
+            ExprRecipe::BinaryOp { op, left, right } => {
+                let left_type = self.evaluate_recipe(left)?;
+                let right_type = self.evaluate_recipe(right)?;
+                let result = match op {
+                    BinaryOpKind::Add => crate::rosy_lib::operators::add::get_return_type(&left_type, &right_type),
+                    BinaryOpKind::Sub => crate::rosy_lib::operators::sub::get_return_type(&left_type, &right_type),
+                    BinaryOpKind::Mult => crate::rosy_lib::operators::mult::get_return_type(&left_type, &right_type),
+                    BinaryOpKind::Div => crate::rosy_lib::operators::div::get_return_type(&left_type, &right_type),
+                    BinaryOpKind::Extract => crate::rosy_lib::operators::extract::get_return_type(&left_type, &right_type),
+                };
+                result.ok_or_else(|| anyhow!(
+                    "No operator rule for {:?}({}, {})", op, left_type, right_type
+                ))
+            }
+            ExprRecipe::Concat(recipes) => {
+                let mut iter = recipes.iter();
+                let first = iter.next()
+                    .ok_or_else(|| anyhow!("Empty concat expression"))?;
+                let mut result = self.evaluate_recipe(first)?;
+                for r in iter {
+                    let t = self.evaluate_recipe(r)?;
+                    result = crate::rosy_lib::operators::concat::get_return_type(&result, &t)
+                        .ok_or_else(|| anyhow!("No concat rule for {} & {}", result, t))?;
+                }
+                Ok(result)
+            }
+            ExprRecipe::Sin(inner) => {
+                let input_type = self.evaluate_recipe(inner)?;
+                crate::rosy_lib::intrinsics::sin::get_return_type(&input_type)
+                    .ok_or_else(|| anyhow!("No SIN rule for {}", input_type))
+            }
+            ExprRecipe::Unknown => {
+                Err(anyhow!("Cannot evaluate unknown expression recipe"))
+            }
+        }
+    }
+
+    // ─── Phase 3: Apply to AST ──────────────────────────────────────────
+
+    /// Walk the AST and fill in all `None` type fields with resolved types.
+    fn apply_to_ast(
         &self,
         statements: &mut [Statement],
         current_scope: &[String],
-        resolved: &HashMap<(Vec<String>, String), RosyType>,
     ) -> Result<()> {
         for stmt in statements.iter_mut() {
             match stmt.enum_variant {
                 StatementEnum::VarDecl => {
                     let var_decl = stmt.inner.as_any_mut()
                         .downcast_mut::<VarDeclStatement>()
-                        .ok_or_else(|| anyhow!("Failed to downcast VarDecl statement for mutation"))?;
+                        .ok_or_else(|| anyhow!("Failed to downcast VarDecl for mutation"))?;
 
                     if var_decl.data.r#type.is_none() {
-                        let key = (current_scope.to_vec(), var_decl.data.name.clone());
-                        if let Some(resolved_type) = resolved.get(&key) {
-                            var_decl.data.r#type = Some(resolved_type.clone());
+                        let slot = TypeSlot::Variable(
+                            current_scope.to_vec(),
+                            var_decl.data.name.clone(),
+                        );
+                        if let Some(node) = self.nodes.get(&slot) {
+                            if let Some(t) = &node.resolved {
+                                var_decl.data.r#type = Some(t.clone());
+                            }
                         }
-                        // If still None, that's okay — transpilation will catch it
-                        // with a helpful error message
                     }
                 }
                 StatementEnum::Function => {
                     let func = stmt.inner.as_any_mut()
                         .downcast_mut::<FunctionStatement>()
-                        .ok_or_else(|| anyhow!("Failed to downcast Function statement for mutation"))?;
+                        .ok_or_else(|| anyhow!("Failed to downcast Function for mutation"))?;
 
-                    // Resolve return type
+                    // Return type
                     if func.return_type.is_none() {
-                        let key = (current_scope.to_vec(), format!("__return__{}", func.name));
-                        if let Some(resolved_type) = resolved.get(&key) {
-                            func.return_type = Some(resolved_type.clone());
-                        }
-                    }
-
-                    // Resolve argument types
-                    for arg in &mut func.args {
-                        if arg.r#type.is_none() {
-                            let key = (current_scope.to_vec(), format!("__arg__{}_{}", func.name, arg.name));
-                            if let Some(resolved_type) = resolved.get(&key) {
-                                arg.r#type = Some(resolved_type.clone());
+                        let slot = TypeSlot::FunctionReturn(
+                            current_scope.to_vec(),
+                            func.name.clone(),
+                        );
+                        if let Some(node) = self.nodes.get(&slot) {
+                            if let Some(t) = &node.resolved {
+                                func.return_type = Some(t.clone());
                             }
                         }
                     }
 
-                    // Resolve the implicit return variable in the body (first statement)
-                    // The function body's first stmt is a VarDecl for the return variable
+                    // Argument types
+                    for arg in &mut func.args {
+                        if arg.r#type.is_none() {
+                            let slot = TypeSlot::Argument(
+                                current_scope.to_vec(),
+                                func.name.clone(),
+                                arg.name.clone(),
+                            );
+                            if let Some(node) = self.nodes.get(&slot) {
+                                if let Some(t) = &node.resolved {
+                                    arg.r#type = Some(t.clone());
+                                }
+                            }
+                        }
+                    }
+
+                    // Resolve the implicit return variable (first stmt in body)
                     if let Some(first_stmt) = func.body.first_mut() {
                         if let StatementEnum::VarDecl = first_stmt.enum_variant {
                             let var_decl = first_stmt.inner.as_any_mut()
@@ -892,68 +1064,72 @@ impl TypeResolver {
                     // Recurse into body
                     let mut inner_scope = current_scope.to_vec();
                     inner_scope.push(func.name.clone());
-                    self.apply_to_statements_inner(&mut func.body, &inner_scope, resolved)?;
+                    self.apply_to_ast(&mut func.body, &inner_scope)?;
                 }
                 StatementEnum::Procedure => {
                     let proc = stmt.inner.as_any_mut()
                         .downcast_mut::<ProcedureStatement>()
-                        .ok_or_else(|| anyhow!("Failed to downcast Procedure statement for mutation"))?;
+                        .ok_or_else(|| anyhow!("Failed to downcast Procedure for mutation"))?;
 
-                    // Resolve argument types
                     for arg in &mut proc.args {
                         if arg.r#type.is_none() {
-                            let key = (current_scope.to_vec(), format!("__arg__{}_{}", proc.name, arg.name));
-                            if let Some(resolved_type) = resolved.get(&key) {
-                                arg.r#type = Some(resolved_type.clone());
+                            let slot = TypeSlot::Argument(
+                                current_scope.to_vec(),
+                                proc.name.clone(),
+                                arg.name.clone(),
+                            );
+                            if let Some(node) = self.nodes.get(&slot) {
+                                if let Some(t) = &node.resolved {
+                                    arg.r#type = Some(t.clone());
+                                }
                             }
                         }
                     }
 
-                    // Recurse into body
                     let mut inner_scope = current_scope.to_vec();
                     inner_scope.push(proc.name.clone());
-                    self.apply_to_statements_inner(&mut proc.body, &inner_scope, resolved)?;
+                    self.apply_to_ast(&mut proc.body, &inner_scope)?;
                 }
                 StatementEnum::If => {
                     let if_stmt = stmt.inner.as_any_mut()
                         .downcast_mut::<IfStatement>()
-                        .ok_or_else(|| anyhow!("Failed to downcast If statement for mutation"))?;
+                        .ok_or_else(|| anyhow!("Failed to downcast If for mutation"))?;
 
-                    self.apply_to_statements_inner(&mut if_stmt.then_body, current_scope, resolved)?;
+                    self.apply_to_ast(&mut if_stmt.then_body, current_scope)?;
                     for elseif in &mut if_stmt.elseif_clauses {
-                        self.apply_to_statements_inner(&mut elseif.body, current_scope, resolved)?;
+                        self.apply_to_ast(&mut elseif.body, current_scope)?;
                     }
                     if let Some(else_body) = &mut if_stmt.else_body {
-                        self.apply_to_statements_inner(else_body, current_scope, resolved)?;
+                        self.apply_to_ast(else_body, current_scope)?;
                     }
                 }
                 StatementEnum::Loop => {
                     let loop_stmt = stmt.inner.as_any_mut()
                         .downcast_mut::<LoopStatement>()
-                        .ok_or_else(|| anyhow!("Failed to downcast Loop statement for mutation"))?;
+                        .ok_or_else(|| anyhow!("Failed to downcast Loop for mutation"))?;
 
-                    self.apply_to_statements_inner(&mut loop_stmt.body, current_scope, resolved)?;
+                    self.apply_to_ast(&mut loop_stmt.body, current_scope)?;
                 }
                 StatementEnum::WhileLoop => {
                     let while_stmt = stmt.inner.as_any_mut()
                         .downcast_mut::<WhileStatement>()
-                        .ok_or_else(|| anyhow!("Failed to downcast While statement for mutation"))?;
+                        .ok_or_else(|| anyhow!("Failed to downcast While for mutation"))?;
 
-                    self.apply_to_statements_inner(&mut while_stmt.body, current_scope, resolved)?;
+                    self.apply_to_ast(&mut while_stmt.body, current_scope)?;
                 }
                 StatementEnum::PLoop => {
                     let ploop_stmt = stmt.inner.as_any_mut()
                         .downcast_mut::<PLoopStatement>()
-                        .ok_or_else(|| anyhow!("Failed to downcast PLoop statement for mutation"))?;
+                        .ok_or_else(|| anyhow!("Failed to downcast PLoop for mutation"))?;
 
-                    self.apply_to_statements_inner(&mut ploop_stmt.body, current_scope, resolved)?;
+                    self.apply_to_ast(&mut ploop_stmt.body, current_scope)?;
                 }
                 StatementEnum::Fit => {
                     let fit_stmt = stmt.inner.as_any_mut()
                         .downcast_mut::<FitStatement>()
-                        .ok_or_else(|| anyhow!("Failed to downcast Fit statement for mutation"))?;
+                        .ok_or_else(|| anyhow!("Failed to downcast Fit for mutation"))?;
 
-                    self.apply_to_statements_inner(&mut fit_stmt.body, current_scope, resolved)?;
+                    self.apply_to_ast(&mut fit_stmt.body, current_scope)?;
                 }
                 _ => {}
             }
