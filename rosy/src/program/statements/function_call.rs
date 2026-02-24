@@ -38,6 +38,8 @@ impl FromRule for FunctionCallStatement {
 }
 
 impl Transpile for FunctionCallStatement {
+    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         function_call_transpile_helper(&self.name, &self.args, context)
     }

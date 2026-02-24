@@ -21,6 +21,8 @@ impl TypeOf for f64 {
     }
 }
 impl Transpile for f64 {
+    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, _context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         Ok(TranspilationOutput {
             serialization: format!("&mut {}f64", self),

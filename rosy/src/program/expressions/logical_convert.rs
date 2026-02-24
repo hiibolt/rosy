@@ -31,6 +31,8 @@ impl TypeOf for LogicalConvertExpr {
     }
 }
 impl Transpile for LogicalConvertExpr {
+    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         // First, ensure the type is convertible to LO
         let expr_type = self.expr.type_of(context)

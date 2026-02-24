@@ -112,6 +112,8 @@ impl FromRule for IfStatement {
 }
 
 impl Transpile for ElseIfClause {
+    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         // Verify the start, end, and step expressions are REs
         let condition_type = self.condition
@@ -178,6 +180,8 @@ impl Transpile for ElseIfClause {
 }
 
 impl Transpile for IfStatement {
+    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         // Verify the start, end, and step expressions are REs
         let condition_type = self.condition

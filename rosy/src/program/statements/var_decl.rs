@@ -21,6 +21,8 @@ impl VariableDeclarationData {
     }
 }
 impl Transpile for VariableDeclarationData {
+    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     // note that this transpiles as the default value for the type
     fn transpile (
         &self, context: &mut TranspilationInputContext
@@ -126,6 +128,8 @@ impl FromRule for VarDeclStatement {
 }
 
 impl Transpile for VarDeclStatement {
+    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         let resolved_type = self.data.require_type()
             .map_err(|e| vec![e.context(format!("...while transpiling variable declaration for '{}'", self.data.name))])?;

@@ -1,0 +1,23 @@
+BEGIN;
+    {Test: Infer function return type and arg types from usage}
+    FUNCTION ADDTWONUMS X Y;
+        ADDTWONUMS := X + Y;
+    ENDFUNCTION;
+
+    PROCEDURE RUN;
+        {X should infer as RE from the literal assignment}
+        VARIABLE X;
+        X := 3;
+        
+        {Y should infer as RE from the literal assignment}
+        VARIABLE Y;
+        Y := 4;
+
+        WRITE 6 "Result: " ST(ADDTWONUMS(X, Y));
+
+        {Z has no assignment and no type - should fail}
+        VARIABLE Z;
+    ENDPROCEDURE;
+
+    RUN;
+END;

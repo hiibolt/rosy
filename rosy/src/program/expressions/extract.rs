@@ -38,6 +38,8 @@ impl TypeOf for ExtractExpr {
     }
 }
 impl Transpile for ExtractExpr {
+    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         // First, ensure the types are compatible
         let _ = self.type_of(context)

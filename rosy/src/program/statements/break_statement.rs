@@ -28,6 +28,8 @@ impl FromRule for BreakStatement {
 }
 
 impl Transpile for BreakStatement {
+    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         if !context.in_loop {
             return Err(vec!(anyhow!(

@@ -6,10 +6,27 @@ pub trait TranspileWithType: Transpile + TypeOf + Send + Sync + std::fmt::Debug 
 pub trait TypeOf {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType>;
 }
-pub trait Transpile: std::fmt::Debug {
+pub trait Transpile: std::fmt::Debug + Any {
     fn transpile ( 
         &self, context: &mut TranspilationInputContext
     ) -> Result<TranspilationOutput, Vec<Error>>;
+    
+    /// Downcast to concrete type for the type resolver.
+    fn as_any(&self) -> &dyn Any;
+    /// Downcast to concrete type for mutable access in the type resolver.
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+
+/// Macro to implement the `as_any` and `as_any_mut` methods for a concrete type.
+/// Use inside an `impl Transpile for T` block is not possible, so instead we provide
+/// this as a helper to generate standalone impls. Actually, since we need it in the
+/// trait impl itself, we provide a macro that generates the two methods.
+#[macro_export]
+macro_rules! impl_as_any {
+    () => {
+        fn as_any(&self) -> &dyn std::any::Any { self }
+        fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    };
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -2,6 +2,7 @@ mod transpile;
 mod ast;
 mod embedded;
 mod program;
+mod resolve;
 #[allow(unused_imports, dead_code)]
 mod rosy_lib;
 
@@ -73,9 +74,13 @@ fn rosy (
         .context("Expected a program")?;
 
     info!("Stage 2 - AST Generation");
-    let ast = Program::from_rule(program)
+    let mut ast = Program::from_rule(program)
         .context("Failed to build AST!")?
         .context("Expected a program")?;
+
+    info!("Stage 2.5 - Type Resolution");
+    resolve::TypeResolver::resolve(&mut ast)
+        .context("Failed to resolve types!")?;
 
     info!("Stage 3 - Transpilation");
     let TranspilationOutput { serialization, .. } = ast

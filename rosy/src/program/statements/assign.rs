@@ -35,6 +35,8 @@ impl FromRule for AssignStatement {
     }
 }
 impl Transpile for AssignStatement {
+    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         // Get the variable type and ensure the value type is compatible
         let variable_type = self.identifier.type_of(context)

@@ -64,6 +64,8 @@ impl FromRule for WhileStatement {
 }
 
 impl Transpile for WhileStatement {
+    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         // Verify the condition is a logical expression
         let condition_type = self.condition.type_of(context)
