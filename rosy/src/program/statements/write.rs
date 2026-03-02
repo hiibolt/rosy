@@ -66,21 +66,33 @@ impl Transpile for WriteStatement {
 
         // Emulate the checking of the unit
         match self.unit {
-            6 => {},
-            _ => return Err(vec!(anyhow!(
-                "Only WRITE to unit 6 (standard output) is supported, found unit {}!", self.unit
-            ))),
+            6 => {
+                // Write to stdout
+                let serialization = format!(
+                    "println!(\"{}\", {});",
+                    serialized_exprs.iter().map(|_| "{}").collect::<Vec<&str>>().join(""),
+                    serialized_exprs.join(", ")
+                );
+                Ok(TranspilationOutput {
+                    serialization,
+                    requested_variables
+                })
+            },
+            unit => {
+                // Write to file unit
+                let mut stmts = Vec::new();
+                for expr_ser in &serialized_exprs {
+                    stmts.push(format!(
+                        "rosy_lib::core::file_io::rosy_write_to_unit({}, &format!(\"{{}}\", {}))?;",
+                        unit,
+                        expr_ser
+                    ));
+                }
+                Ok(TranspilationOutput {
+                    serialization: stmts.join("\n"),
+                    requested_variables
+                })
+            },
         }
-
-        // Serialize the entire function
-        let serialization = format!(
-            "println!(\"{}\", {});",
-            serialized_exprs.iter().map(|_| "{}").collect::<Vec<&str>>().join(""),
-            serialized_exprs.join(", ")
-        );
-        Ok(TranspilationOutput {
-            serialization,
-            requested_variables
-        })
     }
 }

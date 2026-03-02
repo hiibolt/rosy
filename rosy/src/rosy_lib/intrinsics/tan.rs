@@ -64,24 +64,8 @@ impl RosyTAN for DA {
     fn rosy_tan(&self) -> anyhow::Result<Self::Output> {
         use crate::rosy_lib::taylor::DACoefficient;
         use crate::rosy_lib::intrinsics::sin::RosySIN;
-        
-        let config = crate::rosy_lib::taylor::get_config()?;
-        let max_order = config.max_order as usize;
-        
-        let f0 = self.constant_part();
-        let tan_f0 = f0.tan();
-        let sec2_f0 = 1.0 / (f0.cos() * f0.cos());  // sec²(f₀)
-        
-        // Create DA with constant part removed (δf = f - f₀)
-        let mut da_prime = self.clone();
-        da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
-        
-        // For tan, we use the Taylor series approach
-        // tan(f₀ + δf) where we compute term by term
-        // Using the identity: d/dx tan(x) = sec²(x) = 1 + tan²(x)
-        // We build up coefficients using the recurrence relation
-        
-        // Alternative: just compute sin(f)/cos(f) using existing implementations
+
+        // Just compute sin(f)/cos(f) using existing implementations
         let sin_f = self.rosy_sin()?;
         let cos_f = da_cos(self)?;
         

@@ -6,6 +6,7 @@ pub mod add;
 pub mod sub;
 pub mod mult;
 pub mod div;
+pub mod pow;
 pub mod eq;
 pub mod neq;
 pub mod lt;
@@ -21,6 +22,8 @@ pub mod cd;
 pub mod length;
 pub mod sin;
 pub mod sqr;
+pub mod exp;
+pub mod tan;
 pub mod vmax;
 pub mod lst;
 pub mod lcm;
@@ -43,6 +46,8 @@ use crate::program::expressions::cd::CDExpr;
 use crate::program::expressions::length::LengthExpr;
 use crate::program::expressions::sin::SinExpr;
 use crate::program::expressions::sqr::SqrExpr;
+use crate::program::expressions::exp::ExpExpr;
+use crate::program::expressions::tan::TanExpr;
 use crate::program::expressions::vmax::VmaxExpr;
 use crate::program::expressions::lst::LstExpr;
 use crate::program::expressions::lcm::LcmExpr;
@@ -51,6 +56,7 @@ use crate::program::expressions::add::AddExpr;
 use crate::program::expressions::sub::SubExpr;
 use crate::program::expressions::mult::MultExpr;
 use crate::program::expressions::div::DivExpr;
+use crate::program::expressions::pow::PowExpr;
 use crate::program::expressions::eq::EqExpr;
 use crate::program::expressions::neq::NeqExpr;
 use crate::program::expressions::lt::LtExpr;
@@ -83,6 +89,7 @@ pub enum ExprEnum {
     Sub,
     Mult,
     Div,
+    Pow,
     Eq,
     Neq,
     Lt,
@@ -100,6 +107,8 @@ pub enum ExprEnum {
     Length,
     Sin,
     Sqr,
+    Exp,
+    Tan,
     Vmax,
     Lst,
     Lcm,
@@ -244,6 +253,20 @@ impl FromRule for Expr {
                         inner: Box::new(sqr_expr.ok_or_else(|| anyhow::anyhow!("Expected SqrExpr"))?),
                     })
                 },
+                Rule::exp_fn => {
+                    let exp_expr = ExpExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Exp,
+                        inner: Box::new(exp_expr.ok_or_else(|| anyhow::anyhow!("Expected ExpExpr"))?),
+                    })
+                },
+                Rule::tan_fn => {
+                    let tan_expr = TanExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Tan,
+                        inner: Box::new(tan_expr.ok_or_else(|| anyhow::anyhow!("Expected TanExpr"))?),
+                    })
+                },
                 Rule::vmax => {
                     let vmax_expr = VmaxExpr::from_rule(primary)?;
                     Ok(Expr {
@@ -324,6 +347,17 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Div,
                         inner: Box::new(DivExpr {
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        })
+                    })
+                },
+                Rule::pow => {
+                    let left = left.context("...while transpiling base of `pow` expression")?;
+                    let right = right.context("...while transpiling exponent of `pow` expression")?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Pow,
+                        inner: Box::new(PowExpr {
                             left: Box::new(left),
                             right: Box::new(right),
                         })

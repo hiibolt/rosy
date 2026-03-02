@@ -121,7 +121,7 @@ enum ExprRecipe {
 
 #[derive(Debug, Clone, Copy)]
 enum BinaryOpKind {
-    Add, Sub, Mult, Div, Extract, Derive,
+    Add, Sub, Mult, Div, Extract, Derive, Pow,
 }
 
 // ─── Dependency Graph Node ──────────────────────────────────────────────────

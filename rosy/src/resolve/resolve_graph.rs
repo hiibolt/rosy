@@ -274,6 +274,7 @@ impl TypeResolver {
                             _ => None,
                         }
                     }
+                    BinaryOpKind::Pow => crate::rosy_lib::operators::pow::get_return_type(&left_type, &right_type),
                 };
                 result.ok_or_else(|| anyhow!(
                     "No operator rule for {:?}({}, {})", op, left_type, right_type

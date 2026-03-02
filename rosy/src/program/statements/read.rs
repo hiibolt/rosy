@@ -78,18 +78,29 @@ impl Transpile for ReadStatement {
         let serialized_variable_type = variable_type.as_rust_type();
 
         // Emulate the checking of the unit
-        match self.unit {
-            5 => {},
-            _ => return Err(vec!(anyhow!(
-                "Only READ from unit 5 (standard input) is supported, found unit {}!", self.unit
-            ))),
-        }
-
-        // Serialize the entire function
-        let serialization = format!(
-            "{} = rosy_lib::intrinsics::from_st::from_stdin::<{}>().context(\"Failed to READ into {}\")?;",
-            serialized_variable_identifier, serialized_variable_type, self.identifier.name
-        );
+        let serialization = match self.unit {
+            5 => {
+                // Read from stdin
+                format!(
+                    "{} = rosy_lib::intrinsics::from_st::from_stdin::<{}>().context(\"Failed to READ into {}\")?;",
+                    serialized_variable_identifier, serialized_variable_type, self.identifier.name
+                )
+            },
+            unit => {
+                // Read from file unit
+                format!(
+                    "{{\n\
+                        let __rosy_read_str = rosy_lib::core::file_io::rosy_read_from_unit({unit})?;\n\
+                        {dest} = <{typ} as rosy_lib::intrinsics::from_st::RosyFromST>::rosy_from_st(__rosy_read_str)\n\
+                            .context(\"Failed to parse value from file unit {unit} into {name}\")?;\n\
+                    }}",
+                    unit = unit,
+                    dest = serialized_variable_identifier,
+                    typ = serialized_variable_type,
+                    name = self.identifier.name,
+                )
+            },
+        };
         if errors.is_empty() {
             Ok(TranspilationOutput {
                 serialization,

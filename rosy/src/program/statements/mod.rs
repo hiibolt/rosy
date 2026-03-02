@@ -2,7 +2,14 @@ pub mod assign;
 pub mod var_decl;
 pub mod write;
 pub mod read;
+pub mod writeb;
+pub mod readb;
+pub mod openf;
+pub mod openfb;
+pub mod closef;
 pub mod da_init;
+pub mod daprv;
+pub mod darev;
 pub mod r#loop;
 pub mod while_loop;
 pub mod ploop;
@@ -18,7 +25,14 @@ pub use assign::AssignStatement;
 pub use var_decl::{VarDeclStatement, VariableDeclarationData};
 pub use write::WriteStatement;
 pub use read::ReadStatement;
+pub use writeb::WritebStatement;
+pub use readb::ReadbStatement;
+pub use openf::OpenfStatement;
+pub use openfb::OpenfbStatement;
+pub use closef::ClosefStatement;
 pub use da_init::DAInitStatement;
+pub use daprv::DaprvStatement;
+pub use darev::DarevStatement;
 pub use r#loop::LoopStatement;
 pub use while_loop::WhileStatement;
 pub use ploop::PLoopStatement;
@@ -73,9 +87,16 @@ pub struct Statement {
 #[derive(Debug)]
 pub enum StatementEnum {
     DAInit,
+    DaPrv,
+    DaRev,
     VarDecl,
     Write,
+    Writeb,
     Read,
+    Readb,
+    Openf,
+    Openfb,
+    Closef,
     Assign,
     Procedure,
     ProcedureCall,
@@ -103,6 +124,20 @@ impl FromRule for Statement {
                     inner: Box::new(stmt),
                     source_location: loc.clone(),
                 })),
+            Rule::daprv => DaprvStatement::from_rule(pair)
+                .context("...while building DAPRV statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::DaPrv,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::darev => DarevStatement::from_rule(pair)
+                .context("...while building DAREV statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::DaRev,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
             Rule::var_decl => VarDeclStatement::from_rule(pair)
                 .context("...while building variable declaration!")
                 .map(|opt| opt.map(|stmt| Statement {
@@ -121,6 +156,41 @@ impl FromRule for Statement {
                 .context("...while building read statement!")
                 .map(|opt| opt.map(|stmt| Statement {
                     enum_variant: StatementEnum::Read,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::writeb => WritebStatement::from_rule(pair)
+                .context("...while building WRITEB statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Writeb,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::readb => ReadbStatement::from_rule(pair)
+                .context("...while building READB statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Readb,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::openf => OpenfStatement::from_rule(pair)
+                .context("...while building OPENF statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Openf,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::openfb => OpenfbStatement::from_rule(pair)
+                .context("...while building OPENFB statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Openfb,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::closef => ClosefStatement::from_rule(pair)
+                .context("...while building CLOSEF statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Closef,
                     inner: Box::new(stmt),
                     source_location: loc.clone(),
                 })),

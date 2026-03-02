@@ -122,6 +122,7 @@ fn get_operator_symbol(operator_name: &str) -> &'static str {
         "gt" => ">",
         "lte" => "<=",
         "gte" => ">=",
+        "pow" => "^",
         _ => panic!("Unknown operator name: {}", operator_name),
     }
 }

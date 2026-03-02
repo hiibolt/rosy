@@ -643,6 +643,27 @@ impl TypeResolver {
             ExprEnum::Mult => self.build_binop_recipe(expr, ctx, deps, BinaryOpKind::Mult),
             ExprEnum::Div => self.build_binop_recipe(expr, ctx, deps, BinaryOpKind::Div),
             ExprEnum::Extract => self.build_binop_recipe(expr, ctx, deps, BinaryOpKind::Extract),
+            ExprEnum::Pow => self.build_binop_recipe(expr, ctx, deps, BinaryOpKind::Pow),
+            ExprEnum::Exp => {
+                if let Some(exp_expr) = expr.inner.as_any()
+                    .downcast_ref::<crate::program::expressions::exp::ExpExpr>()
+                {
+                    let inner = self.build_expr_recipe(&exp_expr.expr, ctx, deps);
+                    ExprRecipe::Sin(Box::new(inner)) // Reuse Sin recipe - same shape (unary op)
+                } else {
+                    ExprRecipe::Unknown
+                }
+            }
+            ExprEnum::Tan => {
+                if let Some(tan_expr) = expr.inner.as_any()
+                    .downcast_ref::<crate::program::expressions::tan::TanExpr>()
+                {
+                    let inner = self.build_expr_recipe(&tan_expr.expr, ctx, deps);
+                    ExprRecipe::Sin(Box::new(inner)) // Reuse Sin recipe - same shape (unary op)
+                } else {
+                    ExprRecipe::Unknown
+                }
+            }
             ExprEnum::Concat => {
                 if let Some(concat_expr) = expr.inner.as_any()
                     .downcast_ref::<concat::ConcatExpr>()
@@ -698,6 +719,7 @@ impl TypeResolver {
             BinaryOpKind::Derive => {
                 // Derive is handled inline in build_expr_recipe, not here
             }
+            BinaryOpKind::Pow => try_binop!(pow::PowExpr),
         }
         ExprRecipe::Unknown
     }

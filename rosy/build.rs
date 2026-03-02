@@ -21,12 +21,15 @@ fn main() {
     codegen::codegen_operator("gt");
     codegen::codegen_operator("lte");
     codegen::codegen_operator("gte");
+    codegen::codegen_operator("pow");
     // Note: NOT is a unary operator and doesn't use the standard codegen
     
     // Generate intrinsic function test files
     codegen::codegen_intrinsic("length");
     codegen::codegen_intrinsic("sin");
     codegen::codegen_intrinsic("sqr");
+    codegen::codegen_intrinsic("exp");
+    codegen::codegen_intrinsic("tan");
     
     // Generate the embedded files at compile time
     let out_dir = std::env::var("OUT_DIR").unwrap();

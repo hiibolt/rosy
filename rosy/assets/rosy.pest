@@ -7,8 +7,15 @@ program = { SOI ~ begin ~ statement* ~ end ~ EOI }
 statement   = _{ 
   var_decl 
   | daini
+  | daprv
+  | darev
   | write
+  | writeb
   | read
+  | readb
+  | openf
+  | openfb
+  | closef
   | assignment 
   | function
   | loop
@@ -21,31 +28,38 @@ statement   = _{
   | fit_statement }
 
 /// BREAK
-break_statement = { "BREAK" ~ semicolon }
+break_statement = { ^"BREAK" ~ semicolon }
 
 /// BEGIN and END
-begin = { "BEGIN" ~ semicolon }
-end = { "END" ~ semicolon }
+begin = { ^"BEGIN" ~ semicolon }
+end = { ^"END" ~ semicolon }
 
 /// WRITE
-write = { "WRITE" ~ unit ~ expr+ ~ semicolon }
-read = { "READ" ~ unit ~ variable_identifier ~ semicolon }
+write = { ^"WRITE" ~ unit ~ expr+ ~ semicolon }
+read = { ^"READ" ~ unit ~ variable_identifier ~ semicolon }
+writeb = { ^"WRITEB" ~ unit ~ expr+ ~ semicolon }
+readb = { ^"READB" ~ unit ~ variable_identifier ~ semicolon }
+
+/// FILE I/O
+openf = { ^"OPENF" ~ expr ~ expr ~ expr ~ semicolon }
+openfb = { ^"OPENFB" ~ expr ~ expr ~ expr ~ semicolon }
+closef = { ^"CLOSEF" ~ expr ~ semicolon }
 
 /// VARIABLE
 /// Supports both Rosy-style `VARIABLE (RE) name ;` and COSY-style `VARIABLE name expr ;`
 /// The COSY memory size expression is parsed but ignored (Rosy handles memory automatically)
-var_decl = { "VARIABLE" ~ type? ~ variable_name ~ memory_size? ~ semicolon }
+var_decl = { ^"VARIABLE" ~ type? ~ variable_name ~ memory_size* ~ semicolon }
 memory_size = { expr }
 
 /// Keywords - define all reserved words
-keyword = { "BEGIN" | "END" | "WRITE" | "READ" | "VARIABLE" | "PROCEDURE" | "ENDPROCEDURE" | "EXP" | "IF" | "ELSEIF" | "ELSE" | "ENDIF" | "WHILE" | "ENDWHILE" | "TRUE" | "FALSE" | "DAINI" | "LENGTH" | "SIN" | "SQR" | "VMAX" | "LST" | "LCM" | "LCD" | "BREAK" | "FIT" | "ENDFIT" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
+keyword = { ^"BEGIN" | ^"END" | ^"WRITE" | ^"WRITEB" | ^"READ" | ^"READB" | ^"VARIABLE" | ^"PROCEDURE" | ^"ENDPROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"ELSEIF" | ^"ELSE" | ^"ENDIF" | ^"WHILE" | ^"ENDWHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"LENGTH" | ^"SIN" | ^"SQR" | ^"VMAX" | ^"LST" | ^"LCM" | ^"LCD" | ^"BREAK" | ^"FIT" | ^"ENDFIT" | ^"OPENF" | ^"OPENFB" | ^"CLOSEF" | ^"FUNCTION" | ^"ENDFUNCTION" | ^"LOOP" | ^"ENDLOOP" | ^"PLOOP" | ^"ENDPLOOP" | ^"ENDWHILE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
 
 /// [ IF / ELSEIF / ELSE / ENDIF ]
 if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
-if_clause = { "IF" ~ expr ~ semicolon ~ statement* }
-elseif_clause = { "ELSEIF" ~ expr ~ semicolon ~ statement* }
-else_clause = { "ELSE" ~ semicolon ~ statement* }
-endif = { "ENDIF" ~ semicolon }
+if_clause = { ^"IF" ~ expr ~ semicolon ~ statement* }
+elseif_clause = { ^"ELSEIF" ~ expr ~ semicolon ~ statement* }
+else_clause = { ^"ELSE" ~ semicolon ~ statement* }
+endif = { ^"ENDIF" ~ semicolon }
 
 /// [ PROCEDURES / FUNCTIONS ]
   ///
@@ -55,12 +69,12 @@ endif = { "ENDIF" ~ semicolon }
   /// Calling - ensure the name is not a keyword
   procedure_call = { procedure_name ~ expr* ~ semicolon }
   /// PROCEDURE
-  start_procedure = { "PROCEDURE" ~ procedure_name ~ procedure_argument_name_and_type* ~ semicolon }
+  start_procedure = { ^"PROCEDURE" ~ procedure_name ~ procedure_argument_name_and_type* ~ semicolon }
   procedure_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
   procedure_argument_name_and_type = { procedure_argument_name ~ type? }
   procedure_argument_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
   /// ENDPROCEDURE
-  end_procedure = { "ENDPROCEDURE" ~ semicolon }
+  end_procedure = { ^"ENDPROCEDURE" ~ semicolon }
   ///
   /// [ FUNCTIONS ]
   /// Container
@@ -68,62 +82,68 @@ endif = { "ENDIF" ~ semicolon }
   /// Calling - ensure the name is not a keyword
   function_call = { function_name ~ "(" ~ expr ~ ("," ~ expr)* ~ ")"  }
   /// FUNCTION
-  start_function = { "FUNCTION" ~ type? ~ function_name ~ function_argument_name_and_type+ ~ semicolon }
+  start_function = { ^"FUNCTION" ~ type? ~ function_name ~ function_argument_name_and_type+ ~ semicolon }
   function_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
   function_argument_name_and_type = _{ function_argument_name ~ type? }
   function_argument_name = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
   /// ENDFUNCTION
-  end_function = { "ENDFUNCTION" ~ semicolon }
+  end_function = { ^"ENDFUNCTION" ~ semicolon }
 
 /// [ LOOPS / WHILES ]
   ///
   /// [ LOOP ]
   loop = { start_loop ~ statement+ ~ end_loop }
-  start_loop = { "LOOP" ~ variable_name ~ expr ~ expr ~ expr? ~ semicolon }
-  end_loop = { "ENDLOOP" ~ semicolon }
+  start_loop = { ^"LOOP" ~ variable_name ~ expr ~ expr ~ expr? ~ semicolon }
+  end_loop = { ^"ENDLOOP" ~ semicolon }
   /// [ PLOOP ]
   ploop = { start_ploop ~ statement+ ~ end_ploop }
-  start_ploop = { "PLOOP" ~ variable_name ~ expr ~ expr ~ semicolon }
-  end_ploop = { "ENDPLOOP" ~ unit? ~ variable_identifier ~ semicolon }
+  start_ploop = { ^"PLOOP" ~ variable_name ~ expr ~ expr ~ semicolon }
+  end_ploop = { ^"ENDPLOOP" ~ unit? ~ variable_identifier ~ semicolon }
   /// [ WHILE ]
   while_loop = { start_while ~ statement* ~ end_while }
-  start_while = { "WHILE" ~ expr ~ semicolon }
-  end_while = { "ENDWHILE" ~ semicolon }
+  start_while = { ^"WHILE" ~ expr ~ semicolon }
+  end_while = { ^"ENDWHILE" ~ semicolon }
   /// [ FIT ]
   fit_statement = { start_fit ~ statement* ~ end_fit }
-  start_fit = { "FIT" ~ variable_name+ ~ semicolon }
-  end_fit = { "ENDFIT" ~ expr ~ expr ~ expr ~ variable_name+ ~ semicolon }
+  start_fit = { ^"FIT" ~ variable_name+ ~ semicolon }
+  end_fit = { ^"ENDFIT" ~ expr ~ expr ~ expr ~ variable_name+ ~ semicolon }
 
 /// [ INTRINSIC FUNCTIONS ]
-  builtin_function = _{ cm | st | lo | da | cd_intrinsic | length | sin | sqr | vmax | lst | lcm | lcd }
+  builtin_function = _{ cm | st | lo | da | cd_intrinsic | length | sin | sqr | exp_fn | tan_fn | vmax | lst | lcm | lcd }
   /// CM
-  cm = { "CM(" ~ expr ~ ")" }
+  cm = { ^"CM" ~ "(" ~ expr ~ ")" }
   /// ST - String conversion
-  st = { "ST(" ~ expr ~ ")" }
+  st = { ^"ST" ~ "(" ~ expr ~ ")" }
   /// LO - Logical conversion
-  lo = { "LO(" ~ expr ~ ")" }
+  lo = { ^"LO" ~ "(" ~ expr ~ ")" }
   /// DA - Create DA identity vector
-  da = { "DA" ~ "(" ~ expr ~ ")" }
+  da = { ^"DA" ~ "(" ~ expr ~ ")" }
   /// CD - Create CD identity vector
-  cd_intrinsic = { "CD" ~ "(" ~ expr ~ ")" }
+  cd_intrinsic = { ^"CD" ~ "(" ~ expr ~ ")" }
   /// LENGTH - Get memory size
-  length = { "LENGTH(" ~ expr ~ ")" }
+  length = { ^"LENGTH" ~ "(" ~ expr ~ ")" }
   /// SIN - Compute sine
-  sin = { "SIN(" ~ expr ~ ")" }
+  sin = { ^"SIN" ~ "(" ~ expr ~ ")" }
   /// SQR - Compute square
-  sqr = { "SQR(" ~ expr ~ ")" }
+  sqr = { ^"SQR" ~ "(" ~ expr ~ ")" }
+  /// EXP - Compute exponential
+  exp_fn = { ^"EXP" ~ "(" ~ expr ~ ")" }
+  /// TAN - Compute tangent
+  tan_fn = { ^"TAN" ~ "(" ~ expr ~ ")" }
   /// VMAX - Maximum element of vector
-  vmax = { "VMAX(" ~ expr ~ ")" }
+  vmax = { ^"VMAX" ~ "(" ~ expr ~ ")" }
   /// LST - String memory size estimator (compatibility)
-  lst = { "LST(" ~ expr ~ ")" }
+  lst = { ^"LST" ~ "(" ~ expr ~ ")" }
   /// LCM - Complex memory size estimator (compatibility)
-  lcm = { "LCM(" ~ expr ~ ")" }
+  lcm = { ^"LCM" ~ "(" ~ expr ~ ")" }
   /// LCD - DA memory size estimator (compatibility)
-  lcd = { "LCD(" ~ expr ~ ")" }
+  lcd = { ^"LCD" ~ "(" ~ expr ~ ")" }
 
 /// [ INTRINSIC PROCEDURES ]
   /// [ DA ]
-  daini = { "DAINI" ~ expr ~ expr ~ expr? ~ expr? ~ semicolon }
+  daini = { ^"DAINI" ~ expr ~ expr ~ expr? ~ expr? ~ semicolon }
+  daprv = { ^"DAPRV" ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  darev = { ^"DAREV" ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
 /// [ INTRINSIC TYPES ]
   type = { "(" ~ inner_type ~ expr* ~ ")"}
   inner_type = {
@@ -151,7 +171,7 @@ term = _{
     "(" ~ expr ~ ")" }
 
 // Boolean literals
-boolean = { "TRUE" | "FALSE" }
+boolean = { ^"TRUE" | ^"FALSE" }
 
 // NOT expression (prefix unary operator) - ROSY extension
 // Use `!` directly adjacent to operand
@@ -160,9 +180,10 @@ not_expr = { "!" ~ (boolean | variable_identifier | "(" ~ expr ~ ")") }
 // Infix operators
 // Note: lte/gte must come before lt/gt to avoid `<=` being parsed as `<` then `=`
 // We support both COSY syntax (= and #) and modern syntax (== and <>/!=)
-infix_op    = _{ derive | extract | mult | div | add | sub | concat | eq | neq | lte | gte | lt | gt }
+infix_op    = _{ derive | extract | pow | mult | div | add | sub | concat | eq | neq | lte | gte | lt | gt }
 derive      = { "%" }
 extract     = { "|" }
+pow         = { "^" }
 add         = { "+" }
 sub         = { "-" }
 mult        = { "*" }
@@ -176,7 +197,7 @@ lte         = { "<=" }
 gte         = { ">=" }
 
 variable_identifier = { variable_name ~ variable_indexing? }
-variable_indexing = { "[" ~ expr ~ ("," ~ expr)* ~ "]" }
+variable_indexing = { ("[" ~ expr ~ ("," ~ expr)* ~ "]") | ("(" ~ expr ~ ("," ~ expr)* ~ ")") }
 variable_name  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
 number      = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 unit        = @{ ASCII_DIGIT+ }
