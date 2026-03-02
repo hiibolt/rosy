@@ -53,7 +53,6 @@ impl FromRule for ProcedureStatement {
                     name: name.to_string(),
                     r#type,
                     dimension_exprs,
-                    _memory_size_expr: None,
                 };
                 args.push(variable_data);
             }

@@ -330,3 +330,16 @@ impl RosyFromBinary for bool {
         Ok(data[0] != 0)
     }
 }
+
+// Binary serialization for DA (stub — DA binary I/O not yet fully supported)
+impl RosyToBinary for crate::rosy_lib::taylor::DA {
+    fn to_binary(&self) -> Vec<u8> {
+        unimplemented!("Binary I/O for DA vectors is not yet supported in Rosy. Use DAPRV/DAREV for ASCII DA I/O.")
+    }
+}
+
+impl RosyFromBinary for crate::rosy_lib::taylor::DA {
+    fn from_binary(_data: &[u8]) -> Result<Self> {
+        unimplemented!("Binary I/O for DA vectors is not yet supported in Rosy. Use DAPRV/DAREV for ASCII DA I/O.")
+    }
+}

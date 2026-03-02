@@ -111,18 +111,14 @@ impl Transpile for LoopStatement {
         let mut serialized_statements = Vec::new();
         let mut errors = Vec::new();
         
-        // Define the iterator variable
-        if matches!(inner_context.variables.insert(self.iterator.clone(), ScopedVariableData { 
+        // Define the iterator variable (allow reuse of existing variable, as COSY does)
+        inner_context.variables.insert(self.iterator.clone(), ScopedVariableData { 
             scope: VariableScope::Local,
             data: VariableData { 
                 name: self.iterator.clone(),
                 r#type: RosyType::RE()
             }
-        }), Some(_)) {
-            return Err(vec!(anyhow!(
-                "Iterator variable '{}' is already defined in this scope!", self.iterator
-            )));
-        }
+        });
 
         // Transpile each inner statement
         for stmt in &self.body {

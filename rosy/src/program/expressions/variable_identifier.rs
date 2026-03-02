@@ -9,7 +9,34 @@ use anyhow::{Result, Context, Error, ensure};
 #[derive(Debug, PartialEq)]
 pub struct VariableIdentifier {
     pub name: String,
-    pub indicies: Vec<Expr>
+    /// Each paren group `(expr, ...)` is a `Vec<Expr>`.
+    /// `X(I)(J)` → two groups, each with one expr.
+    /// `FUNC(a, b)` → one group with two exprs.
+    pub paren_groups: Vec<Vec<Expr>>,
+    /// Optional bracket indices `[expr, expr, ...]`
+    pub bracket_indices: Vec<Expr>,
+}
+
+impl VariableIdentifier {
+    /// Flatten paren_groups into a single index list for variable indexing.
+    /// Only valid when each paren group has exactly one argument (multi-dim indexing).
+    pub fn flat_indices(&self) -> Vec<&Expr> {
+        let mut indices: Vec<&Expr> = Vec::new();
+        for group in &self.paren_groups {
+            for expr in group {
+                indices.push(expr);
+            }
+        }
+        for expr in &self.bracket_indices {
+            indices.push(expr);
+        }
+        indices
+    }
+
+    /// Total number of indexing dimensions (only valid for variable indexing, not function calls).
+    pub fn num_index_dimensions(&self) -> usize {
+        self.paren_groups.len() + self.bracket_indices.len()
+    }
 }
 
 impl FromRule for VariableIdentifier {
@@ -19,63 +46,80 @@ impl FromRule for VariableIdentifier {
             
         let mut inner = pair.into_inner();
         let name = inner.next()
-            .context("Missing variable name in indexed identifier!")?
+            .context("Missing variable name in variable identifier!")?
             .as_str().to_string();
         
-        let indicies = if let Some(next) = inner.next() {
-            let mut indices = Vec::new();
-            let mut inner_indices = next.into_inner();
-            while let Some(index_pair) = inner_indices.next() {
-                let expr = Expr::from_rule(index_pair)
-                    .context("Failed to build expression in indexed identifier!")?
-                    .ok_or_else(|| anyhow::anyhow!("Expected expression in indexed identifier"))?;
-                indices.push(expr);
+        let mut paren_groups = Vec::new();
+        let mut bracket_indices = Vec::new();
+
+        for token in inner {
+            match token.as_rule() {
+                Rule::paren_group => {
+                    let mut group = Vec::new();
+                    for expr_pair in token.into_inner() {
+                        let expr = Expr::from_rule(expr_pair)
+                            .context("Failed to build expression in paren group!")?
+                            .ok_or_else(|| anyhow::anyhow!("Expected expression in paren group"))?;
+                        group.push(expr);
+                    }
+                    paren_groups.push(group);
+                }
+                Rule::bracket_index => {
+                    for expr_pair in token.into_inner() {
+                        let expr = Expr::from_rule(expr_pair)
+                            .context("Failed to build expression in bracket index!")?
+                            .ok_or_else(|| anyhow::anyhow!("Expected expression in bracket index"))?;
+                        bracket_indices.push(expr);
+                    }
+                }
+                _ => {}
             }
-            indices
-        } else {
-            Vec::new()
-        };
+        }
 
         Ok(Some(VariableIdentifier {
             name,
-            indicies
+            paren_groups,
+            bracket_indices,
         }))
     }
 }
+
 impl TypeOf for VariableIdentifier {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         let var_data = context.variables.get(&self.name)
             .ok_or(anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.name))?;
 
+        let num_indices = self.num_index_dimensions();
         let mut var_type = var_data.data.r#type.clone();
         var_type.dimensions = var_type.dimensions
-            .checked_sub(self.indicies.len())
+            .checked_sub(num_indices)
             .ok_or(anyhow::anyhow!(
                 "Variable '{}' does not have enough dimensions to index into it (tried to index {} times, but it only has {} dimensions)!",
-                self.name, self.indicies.len(), var_type.dimensions
+                self.name, num_indices, var_type.dimensions
             ))?;
 
         Ok(var_type)
     }
 }
+
 impl Transpile for VariableIdentifier {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         // Check that the variable exists and that the 
         //  dimensions are correct
-        //
-        // Cheeky trick to reuse code :3
         let _ = self.type_of(context)
             .map_err(|err| {
                 vec!(err.context(format!("...while checking the type of variable {}", self.name)))
             })?;
 
-        // Serialize the indicies
+        // Serialize the indices
         let mut serialized_indicies = String::new();
         let mut requested_variables = BTreeSet::new();
         let mut errors = Vec::new();
-        for (i, index_expr) in self.indicies.iter().enumerate() {
+
+        let flat = self.flat_indices();
+        for (i, index_expr) in flat.iter().enumerate() {
             let i = i + 1;
             let name = &self.name;
 

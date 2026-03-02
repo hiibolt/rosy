@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::{ast::*, program::expressions::{Expr, variable_identifier::VariableIdentifier}, transpile::{TypeOf, VariableScope}};
+use crate::rosy_lib::{RosyType, RosyBaseType};
 use super::super::super::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Context, Error, anyhow, ensure};
 
@@ -47,7 +48,14 @@ impl Transpile for AssignStatement {
             .map_err(|e| vec!(
                 e.context("...while determining type of value expression for assignment")
             ))?;
-        if variable_type != value_type {
+        // Check for RE→VE coercion: if variable is VE and value is RE,
+        // we'll wrap the value in vec![...] to create a one-element vector.
+        // This supports COSY's dynamic typing pattern (e.g. Y:=1; Y:=Y&I;).
+        let needs_re_to_ve_coercion = variable_type.base_type == RosyBaseType::VE
+            && variable_type.dimensions == 0
+            && value_type == RosyType::RE();
+
+        if variable_type != value_type && !needs_re_to_ve_coercion {
             return Err(vec!(anyhow!(
                 "Cannot assign value of type '{}' to variable '{}' of type '{}'!", 
                 value_type, self.identifier.name, variable_type
@@ -87,6 +95,15 @@ impl Transpile for AssignStatement {
                 }
                 String::new() // dummy value to collect more errors
             }
+        };
+
+        // If RE→VE coercion is needed, wrap the value in vec![...]
+        // We dereference with (*...).to_owned() since the RE expression
+        // may be a reference (e.g. &mut 1f64 or &TEMP).
+        let serialized_value = if needs_re_to_ve_coercion {
+            format!("vec![(*{}).to_owned()]", serialized_value)
+        } else {
+            serialized_value
         };
 
         // Serialize the entire function

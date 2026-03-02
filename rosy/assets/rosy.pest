@@ -1,7 +1,8 @@
 WHITESPACE = _{ " " | "\t" | NEWLINE }
 
-// Comments use {..} syntax with non-greedy matching
-COMMENT = _{ "{" ~ (!"}" ~ ANY)* ~ "}" }
+// Comments use {..} syntax with support for nested {..} blocks
+// e.g. {LOOP I 1 N; X := {inner comment} 1; ENDLOOP;} is one comment
+COMMENT = _{ "{" ~ (COMMENT | (!("{" | "}") ~ ANY))* ~ "}" }
 
 program = { SOI ~ begin ~ statement* ~ end ~ EOI }
 statement   = _{ 
@@ -162,13 +163,16 @@ assignment  = { variable_identifier ~ ":=" ~ expr ~ semicolon }
 expr = { term ~ (infix_op ~ term)* }
 term = _{ 
     not_expr |
+    neg_expr |
     builtin_function | 
-    function_call |
     boolean |
     number | 
     string |
     variable_identifier |
     "(" ~ expr ~ ")" }
+
+// Unary negation (prefix minus)
+neg_expr = { "-" ~ expr }
 
 // Boolean literals
 boolean = { ^"TRUE" | ^"FALSE" }
@@ -196,8 +200,9 @@ gt          = { ">" }
 lte         = { "<=" }
 gte         = { ">=" }
 
-variable_identifier = { variable_name ~ variable_indexing? }
-variable_indexing = { ("[" ~ expr ~ ("," ~ expr)* ~ "]") | ("(" ~ expr ~ ("," ~ expr)* ~ ")") }
+variable_identifier = { variable_name ~ paren_group* ~ bracket_index? }
+paren_group = { "(" ~ expr ~ ("," ~ expr)* ~ ")" }
+bracket_index = { "[" ~ expr ~ ("," ~ expr)* ~ "]" }
 variable_name  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
 number      = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 unit        = @{ ASCII_DIGIT+ }

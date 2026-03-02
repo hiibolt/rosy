@@ -129,17 +129,14 @@ impl Transpile for PLoopStatement {
         let mut inner_context = context.clone();
         let mut requested_variables = BTreeSet::new();
         let mut errors = Vec::new();
-        if matches!(inner_context.variables.insert(self.iterator.clone(), ScopedVariableData { 
+        // Allow reuse of existing variable (COSY behavior)
+        inner_context.variables.insert(self.iterator.clone(), ScopedVariableData { 
             scope: VariableScope::Local,
             data: VariableData { 
                 name: self.iterator.clone(),
                 r#type: RosyType::RE()
             }
-        }), Some(_)) {
-            return Err(vec!(anyhow!(
-                "Iterator variable '{}' is already defined in this scope!", self.iterator
-            )));
-        }
+        });
 
         // Transpile each inner statement
         let mut serialized_statements = Vec::new();

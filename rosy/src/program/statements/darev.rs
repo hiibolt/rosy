@@ -83,8 +83,8 @@ impl Transpile for DarevStatement {
         requested_variables.extend(unit_output.requested_variables);
 
         let serialization = format!(
-            "rosy_lib::core::daprv::rosy_darev(&mut *{}, ({}).to_owned() as usize, ({}).to_owned() as usize, ({}).to_owned() as usize, ({}).to_owned() as u64)?;",
-            array_output.serialization,
+            "rosy_lib::core::daprv::rosy_darev({}, ({}).to_owned() as usize, ({}).to_owned() as usize, ({}).to_owned() as usize, ({}).to_owned() as u64)?;",
+            array_output.serialization.replace("&", "&mut "),
             num_comp_output.serialization,
             max_vars_output.serialization,
             current_vars_output.serialization,

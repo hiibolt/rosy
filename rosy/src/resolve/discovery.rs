@@ -263,12 +263,61 @@ impl TypeResolver {
                     };
 
                     if let Some(ref old_recipe) = old_recipe {
-                        // Try to evaluate both the old and new recipes
+                        // Try to evaluate both recipes. If the new recipe is
+                        // self-referential (e.g. Y:=Y&I), evaluate_recipe will
+                        // fail because Y isn't resolved yet. In that case,
+                        // temporarily resolve Y to the old type so we can
+                        // evaluate what the new assignment produces.
+                        let old_type_result = self.evaluate_recipe(old_recipe);
+                        let mut new_type_result = self.evaluate_recipe(&recipe);
+
+                        // If the new recipe failed but old succeeded, try again
+                        // with a temporary assumption that the variable has the
+                        // old type (handles self-referential patterns like Y:=Y&I)
+                        if new_type_result.is_err() {
+                            if let Ok(ref old_type) = old_type_result {
+                                // Temporarily mark this slot as resolved
+                                if let Some(node) = self.nodes.get_mut(&var_slot) {
+                                    node.resolved = Some(old_type.clone());
+                                }
+                                new_type_result = self.evaluate_recipe(&recipe);
+                                // Undo the temporary resolution
+                                if let Some(node) = self.nodes.get_mut(&var_slot) {
+                                    node.resolved = None;
+                                }
+                            }
+                        }
+
                         if let (Ok(old_type), Ok(new_type)) = (
-                            self.evaluate_recipe(old_recipe),
-                            self.evaluate_recipe(&recipe),
+                            old_type_result,
+                            new_type_result,
                         ) {
                             if old_type != new_type {
+                                // RE ↔ VE coercion: if one is RE and the other is VE,
+                                // upgrade to VE. This supports COSY's dynamic typing
+                                // pattern where a variable is initialized as a scalar
+                                // (Y:=1) and then grown into a vector (Y:=Y&I).
+                                let re = RosyType::RE();
+                                let ve = RosyType::VE();
+                                if (old_type == re && new_type == ve) || (old_type == ve && new_type == re) {
+                                    tracing::debug!(
+                                        "RE↔VE coercion for '{}': upgrading to VE (RE assignments will wrap in vec![])",
+                                        var_name
+                                    );
+                                    // Use a literal VE recipe — we already know the
+                                    // result type. Using the self-referential recipe
+                                    // (e.g. Concat(Y, I)) would create a circular
+                                    // dependency that can't be resolved.
+                                    if let Some(node) = self.nodes.get_mut(&var_slot) {
+                                        node.rule = ResolutionRule::InferredFrom {
+                                            recipe: ExprRecipe::Literal(RosyType::VE()),
+                                            reason: "inferred from assignment (RE→VE upgrade)".to_string(),
+                                        };
+                                        node.depends_on.clear();
+                                    }
+                                    return Ok(());
+                                }
+
                                 let scope_str = if ctx.scope_path.is_empty() {
                                     "global scope".to_string()
                                 } else {
@@ -470,6 +519,11 @@ impl TypeResolver {
                     self.discover_expr_function_calls(&e.expr, ctx)?;
                 }
             }
+            ExprEnum::Neg => {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<crate::program::expressions::neg::NegExpr>() {
+                    self.discover_expr_function_calls(&e.operand, ctx)?;
+                }
+            }
             ExprEnum::StringConvert => {
                 if let Some(e) = expr.inner.as_any().downcast_ref::<string_convert::StringConvertExpr>() {
                     self.discover_expr_function_calls(&e.expr, ctx)?;
@@ -547,6 +601,17 @@ impl TypeResolver {
             ExprEnum::Lcm => ExprRecipe::Literal(RosyType::RE()),
             ExprEnum::Lcd => ExprRecipe::Literal(RosyType::RE()),
             ExprEnum::Not => ExprRecipe::Literal(RosyType::LO()),
+            ExprEnum::Neg => {
+                if let Some(neg_expr) = expr.inner.as_any()
+                    .downcast_ref::<crate::program::expressions::neg::NegExpr>()
+                {
+                    let inner = self.build_expr_recipe(&neg_expr.operand, ctx, deps);
+                    // Negation preserves the operand type (RE - X gives same type as X for numeric)
+                    inner
+                } else {
+                    ExprRecipe::Unknown
+                }
+            }
             ExprEnum::Eq | ExprEnum::Neq | ExprEnum::Lt | ExprEnum::Gt |
             ExprEnum::Lte | ExprEnum::Gte => ExprRecipe::Literal(RosyType::LO()),
 

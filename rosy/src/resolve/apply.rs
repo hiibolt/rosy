@@ -29,7 +29,13 @@ impl TypeResolver {
                         );
                         if let Some(node) = self.nodes.get(&slot) {
                             if let Some(t) = &node.resolved {
-                                var_decl.data.r#type = Some(t.clone());
+                                // Apply resolved base type, but incorporate
+                                // dimension count from COSY-style memory sizes
+                                let mut resolved = t.clone();
+                                if !var_decl.data.dimension_exprs.is_empty() {
+                                    resolved.dimensions = var_decl.data.dimension_exprs.len();
+                                }
+                                var_decl.data.r#type = Some(resolved);
                             }
                         }
                     }

@@ -28,6 +28,7 @@ pub mod vmax;
 pub mod lst;
 pub mod lcm;
 pub mod lcd;
+pub mod neg;
 pub mod derive;
 pub mod number;
 pub mod string;
@@ -64,6 +65,7 @@ use crate::program::expressions::gt::GtExpr;
 use crate::program::expressions::lte::LteExpr;
 use crate::program::expressions::gte::GteExpr;
 use crate::program::expressions::not::NotExpr;
+use crate::program::expressions::neg::NegExpr;
 use crate::program::expressions::concat::ConcatExpr;
 use crate::program::expressions::extract::ExtractExpr;
 use crate::program::expressions::derive::DeriveExpr;
@@ -113,6 +115,7 @@ pub enum ExprEnum {
     Lst,
     Lcm,
     Lcd,
+    Neg,
     Derive,
     FunctionCall,
 }
@@ -121,6 +124,18 @@ impl FromRule for Expr {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Expr>> {
         let result = PRATT_PARSER
             .map_primary(|primary| match primary.as_rule() {
+                Rule::neg_expr => {
+                    let mut inner = primary.into_inner();
+                    let operand_pair = inner.next()
+                        .ok_or_else(|| anyhow::anyhow!("Negation expression missing operand"))?;
+                    let operand = Expr::from_rule(operand_pair)
+                        .context("Failed to parse negation operand")?
+                        .ok_or_else(|| anyhow::anyhow!("Expected expression in negation"))?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Neg,
+                        inner: Box::new(NegExpr { operand: Box::new(operand) }),
+                    })
+                },
                 Rule::not_expr => {
                     // NOT expression: parse the inner operand
                     // The inner can be: boolean, variable_identifier, or expr (parenthesized)
@@ -167,13 +182,6 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Var,
                         inner: Box::new(var_expr.ok_or_else(|| anyhow::anyhow!("Expected VarExpr"))?),
-                    })
-                },
-                Rule::function_call => {
-                    let func_expr = FunctionCallExpr::from_rule(primary)?;
-                    Ok(Expr {
-                        enum_variant: ExprEnum::FunctionCall,
-                        inner: Box::new(func_expr.ok_or_else(|| anyhow::anyhow!("Expected FunctionCallExpr"))?),
                     })
                 },
                 Rule::number => {

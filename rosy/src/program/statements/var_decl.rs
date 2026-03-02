@@ -11,10 +11,6 @@ pub struct VariableDeclarationData {
     pub name: String,
     pub r#type: Option<RosyType>,
     pub dimension_exprs: Vec<Expr>,
-    /// COSY-style memory size expression (e.g. `VARIABLE X 100 ;`)
-    /// Parsed for backwards compatibility but never evaluated —
-    /// Rosy handles memory allocation automatically.
-    pub _memory_size_expr: Option<Expr>,
 }
 impl VariableDeclarationData {
     /// Helper to unwrap the type or return a descriptive error.
@@ -107,7 +103,7 @@ impl FromRule for VarDeclStatement {
         let first = inner.next()
             .context("Missing tokens in variable declaration!")?;
 
-        let (r#type, dimension_exprs, name) = if first.as_rule() == Rule::r#type {
+        let (r#type, mut dimension_exprs, name) = if first.as_rule() == Rule::r#type {
             // Type is present: parse type, then name
             let (r#type, dimension_exprs) = build_type(first)
                 .context("...while building variable type in variable declaration!")?;
@@ -121,29 +117,31 @@ impl FromRule for VarDeclStatement {
             (None, Vec::new(), name)
         };
 
-        // Parse optional COSY-style memory size expression (e.g. `VARIABLE X 100 ;`)
-        let _memory_size_expr = if let Some(mem_pair) = inner.next() {
+        // Parse COSY-style memory size expressions (e.g. `VARIABLE X 100 N ;`)
+        // In COSY: first memory_size = allocation hint (ignored by Rosy)
+        //          additional memory_sizes = array dimensions
+        let mut memory_sizes: Vec<Expr> = Vec::new();
+        for mem_pair in inner {
             if mem_pair.as_rule() == Rule::memory_size {
                 let mem_inner = mem_pair.into_inner().next()
                     .context("Missing expression in memory_size")?;
                 let expr = Expr::from_rule(mem_inner)
                     .context("...while building memory size expression in variable declaration!")?;
-                if expr.is_some() {
-                    eprintln!("Warning: COSY-style memory size in VARIABLE declaration for '{}' is ignored — Rosy handles memory automatically.", name);
+                if let Some(expr) = expr {
+                    memory_sizes.push(expr);
                 }
-                expr
-            } else {
-                None
             }
-        } else {
-            None
-        };
+        }
+
+        // First memory_size is allocation (ignored), rest are array dimensions
+        if memory_sizes.len() > 1 {
+            dimension_exprs.extend(memory_sizes.into_iter().skip(1));
+        }
 
         let data = VariableDeclarationData {
             name,
             r#type,
             dimension_exprs,
-            _memory_size_expr,
         };
 
         Ok(Some(VarDeclStatement { data }))
