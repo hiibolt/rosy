@@ -8,7 +8,7 @@ use std::path::Path;
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Path to the rosy.pest file
-    #[arg(short, long, default_value = "../../rosy.pest")]
+    #[arg(short, long, default_value = "./rosy/assets/rosy.pest")]
     pest_file: String,
     
     /// Output directory for the VSCode extension
@@ -16,59 +16,9 @@ struct Args {
     output_dir: String,
 }
 
-struct VSCodeExtensionGenerator {
-    keywords: Vec<String>,
-    operators: Vec<String>,
-    string_delimiters: Vec<String>,
-    comment_patterns: Vec<String>,
-}
+struct VSCodeExtensionGenerator;
 
 impl VSCodeExtensionGenerator {
-    fn new() -> Self {
-        Self {
-            keywords: Vec::new(),
-            operators: Vec::new(),
-            string_delimiters: Vec::new(),
-            comment_patterns: Vec::new(),
-        }
-    }
-
-    fn parse_pest_file(&mut self, _content: &str) -> Result<()> {
-        // Extract keywords from the pest grammar
-        self.extract_keywords();
-        self.extract_operators();
-        self.extract_strings_and_comments();
-        Ok(())
-    }
-
-    fn extract_keywords(&mut self) {
-        let keywords = vec![
-            "VARIABLE", "BEGIN", "END", "PROCEDURE", "FUNCTION", "RETURNS",
-            "WRITE", "READ", "IF", "THEN", "ELSE", "ENDIF", "LOOP", "ENDLOOP",
-            "FOR", "TO", "ENDFOR", "WHILE", "ENDWHILE", "RETURN", "CALL",
-            "INTEGER", "REAL", "STRING", "BOOLEAN", "TRUE", "FALSE", "ENDFUNCTION",
-            "ENDPROCEDURE"
-        ];
-        
-        self.keywords = keywords.into_iter().map(|s| s.to_string()).collect();
-    }
-
-    fn extract_operators(&mut self) {
-        let operators = vec![
-            "=", "+", "-", "*", "/", "%", "==", "!=", "<", ">", "<=", ">=",
-            "&&", "||", "!", "&", "|", "^", "<<", ">>", "++", "--", "+=",
-            "-=", "*=", "/=", "%=", "?", ":", ".", ",", ";", "(", ")", "[",
-            "]", "{", "}", "->", "<-"
-        ];
-        
-        self.operators = operators.into_iter().map(|s| s.to_string()).collect();
-    }
-
-    fn extract_strings_and_comments(&mut self) {
-        self.string_delimiters = vec!["\"".to_string(), "'".to_string()];
-        self.comment_patterns = vec!["//".to_string(), "/*".to_string()];
-    }
-
     fn generate_package_json(&self) -> serde_json::Value {
         json!({
             "name": "rosy-language-support",
@@ -83,7 +33,7 @@ impl VSCodeExtensionGenerator {
                 "languages": [{
                     "id": "rosy",
                     "aliases": ["ROSY", "rosy"],
-                    "extensions": [".rosy"],
+                    "extensions": [".rosy", ".fox"],
                     "configuration": "./language-configuration.json"
                 }],
                 "grammars": [{
@@ -98,32 +48,35 @@ impl VSCodeExtensionGenerator {
     fn generate_language_configuration(&self) -> serde_json::Value {
         json!({
             "comments": {
-                "lineComment": "//",
-                "blockComment": ["/*", "*/"]
+                "blockComment": ["{", "}"]
             },
             "brackets": [
-                ["{", "}"],
-                ["[", "]"],
-                ["(", ")"]
+                ["(", ")"],
+                ["[", "]"]
             ],
             "autoClosingPairs": [
-                ["{", "}"],
-                ["[", "]"],
-                ["(", ")"],
-                ["\"", "\""],
-                ["'", "'"]
+                { "open": "(", "close": ")" },
+                { "open": "[", "close": "]" },
+                { "open": "{", "close": "}" },
+                { "open": "'", "close": "'", "notIn": ["string"] }
             ],
             "surroundingPairs": [
-                ["{", "}"],
-                ["[", "]"],
                 ["(", ")"],
-                ["\"", "\""],
+                ["[", "]"],
+                ["{", "}"],
                 ["'", "'"]
             ],
+            "folding": {
+                "markers": {
+                    "start": "^\\s*(BEGIN|IF|LOOP|PLOOP|WHILE|PROCEDURE|FUNCTION|FIT)\\b",
+                    "end": "^\\s*(END|ENDIF|ENDLOOP|ENDPLOOP|ENDWHILE|ENDPROCEDURE|ENDFUNCTION|ENDFIT)\\b"
+                }
+            },
             "indentationRules": {
-                "increaseIndentPattern": "^.*\\{[^}\"']*$|^.*\\([^)\"']*$|^.*\\[[^\\]\"']*$|^.*(BEGIN|THEN|ELSE|LOOP|FOR|WHILE|PROCEDURE|FUNCTION|ENDFUNCTION|ENDPROCEDURE)\\s*$",
-                "decreaseIndentPattern": "^\\s*(\\}|\\)|\\]|END|ENDIF|ENDLOOP|ENDFOR|ENDWHILE|ELSE).*$"
-            }
+                "increaseIndentPattern": "^\\s*(BEGIN|IF|ELSEIF|ELSE|LOOP|PLOOP|WHILE|PROCEDURE|FUNCTION|FIT)\\b",
+                "decreaseIndentPattern": "^\\s*(END|ENDIF|ENDLOOP|ENDPLOOP|ENDWHILE|ENDPROCEDURE|ENDFUNCTION|ENDFIT|ELSEIF|ELSE)\\b"
+            },
+            "wordPattern": "[a-zA-Z_][a-zA-Z0-9_]*"
         })
     }
 
@@ -133,120 +86,128 @@ impl VSCodeExtensionGenerator {
             "name": "ROSY",
             "scopeName": "source.rosy",
             "patterns": [
-                {"include": "#comments"},
-                {"include": "#strings"},
-                {"include": "#keywords"},
-                {"include": "#operators"},
-                {"include": "#numbers"},
-                {"include": "#identifiers"}
+                { "include": "#comments" },
+                { "include": "#strings" },
+                { "include": "#constants" },
+                { "include": "#types" },
+                { "include": "#control-keywords" },
+                { "include": "#declaration-keywords" },
+                { "include": "#io-keywords" },
+                { "include": "#da-keywords" },
+                { "include": "#intrinsic-functions" },
+                { "include": "#assignment-operator" },
+                { "include": "#operators" },
+                { "include": "#numbers" },
+                { "include": "#punctuation" },
+                { "include": "#identifiers" }
             ],
             "repository": {
                 "comments": {
-                    "patterns": [
-                        {
-                            "name": "comment.line.double-slash.rosy",
-                            "begin": "//",
-                            "end": "$"
-                        },
-                        {
-                            "name": "comment.block.rosy",
-                            "begin": "/\\*",
-                            "end": "\\*/"
-                        },
-                        {
+                    "patterns": [{
+                        "name": "comment.block.rosy",
+                        "begin": "\\{",
+                        "end": "\\}",
+                        "patterns": [{
                             "name": "comment.block.rosy",
                             "begin": "\\{",
                             "end": "\\}"
-                        }
-                    ]
+                        }]
+                    }]
                 },
                 "strings": {
+                    "patterns": [{
+                        "name": "string.quoted.single.rosy",
+                        "begin": "'",
+                        "end": "'",
+                        "patterns": [{
+                            "name": "constant.character.escape.rosy",
+                            "match": "''"
+                        }]
+                    }]
+                },
+                "constants": {
+                    "patterns": [{
+                        "name": "constant.language.boolean.rosy",
+                        "match": "\\b(TRUE|FALSE)\\b"
+                    }]
+                },
+                "types": {
                     "patterns": [
                         {
-                            "name": "string.quoted.double.rosy",
-                            "begin": "\"",
-                            "end": "\"",
-                            "patterns": [
-                                {
-                                    "name": "constant.character.escape.rosy",
-                                    "match": "\\\\."
-                                }
-                            ]
+                            "comment": "Type annotation in parentheses: (RE), (VE ** 2), etc.",
+                            "match": "\\(\\s*(RE|ST|LO|CM|VE|DA|CD)\\b",
+                            "captures": {
+                                "1": { "name": "entity.name.type.rosy" }
+                            }
                         },
                         {
-                            "name": "string.quoted.single.rosy",
-                            "begin": "'",
-                            "end": "'",
-                            "patterns": [
-                                {
-                                    "name": "constant.character.escape.rosy",
-                                    "match": "\\\\."
-                                }
-                            ]
+                            "comment": "Dimension operator in type annotations",
+                            "name": "keyword.operator.dimension.rosy",
+                            "match": "\\*\\*"
                         }
                     ]
                 },
-                "keywords": {
-                    "patterns": [
-                        {
-                            "name": "keyword.control.rosy",
-                            "match": format!("\\b({}|{}|{}|{})\\b", 
-                                "BEGIN|END|IF|THEN|ELSE|ENDIF",
-                                "LOOP|ENDLOOP", 
-                                "WHILE|ENDWHILE|RETURN",
-                                "PROCEDURE|FUNCTION|ENDPROCEDURE|ENDFUNCTION")
-                        },
-                        {
-                            "name": "keyword.other.rosy",
-                            "match": "\\b(VARIABLE|WRITE|READ)\\b"
-                        },
-                        {
-                            "name": "entity.name.type.rosy",
-                            "match": "\\b(INTEGER|REAL|STRING|BOOLEAN)\\b"
-                        },
-                        {
-                            "name": "entity.name.type.rosy",
-                            "match": "\\(\\s*(RE|LO|VE|CM|ST)\\s*\\)"
-                        },
-                        {
-                            "name": "constant.language.rosy",
-                            "match": "\\b(TRUE|FALSE)\\b"
-                        }
-                    ]
+                "control-keywords": {
+                    "patterns": [{
+                        "name": "keyword.control.rosy",
+                        "match": "\\b(BEGIN|END|IF|ELSEIF|ELSE|ENDIF|LOOP|ENDLOOP|PLOOP|ENDPLOOP|WHILE|ENDWHILE|BREAK|FIT|ENDFIT|NOT)\\b"
+                    }]
+                },
+                "declaration-keywords": {
+                    "patterns": [{
+                        "name": "keyword.declaration.rosy",
+                        "match": "\\b(VARIABLE|PROCEDURE|ENDPROCEDURE|FUNCTION|ENDFUNCTION)\\b"
+                    }]
+                },
+                "io-keywords": {
+                    "patterns": [{
+                        "name": "keyword.other.io.rosy",
+                        "match": "\\b(WRITE|WRITEB|READ|READB|OPENF|OPENFB|CLOSEF)\\b"
+                    }]
+                },
+                "da-keywords": {
+                    "patterns": [{
+                        "name": "keyword.other.da.rosy",
+                        "match": "\\b(OV|DAINI|DAPRV|DAREV)\\b"
+                    }]
+                },
+                "intrinsic-functions": {
+                    "patterns": [{
+                        "name": "support.function.builtin.rosy",
+                        "match": "\\b(SIN|TAN|SQR|EXP|LENGTH|VMAX|LST|LCM|LCD|DA|CD|CM|ST|LO)\\b(?=\\s*\\()"
+                    }]
+                },
+                "assignment-operator": {
+                    "patterns": [{
+                        "name": "keyword.operator.assignment.rosy",
+                        "match": ":="
+                    }]
                 },
                 "operators": {
                     "patterns": [
                         {
-                            "name": "keyword.operator.assignment.rosy",
-                            "match": "=|\\+=|-=|\\*=|/=|%="
-                        },
-                        {
                             "name": "keyword.operator.comparison.rosy",
-                            "match": "==|!=|<=|>=|<|>"
-                        },
-                        {
-                            "name": "keyword.operator.logical.rosy",
-                            "match": "&&|\\|\\||!"
+                            "match": "<=|>=|<>|<|>|="
                         },
                         {
                             "name": "keyword.operator.arithmetic.rosy",
-                            "match": "\\+|\\-|\\*|/|%"
+                            "match": "\\+|-|\\*|/"
                         },
                         {
-                            "name": "keyword.operator.bitwise.rosy",
-                            "match": "&|\\||\\^|<<|>>"
+                            "name": "keyword.operator.concatenation.rosy",
+                            "match": "&"
                         },
                         {
-                            "name": "keyword.operator.increment.rosy",
-                            "match": "\\+\\+|\\-\\-"
+                            "name": "keyword.operator.extraction.rosy",
+                            "match": "\\|"
                         },
                         {
-                            "name": "punctuation.separator.rosy",
-                            "match": ",|;|\\."
+                            "name": "keyword.operator.derivation.rosy",
+                            "match": "%"
                         },
                         {
-                            "name": "punctuation.brackets.rosy",
-                            "match": "\\(|\\)|\\[|\\]|\\{|\\}"
+                            "name": "keyword.operator.power.rosy",
+                            "match": "\\^"
                         }
                     ]
                 },
@@ -254,7 +215,11 @@ impl VSCodeExtensionGenerator {
                     "patterns": [
                         {
                             "name": "constant.numeric.float.rosy",
-                            "match": "\\b\\d+\\.\\d+\\b"
+                            "match": "\\b\\d+\\.\\d+([eE][+-]?\\d+)?\\b"
+                        },
+                        {
+                            "name": "constant.numeric.scientific.rosy",
+                            "match": "\\b\\d+[eE][+-]?\\d+\\b"
                         },
                         {
                             "name": "constant.numeric.integer.rosy",
@@ -262,9 +227,23 @@ impl VSCodeExtensionGenerator {
                         }
                     ]
                 },
+                "punctuation": {
+                    "patterns": [
+                        {
+                            "name": "punctuation.terminator.rosy",
+                            "match": ";"
+                        },
+                        {
+                            "name": "punctuation.separator.comma.rosy",
+                            "match": ","
+                        }
+                    ]
+                },
                 "identifiers": {
-                    "name": "variable.other.rosy",
-                    "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+                    "patterns": [{
+                        "name": "variable.other.rosy",
+                        "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+                    }]
                 }
             }
         })
@@ -301,54 +280,39 @@ impl VSCodeExtensionGenerator {
         // Generate README
         let readme_content = r#"# ROSY Language Support for Visual Studio Code
 
-This extension provides syntax highlighting and basic language support for the ROSY programming language.
+Syntax highlighting and editor support for the ROSY programming language.
 
 ## Features
 
-- Syntax highlighting for ROSY files (.rosy)
-- Automatic bracket matching and closing
-- Comment toggling support
-- Basic indentation rules
+- Full syntax highlighting for `.rosy` and `.fox` files
+- Comment toggling (`{...}` block comments)
+- Bracket matching and auto-closing
+- Code folding for control structures
+- Indentation rules
 
 ## Installation
 
-1. Copy this extension to your VSCode extensions directory
-2. Reload VSCode
-3. Open any .rosy file to see syntax highlighting
+Copy the entire extension folder to your VSCode extensions directory:
 
-## Language Features
+- **Linux**: `~/.vscode/extensions/`
+- **macOS**: `~/.vscode/extensions/`
+- **Windows**: `%USERPROFILE%\.vscode\extensions\`
 
-The ROSY language includes:
-- Variables and data types (INTEGER, REAL, STRING, BOOLEAN)
-- Control structures (IF/THEN/ELSE, LOOP, FOR, WHILE)
-- Procedures and functions
-- Input/output operations (READ, WRITE)
-- Arithmetic and logical operators
+Then reload VSCode. Open any `.rosy` file to see syntax highlighting.
 
-## File Extensions
+## Regenerating
 
-- `.rosy` - ROSY source files
+This extension is auto-generated from the ROSY grammar. To regenerate:
+
+```bash
+cargo run --bin generate_vscode_extension
+```
 "#;
 
         fs::write(output_path.join("README.md"), readme_content)?;
 
-        // Generate .vscodeignore
-        let vscodeignore_content = r#".vscode/**
-.vscode-test/**
-**/*.map
-**/node_modules/**
-src/**
-**/*.ts
-.gitignore
-README.md
-.eslintrc.json
-**/*.vsix
-"#;
-
-        fs::write(output_path.join(".vscodeignore"), vscodeignore_content)?;
-
-        println!("VSCode extension generated successfully in: {}", output_dir);
-        println!("\nTo install the extension:");
+        println!("\nVSCode extension generated successfully in: {}\n", output_dir);
+        println!("To install the extension:");
         println!("1. Copy the entire '{}' folder to your VSCode extensions directory:", output_dir);
         println!("   - Linux: ~/.vscode/extensions/");
         println!("   - macOS: ~/.vscode/extensions/");
@@ -362,12 +326,14 @@ README.md
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    
-    let pest_content = fs::read_to_string(&args.pest_file)
-        .map_err(|e| anyhow::anyhow!("Failed to read pest file {}: {}", args.pest_file, e))?;
 
-    let mut generator = VSCodeExtensionGenerator::new();
-    generator.parse_pest_file(&pest_content)?;
+    // We still accept the pest file path for future use,
+    // but currently keywords are defined statically to match the grammar.
+    if !Path::new(&args.pest_file).exists() {
+        eprintln!("Warning: pest file '{}' not found, using built-in definitions", args.pest_file);
+    }
+
+    let generator = VSCodeExtensionGenerator;
     generator.generate_extension(&args.output_dir)?;
 
     Ok(())
