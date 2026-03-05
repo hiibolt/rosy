@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure, bail};
 
 use crate::{
-    ast::*, program::expressions::{Expr, variable_identifier::VariableIdentifier}, rosy_lib::RosyType, program::statements::Statement, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TypeOf, VariableData, VariableScope, indent}
+    ast::*, program::expressions::{Expr, core::variable_identifier::VariableIdentifier}, rosy_lib::RosyType, program::statements::Statement, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TypeOf, VariableData, VariableScope, indent}
 };
 
 #[derive(Debug)]

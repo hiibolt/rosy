@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
-    ast::*, program::expressions::variable_identifier::VariableIdentifier, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TypeOf}
+    ast::*, program::expressions::core::variable_identifier::VariableIdentifier, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TypeOf}
 };
 
 /// READB unit variable_identifier ;

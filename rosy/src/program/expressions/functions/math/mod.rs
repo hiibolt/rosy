@@ -1,3 +1,4 @@
+pub mod trig;
 pub mod exp;
 pub mod lcd;
 pub mod lcm;

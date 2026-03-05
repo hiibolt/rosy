@@ -1,6 +1,6 @@
 use crate::ast::{FromRule, Rule};
-use crate::program::expressions::variable_identifier::VariableIdentifier;
-use crate::program::expressions::function_call::function_call_transpile_helper;
+use super::variable_identifier::VariableIdentifier;
+use super::function_call::function_call_transpile_helper;
 use crate::transpile::TranspileWithType;
 use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, VariableScope, };
 use anyhow::{Result, Context, Error};

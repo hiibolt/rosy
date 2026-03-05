@@ -4,7 +4,7 @@ use anyhow::{Result, Error, anyhow};
 use crate::ast::{FromRule, Rule};
 use crate::rosy_lib::RosyType;
 use crate::transpile::{Transpile, TranspileWithType, TypeOf, TranspilationInputContext, TranspilationOutput};
-use super::Expr;
+use crate::program::expressions::Expr;
 
 /// Unary negation expression: `-expr`
 /// Transpiled as `0 - expr` using the existing subtraction operator.

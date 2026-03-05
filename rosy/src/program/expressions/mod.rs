@@ -5,38 +5,42 @@ pub mod types;
 
 use crate::{ast::{FromRule, PRATT_PARSER, Rule}, rosy_lib::RosyType, transpile::{TranspileWithType, TypeOf, add_context_to_all}};
 use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
-use crate::program::expressions::var_expr::VarExpr;
-use crate::program::expressions::function_call::FunctionCallExpr;
-use crate::program::expressions::complex_convert::ComplexConvertExpr;
-use crate::program::expressions::string_convert::StringConvertExpr;
-use crate::program::expressions::logical_convert::LogicalConvertExpr;
-use crate::program::expressions::da::DAExpr;
-use crate::program::expressions::cd::CDExpr;
-use crate::program::expressions::length::LengthExpr;
-use crate::program::expressions::sin::SinExpr;
-use crate::program::expressions::sqr::SqrExpr;
-use crate::program::expressions::exp::ExpExpr;
-use crate::program::expressions::tan::TanExpr;
-use crate::program::expressions::vmax::VmaxExpr;
-use crate::program::expressions::lst::LstExpr;
-use crate::program::expressions::lcm::LcmExpr;
-use crate::program::expressions::lcd::LcdExpr;
-use crate::program::expressions::add::AddExpr;
-use crate::program::expressions::sub::SubExpr;
-use crate::program::expressions::mult::MultExpr;
-use crate::program::expressions::div::DivExpr;
-use crate::program::expressions::pow::PowExpr;
-use crate::program::expressions::eq::EqExpr;
-use crate::program::expressions::neq::NeqExpr;
-use crate::program::expressions::lt::LtExpr;
-use crate::program::expressions::gt::GtExpr;
-use crate::program::expressions::lte::LteExpr;
-use crate::program::expressions::gte::GteExpr;
-use crate::program::expressions::not::NotExpr;
-use crate::program::expressions::neg::NegExpr;
-use crate::program::expressions::concat::ConcatExpr;
-use crate::program::expressions::extract::ExtractExpr;
-use crate::program::expressions::derive::DeriveExpr;
+
+use crate::program::expressions::core::var_expr::VarExpr;
+
+use crate::program::expressions::functions::conversion::complex_convert::ComplexConvertExpr;
+use crate::program::expressions::functions::conversion::string_convert::StringConvertExpr;
+use crate::program::expressions::functions::conversion::logical_convert::LogicalConvertExpr;
+use crate::program::expressions::functions::math::trig::tan::TanExpr;
+use crate::program::expressions::functions::math::trig::sin::SinExpr;
+use crate::program::expressions::functions::math::sqr::SqrExpr;
+use crate::program::expressions::functions::math::exp::ExpExpr;
+use crate::program::expressions::functions::math::vmax::VmaxExpr;
+use crate::program::expressions::functions::math::lst::LstExpr;
+use crate::program::expressions::functions::math::lcm::LcmExpr;
+use crate::program::expressions::functions::math::lcd::LcdExpr;
+use crate::program::expressions::functions::math::pow::PowExpr;
+
+use crate::program::expressions::operators::add::AddExpr;
+use crate::program::expressions::operators::sub::SubExpr;
+use crate::program::expressions::operators::mult::MultExpr;
+use crate::program::expressions::operators::div::DivExpr;
+use crate::program::expressions::operators::eq::EqExpr;
+use crate::program::expressions::operators::neq::NeqExpr;
+use crate::program::expressions::operators::lt::LtExpr;
+use crate::program::expressions::operators::gt::GtExpr;
+use crate::program::expressions::operators::lte::LteExpr;
+use crate::program::expressions::operators::gte::GteExpr;
+use crate::program::expressions::operators::not::NotExpr;
+use crate::program::expressions::operators::neg::NegExpr;
+use crate::program::expressions::operators::concat::ConcatExpr;
+use crate::program::expressions::operators::extract::ExtractExpr;
+use crate::program::expressions::operators::derive::DeriveExpr;
+
+use crate::program::expressions::functions::sys::length::LengthExpr;
+
+use crate::program::expressions::types::da::DAExpr;
+use crate::program::expressions::types::cd::CDExpr;
 use anyhow::{Context, Error, Result, bail};
 
 #[derive(Debug)]

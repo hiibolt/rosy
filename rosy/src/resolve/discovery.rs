@@ -9,7 +9,6 @@ use anyhow::{anyhow, Result};
 use crate::rosy_lib::RosyType;
 use crate::program::statements::*;
 use crate::program::expressions::*;
-use crate::program::expressions::function_call as expr_function_call;
 
 use super::{
     TypeResolver, TypeSlot, ScopeContext, ResolutionRule, ExprRecipe, BinaryOpKind,
@@ -466,7 +465,7 @@ impl TypeResolver {
         match &expr.enum_variant {
             ExprEnum::FunctionCall => {
                 if let Some(func_call) = expr.inner.as_any()
-                    .downcast_ref::<expr_function_call::FunctionCallExpr>()
+                    .downcast_ref::<core::function_call::FunctionCallExpr>()
                 {
                     self.discover_call_site_deps(
                         &func_call.name, &func_call.args, true, ctx
@@ -478,54 +477,54 @@ impl TypeResolver {
                 }
             }
             ExprEnum::Add => {
-                if let Some(e) = expr.inner.as_any().downcast_ref::<add::AddExpr>() {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<operators::add::AddExpr>() {
                     self.discover_expr_function_calls(&e.left, ctx)?;
                     self.discover_expr_function_calls(&e.right, ctx)?;
                 }
             }
             ExprEnum::Sub => {
-                if let Some(e) = expr.inner.as_any().downcast_ref::<sub::SubExpr>() {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<operators::sub::SubExpr>() {
                     self.discover_expr_function_calls(&e.left, ctx)?;
                     self.discover_expr_function_calls(&e.right, ctx)?;
                 }
             }
             ExprEnum::Mult => {
-                if let Some(e) = expr.inner.as_any().downcast_ref::<mult::MultExpr>() {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<operators::mult::MultExpr>() {
                     self.discover_expr_function_calls(&e.left, ctx)?;
                     self.discover_expr_function_calls(&e.right, ctx)?;
                 }
             }
             ExprEnum::Div => {
-                if let Some(e) = expr.inner.as_any().downcast_ref::<div::DivExpr>() {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<operators::div::DivExpr>() {
                     self.discover_expr_function_calls(&e.left, ctx)?;
                     self.discover_expr_function_calls(&e.right, ctx)?;
                 }
             }
             ExprEnum::Extract => {
-                if let Some(e) = expr.inner.as_any().downcast_ref::<extract::ExtractExpr>() {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<operators::extract::ExtractExpr>() {
                     self.discover_expr_function_calls(&e.object, ctx)?;
                     self.discover_expr_function_calls(&e.index, ctx)?;
                 }
             }
             ExprEnum::Concat => {
-                if let Some(e) = expr.inner.as_any().downcast_ref::<concat::ConcatExpr>() {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<operators::concat::ConcatExpr>() {
                     for term in &e.terms {
                         self.discover_expr_function_calls(term, ctx)?;
                     }
                 }
             }
             ExprEnum::Sin => {
-                if let Some(e) = expr.inner.as_any().downcast_ref::<sin::SinExpr>() {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<functions::math::trig::sin::SinExpr>() {
                     self.discover_expr_function_calls(&e.expr, ctx)?;
                 }
             }
             ExprEnum::Neg => {
-                if let Some(e) = expr.inner.as_any().downcast_ref::<crate::program::expressions::neg::NegExpr>() {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<operators::neg::NegExpr>() {
                     self.discover_expr_function_calls(&e.operand, ctx)?;
                 }
             }
             ExprEnum::StringConvert => {
-                if let Some(e) = expr.inner.as_any().downcast_ref::<string_convert::StringConvertExpr>() {
+                if let Some(e) = expr.inner.as_any().downcast_ref::<functions::conversion::string_convert::StringConvertExpr>() {
                     self.discover_expr_function_calls(&e.expr, ctx)?;
                 }
             }
@@ -603,7 +602,7 @@ impl TypeResolver {
             ExprEnum::Not => ExprRecipe::Literal(RosyType::LO()),
             ExprEnum::Neg => {
                 if let Some(neg_expr) = expr.inner.as_any()
-                    .downcast_ref::<crate::program::expressions::neg::NegExpr>()
+                    .downcast_ref::<crate::program::expressions::operators::neg::NegExpr>()
                 {
                     let inner = self.build_expr_recipe(&neg_expr.operand, ctx, deps);
                     // Negation preserves the operand type (RE - X gives same type as X for numeric)
@@ -617,7 +616,7 @@ impl TypeResolver {
 
             ExprEnum::Var => {
                 if let Some(var_expr) = expr.inner.as_any()
-                    .downcast_ref::<var_expr::VarExpr>()
+                    .downcast_ref::<core::var_expr::VarExpr>()
                 {
                     let ident = &var_expr.identifier;
                     if let Some(slot) = ctx.variables.get(&ident.name) {
@@ -632,7 +631,7 @@ impl TypeResolver {
             }
             ExprEnum::FunctionCall => {
                 if let Some(func_call) = expr.inner.as_any()
-                    .downcast_ref::<expr_function_call::FunctionCallExpr>()
+                    .downcast_ref::<core::function_call::FunctionCallExpr>()
                 {
                     if let Some((ret_slot, param_slots)) = ctx.functions.get(&func_call.name) {
                         deps.insert(ret_slot.clone());
@@ -670,7 +669,7 @@ impl TypeResolver {
             }
             ExprEnum::Sin => {
                 if let Some(sin_expr) = expr.inner.as_any()
-                    .downcast_ref::<sin::SinExpr>()
+                    .downcast_ref::<functions::math::trig::sin::SinExpr>()
                 {
                     let inner = self.build_expr_recipe(&sin_expr.expr, ctx, deps);
                     ExprRecipe::Sin(Box::new(inner))
@@ -680,7 +679,7 @@ impl TypeResolver {
             }
             ExprEnum::Sqr => {
                 if let Some(sqr_expr) = expr.inner.as_any()
-                    .downcast_ref::<crate::program::expressions::sqr::SqrExpr>()
+                    .downcast_ref::<crate::program::expressions::functions::math::sqr::SqrExpr>()
                 {
                     let inner = self.build_expr_recipe(&sqr_expr.expr, ctx, deps);
                     ExprRecipe::Sin(Box::new(inner)) // Reuse Sin recipe - same shape (unary op)
@@ -690,7 +689,7 @@ impl TypeResolver {
             }
             ExprEnum::Derive => {
                 if let Some(derive_expr) = expr.inner.as_any()
-                    .downcast_ref::<crate::program::expressions::derive::DeriveExpr>()
+                    .downcast_ref::<crate::program::expressions::operators::derive::DeriveExpr>()
                 {
                     let left = self.build_expr_recipe(&derive_expr.object, ctx, deps);
                     let right = self.build_expr_recipe(&derive_expr.index, ctx, deps);
@@ -711,7 +710,7 @@ impl TypeResolver {
             ExprEnum::Pow => self.build_binop_recipe(expr, ctx, deps, BinaryOpKind::Pow),
             ExprEnum::Exp => {
                 if let Some(exp_expr) = expr.inner.as_any()
-                    .downcast_ref::<crate::program::expressions::exp::ExpExpr>()
+                    .downcast_ref::<crate::program::expressions::functions::math::exp::ExpExpr>()
                 {
                     let inner = self.build_expr_recipe(&exp_expr.expr, ctx, deps);
                     ExprRecipe::Sin(Box::new(inner)) // Reuse Sin recipe - same shape (unary op)
@@ -721,7 +720,7 @@ impl TypeResolver {
             }
             ExprEnum::Tan => {
                 if let Some(tan_expr) = expr.inner.as_any()
-                    .downcast_ref::<crate::program::expressions::tan::TanExpr>()
+                    .downcast_ref::<crate::program::expressions::functions::math::trig::tan::TanExpr>()
                 {
                     let inner = self.build_expr_recipe(&tan_expr.expr, ctx, deps);
                     ExprRecipe::Sin(Box::new(inner)) // Reuse Sin recipe - same shape (unary op)
@@ -731,7 +730,7 @@ impl TypeResolver {
             }
             ExprEnum::Concat => {
                 if let Some(concat_expr) = expr.inner.as_any()
-                    .downcast_ref::<concat::ConcatExpr>()
+                    .downcast_ref::<operators::concat::ConcatExpr>()
                 {
                     let recipes: Vec<ExprRecipe> = concat_expr.terms.iter()
                         .map(|t| self.build_expr_recipe(t, ctx, deps))
@@ -766,12 +765,12 @@ impl TypeResolver {
             };
         }
         match op {
-            BinaryOpKind::Add => try_binop!(add::AddExpr),
-            BinaryOpKind::Sub => try_binop!(sub::SubExpr),
-            BinaryOpKind::Mult => try_binop!(mult::MultExpr),
-            BinaryOpKind::Div => try_binop!(div::DivExpr),
+            BinaryOpKind::Add => try_binop!(operators::add::AddExpr),
+            BinaryOpKind::Sub => try_binop!(operators::sub::SubExpr),
+            BinaryOpKind::Mult => try_binop!(operators::mult::MultExpr),
+            BinaryOpKind::Div => try_binop!(operators::div::DivExpr),
             BinaryOpKind::Extract => {
-                if let Some(ext) = expr.inner.as_any().downcast_ref::<extract::ExtractExpr>() {
+                if let Some(ext) = expr.inner.as_any().downcast_ref::<operators::extract::ExtractExpr>() {
                     let left = self.build_expr_recipe(&ext.object, ctx, deps);
                     let right = self.build_expr_recipe(&ext.index, ctx, deps);
                     return ExprRecipe::BinaryOp {
@@ -784,7 +783,7 @@ impl TypeResolver {
             BinaryOpKind::Derive => {
                 // Derive is handled inline in build_expr_recipe, not here
             }
-            BinaryOpKind::Pow => try_binop!(pow::PowExpr),
+            BinaryOpKind::Pow => try_binop!(functions::math::pow::PowExpr),
         }
         ExprRecipe::Unknown
     }
