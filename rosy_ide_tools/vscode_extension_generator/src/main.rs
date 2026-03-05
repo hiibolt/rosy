@@ -42,7 +42,6 @@ impl VSCodeExtensionGenerator {
     }
 
     fn extract_keywords(&mut self) {
-        // Based on the rosy.pest file, extract all the keywords
         let keywords = vec![
             "VARIABLE", "BEGIN", "END", "PROCEDURE", "FUNCTION", "RETURNS",
             "WRITE", "READ", "IF", "THEN", "ELSE", "ENDIF", "LOOP", "ENDLOOP",

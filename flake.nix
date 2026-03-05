@@ -39,6 +39,7 @@
             pest-ide-tools
             clang
             cmake
+            mpi
           ]);
           buildInputs = with pkgs; [
             mpi
