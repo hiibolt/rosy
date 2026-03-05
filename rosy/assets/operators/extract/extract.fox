@@ -1,0 +1,95 @@
+BEGIN;
+
+PROCEDURE RUN;
+    { All variable declarations must come first in FOX/COSY }
+    VARIABLE NM 1;
+    VARIABLE LHS_0 6;
+    VARIABLE RHS_0 1;
+    VARIABLE RESULT_0 6;
+    VARIABLE LHS_1 6;
+    VARIABLE RHS_1 6;
+    VARIABLE RESULT_1 6;
+    VARIABLE LHS_2 2;
+    VARIABLE RHS_2 1;
+    VARIABLE RESULT_2 1;
+    VARIABLE LHS_3 6;
+    VARIABLE RHS_3 1;
+    VARIABLE RESULT_3 1;
+    VARIABLE LHS_4 6;
+    VARIABLE RHS_4 6;
+    VARIABLE RESULT_4 6;
+    VARIABLE LHS_5 2000;
+    VARIABLE RHS_5 1;
+    VARIABLE RESULT_5 1;
+    VARIABLE LHS_6 2000;
+    VARIABLE RHS_6 6;
+    VARIABLE RESULT_6 1;
+    VARIABLE LHS_7 4000;
+    VARIABLE RHS_7 1;
+    VARIABLE RESULT_7 2;
+    VARIABLE LHS_8 4000;
+    VARIABLE RHS_8 6;
+    VARIABLE RESULT_8 2;
+
+    { Initialize DA system for tests that use DA/CD types }
+    { DAINI: order 10, number_of_variables 6, mode 0 (see COSY manual) }
+    DAINI 10 6 0 NM;
+
+    { Test 0: ST | RE => ST }
+    LHS_0 := 'test';
+    RHS_0 := 2;
+    RESULT_0 := LHS_0 | RHS_0;
+    WRITE 6 RESULT_0;
+
+    { Test 1: ST | VE => ST }
+    LHS_1 := 'test';
+    RHS_1 := 2&3;
+    RESULT_1 := LHS_1 | RHS_1;
+    WRITE 6 RESULT_1;
+
+    { Test 2: CM | RE => RE }
+    LHS_2 := CM(3&4);
+    RHS_2 := 1;
+    RESULT_2 := LHS_2 | RHS_2;
+    WRITE 6 RESULT_2;
+
+    { Test 3: VE | RE => RE }
+    LHS_3 := 1&2;
+    RHS_3 := 2;
+    RESULT_3 := LHS_3 | RHS_3;
+    WRITE 6 RESULT_3;
+
+    { Test 4: VE | VE => VE }
+    LHS_4 := 1&2&3;
+    RHS_4 := 2&3;
+    RESULT_4 := LHS_4 | RHS_4;
+    WRITE 6 RESULT_4;
+
+    { Test 5: DA | RE => RE }
+    LHS_5 := DA(1);
+    RHS_5 := 1;
+    RESULT_5 := LHS_5 | RHS_5;
+    WRITE 6 RESULT_5;
+
+    { Test 6: DA | VE => RE }
+    LHS_6 := DA(1);
+    RHS_6 := 0&1;
+    RESULT_6 := LHS_6 | RHS_6;
+    WRITE 6 RESULT_6;
+
+    { Test 7: CD | RE => CM }
+    LHS_7 := CD(1);
+    RHS_7 := 1;
+    RESULT_7 := LHS_7 | RHS_7;
+    WRITE 6 RESULT_7;
+
+    { Test 8: CD | VE => CM }
+    LHS_8 := CD(1);
+    RHS_8 := 0&1;
+    RESULT_8 := LHS_8 | RHS_8;
+    WRITE 6 RESULT_8;
+
+ENDPROCEDURE;
+
+RUN;
+END;

@@ -1,0 +1,41 @@
+BEGIN;
+
+PROCEDURE RUN;
+    { All variable declarations must come first in FOX/COSY }
+    VARIABLE NM 1;
+    VARIABLE LHS_0 1;
+    VARIABLE RHS_0 1;
+    VARIABLE RESULT_0 1;
+    VARIABLE LHS_1 6;
+    VARIABLE RHS_1 6;
+    VARIABLE RESULT_1 1;
+    VARIABLE LHS_2 1;
+    VARIABLE RHS_2 1;
+    VARIABLE RESULT_2 1;
+
+    { Initialize DA system for tests that use DA/CD types }
+    { DAINI: order 10, number_of_variables 6, mode 0 (see COSY manual) }
+    DAINI 10 6 0 NM;
+
+    { Test 0: RE # RE => LO }
+    LHS_0 := 3.14159;
+    RHS_0 := 2.71828;
+    RESULT_0 := LHS_0 # RHS_0;
+    WRITE 6 RESULT_0;
+
+    { Test 1: ST # ST => LO }
+    LHS_1 := 'hello';
+    RHS_1 := 'world';
+    RESULT_1 := LHS_1 # RHS_1;
+    WRITE 6 RESULT_1;
+
+    { Test 2: LO # LO => LO }
+    LHS_2 := TRUE;
+    RHS_2 := FALSE;
+    RESULT_2 := LHS_2 # RHS_2;
+    WRITE 6 RESULT_2;
+
+ENDPROCEDURE;
+
+RUN;
+END;

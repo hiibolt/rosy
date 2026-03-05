@@ -1,0 +1,63 @@
+BEGIN;
+
+PROCEDURE RUN;
+    { All variable declarations must come first in FOX/COSY }
+    VARIABLE NM 1;
+    VARIABLE INPUT_0 1;
+    VARIABLE RESULT_0 1;
+    VARIABLE INPUT_1 6;
+    VARIABLE RESULT_1 1;
+    VARIABLE INPUT_2 1;
+    VARIABLE RESULT_2 1;
+    VARIABLE INPUT_3 2;
+    VARIABLE RESULT_3 1;
+    VARIABLE INPUT_4 6;
+    VARIABLE RESULT_4 1;
+    VARIABLE INPUT_5 2000;
+    VARIABLE RESULT_5 1;
+    VARIABLE INPUT_6 4000;
+    VARIABLE RESULT_6 1;
+
+    { Initialize DA system for tests that use DA/CD types }
+    { DAINI: order 10, number_of_variables 6, mode 0 (see COSY manual) }
+    DAINI 10 6 0 NM;
+
+    { Test 0: LENGTH(RE) => RE }
+    INPUT_0 := 1.5;
+    RESULT_0 := LENGTH(INPUT_0);
+    WRITE 6 RESULT_0;
+
+    { Test 1: LENGTH(ST) => RE }
+    INPUT_1 := "Hello";
+    RESULT_1 := LENGTH(INPUT_1);
+    WRITE 6 RESULT_1;
+
+    { Test 2: LENGTH(LO) => RE }
+    INPUT_2 := TRUE;
+    RESULT_2 := LENGTH(INPUT_2);
+    WRITE 6 RESULT_2;
+
+    { Test 3: LENGTH(CM) => RE }
+    INPUT_3 := 1.5&2.5;
+    RESULT_3 := LENGTH(INPUT_3);
+    WRITE 6 RESULT_3;
+
+    { Test 4: LENGTH(VE) => RE }
+    INPUT_4 := 1.5&2.5&3.5;
+    RESULT_4 := LENGTH(INPUT_4);
+    WRITE 6 RESULT_4;
+
+    { Test 5: LENGTH(DA) => RE }
+    INPUT_5 := 1.5+DA(1);
+    RESULT_5 := LENGTH(INPUT_5);
+    WRITE 6 RESULT_5;
+
+    { Test 6: LENGTH(CD) => RE }
+    INPUT_6 := CM(1.5&2.5)+CD(1);
+    RESULT_6 := LENGTH(INPUT_6);
+    WRITE 6 RESULT_6;
+
+ENDPROCEDURE;
+
+RUN;
+END;

@@ -1,0 +1,185 @@
+BEGIN;
+
+PROCEDURE RUN;
+    { All variable declarations must come first in FOX/COSY }
+    VARIABLE NM 1;
+    VARIABLE LHS_0 1;
+    VARIABLE RHS_0 1;
+    VARIABLE RESULT_0 1;
+    VARIABLE LHS_1 1;
+    VARIABLE RHS_1 2;
+    VARIABLE RESULT_1 2;
+    VARIABLE LHS_2 1;
+    VARIABLE RHS_2 6;
+    VARIABLE RESULT_2 6;
+    VARIABLE LHS_3 1;
+    VARIABLE RHS_3 2000;
+    VARIABLE RESULT_3 2000;
+    VARIABLE LHS_4 1;
+    VARIABLE RHS_4 4000;
+    VARIABLE RESULT_4 4000;
+    VARIABLE LHS_5 2;
+    VARIABLE RHS_5 1;
+    VARIABLE RESULT_5 2;
+    VARIABLE LHS_6 2;
+    VARIABLE RHS_6 2;
+    VARIABLE RESULT_6 2;
+    VARIABLE LHS_7 2;
+    VARIABLE RHS_7 2000;
+    VARIABLE RESULT_7 4000;
+    VARIABLE LHS_8 2;
+    VARIABLE RHS_8 4000;
+    VARIABLE RESULT_8 4000;
+    VARIABLE LHS_9 6;
+    VARIABLE RHS_9 1;
+    VARIABLE RESULT_9 6;
+    VARIABLE LHS_10 6;
+    VARIABLE RHS_10 6;
+    VARIABLE RESULT_10 6;
+    VARIABLE LHS_11 2000;
+    VARIABLE RHS_11 1;
+    VARIABLE RESULT_11 2000;
+    VARIABLE LHS_12 2000;
+    VARIABLE RHS_12 2;
+    VARIABLE RESULT_12 4000;
+    VARIABLE LHS_13 2000;
+    VARIABLE RHS_13 2000;
+    VARIABLE RESULT_13 2000;
+    VARIABLE LHS_14 2000;
+    VARIABLE RHS_14 4000;
+    VARIABLE RESULT_14 4000;
+    VARIABLE LHS_15 4000;
+    VARIABLE RHS_15 1;
+    VARIABLE RESULT_15 4000;
+    VARIABLE LHS_16 4000;
+    VARIABLE RHS_16 2;
+    VARIABLE RESULT_16 4000;
+    VARIABLE LHS_17 4000;
+    VARIABLE RHS_17 2000;
+    VARIABLE RESULT_17 4000;
+    VARIABLE LHS_18 4000;
+    VARIABLE RHS_18 4000;
+    VARIABLE RESULT_18 4000;
+
+    { Initialize DA system for tests that use DA/CD types }
+    { DAINI: order 10, number_of_variables 6, mode 0 (see COSY manual) }
+    DAINI 10 6 0 NM;
+
+    { Test 0: RE - RE => RE }
+    LHS_0 := 2;
+    RHS_0 := 1;
+    RESULT_0 := LHS_0 - RHS_0;
+    WRITE 6 RESULT_0;
+
+    { Test 1: RE - CM => CM }
+    LHS_1 := 3;
+    RHS_1 := CM(1&2);
+    RESULT_1 := LHS_1 - RHS_1;
+    WRITE 6 RESULT_1;
+
+    { Test 2: RE - VE => VE }
+    LHS_2 := 5;
+    RHS_2 := 1&2;
+    RESULT_2 := LHS_2 - RHS_2;
+    WRITE 6 RESULT_2;
+
+    { Test 3: RE - DA => DA }
+    LHS_3 := 4;
+    RHS_3 := DA(1);
+    RESULT_3 := LHS_3 - RHS_3;
+    WRITE 6 RESULT_3;
+
+    { Test 4: RE - CD => CD }
+    LHS_4 := 5;
+    RHS_4 := DA(1)+CM(1&2)*DA(2);
+    RESULT_4 := LHS_4 - RHS_4;
+    WRITE 6 RESULT_4;
+
+    { Test 5: CM - RE => CM }
+    LHS_5 := CM(3&4);
+    RHS_5 := 2;
+    RESULT_5 := LHS_5 - RHS_5;
+    WRITE 6 RESULT_5;
+
+    { Test 6: CM - CM => CM }
+    LHS_6 := CM(5&6);
+    RHS_6 := CM(7&8);
+    RESULT_6 := LHS_6 - RHS_6;
+    WRITE 6 RESULT_6;
+
+    { Test 7: CM - DA => CD }
+    LHS_7 := CM(1&2);
+    RHS_7 := DA(1);
+    RESULT_7 := LHS_7 - RHS_7;
+    WRITE 6 RESULT_7;
+
+    { Test 8: CM - CD => CD }
+    LHS_8 := CM(1&2);
+    RHS_8 := DA(1)+CM(3&4)*DA(2);
+    RESULT_8 := LHS_8 - RHS_8;
+    WRITE 6 RESULT_8;
+
+    { Test 9: VE - RE => VE }
+    LHS_9 := 3&4;
+    RHS_9 := 3;
+    RESULT_9 := LHS_9 - RHS_9;
+    WRITE 6 RESULT_9;
+
+    { Test 10: VE - VE => VE }
+    LHS_10 := 5&6;
+    RHS_10 := 7&8;
+    RESULT_10 := LHS_10 - RHS_10;
+    WRITE 6 RESULT_10;
+
+    { Test 11: DA - RE => DA }
+    LHS_11 := DA(1);
+    RHS_11 := 3;
+    RESULT_11 := LHS_11 - RHS_11;
+    WRITE 6 RESULT_11;
+
+    { Test 12: DA - CM => CD }
+    LHS_12 := DA(1);
+    RHS_12 := CM(1&2);
+    RESULT_12 := LHS_12 - RHS_12;
+    WRITE 6 RESULT_12;
+
+    { Test 13: DA - DA => DA }
+    LHS_13 := DA(2);
+    RHS_13 := DA(3);
+    RESULT_13 := LHS_13 - RHS_13;
+    WRITE 6 RESULT_13;
+
+    { Test 14: DA - CD => CD }
+    LHS_14 := DA(1);
+    RHS_14 := DA(2)+CM(1&2)*DA(3);
+    RESULT_14 := LHS_14 - RHS_14;
+    WRITE 6 RESULT_14;
+
+    { Test 15: CD - RE => CD }
+    LHS_15 := DA(1)+CM(1&2)*DA(2);
+    RHS_15 := 4;
+    RESULT_15 := LHS_15 - RHS_15;
+    WRITE 6 RESULT_15;
+
+    { Test 16: CD - CM => CD }
+    LHS_16 := DA(1)+CM(1&2)*DA(2);
+    RHS_16 := CM(3&4);
+    RESULT_16 := LHS_16 - RHS_16;
+    WRITE 6 RESULT_16;
+
+    { Test 17: CD - DA => CD }
+    LHS_17 := DA(1)+CM(1&2)*DA(2);
+    RHS_17 := DA(3);
+    RESULT_17 := LHS_17 - RHS_17;
+    WRITE 6 RESULT_17;
+
+    { Test 18: CD - CD => CD }
+    LHS_18 := DA(1)+CM(1&2)*DA(2);
+    RHS_18 := DA(3)+CM(5&6)*DA(4);
+    RESULT_18 := LHS_18 - RHS_18;
+    WRITE 6 RESULT_18;
+
+ENDPROCEDURE;
+
+RUN;
+END;
