@@ -1,6 +1,5 @@
 /target
 /.direnv
-/cosy_examples
 .envrc
 */target
 .rosy_output
