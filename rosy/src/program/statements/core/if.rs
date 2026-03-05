@@ -146,13 +146,13 @@ impl Transpile for ElseIfClause {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
-        // Verify the start, end, and step expressions are REs
+        // Verify the condition is a logical expression
         let condition_type = self.condition
             .type_of(context)
             .context("...while determining type of ELSEIF condition expression")
             .map_err(|e| vec!(e))?;
         if condition_type != RosyType::LO() {
-            return Err(vec!(anyhow!("Loop start expression must be of type 'RE', found '{condition_type}'")));
+            return Err(vec!(anyhow!("ELSEIF condition must be of type 'LO' (logical), found '{condition_type}'")));
         }
 
         let mut requested_variables = BTreeSet::new();
@@ -186,7 +186,7 @@ impl Transpile for ElseIfClause {
                     },
                     Err(stmt_errors) => {
                         for e in stmt_errors {
-                            errors.push(e.context("...while transpiling statement in loop"));
+                            errors.push(e.context("...while transpiling statement in ELSEIF body"));
                         }
                     }
                 }
@@ -214,13 +214,13 @@ impl Transpile for IfStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
-        // Verify the start, end, and step expressions are REs
+        // Verify the condition is a logical expression
         let condition_type = self.condition
             .type_of(context)
             .context("...while determining type of IF condition expression")
             .map_err(|e| vec!(e))?;
         if condition_type != RosyType::LO() {
-            return Err(vec!(anyhow!("Loop start expression must be of type 'RE', found '{condition_type}'")));
+            return Err(vec!(anyhow!("IF condition must be of type 'LO' (logical), found '{condition_type}'")));
         }
 
         let mut requested_variables = BTreeSet::new();
@@ -296,7 +296,7 @@ impl Transpile for IfStatement {
                     },
                     Err(stmt_errors) => {
                         for e in stmt_errors {
-                            errors.push(e.context("...while transpiling statement in loop"));
+                            errors.push(e.context("...while transpiling statement in ELSE body"));
                         }
                     }
                 }

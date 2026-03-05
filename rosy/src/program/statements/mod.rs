@@ -292,7 +292,10 @@ impl Transpile for Statement {
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         self.inner.transpile(context)
             .map_err(|err_vec| {
-                add_context_to_all(err_vec, format!("...while transpiling statement: {:?}", self.enum_variant))
+                add_context_to_all(err_vec, format!(
+                    "...while transpiling {:?} at {}",
+                    self.enum_variant, self.source_location
+                ))
             })
     }
 }
