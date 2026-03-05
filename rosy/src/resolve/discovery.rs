@@ -463,19 +463,6 @@ impl TypeResolver {
         ctx: &ScopeContext,
     ) -> Result<()> {
         match &expr.enum_variant {
-            ExprEnum::FunctionCall => {
-                if let Some(func_call) = expr.inner.as_any()
-                    .downcast_ref::<core::function_call::FunctionCallExpr>()
-                {
-                    self.discover_call_site_deps(
-                        &func_call.name, &func_call.args, true, ctx
-                    )?;
-                    // Recurse into the arguments too
-                    for arg in &func_call.args {
-                        self.discover_expr_function_calls(arg, ctx)?;
-                    }
-                }
-            }
             ExprEnum::Add => {
                 if let Some(e) = expr.inner.as_any().downcast_ref::<operators::add::AddExpr>() {
                     self.discover_expr_function_calls(&e.left, ctx)?;
@@ -628,45 +615,7 @@ impl TypeResolver {
                 } else {
                     ExprRecipe::Unknown
                 }
-            }
-            ExprEnum::FunctionCall => {
-                if let Some(func_call) = expr.inner.as_any()
-                    .downcast_ref::<core::function_call::FunctionCallExpr>()
-                {
-                    if let Some((ret_slot, param_slots)) = ctx.functions.get(&func_call.name) {
-                        deps.insert(ret_slot.clone());
-
-                        // Also discover call-site arg dependencies inline
-                        for (i, arg_expr) in func_call.args.iter().enumerate() {
-                            if let Some((_, param_slot)) = param_slots.get(i) {
-                                // Only wire up if param is unresolved
-                                let is_unresolved = self.nodes.get(param_slot)
-                                    .map_or(false, |n| n.resolved.is_none());
-
-                                if is_unresolved {
-                                    let mut arg_deps = HashSet::new();
-                                    let recipe = self.build_expr_recipe(arg_expr, ctx, &mut arg_deps);
-
-                                    // We can't mutate nodes here (borrow checker), so
-                                    // just collect the arg expression deps for the
-                                    // outer expression. The actual param slot wiring
-                                    // is done by discover_call_site_deps for statement-
-                                    // level calls and by WRITE/assign discovery for
-                                    // expression-level calls.
-                                    deps.extend(arg_deps);
-                                    let _ = recipe;
-                                }
-                            }
-                        }
-
-                        ExprRecipe::FunctionCall(ret_slot.clone())
-                    } else {
-                        ExprRecipe::Unknown
-                    }
-                } else {
-                    ExprRecipe::Unknown
-                }
-            }
+            },
             ExprEnum::Sin => {
                 if let Some(sin_expr) = expr.inner.as_any()
                     .downcast_ref::<functions::math::trig::sin::SinExpr>()

@@ -252,11 +252,6 @@ impl TypeResolver {
                     .and_then(|n| n.resolved.clone())
                     .ok_or_else(|| anyhow!("Variable slot {} not resolved", slot))
             }
-            ExprRecipe::FunctionCall(ret_slot) => {
-                self.nodes.get(ret_slot)
-                    .and_then(|n| n.resolved.clone())
-                    .ok_or_else(|| anyhow!("Function return slot {} not resolved", ret_slot))
-            }
             ExprRecipe::BinaryOp { op, left, right } => {
                 let left_type = self.evaluate_recipe(left)?;
                 let right_type = self.evaluate_recipe(right)?;

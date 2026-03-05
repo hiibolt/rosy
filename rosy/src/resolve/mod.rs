@@ -111,8 +111,6 @@ enum ExprRecipe {
     BinaryOp { op: BinaryOpKind, left: Box<ExprRecipe>, right: Box<ExprRecipe> },
     /// An n-ary concat of sub-recipes.
     Concat(Vec<ExprRecipe>),
-    /// A function call — result is the function's return type slot.
-    FunctionCall(TypeSlot),
     /// SIN intrinsic — result depends on input type.
     Sin(Box<ExprRecipe>),
     /// Expression whose type couldn't be determined statically.

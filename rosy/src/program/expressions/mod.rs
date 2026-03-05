@@ -89,7 +89,6 @@ pub enum ExprEnum {
     Lcd,
     Neg,
     Derive,
-    FunctionCall,
 }
 
 impl FromRule for Expr {
