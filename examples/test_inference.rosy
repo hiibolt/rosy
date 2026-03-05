@@ -8,7 +8,7 @@ BEGIN;
         VARIABLE X;
         X := 3;
         
-        VARIABLE Y;
+        VARIABLE Y 4 ;
         Y := 4;
 
         WRITE 6 "Result: " ST(ADDTWONUMS(X, Y));

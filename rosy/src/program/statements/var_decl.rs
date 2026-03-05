@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};
 
 use crate::{
-    ast::*, program::expressions::Expr, rosy_lib::{RosyBaseType, RosyType}, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TypeOf, VariableData, VariableScope}
+    ast::*, program::expressions::Expr, rosy_lib::{RosyBaseType, RosyType}, syntax_config, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TypeOf, VariableData, VariableScope}
 };
 
 #[derive(Debug)]
@@ -117,9 +117,7 @@ impl FromRule for VarDeclStatement {
             (None, Vec::new(), name)
         };
 
-        // Parse COSY-style memory size expressions (e.g. `VARIABLE X 100 N ;`)
-        // In COSY: first memory_size = allocation hint (ignored by Rosy)
-        //          additional memory_sizes = array dimensions
+        // Collect all memory_size expressions from the grammar
         let mut memory_sizes: Vec<Expr> = Vec::new();
         for mem_pair in inner {
             if mem_pair.as_rule() == Rule::memory_size {
@@ -133,9 +131,28 @@ impl FromRule for VarDeclStatement {
             }
         }
 
-        // First memory_size is allocation (ignored), rest are array dimensions
-        if memory_sizes.len() > 1 {
-            dimension_exprs.extend(memory_sizes.into_iter().skip(1));
+        // Apply syntax-mode-specific validation and semantics
+        if syntax_config::is_cosy_syntax() {
+            // ── COSY mode ──
+            // Memory size is REQUIRED as the first expression after the name.
+            // It is parsed and discarded (Rosy handles memory automatically).
+            // Any additional expressions are array dimensions.
+            if memory_sizes.is_empty() {
+                anyhow::bail!(
+                    "COSY syntax mode requires a memory size in VARIABLE declarations.\n\
+                     Expected: VARIABLE {name} <memory_size> ;\n\
+                     Hint: If you intended to use Rosy syntax, remove the `--cosy-syntax` flag."
+                );
+            }
+            // First memory_size is allocation hint (discarded), rest are array dimensions
+            if memory_sizes.len() > 1 {
+                dimension_exprs.extend(memory_sizes.into_iter().skip(1));
+            }
+        } else {
+            // ── Rosy mode (default) ──
+            // Memory sizes are NOT a concept — all expressions after the name
+            // are treated as array dimensions.
+            dimension_exprs.extend(memory_sizes);
         }
 
         let data = VariableDeclarationData {

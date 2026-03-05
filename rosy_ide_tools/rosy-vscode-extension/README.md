@@ -12,6 +12,9 @@ This extension provides syntax highlighting and basic language support for the R
 ## Installation
 
 1. Copy this extension to your VSCode extensions directory
+    ```
+    cp -r "$PWD/rosy_ide_tools/rosy-vscode-extension" "$HOME/.vscode/extensions"
+    ```
 2. Reload VSCode
 3. Open any .rosy file to see syntax highlighting
 

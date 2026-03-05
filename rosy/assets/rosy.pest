@@ -47,8 +47,9 @@ openfb = { ^"OPENFB" ~ expr ~ expr ~ expr ~ semicolon }
 closef = { ^"CLOSEF" ~ expr ~ semicolon }
 
 /// VARIABLE
-/// Supports both Rosy-style `VARIABLE (RE) name ;` and COSY-style `VARIABLE name expr ;`
-/// The COSY memory size expression is parsed but ignored (Rosy handles memory automatically)
+/// In Rosy mode (default): `VARIABLE (RE) name dim1 dim2 ;` — all trailing exprs are dimensions.
+/// In COSY mode (--cosy-syntax): `VARIABLE name memsize dim1 ;` — first expr is required memory size (discarded).
+/// Validation of which mode applies is done in AST construction, not grammar.
 var_decl = { ^"VARIABLE" ~ type? ~ variable_name ~ memory_size* ~ semicolon }
 memory_size = { expr }
 

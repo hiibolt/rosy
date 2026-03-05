@@ -1,7 +1,7 @@
 use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
-    ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile}
+    ast::*, program::expressions::Expr, syntax_config, transpile::{TranspilationInputContext, TranspilationOutput, Transpile}
 };
 
 #[derive(Debug)]
@@ -35,13 +35,29 @@ impl FromRule for DAInitStatement {
         if let Some(third_pair) = inner.next() {
             let _third_expr = Expr::from_rule(third_pair)
                 .context("Failed to build 3rd expression in DAINI statement!")?;
-            eprintln!("[rosy] Note: DAINI 3rd argument (output unit) ignored — Rosy handles this automatically~");
+            if !syntax_config::is_cosy_syntax() {
+                eprintln!("[rosy] Note: DAINI 3rd argument (output unit) ignored — Rosy handles this automatically~");
+            }
             
             if let Some(fourth_pair) = inner.next() {
                 let _fourth_expr = Expr::from_rule(fourth_pair)
                     .context("Failed to build 4th expression in DAINI statement!")?;
-                eprintln!("[rosy] Note: DAINI 4th argument (num monomials out) ignored — Rosy handles this automatically~");
+                if !syntax_config::is_cosy_syntax() {
+                    eprintln!("[rosy] Note: DAINI 4th argument (num monomials out) ignored — Rosy handles this automatically~");
+                }
+            } else if syntax_config::is_cosy_syntax() {
+                anyhow::bail!(
+                    "COSY syntax mode requires all 4 arguments in DAINI statements.\n\
+                     Expected: DAINI <order> <nvars> <output_unit> <num_monomials> ;\n\
+                     Hint: If you intended to use Rosy syntax, remove the `--cosy-syntax` flag."
+                );
             }
+        } else if syntax_config::is_cosy_syntax() {
+            anyhow::bail!(
+                "COSY syntax mode requires all 4 arguments in DAINI statements.\n\
+                 Expected: DAINI <order> <nvars> <output_unit> <num_monomials> ;\n\
+                 Hint: If you intended to use Rosy syntax, remove the `--cosy-syntax` flag."
+            );
         }
         
         Ok(Some(DAInitStatement {

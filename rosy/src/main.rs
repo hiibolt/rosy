@@ -3,6 +3,7 @@ mod ast;
 mod embedded;
 mod program;
 mod resolve;
+mod syntax_config;
 #[allow(unused_imports, dead_code)]
 mod rosy_lib;
 
@@ -37,6 +38,10 @@ enum Commands {
         /// Build in release mode with optimizations
         #[arg(short, long)]
         release: bool,
+
+        /// Enforce COSY INFINITY syntax: memory sizes are required in VARIABLE declarations
+        #[arg(long)]
+        cosy_syntax: bool,
     },
     
     /// Build a ROSY script and place the binary in PWD
@@ -55,6 +60,10 @@ enum Commands {
         /// Build in release mode with optimizations
         #[arg(short, long)]
         release: bool,
+
+        /// Enforce COSY INFINITY syntax: memory sizes are required in VARIABLE declarations
+        #[arg(long)]
+        cosy_syntax: bool,
     },
 }
 
@@ -156,7 +165,8 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Run { source, output_dir, release } => {
+        Commands::Run { source, output_dir, release, cosy_syntax } => {
+            syntax_config::set_cosy_syntax(cosy_syntax);
             info!("Running ROSY script: {}", source.display());
             let binary_path = rosy(&source, output_dir, release)?;
             info!("Compilation successful! Binary remains at: {}", binary_path.display());
@@ -169,7 +179,8 @@ fn main() -> Result<()> {
             ensure!(status.success(), "Execution failed with exit code: {:?}", status.code());
         }
         
-        Commands::Build { source, output, output_dir, release } => {
+        Commands::Build { source, output, output_dir, release, cosy_syntax } => {
+            syntax_config::set_cosy_syntax(cosy_syntax);
             info!("Building ROSY script: {}", source.display());
             let binary_path = rosy(&source, output_dir, release)?;
             
