@@ -2,16 +2,7 @@
 //!
 //! A modern Rust-based programming language based on the COSY INFINITY syntax,
 //! designed for scientific computing and beam physics applications.
-//!
-//! ## Overview
-//!
-//! Rosy converts source code into self-contained, native Rust executables
-//! via a three-stage pipeline:
-//!
-//! 1. **Parsing** — A PEG grammar ([`rosy.pest`](../assets/rosy.pest)) parsed via `pest`
-//! 2. **AST Generation** — Typed AST nodes built from the parse tree (see [`program`])
-//! 3. **Transpilation** — Rust code generation with an embedded runtime (see [`transpile`])
-//!
+//! 
 //! ## Quick Start
 //!
 //! ```bash
@@ -59,17 +50,15 @@
 //! | `DA` | Differential Algebra (Taylor series) | `DA` |
 //! | `CD` | Complex Differential Algebra | `CD` |
 //!
-//! Multi-dimensional arrays are supported: `(RE ** 2)` is a 2D array of reals.
+//! Multi-dimensional arrays are supported: `(RE 2 2)` is a 2x2 VE of reals.
 //!
-//! ## Navigating the Documentation
-//!
+//! ## Ways to Learn Rosy
+//! ### View All Language Features and Documentation
 //! - **[`program`]** — The AST structure: expressions and statements
 //!   - [`program::expressions`] — All expression types (operators, functions, literals, etc.)
 //!   - [`program::statements`] — All statement types (control flow, I/O, declarations, etc.)
-//! - **[`transpile`]** — The transpilation traits and context
-//! - **[`rosy_lib`]** — The embedded runtime (operators, intrinsics, type system)
-//! - **[`ast`]** — Parser and grammar definitions
-//! - **[`resolve`]** — Type inference and resolution
+//! ### View Example Rosy Programs
+//! - **[Link to GitHub](https://github.com/hiibolt/rosy/tree/master/examples)** — A collection of example Rosy scripts demonstrating various features and use cases
 //!
 //! ## IDE Support
 //!
