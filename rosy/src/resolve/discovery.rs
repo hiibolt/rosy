@@ -207,7 +207,13 @@ impl TypeResolver {
                     if node.resolved.is_some() {
                         // Already has an explicit type — check that the new
                         // assignment is compatible (if evaluable now).
-                        let explicit_type = node.resolved.as_ref().unwrap().clone();
+                        // Account for indexing on the LHS: X[I, J] := expr
+                        // means we're assigning to a sub-element, so reduce
+                        // the declared dimensions by the number of indices.
+                        let mut explicit_type = node.resolved.as_ref().unwrap().clone();
+                        let num_indices = assign.identifier.num_index_dimensions();
+                        explicit_type.dimensions = explicit_type.dimensions
+                            .saturating_sub(num_indices);
                         if let Ok(new_type) = self.evaluate_recipe(&recipe) {
                             if new_type != explicit_type {
                                 let scope_str = if ctx.scope_path.is_empty() {
@@ -603,7 +609,7 @@ impl TypeResolver {
 
             ExprEnum::Var => {
                 if let Some(var_expr) = expr.inner.as_any()
-                    .downcast_ref::<core::var_expr::VarExpr>()
+                    .downcast_ref::<crate::program::expressions::core::var_expr::VarExpr>()
                 {
                     let ident = &var_expr.identifier;
                     if let Some(slot) = ctx.variables.get(&ident.name) {

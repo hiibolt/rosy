@@ -4,10 +4,6 @@ PROCEDURE RUN;
     VARIABLE I 1;
     VARIABLE N 1;
 
-    { COSY - VARIABLE X 100 N; }
-    { ROSY - VARIABLE X N; <- VE }
-    { ROSY - VARIABLE X N; <- RE }
-
     PROCEDURE ASCII_EXAMPLE;     {ASCII I/O}
         VARIABLE X 100 N;   {DA vector with N entries, each entry has 100 memory locations}
         VARIABLE Y N;       {A vector of length N}

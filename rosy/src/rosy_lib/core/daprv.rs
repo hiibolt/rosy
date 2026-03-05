@@ -21,11 +21,11 @@ use crate::rosy_lib::core::display::RosyDisplay;
 pub fn rosy_daprv(
     array: &Vec<DA>,
     num_components: usize,
-    max_vars: usize,
+    _max_vars: usize,
     current_vars: usize,
     unit: u64,
 ) -> Result<()> {
-    let output = format_daprv(array, num_components, max_vars, current_vars)?;
+    let output = format_daprv(array, num_components, _max_vars, current_vars)?;
 
     if unit == 6 {
         print!("{}", output);
@@ -44,7 +44,7 @@ pub fn rosy_daprv(
 fn format_daprv(
     array: &Vec<DA>,
     num_components: usize,
-    max_vars: usize,
+    _max_vars: usize,
     current_vars: usize,
 ) -> Result<String> {
     let mut output = String::new();
@@ -121,7 +121,7 @@ fn format_daprv(
 pub fn rosy_darev(
     array: &mut Vec<DA>,
     num_components: usize,
-    max_vars: usize,
+    _max_vars: usize,
     current_vars: usize,
     unit: u64,
 ) -> Result<()> {
@@ -129,7 +129,7 @@ pub fn rosy_darev(
     let mut lines = Vec::new();
     
     // Read the header line
-    let header = crate::rosy_lib::core::file_io::rosy_read_from_unit(unit)
+    let _header = crate::rosy_lib::core::file_io::rosy_read_from_unit(unit)
         .context("Failed to read header line in DAREV")?;
     
     // Read coefficient lines until we hit the separator
