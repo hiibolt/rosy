@@ -1,3 +1,25 @@
+//! # FUNCTION Definition
+//!
+//! Defines a user function that returns a value. Functions capture
+//! variables from their enclosing scope as closures.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! FUNCTION [type] name arg1 [arg2 ...];
+//!     <statements>
+//! ENDFUNCTION name result;
+//! ```
+//!
+//! ## Example
+//!
+//! ```text
+//! FUNCTION RE SQUARE X;
+//!     VARIABLE (RE) result;
+//!     result := X * X;
+//! ENDFUNCTION SQUARE result;
+//! ```
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};
 
@@ -5,6 +27,7 @@ use crate::{
     ast::*, rosy_lib::RosyType, program::statements::*, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationInputFunctionContext, TranspilationOutput, Transpile, VariableData, VariableScope, indent}
 };
 
+/// AST node for a user-defined function declaration.
 #[derive(Debug)]
 pub struct FunctionStatement {
     pub name: String,

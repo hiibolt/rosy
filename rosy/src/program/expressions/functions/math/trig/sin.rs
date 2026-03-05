@@ -1,3 +1,29 @@
+//! # SIN Function
+//!
+//! Computes the sine of a value.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! SIN(expr)
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Input | Result |
+//! |-------|--------|
+//! | RE | RE |
+//! | CM | CM |
+//! | VE | VE |
+//! | DA | DA |
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (RE) x;
+//! x := SIN(3.14159 / 2);   { ≈ 1.0 }
+//! ```
+
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
@@ -5,6 +31,7 @@ use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
 use std::collections::BTreeSet;
 
+/// AST node for the `SIN(expr)` intrinsic function.
 #[derive(Debug, PartialEq)]
 pub struct SinExpr {
     pub expr: Box<Expr>,

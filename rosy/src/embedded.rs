@@ -1,3 +1,14 @@
+//! # Embedded Runtime Scaffolding
+//!
+//! Writes the vendored `rosy_lib` runtime and project scaffolding (Cargo.toml,
+//! main.rs template) into the generated output directory. This makes every
+//! transpiled project self-contained — it compiles without depending on the
+//! rosy transpiler installation.
+//!
+//! The `rosy_lib` source files are embedded into the transpiler binary at
+//! compile time via `include_str!()` (see `build.rs`). At transpilation time,
+//! they are extracted and path-rewritten (`crate::rosy_lib::` → `crate::`).
+
 use std::path::Path;
 use anyhow::{Context, Result};
 

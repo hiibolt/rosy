@@ -1,3 +1,14 @@
+//! # LO — Boolean Literal
+//!
+//! Logical literals `TRUE` and `FALSE`. Produce the `LO` type.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! TRUE
+//! FALSE
+//! ```
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Error, bail};
 

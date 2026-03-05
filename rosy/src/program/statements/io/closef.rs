@@ -1,3 +1,19 @@
+//! # CLOSEF Statement
+//!
+//! Closes a file unit previously opened with `OPENF` or `OPENFB`.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! CLOSEF unit;
+//! ```
+//!
+//! ## Example
+//!
+//! ```text
+//! CLOSEF 10;
+//! ```
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
 
@@ -5,6 +21,7 @@ use crate::{
     ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, add_context_to_all}
 };
 
+/// AST node for `CLOSEF unit;`.
 /// CLOSEF unit ;
 #[derive(Debug)]
 pub struct ClosefStatement {

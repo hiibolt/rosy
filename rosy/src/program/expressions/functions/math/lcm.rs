@@ -1,3 +1,20 @@
+//! # LCM Function (Complex Memory Estimate)
+//!
+//! Returns the complex-number memory size estimate. This is a COSY INFINITY
+//! compatibility function — returns `2*n` as a `RE`.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! LCM(expr)
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Input | Result |
+//! |-------|--------|
+//! | RE | RE |
+
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
@@ -5,8 +22,8 @@ use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
 use std::collections::BTreeSet;
 
-/// LCM(n) - Complex memory size estimator (COSY compatibility).
-/// Returns 2*n as RE (Rosy doesn't need memory management).
+/// LCM(n) — Complex memory size estimator (COSY compatibility).
+/// Returns `2*n` as RE. Rosy doesn't need memory management.
 #[derive(Debug, PartialEq)]
 pub struct LcmExpr {
     pub expr: Box<Expr>,

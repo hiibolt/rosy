@@ -1,3 +1,25 @@
+//! # Unary Negation (`-expr`)
+//!
+//! Negates a numeric value. Transpiled as `0 - expr` using the subtraction operator.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! -expr
+//! ```
+//!
+//! ## Supported Types
+//!
+//! Any type that supports `RE - T`, including RE, CM, VE, DA, CD.
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (RE) x;
+//! x := -5;               { unary negation }
+//! x := -(3 + 4);         { negation of expression }
+//! ```
+
 use std::collections::BTreeSet;
 
 use anyhow::{Result, Error, anyhow};

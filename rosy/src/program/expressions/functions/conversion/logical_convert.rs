@@ -1,3 +1,20 @@
+//! # LO() — Logical Conversion
+//!
+//! Converts a value to a logical (boolean) type.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! LO(expr)
+//! ```
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (LO) flag;
+//! flag := LO(1);         { TRUE (nonzero = true) }
+//! ```
+
 use crate::ast::{FromRule, Rule};
 use crate::transpile::TranspileWithType;
 use crate::program::expressions::Expr;
@@ -5,6 +22,7 @@ use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, Transpilati
 use anyhow::{Result, Error, anyhow, Context};
 use crate::rosy_lib::RosyType;
 
+/// AST node for the `LO(expr)` type conversion function.
 #[derive(Debug, PartialEq)]
 pub struct LogicalConvertExpr {
     pub expr: Box<Expr>,

@@ -1,3 +1,19 @@
+//! # RE — Numeric Literal
+//!
+//! Real number literals parsed as `f64`. The `FromRule`, `TypeOf`, and
+//! `Transpile` traits are implemented directly on `f64`.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! 3.14
+//! 42
+//! -7
+//! 1.23E-4
+//! ```
+//!
+//! All numeric literals produce the `RE` type.
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Error};
 

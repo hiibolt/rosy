@@ -1,3 +1,27 @@
+//! # Assignment Statement
+//!
+//! Assigns the result of an expression to a variable (optionally indexed).
+//!
+//! ## Syntax
+//!
+//! ```text
+//! name := expr;
+//! name(i) := expr;          { indexed assignment }
+//! name(i)(j) := expr;       { multi-dim indexed assignment }
+//! ```
+//!
+//! ## Type Checking
+//!
+//! The right-hand side expression must be type-compatible with the target
+//! variable. Indexed assignments check that the resulting element type matches.
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (RE) x;
+//! x := 42;
+//! ```
+
 use std::collections::BTreeSet;
 
 use crate::{ast::*, program::expressions::{Expr, core::variable_identifier::VariableIdentifier}, transpile::{TypeOf, VariableScope}};
@@ -5,6 +29,7 @@ use crate::rosy_lib::{RosyType, RosyBaseType};
 use super::super::super::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Context, Error, anyhow, ensure};
 
+/// AST node for the assignment statement `name := expr;`.
 #[derive(Debug)]
 pub struct AssignStatement {
     pub identifier: VariableIdentifier,

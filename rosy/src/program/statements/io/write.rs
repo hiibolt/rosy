@@ -1,3 +1,22 @@
+//! # WRITE Statement
+//!
+//! Writes formatted text to a unit (file or console).
+//!
+//! ## Syntax
+//!
+//! ```text
+//! WRITE unit expr1 [expr2 ...];
+//! ```
+//!
+//! Unit `6` writes to standard output. Each expression is converted
+//! to its string representation and printed.
+//!
+//! ## Example
+//!
+//! ```text
+//! WRITE 6 'x = ' x ' y = ' y;
+//! ```
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
 
@@ -5,6 +24,7 @@ use crate::{
     ast::*, program::expressions::{Expr, functions::conversion::string_convert::string_convert_transpile_helper}, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, add_context_to_all}
 };
 
+/// AST node for the `WRITE unit expr+;` statement.
 #[derive(Debug)]
 pub struct WriteStatement {
     pub unit: u8,

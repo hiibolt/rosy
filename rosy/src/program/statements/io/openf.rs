@@ -1,3 +1,25 @@
+//! # OPENF Statement
+//!
+//! Opens a text file and associates it with a unit number.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! OPENF unit filename status;
+//! ```
+//!
+//! - `unit` — numeric expression for the file unit
+//! - `filename` — string expression for the file path
+//! - `status` — string expression (`'NEW'`, `'OLD'`, `'UNKNOWN'`, `'APPEND'`)
+//!
+//! ## Example
+//!
+//! ```text
+//! OPENF 10 'output.txt' 'NEW';
+//! WRITE 10 'Hello, file!';
+//! CLOSEF 10;
+//! ```
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
 
@@ -5,6 +27,7 @@ use crate::{
     ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, add_context_to_all}
 };
 
+/// AST node for `OPENF unit filename status;`.
 /// OPENF unit filename status ;
 #[derive(Debug)]
 pub struct OpenfStatement {

@@ -1,9 +1,29 @@
+//! # ST() — String Conversion
+//!
+//! Converts any value to its string representation.
+//! Commonly used in `WRITE` statements for output formatting.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! ST(expr)
+//! ```
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (RE) x;
+//! x := 42;
+//! WRITE 6 'The answer is: ' ST(x);
+//! ```
+
 use crate::ast::{FromRule, Rule};
 use crate::transpile::*;
 use crate::program::expressions::Expr;
 use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, anyhow, Context};
 
+/// AST node for the `ST(expr)` type conversion function.
 #[derive(Debug, PartialEq)]
 pub struct StringConvertExpr {
     pub expr: Box<Expr>,

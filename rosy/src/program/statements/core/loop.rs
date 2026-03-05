@@ -1,3 +1,30 @@
+//! # LOOP Statement (Counted Loop)
+//!
+//! Iterates a variable from a start value to an end value with an optional step.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! LOOP i start end [step];
+//!     <statements>
+//! ENDLOOP;
+//! ```
+//!
+//! If `step` is omitted, it defaults to `1`. The loop variable `i` is
+//! automatically declared as `RE` within the loop scope.
+//!
+//! ## Example
+//!
+//! ```text
+//! LOOP I 1 10;
+//!     WRITE 6 I;
+//! ENDLOOP;
+//!
+//! LOOP J 0 1 0.1;       { step of 0.1 }
+//!     WRITE 6 J;
+//! ENDLOOP;
+//! ```
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};
 
@@ -5,6 +32,7 @@ use crate::{
     ast::*, program::expressions::Expr, rosy_lib::RosyType, program::statements::Statement, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TypeOf, VariableData, VariableScope, indent}
 };
 
+/// AST node for the counted `LOOP i start end [step]; ... ENDLOOP;` statement.
 #[derive(Debug)]
 pub struct LoopStatement {
     pub iterator: String,

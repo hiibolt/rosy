@@ -1,3 +1,20 @@
+//! # Less-Than Operator (`<`)
+//!
+//! Numeric or lexicographic less-than comparison. Returns `LO`.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! expr < expr
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Left | Right | Result | Comment |
+//! |------|-------|--------|---------|
+//! | RE | RE | LO | Numeric less-than |
+//! | ST | ST | LO | Lexicographic ordering |
+
 use std::collections::BTreeSet;
 
 use crate::ast::{FromRule, Rule};
@@ -7,6 +24,7 @@ use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, Transpilati
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
 
+/// AST node for the less-than operator (`<`).
 #[derive(Debug, PartialEq)]
 pub struct LtExpr {
     pub left: Box<Expr>,

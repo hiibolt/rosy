@@ -1,3 +1,21 @@
+//! # WRITEB Statement (Binary Write)
+//!
+//! Writes values in binary format to a file unit.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! WRITEB unit expr1 [expr2 ...];
+//! ```
+//!
+//! ## Example
+//!
+//! ```text
+//! OPENFB 11 'data.bin' 'NEW';
+//! WRITEB 11 myVector;
+//! CLOSEF 11;
+//! ```
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
 
@@ -5,6 +23,7 @@ use crate::{
     ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, add_context_to_all}
 };
 
+/// AST node for `WRITEB unit expr+;`.
 /// WRITEB unit expr+ ;
 #[derive(Debug)]
 pub struct WritebStatement {

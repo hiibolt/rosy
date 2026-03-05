@@ -1,3 +1,27 @@
+//! # Power Operator (`^`)
+//!
+//! Raises a value to a power. Parsed as an infix operator.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! expr ^ expr
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Left | Right | Result | Comment |
+//! |------|-------|--------|---------|
+//! | RE | RE | RE | |
+//! | VE | RE | VE | Raise to Real power componentwise |
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (RE) x;
+//! x := 2 ^ 10;          { 1024 }
+//! ```
+
 use std::collections::BTreeSet;
 
 use crate::ast::{FromRule, Rule};
@@ -7,6 +31,7 @@ use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, Transpilati
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
 
+/// AST node for the power/exponentiation operator (`^`).
 #[derive(Debug, PartialEq)]
 pub struct PowExpr {
     pub left: Box<Expr>,

@@ -1,3 +1,31 @@
+//! # Parser & AST Infrastructure
+//!
+//! PEG grammar integration via [pest](https://pest.rs) and the Pratt parser
+//! for expression precedence.
+//!
+//! ## Grammar
+//!
+//! The PEG grammar lives at `rosy/assets/rosy.pest` and defines all ROSY
+//! language constructs. The generated [`CosyParser`] provides parsing entry
+//! points.
+//!
+//! ## Operator Precedence
+//!
+//! The [`PRATT_PARSER`] defines expression operator precedence (lowest → highest):
+//!
+//! | Priority | Operators |
+//! |----------|-----------|
+//! | 2 | `&` `=` `#` `<` `>` `<=` `>=` |
+//! | 3 | `+` `-` |
+//! | 4 | `*` `/` |
+//! | 5 | `^` (right-assoc) |
+//! | 6 | `\|` `%` |
+//!
+//! ## FromRule Trait
+//!
+//! All AST nodes implement [`FromRule`] to construct themselves from a pest
+//! parse pair.
+
 use pest::pratt_parser::PrattParser;
 use pest_derive::Parser;
 use anyhow::{ensure, Context, Result};

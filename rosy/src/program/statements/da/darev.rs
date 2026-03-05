@@ -1,3 +1,14 @@
+//! # DAREV Statement
+//!
+//! Reads DA (Taylor series) array components from a file unit.
+//! Reverse of [`super::daprv`].
+//!
+//! ## Syntax
+//!
+//! ```text
+//! DAREV array num_components max_vars current_vars unit;
+//! ```
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
 
@@ -5,6 +16,7 @@ use crate::{
     ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, add_context_to_all}
 };
 
+/// AST node for `DAREV array num_components max_vars current_vars unit;`.
 /// DAREV array num_components max_vars current_vars unit ;
 #[derive(Debug)]
 pub struct DarevStatement {

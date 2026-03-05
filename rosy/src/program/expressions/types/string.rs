@@ -1,3 +1,17 @@
+//! # ST — String Literal
+//!
+//! String literals enclosed in single quotes. Escaped single quotes
+//! are written as `''` inside the string.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! 'hello world'
+//! 'it''s escaped'
+//! ```
+//!
+//! All string literals produce the `ST` type.
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Error};
 

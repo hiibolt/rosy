@@ -1,3 +1,30 @@
+//! # Variable Expressions & Function Call Disambiguation
+//!
+//! A `variable_identifier` in the parse tree can represent either a plain
+//! variable access (with optional indexing) or a user-defined function call.
+//!
+//! At transpile time, [`VarExpr::classify`] applies a decision tree to
+//! determine which interpretation is correct based on scope context.
+//!
+//! ## Decision Tree
+//!
+//! | Paren Groups | Args per Group | Bracket Indices | Result |
+//! |-------------|----------------|-----------------|--------|
+//! | 0 | — | any | Variable |
+//! | 1 | multiple | — | Function call |
+//! | 1 | 1 | — | Context-dependent |
+//! | ≥2 | 1 each | — | Multi-dim index (Variable) |
+//!
+//! ## Example
+//!
+//! ```text
+//! X              { Variable }
+//! X(3)           { Variable with 1D index, OR function call — resolved by context }
+//! X(I)(J)        { Variable with 2D indexing }
+//! MYFUNC(a, b)   { Function call (multiple args) }
+//! X[I,J]         { Variable with bracket indexing }
+//! ```
+
 use crate::ast::{FromRule, Rule};
 use super::variable_identifier::VariableIdentifier;
 use crate::transpile::TranspileWithType;

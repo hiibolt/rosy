@@ -1,3 +1,21 @@
+//! # Variable Identifier
+//!
+//! Parsed representation of a ROSY identifier with optional parenthesized
+//! arguments and/or bracket indices.
+//!
+//! ## Syntax Forms
+//!
+//! ```text
+//! NAME                    { plain identifier }
+//! NAME(expr)              { single index or single-arg function }
+//! NAME(expr)(expr)        { multi-dimensional indexing }
+//! NAME(expr, expr, ...)   { multi-arg function call }
+//! NAME[expr, expr]        { bracket indexing (vector element extraction) }
+//! ```
+//!
+//! The distinction between indexing and function call is resolved later
+//! by [`super::var_expr::VarExpr::classify`].
+
 use std::collections::BTreeSet;
 
 use crate::ast::Rule;
@@ -6,6 +24,7 @@ use crate::rosy_lib::RosyType;
 use crate::program::expressions::Expr;
 use anyhow::{Result, Context, Error, ensure};
 
+/// A parsed identifier with optional parenthesized arguments and bracket indices.
 #[derive(Debug, PartialEq)]
 pub struct VariableIdentifier {
     pub name: String,

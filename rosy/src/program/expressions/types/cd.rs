@@ -1,3 +1,21 @@
+//! # CD — Complex Differential Algebra Constructor
+//!
+//! Creates a CD (Complex Differential Algebra / complex Taylor series)
+//! value from a variable index.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! CD(n)          { creates CD identity for variable n }
+//! ```
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (CD) g;
+//! g := CD(1) + CD(2);    { g = x + y (complex Taylor) }
+//! ```
+
 use crate::{
     ast::{FromRule, Rule},
     program::expressions::Expr,
@@ -6,6 +24,7 @@ use crate::{
 use anyhow::{Error, Context};
 use crate::rosy_lib::RosyType;
 
+/// AST node for the `CD(n)` constructor expression.
 #[derive(Debug, PartialEq)]
 pub struct CDExpr {
     pub index: Box<Expr>,

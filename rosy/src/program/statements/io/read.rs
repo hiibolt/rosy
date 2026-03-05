@@ -1,3 +1,20 @@
+//! # READ Statement
+//!
+//! Reads a value from a unit (file or console) into a variable.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! READ unit variable;
+//! ```
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (RE) x;
+//! READ 5 x;              { read from unit 5 }
+//! ```
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};
 
@@ -5,6 +22,7 @@ use crate::{
     ast::*, program::expressions::core::variable_identifier::VariableIdentifier, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TypeOf}
 };
 
+/// AST node for the `READ unit variable;` statement.
 #[derive(Debug)]
 pub struct ReadStatement {
     pub unit: u8,

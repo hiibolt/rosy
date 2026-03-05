@@ -1,8 +1,33 @@
+//! # PROCEDURE Definition
+//!
+//! Defines a user procedure (subroutine with no return value).
+//! Procedures capture variables from their enclosing scope as closures
+//! and can modify them via mutable references.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! PROCEDURE name [arg1 arg2 ...];
+//!     <statements>
+//! ENDPROCEDURE;
+//! ```
+//!
+//! ## Example
+//!
+//! ```text
+//! PROCEDURE GREET NAME;
+//!     WRITE 6 'Hello, ' NAME;
+//! ENDPROCEDURE;
+//!
+//! GREET 'World';
+//! ```
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};
 
 use crate::{ast::*, program::statements::*, transpile::*};
 
+/// AST node for a user-defined procedure declaration.
 #[derive(Debug)]
 pub struct ProcedureStatement {
     pub name: String,

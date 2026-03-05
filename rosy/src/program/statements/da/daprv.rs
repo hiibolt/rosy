@@ -1,3 +1,13 @@
+//! # DAPRV Statement
+//!
+//! Prints DA (Taylor series) array components to a file unit.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! DAPRV array num_components max_vars current_vars unit;
+//! ```
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
 
@@ -5,6 +15,7 @@ use crate::{
     ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, add_context_to_all}
 };
 
+/// AST node for `DAPRV array num_components max_vars current_vars unit;`.
 /// DAPRV array num_components max_vars current_vars unit ;
 #[derive(Debug)]
 pub struct DaprvStatement {

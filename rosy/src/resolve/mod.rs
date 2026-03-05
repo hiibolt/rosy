@@ -1,3 +1,17 @@
+//! # Type Resolution
+//!
+//! Dependency-graph-based type inference pass that runs between AST
+//! construction and transpilation. Fills in `Option<RosyType>` fields
+//! left as `None` during parsing.
+//!
+//! ## Algorithm
+//!
+//! 1. Walk the AST to discover all "type slots" (variables, function args,
+//!    function return types, procedure args)
+//! 2. Build a dependency graph between unresolved slots
+//! 3. Topologically sort (Kahn's algorithm) and resolve from leaves inward
+//! 4. Report cycles as errors
+
 /// Type Resolution Module
 ///
 /// This module implements a **dependency-graph-based** type inference system for Rosy.

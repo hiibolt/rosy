@@ -1,9 +1,21 @@
+//! # Function Call Statement
+//!
+//! Calls a user-defined function as a statement (return value is discarded).
+//! This is the statement-level counterpart to function call expressions.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! FNAME arg1 [arg2 ...];
+//! ```
+
 use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
     ast::*, program::expressions::{Expr, core::var_expr::function_call_transpile_helper}, transpile::{TranspilationInputContext, TranspilationOutput, Transpile}
 };
 
+/// AST node for a function call used as a statement.
 #[derive(Debug)]
 pub struct FunctionCallStatement {
     pub name: String,

@@ -1,3 +1,11 @@
+//! # Syntax Configuration
+//!
+//! Global toggle for COSY INFINITY vs. Rosy syntax mode.
+//!
+//! When `--cosy-syntax` is passed on the CLI, COSY INFINITY syntax rules
+//! apply (e.g., VARIABLE declarations require a memory-size argument).
+//! The default is Rosy mode.
+
 /// Global syntax configuration for COSY vs Rosy syntax mode.
 ///
 /// When `--cosy-syntax` is passed, COSY INFINITY syntax is enforced:

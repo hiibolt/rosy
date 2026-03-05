@@ -1,3 +1,20 @@
+//! # Greater-Than-or-Equal Operator (`>=`)
+//!
+//! Numeric or lexicographic greater-than-or-equal comparison. Returns `LO`.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! expr >= expr
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Left | Right | Result | Comment |
+//! |------|-------|--------|---------|
+//! | RE | RE | LO | Numeric greater-than-or-equal |
+//! | ST | ST | LO | Lexicographic ordering |
+
 use std::collections::BTreeSet;
 
 use crate::ast::{FromRule, Rule};
@@ -7,6 +24,7 @@ use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, Transpilati
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
 
+/// AST node for the greater-than-or-equal operator (`>=`).
 #[derive(Debug, PartialEq)]
 pub struct GteExpr {
     pub left: Box<Expr>,

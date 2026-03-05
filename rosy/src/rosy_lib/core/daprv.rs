@@ -13,7 +13,7 @@ use crate::rosy_lib::core::display::RosyDisplay;
 /// Write an array of DA vectors in COSY INFINITY DAPRV format.
 ///
 /// Arguments:
-/// - `array`: the DA vector array (Vec<DA>)
+/// - `array`: the DA vector array (`Vec<DA>`)
 /// - `num_components`: number of components to print
 /// - `max_vars`: maximum number of variables in the expansion
 /// - `current_vars`: current number of main variables

@@ -1,3 +1,26 @@
+//! # Transpilation Engine
+//!
+//! Core traits and context types for converting the ROSY AST into Rust source code.
+//!
+//! ## Key Traits
+//!
+//! | Trait | Purpose |
+//! |-------|---------|
+//! | [`Transpile`] | Converts an AST node to a Rust code string |
+//! | [`TypeOf`] | Determines the ROSY type of an expression |
+//! | [`TranspileWithType`] | Combines both for expression nodes |
+//!
+//! ## Context
+//!
+//! [`TranspilationInputContext`] tracks variable scope, function/procedure
+//! signatures, and closure-captured variables during transpilation.
+//!
+//! ## Error Handling
+//!
+//! Transpilation returns `Result<TranspilationOutput, Vec<Error>>` to
+//! accumulate multiple errors before failing. Use `.context()` to add
+//! breadcrumbs for error diagnostics.
+
 use std::{any::Any, collections::{BTreeSet, HashMap}};
 use anyhow::{Result, Error};
 use crate::rosy_lib::RosyType;

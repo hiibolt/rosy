@@ -1,3 +1,24 @@
+//! # OPENFB Statement
+//!
+//! Opens a **binary** file and associates it with a unit number.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! OPENFB unit filename status;
+//! ```
+//!
+//! Same arguments as [`super::openf`] but the file is opened in binary mode
+//! for use with `WRITEB` / `READB`.
+//!
+//! ## Example
+//!
+//! ```text
+//! OPENFB 11 'data.bin' 'NEW';
+//! WRITEB 11 myVector;
+//! CLOSEF 11;
+//! ```
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
 
@@ -5,6 +26,7 @@ use crate::{
     ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, add_context_to_all}
 };
 
+/// AST node for `OPENFB unit filename status;`.
 /// OPENFB unit filename status ;
 #[derive(Debug)]
 pub struct OpenfbStatement {

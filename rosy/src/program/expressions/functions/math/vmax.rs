@@ -1,3 +1,28 @@
+//! # VMAX Function
+//!
+//! Returns the maximum element of a vector.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! VMAX(expr)
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Input | Result |
+//! |-------|--------|
+//! | VE | RE |
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (VE) v;
+//! VARIABLE (RE) m;
+//! v := 3 & 1 & 4 & 1 & 5;
+//! m := VMAX(v);          { 5.0 }
+//! ```
+
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
@@ -5,6 +30,7 @@ use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
 use std::collections::BTreeSet;
 
+/// AST node for the `VMAX(expr)` function (vector maximum).
 #[derive(Debug, PartialEq)]
 pub struct VmaxExpr {
     pub expr: Box<Expr>,

@@ -1,3 +1,29 @@
+//! # Not-Equal Operator (`<>`)
+//!
+//! Tests two values for inequality. Returns `LO` (logical/boolean).
+//!
+//! ## Syntax
+//!
+//! ```text
+//! expr <> expr
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Left | Right | Result | Comment |
+//! |------|-------|--------|---------|
+//! | RE | RE | LO | Not-equals with epsilon tolerance |
+//! | ST | ST | LO | String not-equals |
+//! | LO | LO | LO | Logical not-equals |
+//!
+//! ## Example
+//!
+//! ```text
+//! IF x <> 0;
+//!     WRITE 6 'x is not zero';
+//! ENDIF;
+//! ```
+
 use std::collections::BTreeSet;
 
 use crate::ast::{FromRule, Rule};
@@ -7,6 +33,7 @@ use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, Transpilati
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
 
+/// AST node for the not-equal operator (`<>`).
 #[derive(Debug, PartialEq)]
 pub struct NeqExpr {
     pub left: Box<Expr>,

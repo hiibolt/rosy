@@ -1,3 +1,29 @@
+//! # SQR Function (Square Root)
+//!
+//! Computes the square root of a value.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! SQR(expr)
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Input | Result |
+//! |-------|--------|
+//! | RE | RE |
+//! | CM | CM |
+//! | VE | VE |
+//! | DA | DA |
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (RE) x;
+//! x := SQR(16);          { 4.0 }
+//! ```
+
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
@@ -5,6 +31,7 @@ use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
 use std::collections::BTreeSet;
 
+/// AST node for the `SQR(expr)` intrinsic function (square root).
 #[derive(Debug, PartialEq)]
 pub struct SqrExpr {
     pub expr: Box<Expr>,

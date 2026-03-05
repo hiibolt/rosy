@@ -1,3 +1,32 @@
+//! # ROSY Runtime Library
+//!
+//! The embedded runtime library that ships with every generated Rust project.
+//! Contains operator implementations, intrinsic functions, type definitions,
+//! MPI support, Taylor series (DA/CD), and the optimizer.
+//!
+//! ## Type Aliases
+//!
+//! | ROSY Type | Rust Type | Description |
+//! |-----------|-----------|-------------|
+//! | `RE` | `f64` | Real number |
+//! | `ST` | `String` | String |
+//! | `LO` | `bool` | Logical (boolean) |
+//! | `CM` | `Complex64` | Complex number |
+//! | `VE` | `Vec<f64>` | Vector of reals |
+//! | `DA` | [`taylor::DA`] | Differential Algebra (Taylor series) |
+//! | `CD` | [`taylor::CD`] | Complex Differential Algebra |
+//!
+//! ## Sub-modules
+//!
+//! | Module | Contents |
+//! |--------|----------|
+//! | [`operators`] | Binary operator dispatch (add, sub, mult, div, etc.) |
+//! | [`intrinsics`] | Built-in math functions (sin, sqr, exp, etc.) |
+//! | [`core`] | Core I/O, file management, concatenation |
+//! | [`taylor`] | DA/CD Taylor series implementation |
+//! | [`mpi`] | MPI parallel context |
+//! | [`optimizer`] | FIT loop optimization algorithms |
+
 pub mod operators;
 pub mod intrinsics;
 pub mod core;

@@ -1,3 +1,25 @@
+//! # PLOOP Statement (Parallel Loop)
+//!
+//! MPI-distributed loop that partitions iterations across ranks.
+//! Results are gathered into a specified output variable.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! PLOOP i start end [commut];
+//!     <statements>
+//! ENDPLOOP output;
+//! ```
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (VE) results;
+//! PLOOP I 1 100;
+//!     results := results & (I * 2);
+//! ENDPLOOP results;
+//! ```
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure, bail};
 
@@ -5,6 +27,7 @@ use crate::{
     ast::*, program::expressions::{Expr, core::variable_identifier::VariableIdentifier}, rosy_lib::RosyType, program::statements::Statement, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TypeOf, VariableData, VariableScope, indent}
 };
 
+/// AST node for the parallel loop `PLOOP ... ENDPLOOP output;`.
 #[derive(Debug)]
 pub struct PLoopStatement {
     pub iterator: String,

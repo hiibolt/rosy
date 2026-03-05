@@ -1,3 +1,35 @@
+//! # LENGTH Function
+//!
+//! Returns the length/size of a value. For vectors, returns the number of
+//! elements. For strings, returns the character count. For scalars, returns 1.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! LENGTH(expr)
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Input | Result |
+//! |-------|--------|
+//! | RE | RE |
+//! | ST | RE |
+//! | LO | RE |
+//! | CM | RE |
+//! | VE | RE |
+//! | DA | RE |
+//! | CD | RE |
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (VE) v;
+//! VARIABLE (RE) n;
+//! v := 1 & 2 & 3;
+//! n := LENGTH(v);        { 3.0 }
+//! ```
+
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
@@ -5,6 +37,7 @@ use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
 use std::collections::BTreeSet;
 
+/// AST node for the `LENGTH(expr)` system function.
 #[derive(Debug, PartialEq)]
 pub struct LengthExpr {
     pub expr: Box<Expr>,

@@ -1,3 +1,29 @@
+//! # Equality Operator (`=`)
+//!
+//! Tests two values for equality. Returns `LO` (logical/boolean).
+//!
+//! ## Syntax
+//!
+//! ```text
+//! expr = expr
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Left | Right | Result | Comment |
+//! |------|-------|--------|---------|
+//! | RE | RE | LO | Equality with epsilon tolerance |
+//! | ST | ST | LO | String equality |
+//! | LO | LO | LO | Logical equality |
+//!
+//! ## Example
+//!
+//! ```text
+//! IF x = 0;
+//!     WRITE 6 'x is zero';
+//! ENDIF;
+//! ```
+
 use std::collections::BTreeSet;
 
 use crate::ast::{FromRule, Rule};
@@ -7,6 +33,7 @@ use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, Transpilati
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
 
+/// AST node for the equality operator (`=`).
 #[derive(Debug, PartialEq)]
 pub struct EqExpr {
     pub left: Box<Expr>,

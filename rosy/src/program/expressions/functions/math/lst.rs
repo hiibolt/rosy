@@ -1,3 +1,23 @@
+//! # LST Function (String Memory Estimate)
+//!
+//! Returns the string memory size estimate. This is a COSY INFINITY
+//! compatibility function — Rosy does not require memory management,
+//! but the function is provided so legacy scripts parse correctly.
+//!
+//! In practice, `LST(n)` simply returns `n` as a `RE`.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! LST(expr)
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Input | Result |
+//! |-------|--------|
+//! | RE | RE |
+
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
@@ -5,9 +25,9 @@ use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
 use std::collections::BTreeSet;
 
-/// LST(n) - String memory size estimator (COSY compatibility).
-/// Returns n as RE (Rosy doesn't need memory management, but returns a value
-/// for backwards compatibility).
+/// LST(n) — String memory size estimator (COSY compatibility).
+/// Returns `n` as RE. Rosy doesn't need memory management, but returns
+/// a value for backwards compatibility.
 #[derive(Debug, PartialEq)]
 pub struct LstExpr {
     pub expr: Box<Expr>,

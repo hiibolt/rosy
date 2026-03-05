@@ -1,3 +1,36 @@
+//! # Extraction Operator (`|`)
+//!
+//! Extracts elements or sub-ranges from vectors, strings, DA, and CD values.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! expr | expr
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Left | Right | Result | Comment |
+//! |------|-------|--------|---------|
+//! | ST | RE | ST | Extract i-th character |
+//! | ST | VE | ST | Extract substring by range |
+//! | CM | RE | RE | Extract real part |
+//! | VE | RE | RE | Extract i-th component |
+//! | VE | VE | VE | Extract subvector by range |
+//! | DA | RE | RE | Extract DA coefficient by flat index |
+//! | DA | VE | RE | Extract DA coefficient by exponent vector |
+//! | CD | RE | CM | Extract CD coefficient by flat index |
+//! | CD | VE | CM | Extract CD coefficient by exponent vector |
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (VE) v;
+//! VARIABLE (RE) x;
+//! v := 10 & 20 & 30;
+//! x := v|2;              { extracts 20 (1-indexed) }
+//! ```
+
 use std::collections::BTreeSet;
 
 use crate::ast::{FromRule, Rule};
@@ -7,6 +40,7 @@ use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, Transpilati
 use anyhow::{Result, Error};
 use crate::rosy_lib::RosyType;
 
+/// AST node for the extraction operator (`|`).
 #[derive(Debug, PartialEq)]
 pub struct ExtractExpr {
     pub object: Box<Expr>,

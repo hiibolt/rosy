@@ -1,3 +1,26 @@
+//! # Variable Declaration Statement
+//!
+//! Declares one or more variables with a specified type and optional
+//! array dimensions.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! VARIABLE (type) name1 [name2 ...];          { scalar }
+//! VARIABLE (type ** n) name;                    { n-dimensional array }
+//! ```
+//!
+//! ## Supported Types
+//!
+//! `RE`, `ST`, `LO`, `CM`, `VE`, `DA`, `CD`
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (RE) x y z;
+//! VARIABLE (VE ** 2) matrix;    { 2D array of vectors }
+//! ```
+
 use std::collections::BTreeSet;
 
 use anyhow::{Result, Context, Error, anyhow, ensure};

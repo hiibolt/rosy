@@ -9,7 +9,7 @@ pub trait RosyDerive {
     fn rosy_derive(&self, var_index: i64) -> anyhow::Result<Self::Output>;
 }
 
-/// Generic derivative implementation for DA<T>.
+/// Generic derivative implementation for `DA<T>`.
 fn da_derivative<T: DACoefficient>(da: &crate::rosy_lib::taylor::da::DA<T>, var_idx: usize) -> anyhow::Result<crate::rosy_lib::taylor::da::DA<T>> {
     let config = get_config()?;
     let mut result_coeffs: HashMap<Monomial, T> = HashMap::new();
@@ -54,7 +54,7 @@ fn da_derivative<T: DACoefficient>(da: &crate::rosy_lib::taylor::da::DA<T>, var_
     Ok(crate::rosy_lib::taylor::da::DA::from_coeffs(result_coeffs))
 }
 
-/// Generic anti-derivative (integral) implementation for DA<T>.
+/// Generic anti-derivative (integral) implementation for `DA<T>`.
 fn da_antiderivative<T: DACoefficient>(da: &crate::rosy_lib::taylor::da::DA<T>, var_idx: usize) -> anyhow::Result<crate::rosy_lib::taylor::da::DA<T>> {
     let config = get_config()?;
     let mut result_coeffs: HashMap<Monomial, T> = HashMap::new();

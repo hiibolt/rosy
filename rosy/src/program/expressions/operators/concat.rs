@@ -1,3 +1,36 @@
+//! # Concatenation Operator (`&`)
+//!
+//! Concatenates scalars and vectors into larger vectors, or strings together.
+//! Multiple `&` operators in a row are flattened into a single `ConcatExpr`
+//! with multiple terms for efficient code generation.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! expr & expr & ...
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Left | Right | Result | Comment |
+//! |------|-------|--------|---------|
+//! | RE | RE | VE | Concatenate two Reals to a Vector |
+//! | RE | VE | VE | Prepend a Real to the left of a Vector |
+//! | ST | ST | ST | Concatenate two Strings |
+//! | VE | RE | VE | Append a Real to the right of a Vector |
+//! | VE | VE | VE | Concatenate two Vectors |
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (VE) v;
+//! v := 1 & 2 & 3 & 4;     { builds VE from scalars }
+//! v := v & 5;              { append to vector }
+//!
+//! VARIABLE (ST) s;
+//! s := 'hello' & ' world'; { string concatenation }
+//! ```
+
 use std::collections::BTreeSet;
 
 use crate::ast::{FromRule, Rule};
@@ -7,6 +40,10 @@ use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, Transpilati
 use anyhow::{Result, Context, Error, anyhow};
 use crate::rosy_lib::RosyType;
 
+/// AST node for the concatenation operator (`&`).
+///
+/// Unlike other binary operators, concatenation flattens chains:
+/// `a & b & c` becomes `ConcatExpr { terms: [a, b, c] }` rather than nested nodes.
 #[derive(Debug, PartialEq)]
 pub struct ConcatExpr {
     pub terms: Vec<Expr>

@@ -1,3 +1,23 @@
+//! # CM() — Complex Number Conversion
+//!
+//! Converts a value to a complex number (`CM`). When applied to a VE with
+//! two elements, creates a complex number from (real, imaginary) components.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! CM(expr)
+//! ```
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (CM) z;
+//! VARIABLE (VE) v;
+//! v := 3 & 4;
+//! z := CM(v);            { 3 + 4i }
+//! ```
+
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::TranspileWithType;
@@ -5,6 +25,7 @@ use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, Transpilati
 use anyhow::{Result, Error, Context};
 use crate::rosy_lib::RosyType;
 
+/// AST node for the `CM(expr)` type conversion function.
 #[derive(Debug, PartialEq)]
 pub struct ComplexConvertExpr {
     pub expr: Box<Expr>,

@@ -1,3 +1,33 @@
+//! # IF Statement (Conditional Branching)
+//!
+//! Conditional execution with optional `ELSEIF` and `ELSE` clauses.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! IF condition;
+//!     <statements>
+//! [ELSEIF condition;
+//!     <statements>]
+//! [ELSE;
+//!     <statements>]
+//! ENDIF;
+//! ```
+//!
+//! The condition must evaluate to a `LO` (logical/boolean) type.
+//!
+//! ## Example
+//!
+//! ```text
+//! IF x > 0;
+//!     WRITE 6 'positive';
+//! ELSEIF x = 0;
+//!     WRITE 6 'zero';
+//! ELSE;
+//!     WRITE 6 'negative';
+//! ENDIF;
+//! ```
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure, bail};
 
@@ -5,6 +35,7 @@ use crate::{
     ast::*, program::expressions::Expr, rosy_lib::RosyType, program::statements::Statement, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TypeOf, indent}
 };
 
+/// AST node for the `IF ... [ELSEIF ...] [ELSE] ENDIF;` statement.
 #[derive(Debug)]
 pub struct IfStatement {
     pub condition: Expr,

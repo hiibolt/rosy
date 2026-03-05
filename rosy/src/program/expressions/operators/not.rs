@@ -1,3 +1,29 @@
+//! # Logical NOT Operator
+//!
+//! Inverts a logical (boolean) value.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! NOT expr
+//! ```
+//!
+//! ## Supported Types
+//!
+//! | Input | Result |
+//! |-------|--------|
+//! | LO | LO |
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (LO) flag;
+//! flag := TRUE;
+//! IF NOT flag;
+//!     WRITE 6 'flag is false';
+//! ENDIF;
+//! ```
+
 use std::collections::BTreeSet;
 
 use crate::ast::{FromRule, Rule};

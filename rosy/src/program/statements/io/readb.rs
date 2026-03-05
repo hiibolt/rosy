@@ -1,3 +1,21 @@
+//! # READB Statement (Binary Read)
+//!
+//! Reads a binary value from a file unit into a variable.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! READB unit variable;
+//! ```
+//!
+//! ## Example
+//!
+//! ```text
+//! OPENFB 11 'data.bin' 'OLD';
+//! READB 11 myVector;
+//! CLOSEF 11;
+//! ```
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
 
@@ -5,6 +23,7 @@ use crate::{
     ast::*, program::expressions::core::variable_identifier::VariableIdentifier, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TypeOf}
 };
 
+/// AST node for `READB unit variable;`.
 /// READB unit variable_identifier ;
 #[derive(Debug)]
 pub struct ReadbStatement {

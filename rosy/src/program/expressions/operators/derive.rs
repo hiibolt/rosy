@@ -1,3 +1,30 @@
+//! # Derivation Operator (`%`)
+//!
+//! Computes partial derivatives or anti-derivatives of DA/CD Taylor series.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! da_expr % n       { partial derivative w.r.t. variable n (n > 0) }
+//! da_expr % (-n)    { anti-derivative (integral) w.r.t. variable n }
+//! ```
+//!
+//! ## Supported Types
+//!
+//! | Object | Result |
+//! |--------|--------|
+//! | DA | DA |
+//! | CD | CD |
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (DA) f;
+//! VARIABLE (DA) df;
+//! f := DA(1) * DA(1) + DA(2);  { f = x² + y }
+//! df := f % 1;                  { df/dx = 2x }
+//! ```
+
 use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
 use crate::rosy_lib::RosyType;

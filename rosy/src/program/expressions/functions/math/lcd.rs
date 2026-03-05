@@ -1,3 +1,21 @@
+//! # LCD Function (DA Memory Estimate)
+//!
+//! Returns the Differential Algebra memory size estimate. This is a COSY
+//! INFINITY compatibility function — takes a VE of `(order & num_vars)`
+//! and returns an estimated DA memory size as `RE`.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! LCD(expr)
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Input | Result |
+//! |-------|--------|
+//! | VE | RE |
+
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
@@ -5,7 +23,7 @@ use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
 use std::collections::BTreeSet;
 
-/// LCD(ve) - DA memory size estimator (COSY compatibility).
+/// LCD(ve) — DA memory size estimator (COSY compatibility).
 /// Takes a VE with (order & num_vars) and returns estimated DA memory size.
 /// Rosy doesn't need memory management, but returns a reasonable value.
 #[derive(Debug, PartialEq)]

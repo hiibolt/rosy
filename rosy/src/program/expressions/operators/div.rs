@@ -1,3 +1,44 @@
+//! # Division Operator (`/`)
+//!
+//! Binary division for numeric, vector, complex, and Taylor series types.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! expr / expr
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Left | Right | Result | Comment |
+//! |------|-------|--------|---------|
+//! | RE | RE | RE | |
+//! | RE | CM | CM | |
+//! | RE | VE | VE | Divide Real componentwise |
+//! | RE | DA | DA | |
+//! | RE | CD | CD | |
+//! | CM | RE | CM | |
+//! | CM | CM | CM | |
+//! | CM | DA | CD | |
+//! | CM | CD | CD | |
+//! | VE | RE | VE | Divide by Real componentwise |
+//! | VE | VE | VE | Divide componentwise |
+//! | DA | RE | DA | |
+//! | DA | CM | CD | |
+//! | DA | DA | DA | |
+//! | DA | CD | CD | |
+//! | CD | RE | CD | |
+//! | CD | CM | CD | |
+//! | CD | DA | CD | |
+//! | CD | CD | CD | |
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (RE) x;
+//! x := 10 / 3;          { RE / RE → RE }
+//! ```
+
 use std::collections::BTreeSet;
 
 use crate::ast::{FromRule, Rule};
@@ -7,6 +48,7 @@ use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, Transpilati
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
 
+/// AST node for the binary division operator (`/`).
 #[derive(Debug, PartialEq)]
 pub struct DivExpr {
     pub left: Box<Expr>,

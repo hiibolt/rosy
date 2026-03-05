@@ -1,3 +1,28 @@
+//! # DA — Differential Algebra Constructor
+//!
+//! Creates a DA (Differential Algebra / Taylor series) value from
+//! a variable index.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! DA(n)          { creates DA identity for variable n }
+//! ```
+//!
+//! ## Example
+//!
+//! ```text
+//! VARIABLE (DA) f;
+//! f := DA(1) + DA(2);    { f = x + y }
+//! ```
+//!
+//! ## Note
+//!
+//! Taylor series must be initialized before use:
+//! ```text
+//! OV 3 2;                { order 3, 2 variables }
+//! ```
+
 use crate::{
     ast::{FromRule, Rule},
     program::expressions::Expr,
@@ -6,6 +31,7 @@ use crate::{
 use anyhow::{Error, Context};
 use crate::rosy_lib::RosyType;
 
+/// AST node for the `DA(n)` constructor expression.
 #[derive(Debug, PartialEq)]
 pub struct DAExpr {
     pub index: Box<Expr>,

@@ -1,3 +1,18 @@
+//! # Procedure Call Statement
+//!
+//! Invokes a user-defined procedure with arguments.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! PROCNAME arg1 [arg2 ...];
+//! ```
+//!
+//! ## Note
+//!
+//! Arguments are passed by mutable reference. The procedure may modify
+//! the caller's variables.
+
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};
 
@@ -5,6 +20,7 @@ use crate::{
     ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TypeOf, VariableScope}
 };
 
+/// AST node for a procedure call statement.
 #[derive(Debug)]
 pub struct ProcedureCallStatement {
     pub name: String,

@@ -1,3 +1,33 @@
+//! # Expressions
+//!
+//! All expression types in the ROSY language. Expressions produce values and
+//! have types determined at transpilation time via the [`TypeOf`] trait.
+//!
+//! ## Sub-modules
+//!
+//! - **[`operators`]** — Binary and unary operators (`+`, `-`, `*`, `/`, `&`, `|`, `%`, comparisons, `NOT`, negation)
+//! - **[`functions`]** — Built-in functions (math, conversion, system)
+//! - **[`types`]** — Literal values (numbers, strings, booleans, `DA()`, `CD()`)
+//! - **[`core`]** — Variable references and function call disambiguation
+//!
+//! ## Pratt Parser
+//!
+//! Binary operators are parsed using a Pratt parser with precedence levels
+//! defined in the [`PRATT_PARSER`]. The parser produces an [`Expr`] AST node
+//! wrapping a concrete expression type (e.g., [`AddExpr`]).
+//!
+//! ## Example
+//!
+//! ```text
+//! {ROSY expression examples}
+//! x + y * 2           {arithmetic with precedence}
+//! 1 & 2 & 3           {vector concatenation}
+//! vec|3               {extract 3rd element}
+//! SIN(x)              {intrinsic function}
+//! ST(42)              {type conversion}
+//! DA(1)               {DA variable constructor}
+//! ```
+
 pub mod core;
 pub mod functions;
 pub mod operators;

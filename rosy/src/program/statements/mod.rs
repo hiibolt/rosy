@@ -1,3 +1,24 @@
+//! # Statements
+//!
+//! All executable statements in the ROSY language. Each statement is represented
+//! as a [`Statement`] struct wrapping a [`StatementEnum`] variant and a boxed
+//! [`Transpile`] implementation.
+//!
+//! ## Sub-modules
+//!
+//! | Module | Contents |
+//! |--------|----------|
+//! | [`core`] | Variable declarations, assignment, control flow, functions, procedures |
+//! | [`io`] | File I/O — `WRITE`, `READ`, `OPENF`, `CLOSEF`, binary I/O |
+//! | [`da`] | Differential Algebra — `OV` (DA init), `DAPRV`, `DAREV` |
+//! | [`math`] | Optimization — `FIT` loop |
+//!
+//! ## Statement Lifecycle
+//!
+//! 1. **Parse** — pest grammar matches a rule
+//! 2. **AST build** — `Statement::from_rule` dispatches to the correct `FromRule` impl
+//! 3. **Transpile** — `Transpile::transpile` generates equivalent Rust code
+
 pub mod core;
 pub mod da;
 pub mod io;

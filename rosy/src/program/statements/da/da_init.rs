@@ -1,9 +1,31 @@
+//! # OV Statement (DA Initialization)
+//!
+//! Initializes the Differential Algebra (Taylor series) environment with
+//! a specified computation order and number of variables.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! OV order nvars;
+//! ```
+//!
+//! Must be called before any DA or CD operations.
+//!
+//! ## Example
+//!
+//! ```text
+//! OV 3 2;                { order 3, 2 variables }
+//! VARIABLE (DA) f;
+//! f := DA(1) + DA(2);    { f = x + y }
+//! ```
+
 use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
     ast::*, program::expressions::Expr, syntax_config, transpile::{TranspilationInputContext, TranspilationOutput, Transpile}
 };
 
+/// AST node for the `OV order nvars;` DA initialization statement.
 #[derive(Debug)]
 pub struct DAInitStatement {
     pub order: Expr,
