@@ -9,3 +9,4 @@ manual.md
 /cosy_examples
 *.out
 *.lis
+*.ssv
