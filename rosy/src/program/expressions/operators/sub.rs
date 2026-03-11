@@ -42,10 +42,10 @@
 use std::collections::BTreeSet;
 
 use crate::ast::{FromRule, Rule};
-use crate::transpile::TranspileWithType;
+use crate::transpile::TranspileableExpr;
 use crate::program::expressions::Expr;
 use crate::rosy_lib::RosyType;
-use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error, anyhow};
 
 /// AST node for the binary subtraction operator (`-`).
@@ -61,8 +61,7 @@ impl FromRule for SubExpr {
         anyhow::bail!("SubExpr should be created by infix parser, not FromRule")
     }
 }
-impl TranspileWithType for SubExpr {}
-impl TypeOf for SubExpr {
+impl TranspileableExpr for SubExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         crate::rosy_lib::operators::sub::get_return_type(
             &self.left.type_of(context)?,

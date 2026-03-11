@@ -42,8 +42,7 @@ impl FromRule for StringConvertExpr {
     }
 }
 
-impl TranspileWithType for StringConvertExpr {}
-impl TypeOf for StringConvertExpr {
+impl TranspileableExpr for StringConvertExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         let expr_type = self.expr.type_of(context)?;
         crate::rosy_lib::intrinsics::st::get_return_type(&expr_type)

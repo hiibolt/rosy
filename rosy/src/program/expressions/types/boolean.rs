@@ -15,7 +15,7 @@ use anyhow::{Result, Error, bail};
 use crate::{
     ast::{FromRule, Rule},
     rosy_lib::RosyType,
-    transpile::{Transpile, TypeOf, TranspileWithType, TranspilationInputContext, TranspilationOutput}
+    transpile::{Transpile, TranspileableExpr, TranspilationInputContext, TranspilationOutput}
 };
 
 impl FromRule for bool {
@@ -29,8 +29,7 @@ impl FromRule for bool {
         Ok(Some(b))
     }
 }
-impl TranspileWithType for bool {}
-impl TypeOf for bool {
+impl TranspileableExpr for bool {
     fn type_of(&self, _context: &TranspilationInputContext) -> Result<RosyType> {
         Ok(RosyType::LO())
     }

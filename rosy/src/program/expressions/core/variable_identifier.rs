@@ -103,7 +103,7 @@ impl FromRule for VariableIdentifier {
     }
 }
 
-impl TypeOf for VariableIdentifier {
+impl TranspileableExpr for VariableIdentifier {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         let var_data = context.variables.get(&self.name)
             .ok_or(anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.name))?;

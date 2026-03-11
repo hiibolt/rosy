@@ -26,7 +26,7 @@
 use crate::{
     ast::{FromRule, Rule},
     program::expressions::Expr,
-    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf}
+    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr}
 };
 use anyhow::{Error, Context};
 use crate::rosy_lib::RosyType;
@@ -49,8 +49,7 @@ impl FromRule for DAExpr {
         Ok(Some(DAExpr { index }))
     }
 }
-impl TranspileWithType for DAExpr {}
-impl TypeOf for DAExpr {
+impl TranspileableExpr for DAExpr {
     fn type_of(&self, _context: &TranspilationInputContext) -> anyhow::Result<RosyType> {
         Ok(RosyType::DA())
     }

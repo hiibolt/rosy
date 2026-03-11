@@ -26,7 +26,7 @@
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr};
 use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
 use std::collections::BTreeSet;
@@ -49,7 +49,6 @@ impl FromRule for ExpExpr {
         Ok(Some(ExpExpr { expr }))
     }
 }
-impl TranspileWithType for ExpExpr {}
 impl Transpile for ExpExpr {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
@@ -76,7 +75,7 @@ impl Transpile for ExpExpr {
         })
     }
 }
-impl TypeOf for ExpExpr {
+impl TranspileableExpr for ExpExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         use crate::rosy_lib::intrinsics::exp;
         

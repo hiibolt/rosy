@@ -1,6 +1,6 @@
 //! # RE — Numeric Literal
 //!
-//! Real number literals parsed as `f64`. The `FromRule`, `TypeOf`, and
+//! Real number literals parsed as `f64`. The `FromRule`, `TranspileableExpr`, and
 //! `Transpile` traits are implemented directly on `f64`.
 //!
 //! ## Syntax
@@ -20,7 +20,7 @@ use anyhow::{Result, Error};
 use crate::{
     ast::{FromRule, Rule},
     rosy_lib::RosyType,
-    transpile::{Transpile, TypeOf, TranspileWithType, TranspilationInputContext, TranspilationOutput}
+    transpile::{Transpile, TranspileableExpr, TranspilationInputContext, TranspilationOutput}
 };
 
 impl FromRule for f64 {
@@ -30,8 +30,7 @@ impl FromRule for f64 {
         Ok(Some(n))
     }
 }
-impl TranspileWithType for f64 {}
-impl TypeOf for f64 {
+impl TranspileableExpr for f64 {
     fn type_of(&self, _context: &TranspilationInputContext) -> Result<RosyType> {
         Ok(RosyType::RE())
     }

@@ -18,7 +18,7 @@ use anyhow::{Result, Error};
 use crate::{
     ast::{FromRule, Rule},
     rosy_lib::RosyType,
-    transpile::{Transpile, TypeOf, TranspileWithType, TranspilationInputContext, TranspilationOutput}
+    transpile::{Transpile, TranspileableExpr, TranspilationInputContext, TranspilationOutput}
 };
 
 impl FromRule for String {
@@ -35,8 +35,7 @@ impl FromRule for String {
         Ok(Some(s.to_string()))
     }
 }
-impl TranspileWithType for String {}
-impl TypeOf for String {
+impl TranspileableExpr for String {
     fn type_of(&self, _context: &TranspilationInputContext) -> Result<RosyType> {
         Ok(RosyType::ST())
     }

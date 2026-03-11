@@ -19,8 +19,8 @@ use std::collections::BTreeSet;
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::TranspileWithType;
-use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::TranspileableExpr;
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
 
@@ -36,8 +36,7 @@ impl FromRule for GteExpr {
         anyhow::bail!("GteExpr should be created by infix parser, not FromRule")
     }
 }
-impl TranspileWithType for GteExpr {}
-impl TypeOf for GteExpr {
+impl TranspileableExpr for GteExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         crate::rosy_lib::operators::gte::get_return_type(
             &self.left.type_of(context)?,

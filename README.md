@@ -124,7 +124,7 @@ cargo doc --document-private-items --no-deps -p rosy --open
 1. Read `manual.md` for the operator/function spec and type tables
 2. Add grammar rule to `rosy/assets/rosy.pest`
 3. Create AST struct in `rosy/src/program/expressions/`
-4. Implement `FromRule`, `TypeOf`, `Transpile` traits
+4. Implement `FromRule`, `Transpile`, and `TranspileableExpr` traits
 5. For operators: define `TypeRule` registry in `rosy/src/rosy_lib/operators/`
 6. `cargo build` auto-generates test files from the registry
 7. Validate against COSY INFINITY output — must match exactly

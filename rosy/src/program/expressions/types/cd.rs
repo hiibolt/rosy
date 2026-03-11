@@ -19,7 +19,7 @@
 use crate::{
     ast::{FromRule, Rule},
     program::expressions::Expr,
-    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf}
+    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr}
 };
 use anyhow::{Error, Context};
 use crate::rosy_lib::RosyType;
@@ -42,8 +42,7 @@ impl FromRule for CDExpr {
         Ok(Some(CDExpr { index }))
     }
 }
-impl TranspileWithType for CDExpr {}
-impl TypeOf for CDExpr {
+impl TranspileableExpr for CDExpr {
     fn type_of(&self, _context: &TranspilationInputContext) -> anyhow::Result<RosyType> {
         Ok(RosyType::CD())
     }

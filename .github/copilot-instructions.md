@@ -99,19 +99,6 @@ Err(mut e) => {
 - `functions/procedures` - for signature checking
 - `requested_variables: BTreeSet<String>` - captures closure variables for procedures/functions
 
-### Type Checking via TypeOf Trait
-Before transpilation, use `TypeOf::type_of()` to validate compatibility:
-```rust
-impl TypeOf for AddExpr {
-    fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
-        add::get_return_type(
-            &self.left.type_of(context)?,
-            &self.right.type_of(context)?
-        ).ok_or(anyhow!("Cannot add types..."))
-    }
-}
-```
-
 ### ROSY Type System
 - **Base types**: `RE` (f64), `ST` (String), `LO` (bool), `CM` ((f64,f64)), `VE` (Vec<f64>), `DA`/`CD` (Taylor series)
 - **Multi-dimensional arrays**: `RosyType { base_type, dimensions }` - e.g., `(RE ** 2)` = 2D array
@@ -161,7 +148,7 @@ cargo run --bin rosy -- help
 3. **Build to generate tests**: `cargo build` creates `.rosy` and `.fox` files
 4. **Implement trait** for each type pair in `operators/newop.rs`
 5. **Create AST node** in `rosy/src/ast/mod.rs` and parser in `rosy/assets/rosy.pest`
-6. **Implement transpilation** with `Transpile` and `TypeOf` in `rosy/src/transpile/expr/`
+6. **Implement transpilation** with `Transpile` and `TranspileableExpr` in `rosy/src/transpile/expr/`
 7. **Validate against COSY**: Run both test scripts and diff outputs - must match exactly
 8. **Iterate** until all test cases pass with identical output
 
@@ -271,7 +258,7 @@ If a request is vague (e.g., "add support for X"), probe:
 5. Module declared in `rosy/src/program/expressions/mod.rs`
 6. `ExprEnum` variant added
 7. Pratt parser mapping implemented (`map_primary` or `map_infix`)
-8. `TranspileWithType`, `TypeOf`, and `Transpile` traits implemented
+8. `TranspileableExpr`, and `Transpile` traits implemented
 9. For operators: `TypeRule` registry defined with test values from manual in `rosy/src/rosy_lib/operators/<name>.rs`
 10. Codegen triggered via `cargo build` generates test scaffolding
 11. COSY/ROSY output diff validates correctness

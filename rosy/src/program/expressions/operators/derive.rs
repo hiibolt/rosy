@@ -26,7 +26,7 @@
 //! ```
 
 use crate::program::expressions::Expr;
-use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr};
 use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
 use std::collections::BTreeSet;
@@ -39,7 +39,6 @@ pub struct DeriveExpr {
     pub index: Box<Expr>,
 }
 
-impl TranspileWithType for DeriveExpr {}
 impl Transpile for DeriveExpr {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
@@ -68,7 +67,7 @@ impl Transpile for DeriveExpr {
         })
     }
 }
-impl TypeOf for DeriveExpr {
+impl TranspileableExpr for DeriveExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         let object_type = self.object.type_of(context)
             .context("Failed to determine type of object in % (derive) expression")?;

@@ -32,7 +32,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure, bail};
 
 use crate::{
-    ast::*, program::expressions::Expr, rosy_lib::RosyType, program::statements::Statement, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TypeOf, indent}
+    ast::*, program::{expressions::Expr, statements::Statement}, rosy_lib::RosyType, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, indent}
 };
 
 /// AST node for the `IF ... [ELSEIF ...] [ELSE] ENDIF;` statement.
@@ -141,7 +141,7 @@ impl FromRule for IfStatement {
         Ok(Some(IfStatement { condition, then_body, elseif_clauses, else_body }))
     }
 }
-
+impl TranspileableStatement for IfStatement {}
 impl Transpile for ElseIfClause {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
@@ -209,7 +209,6 @@ impl Transpile for ElseIfClause {
         }
     }
 }
-
 impl Transpile for IfStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
@@ -327,3 +326,4 @@ impl Transpile for IfStatement {
         }
     }
 }
+impl TranspileableStatement for ElseIfClause {}

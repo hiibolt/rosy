@@ -7,8 +7,8 @@
 //! | Trait | Purpose |
 //! |-------|---------|
 //! | [`Transpile`] | Converts an AST node to a Rust code string |
-//! | [`TypeOf`] | Determines the ROSY type of an expression |
-//! | [`TranspileWithType`] | Combines both for expression nodes |
+//! | [`TranspileableStatement`] | Represents a statement node that can be transpiled |
+//! | [`TranspileableExpr`] | Represents an expression node that can be transpiled |
 //!
 //! ## Context
 //!
@@ -25,8 +25,8 @@ use std::{any::Any, collections::{BTreeSet, HashMap}};
 use anyhow::{Result, Error};
 use crate::rosy_lib::RosyType;
 
-pub trait TranspileWithType: Transpile + TypeOf + Send + Sync + std::fmt::Debug + Any + 'static {}
-pub trait TypeOf {
+pub trait TranspileableStatement: Transpile + Send + Sync + std::fmt::Debug + Any {}
+pub trait TranspileableExpr: Transpile + Send + Sync + std::fmt::Debug + Any {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType>;
 }
 pub trait Transpile: std::fmt::Debug + Any {

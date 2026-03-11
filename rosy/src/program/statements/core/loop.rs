@@ -29,7 +29,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};
 
 use crate::{
-    ast::*, program::expressions::Expr, rosy_lib::RosyType, program::statements::Statement, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TypeOf, VariableData, VariableScope, indent}
+    ast::*, program::{expressions::Expr, statements::Statement}, rosy_lib::RosyType, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, VariableData, VariableScope, indent}
 };
 
 /// AST node for the counted `LOOP i start end [step]; ... ENDLOOP;` statement.
@@ -102,7 +102,7 @@ impl FromRule for LoopStatement {
         Ok(Some(LoopStatement { iterator, start, end, step, body }))
     }
 }
-
+impl TranspileableStatement for LoopStatement {}
 impl Transpile for LoopStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

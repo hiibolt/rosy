@@ -17,7 +17,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};
 
 use crate::{
-    ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TypeOf, VariableScope}
+    ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, VariableScope}
 };
 
 /// AST node for a procedure call statement.
@@ -53,7 +53,7 @@ impl FromRule for ProcedureCallStatement {
         Ok(Some(ProcedureCallStatement { name, args }))
     }
 }
-
+impl TranspileableStatement for ProcedureCallStatement {}
 impl Transpile for ProcedureCallStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

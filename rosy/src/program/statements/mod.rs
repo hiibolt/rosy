@@ -87,7 +87,7 @@ impl SourceLocation {
 #[derive(Debug)]
 pub struct Statement {
     pub enum_variant: StatementEnum,
-    pub inner: Box<dyn Transpile>,
+    pub inner: Box<dyn TranspileableStatement>,
     pub source_location: SourceLocation,
 }
 #[derive(Debug)]
@@ -115,7 +115,7 @@ pub enum StatementEnum {
     Break,
     Fit,
 }
-
+impl TranspileableStatement for Statement {}
 impl FromRule for Statement {
     fn from_rule (
         pair: pest::iterators::Pair<Rule>

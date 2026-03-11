@@ -34,7 +34,7 @@ pub mod expressions;
 pub struct Program {
     pub statements: Vec<Statement>,
 }
-
+impl TranspileableStatement for Program {}
 impl FromRule for Program {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Program>> {
         let mut statements = Vec::new();

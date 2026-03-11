@@ -25,7 +25,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Error, anyhow};
 use crate::ast::{FromRule, Rule};
 use crate::rosy_lib::RosyType;
-use crate::transpile::{Transpile, TranspileWithType, TypeOf, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::{Transpile, TranspileableExpr, TranspilationInputContext, TranspilationOutput};
 use crate::program::expressions::Expr;
 
 /// Unary negation expression: `-expr`
@@ -42,9 +42,7 @@ impl FromRule for NegExpr {
     }
 }
 
-impl TranspileWithType for NegExpr {}
-
-impl TypeOf for NegExpr {
+impl TranspileableExpr for NegExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         // Negation has the same type as its operand (validated via subtraction from 0)
         let operand_type = self.operand.type_of(context)?;

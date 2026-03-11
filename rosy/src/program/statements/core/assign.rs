@@ -24,7 +24,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::{ast::*, program::expressions::{Expr, core::variable_identifier::VariableIdentifier}, transpile::{TypeOf, VariableScope}};
+use crate::{ast::*, program::expressions::{Expr, core::variable_identifier::VariableIdentifier}, transpile::{TranspileableExpr, TranspileableStatement, VariableScope}};
 use crate::rosy_lib::{RosyType, RosyBaseType};
 use super::super::super::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Context, Error, anyhow, ensure};
@@ -60,6 +60,7 @@ impl FromRule for AssignStatement {
         }))
     }
 }
+impl TranspileableStatement for AssignStatement {}
 impl Transpile for AssignStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

@@ -11,7 +11,9 @@ use crate::program::statements::*;
 use crate::program::expressions::*;
 
 use super::{
-    TypeResolver, TypeSlot, ScopeContext, ResolutionRule, ExprRecipe, BinaryOpKind,
+    TypeResolver, TypeSlot, 
+    ScopeContext, ResolutionRule, 
+    ExprRecipe, BinaryOpKind,
 };
 
 impl TypeResolver {
@@ -463,7 +465,7 @@ impl TypeResolver {
 
     /// Recursively walk an expression tree looking for function calls.
     /// For each one found, wire up call-site argument dependencies.
-    fn discover_expr_function_calls(
+    fn discover_expr_function_calls( // invesigate whether this actually does anything
         &mut self,
         expr: &Expr,
         ctx: &ScopeContext,

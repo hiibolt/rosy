@@ -24,7 +24,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure, bail};
 
 use crate::{
-    ast::*, program::expressions::{Expr, core::variable_identifier::VariableIdentifier}, rosy_lib::RosyType, program::statements::Statement, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TypeOf, VariableData, VariableScope, indent}
+    ast::*, program::{expressions::{Expr, core::variable_identifier::VariableIdentifier}, statements::Statement}, rosy_lib::RosyType, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, VariableData, VariableScope, indent}
 };
 
 /// AST node for the parallel loop `PLOOP ... ENDPLOOP output;`.
@@ -127,7 +127,7 @@ impl FromRule for PLoopStatement {
         }))
     }
 }
-
+impl TranspileableStatement for PLoopStatement {}
 impl Transpile for PLoopStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

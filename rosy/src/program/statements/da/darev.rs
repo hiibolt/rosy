@@ -13,7 +13,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
-    ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, add_context_to_all}
+    ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement, add_context_to_all}
 };
 
 /// AST node for `DAREV array num_components max_vars current_vars unit;`.
@@ -67,7 +67,7 @@ impl FromRule for DarevStatement {
         Ok(Some(DarevStatement { array_expr, num_components_expr, max_vars_expr, current_vars_expr, unit_expr }))
     }
 }
-
+impl TranspileableStatement for DarevStatement {}
 impl Transpile for DarevStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

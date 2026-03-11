@@ -27,8 +27,8 @@
 
 use crate::ast::{FromRule, Rule};
 use super::variable_identifier::VariableIdentifier;
-use crate::transpile::TranspileWithType;
-use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput, VariableScope, };
+use crate::transpile::TranspileableExpr;
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, VariableScope, };
 use anyhow::{Result, Context, Error, anyhow};
 use crate::rosy_lib::RosyType;
 use crate::program::expressions::Expr;
@@ -133,8 +133,7 @@ impl FromRule for VarExpr {
         Ok(Some(VarExpr { identifier }))
     }
 }
-impl TranspileWithType for VarExpr {}
-impl TypeOf for VarExpr {
+impl TranspileableExpr for VarExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         match self.classify(context).map_err(|errs| {
             errs.into_iter().next().unwrap_or_else(|| anyhow::anyhow!("Unknown classification error"))

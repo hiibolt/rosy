@@ -28,8 +28,8 @@ use std::collections::BTreeSet;
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::TranspileWithType;
-use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::TranspileableExpr;
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
 
@@ -45,8 +45,7 @@ impl FromRule for NotExpr {
         anyhow::bail!("NotExpr should be created by prefix parser, not FromRule")
     }
 }
-impl TranspileWithType for NotExpr {}
-impl TypeOf for NotExpr {
+impl TranspileableExpr for NotExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         crate::rosy_lib::operators::not::get_return_type(
             &self.operand.type_of(context)?

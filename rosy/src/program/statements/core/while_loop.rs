@@ -11,10 +11,9 @@ use anyhow::{Result, Context, Error, anyhow, ensure};
 
 use crate::{
     ast::*,
-    program::expressions::Expr,
+    program::{expressions::Expr, statements::Statement},
     rosy_lib::RosyType,
-    program::statements::Statement,
-    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TypeOf, indent}
+    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, indent}
 };
 
 #[derive(Debug)]
@@ -62,7 +61,7 @@ impl FromRule for WhileStatement {
         Ok(Some(WhileStatement { condition, body }))
     }
 }
-
+impl TranspileableStatement for WhileStatement {}
 impl Transpile for WhileStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

@@ -35,8 +35,8 @@ use std::collections::BTreeSet;
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::TranspileWithType;
-use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::TranspileableExpr;
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Context, Error, anyhow};
 use crate::rosy_lib::RosyType;
 
@@ -55,8 +55,7 @@ impl FromRule for ConcatExpr {
         anyhow::bail!("ConcatExpr should be created by infix parser, not FromRule")
     }
 }
-impl TranspileWithType for ConcatExpr {}
-impl TypeOf for ConcatExpr {
+impl TranspileableExpr for ConcatExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         let mut r#type = self.terms.last()
             .ok_or(anyhow::anyhow!("Cannot concatenate zero terms!"))?

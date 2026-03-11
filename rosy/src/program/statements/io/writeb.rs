@@ -20,7 +20,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
-    ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, add_context_to_all}
+    ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement, add_context_to_all}
 };
 
 /// AST node for `WRITEB unit expr+;`.
@@ -62,7 +62,7 @@ impl FromRule for WritebStatement {
         Ok(Some(WritebStatement { unit, exprs }))
     }
 }
-
+impl TranspileableStatement for WritebStatement {}
 impl Transpile for WritebStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

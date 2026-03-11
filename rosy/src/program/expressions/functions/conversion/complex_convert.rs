@@ -20,8 +20,8 @@
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::TranspileWithType;
-use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::TranspileableExpr;
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error, Context};
 use crate::rosy_lib::RosyType;
 
@@ -43,8 +43,7 @@ impl FromRule for ComplexConvertExpr {
         Ok(Some(ComplexConvertExpr { expr }))
     }
 }
-impl TranspileWithType for ComplexConvertExpr {}
-impl TypeOf for ComplexConvertExpr {
+impl TranspileableExpr for ComplexConvertExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         let expr_type = self.expr.type_of(context)
             .map_err(|e| e.context("...while determining type of expression for complex conversion"))?;

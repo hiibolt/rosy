@@ -48,8 +48,8 @@ use std::collections::BTreeSet;
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::TranspileWithType;
-use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::TranspileableExpr;
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
 
@@ -68,8 +68,7 @@ impl FromRule for AddExpr {
         anyhow::bail!("AddExpr should be created by infix parser, not FromRule")
     }
 }
-impl TranspileWithType for AddExpr {}
-impl TypeOf for AddExpr {
+impl TranspileableExpr for AddExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         crate::rosy_lib::operators::add::get_return_type(
             &self.left.type_of(context)?,

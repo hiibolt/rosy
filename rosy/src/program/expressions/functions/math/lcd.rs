@@ -18,7 +18,7 @@
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr};
 use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
 use std::collections::BTreeSet;
@@ -43,7 +43,6 @@ impl FromRule for LcdExpr {
         Ok(Some(LcdExpr { expr }))
     }
 }
-impl TranspileWithType for LcdExpr {}
 impl Transpile for LcdExpr {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
@@ -67,7 +66,7 @@ impl Transpile for LcdExpr {
         })
     }
 }
-impl TypeOf for LcdExpr {
+impl TranspileableExpr for LcdExpr {
     fn type_of(&self, _context: &TranspilationInputContext) -> Result<RosyType> {
         Ok(RosyType::RE())
     }

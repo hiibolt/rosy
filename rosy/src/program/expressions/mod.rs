@@ -1,7 +1,7 @@
 //! # Expressions
 //!
 //! All expression types in the ROSY language. Expressions produce values and
-//! have types determined at transpilation time via the [`TypeOf`] trait.
+//! have types determined at transpilation time via the [`TranspileableExpr`] trait.
 //!
 //! ## Sub-modules
 //!
@@ -33,7 +33,7 @@ pub mod functions;
 pub mod operators;
 pub mod types;
 
-use crate::{ast::{FromRule, PRATT_PARSER, Rule}, rosy_lib::RosyType, transpile::{TranspileWithType, TypeOf, add_context_to_all}};
+use crate::{ast::{FromRule, PRATT_PARSER, Rule}, rosy_lib::RosyType, transpile::{TranspileableExpr, add_context_to_all}};
 use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 
 use crate::program::expressions::core::var_expr::VarExpr;
@@ -76,7 +76,7 @@ use anyhow::{Context, Error, Result, bail};
 #[derive(Debug)]
 pub struct Expr {
     pub enum_variant: ExprEnum,
-    pub inner: Box<dyn TranspileWithType>,
+    pub inner: Box<dyn TranspileableExpr>,
 }
 impl PartialEq for Expr {
     fn eq(&self, other: &Self) -> bool {
@@ -493,7 +493,7 @@ impl FromRule for Expr {
         result.map(Some)
     }
 }
-impl TypeOf for Expr {
+impl TranspileableExpr for Expr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         self.inner.type_of(context)
     }

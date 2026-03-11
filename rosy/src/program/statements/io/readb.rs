@@ -20,7 +20,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
-    ast::*, program::expressions::core::variable_identifier::VariableIdentifier, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TypeOf}
+    ast::*, program::expressions::core::variable_identifier::VariableIdentifier, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement}
 };
 
 /// AST node for `READB unit variable;`.
@@ -53,7 +53,7 @@ impl FromRule for ReadbStatement {
         Ok(Some(ReadbStatement { unit, identifier }))
     }
 }
-
+impl TranspileableStatement for ReadbStatement {}
 impl Transpile for ReadbStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

@@ -18,10 +18,9 @@ use anyhow::{Result, Context, Error, anyhow, ensure};
 
 use crate::{
     ast::*,
-    program::expressions::Expr,
+    program::{expressions::Expr, statements::Statement},
     rosy_lib::RosyType,
-    program::statements::Statement,
-    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TypeOf, indent}
+    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, indent}
 };
 
 #[derive(Debug)]
@@ -39,7 +38,6 @@ pub struct FitStatement {
     /// Objective variable name(s) to minimize
     pub objectives: Vec<String>,
 }
-
 impl FromRule for FitStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
         ensure!(pair.as_rule() == Rule::fit_statement,
@@ -133,7 +131,7 @@ impl FromRule for FitStatement {
         }))
     }
 }
-
+impl TranspileableStatement for FitStatement {}
 impl Transpile for FitStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

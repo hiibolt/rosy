@@ -12,7 +12,7 @@ use anyhow::{Result, Error, anyhow, ensure};
 
 use crate::{
     ast::*,
-    transpile::{TranspilationInputContext, TranspilationOutput, Transpile}
+    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement}
 };
 
 #[derive(Debug)]
@@ -26,7 +26,7 @@ impl FromRule for BreakStatement {
         Ok(Some(BreakStatement))
     }
 }
-
+impl TranspileableStatement for BreakStatement {}
 impl Transpile for BreakStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

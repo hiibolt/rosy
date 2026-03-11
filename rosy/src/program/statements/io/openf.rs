@@ -24,7 +24,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
-    ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, add_context_to_all}
+    ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement, add_context_to_all}
 };
 
 /// AST node for `OPENF unit filename status;`.
@@ -64,7 +64,7 @@ impl FromRule for OpenfStatement {
         Ok(Some(OpenfStatement { unit_expr, filename_expr, status_expr }))
     }
 }
-
+impl TranspileableStatement for OpenfStatement {}
 impl Transpile for OpenfStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

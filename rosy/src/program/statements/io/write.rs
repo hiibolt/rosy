@@ -21,7 +21,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
-    ast::*, program::expressions::{Expr, functions::conversion::string_convert::string_convert_transpile_helper}, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, add_context_to_all}
+    ast::*, program::expressions::{Expr, functions::conversion::string_convert::string_convert_transpile_helper}, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement, add_context_to_all}
 };
 
 /// AST node for the `WRITE unit expr+;` statement.
@@ -62,7 +62,7 @@ impl FromRule for WriteStatement {
         Ok(Some(WriteStatement { unit, exprs }))
     }
 }
-
+impl TranspileableStatement for WriteStatement {}
 impl Transpile for WriteStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

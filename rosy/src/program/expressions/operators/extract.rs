@@ -35,8 +35,8 @@ use std::collections::BTreeSet;
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::TranspileWithType;
-use crate::transpile::{Transpile, TypeOf, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::TranspileableExpr;
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error};
 use crate::rosy_lib::RosyType;
 
@@ -54,8 +54,7 @@ impl FromRule for ExtractExpr {
     }
 }
 
-impl TranspileWithType for ExtractExpr {}
-impl TypeOf for ExtractExpr {
+impl TranspileableExpr for ExtractExpr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         let object_type = self.object.type_of(context)
             .map_err(|e| e.context("...while determining type of object expression for extraction"))?;

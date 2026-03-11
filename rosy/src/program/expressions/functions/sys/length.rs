@@ -32,7 +32,7 @@
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileWithType, TypeOf};
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr};
 use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
 use std::collections::BTreeSet;
@@ -55,7 +55,6 @@ impl FromRule for LengthExpr {
         Ok(Some(LengthExpr { expr }))
     }
 }
-impl TranspileWithType for LengthExpr {}
 impl Transpile for LengthExpr {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
@@ -82,7 +81,7 @@ impl Transpile for LengthExpr {
         })
     }
 }
-impl TypeOf for LengthExpr {
+impl TranspileableExpr for LengthExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         use crate::rosy_lib::intrinsics::length;
         
