@@ -91,7 +91,7 @@ impl std::fmt::Display for TypeSlot {
 
 /// Describes *how* to compute a slot's type once all its dependencies are resolved.
 #[derive(Debug, Clone)]
-enum ResolutionRule {
+pub enum ResolutionRule {
     /// The type is already known from an explicit annotation.
     Explicit(RosyType),
     /// Inferred from an assignment RHS or call-site argument expression.
@@ -116,7 +116,7 @@ enum ResolutionRule {
 /// A lightweight "recipe" for computing the type of an expression.
 /// Stores just enough info to re-derive the type once dependencies are resolved.
 #[derive(Debug, Clone)]
-enum ExprRecipe {
+pub enum ExprRecipe {
     /// A literal type — always known.
     Literal(RosyType),
     /// A variable reference — look up its slot.
@@ -132,46 +132,46 @@ enum ExprRecipe {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum BinaryOpKind {
+pub enum BinaryOpKind {
     Add, Sub, Mult, Div, Extract, Derive, Pow,
 }
 
 // ─── Dependency Graph Node ──────────────────────────────────────────────────
 
 #[derive(Debug)]
-struct GraphNode {
-    slot: TypeSlot,
+pub struct GraphNode {
+    pub slot: TypeSlot,
     /// How to compute this slot's type once dependencies are met.
-    rule: ResolutionRule,
+    pub rule: ResolutionRule,
     /// Slots that this node depends on (must be resolved first).
-    depends_on: HashSet<TypeSlot>,
+    pub depends_on: HashSet<TypeSlot>,
     /// The resolved type (filled in during topological traversal).
-    resolved: Option<RosyType>,
+    pub resolved: Option<RosyType>,
     /// Where this slot was declared (VARIABLE statement source location).
-    declared_at: Option<SourceLocation>,
+    pub declared_at: Option<SourceLocation>,
     /// Where the assignment that established the type inference rule is.
-    assigned_at: Option<SourceLocation>,
+    pub assigned_at: Option<SourceLocation>,
 }
 
 // ─── Scope Context (used during graph construction) ─────────────────────────
 
 /// Tracks what's been declared so far in a scope during the discovery walk.
 #[derive(Debug, Clone, Default)]
-struct ScopeContext {
-    scope_path: Vec<String>,
+pub struct ScopeContext {
+    pub scope_path: Vec<String>,
     /// Maps variable name → its TypeSlot.
-    variables: HashMap<String, TypeSlot>,
+    pub variables: HashMap<String, TypeSlot>,
     /// Maps function name → (return_type_slot, vec of (arg_name, arg_slot)).
-    functions: HashMap<String, (TypeSlot, Vec<(String, TypeSlot)>)>,
+    pub functions: HashMap<String, (TypeSlot, Vec<(String, TypeSlot)>)>,
     /// Maps procedure name → vec of (arg_name, arg_slot).
-    procedures: HashMap<String, Vec<(String, TypeSlot)>>,
+    pub procedures: HashMap<String, Vec<(String, TypeSlot)>>,
 }
 
 // ─── Type Resolver ──────────────────────────────────────────────────────────
 
 pub struct TypeResolver {
     /// All nodes in the dependency graph, keyed by their slot.
-    nodes: HashMap<TypeSlot, GraphNode>,
+    pub nodes: HashMap<TypeSlot, GraphNode>,
 }
 
 impl TypeResolver {
@@ -203,7 +203,7 @@ impl TypeResolver {
     // ─── Graph Infrastructure ───────────────────────────────────────────
 
     /// Insert a node for a slot. If it has an explicit type, mark it resolved.
-    fn insert_slot(&mut self, slot: TypeSlot, explicit_type: Option<&RosyType>, declared_at: Option<SourceLocation>) {
+    pub fn insert_slot(&mut self, slot: TypeSlot, explicit_type: Option<&RosyType>, declared_at: Option<SourceLocation>) {
         if let Some(t) = explicit_type {
             self.nodes.insert(slot.clone(), GraphNode {
                 slot,

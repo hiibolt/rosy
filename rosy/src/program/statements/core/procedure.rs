@@ -25,7 +25,7 @@
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};
 
-use crate::{ast::*, program::statements::*, transpile::*};
+use crate::{ast::*, program::statements::*, resolve::{ScopeContext, TypeResolver, TypeSlot}, transpile::*};
 
 /// AST node for a user-defined procedure declaration.
 #[derive(Debug)]
@@ -108,7 +108,53 @@ impl FromRule for ProcedureStatement {
         Ok(Some(ProcedureStatement { name, args, body }))
     }
 }
-impl TranspileableStatement for ProcedureStatement {}
+impl TranspileableStatement for ProcedureStatement {
+    fn register_declaration(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &mut ScopeContext,
+        source_location: SourceLocation
+    ) -> Option<Result<()>> {
+        let mut arg_slots = Vec::new();
+        for arg in &self.args {
+            let arg_slot = TypeSlot::Argument(
+                ctx.scope_path.clone(),
+                self.name.clone(),
+                arg.name.clone(),
+            );
+            resolver.insert_slot(arg_slot.clone(), arg.r#type.as_ref(), Some(source_location.clone()));
+            arg_slots.push((arg.name.clone(), arg_slot));
+        }
+
+        ctx.procedures.insert(self.name.clone(), arg_slots);
+        // Recurse into procedure body
+        let mut inner_ctx = ScopeContext {
+            scope_path: {
+                let mut p = ctx.scope_path.clone();
+                p.push(self.name.clone());
+                p
+            },
+            variables: ctx.variables.clone(),
+            functions: ctx.functions.clone(),
+            procedures: ctx.procedures.clone(),
+        };
+
+        for arg in &self.args {
+            let arg_slot = TypeSlot::Argument(
+                ctx.scope_path.clone(),
+                self.name.clone(),
+                arg.name.clone(),
+            );
+            inner_ctx.variables.insert(arg.name.clone(), arg_slot);
+        }
+
+        if let Err(e) = resolver.discover_slots(&self.body, &mut inner_ctx) {
+            return Some(Err(e));
+        }
+
+        Some(Ok(()))
+    }
+}
 impl Transpile for ProcedureStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

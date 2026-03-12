@@ -23,9 +23,18 @@
 
 use std::{any::Any, collections::{BTreeSet, HashMap}};
 use anyhow::{Result, Error};
-use crate::rosy_lib::RosyType;
+use crate::{program::statements::SourceLocation, resolve::{ScopeContext, TypeResolver}, rosy_lib::RosyType};
 
-pub trait TranspileableStatement: Transpile + Send + Sync + std::fmt::Debug + Any {}
+pub trait TranspileableStatement: Transpile + Send + Sync + std::fmt::Debug + Any {
+    fn register_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation
+    ) -> Option<Result<()>> {
+        None
+    }
+}
 pub trait TranspileableExpr: Transpile + Send + Sync + std::fmt::Debug + Any {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType>;
 }

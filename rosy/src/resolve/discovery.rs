@@ -19,7 +19,7 @@ use super::{
 impl TypeResolver {
     /// Walk the AST, creating graph nodes for every type slot and recording
     /// their dependencies.
-    pub(super) fn discover_slots(
+    pub fn discover_slots(
         &mut self,
         statements: &[Statement],
         ctx: &mut ScopeContext,
@@ -43,141 +43,11 @@ impl TypeResolver {
         stmt: &Statement,
         ctx: &mut ScopeContext,
     ) -> Result<()> {
-        match stmt.enum_variant {
-            StatementEnum::VarDecl => {
-                let var_decl = stmt.inner.as_any()
-                    .downcast_ref::<VarDeclStatement>()
-                    .ok_or_else(|| anyhow!("Failed to downcast VarDecl statement"))?;
+        let Some(result) = stmt.inner.register_declaration(self, ctx, stmt.source_location.clone()) else {
+            return Ok(()); // not a declaration, skip
+        };
 
-                let slot = TypeSlot::Variable(
-                    ctx.scope_path.clone(),
-                    var_decl.data.name.clone(),
-                );
-                self.insert_slot(slot.clone(), var_decl.data.r#type.as_ref(), Some(stmt.source_location.clone()));
-                ctx.variables.insert(var_decl.data.name.clone(), slot);
-            }
-            StatementEnum::Function => {
-                let func = stmt.inner.as_any()
-                    .downcast_ref::<FunctionStatement>()
-                    .ok_or_else(|| anyhow!("Failed to downcast Function statement"))?;
-
-                // Return type slot
-                let ret_slot = TypeSlot::FunctionReturn(
-                    ctx.scope_path.clone(),
-                    func.name.clone(),
-                );
-                self.insert_slot(ret_slot.clone(), func.return_type.as_ref(), Some(stmt.source_location.clone()));
-
-                // Argument slots
-                let mut arg_slots = Vec::new();
-                for arg in &func.args {
-                    let arg_slot = TypeSlot::Argument(
-                        ctx.scope_path.clone(),
-                        func.name.clone(),
-                        arg.name.clone(),
-                    );
-                    self.insert_slot(arg_slot.clone(), arg.r#type.as_ref(), Some(stmt.source_location.clone()));
-                    arg_slots.push((arg.name.clone(), arg_slot));
-                }
-
-                ctx.functions.insert(
-                    func.name.clone(),
-                    (ret_slot.clone(), arg_slots),
-                );
-
-                // Recurse into function body with inner scope
-                let mut inner_ctx = ScopeContext {
-                    scope_path: {
-                        let mut p = ctx.scope_path.clone();
-                        p.push(func.name.clone());
-                        p
-                    },
-                    // Inner scope inherits outer declarations
-                    variables: ctx.variables.clone(),
-                    functions: ctx.functions.clone(),
-                    procedures: ctx.procedures.clone(),
-                };
-
-                // Add args to inner scope as variable references
-                for arg in &func.args {
-                    let arg_slot = TypeSlot::Argument(
-                        ctx.scope_path.clone(),
-                        func.name.clone(),
-                        arg.name.clone(),
-                    );
-                    inner_ctx.variables.insert(arg.name.clone(), arg_slot);
-                }
-
-                // The implicit return variable inside the function body
-                let inner_ret_var_slot = TypeSlot::Variable(
-                    inner_ctx.scope_path.clone(),
-                    func.name.clone(),
-                );
-                // If the return type is known explicitly, the inner return var is also known
-                self.insert_slot(inner_ret_var_slot.clone(), func.return_type.as_ref(), Some(stmt.source_location.clone()));
-                inner_ctx.variables.insert(func.name.clone(), inner_ret_var_slot.clone());
-
-                self.discover_slots(&func.body, &mut inner_ctx)?;
-
-                // If the return type is NOT explicit, it depends on the inner return var
-                if func.return_type.is_none() {
-                    if self.nodes.contains_key(&inner_ret_var_slot) {
-                        let node = self.nodes.get_mut(&ret_slot).unwrap();
-                        node.rule = ResolutionRule::Mirror {
-                            source: inner_ret_var_slot.clone(),
-                            reason: format!(
-                                "inferred from assignment to return variable '{}'",
-                                func.name
-                            ),
-                        };
-                        node.depends_on.insert(inner_ret_var_slot);
-                    }
-                }
-            }
-            StatementEnum::Procedure => {
-                let proc = stmt.inner.as_any()
-                    .downcast_ref::<ProcedureStatement>()
-                    .ok_or_else(|| anyhow!("Failed to downcast Procedure statement"))?;
-
-                let mut arg_slots = Vec::new();
-                for arg in &proc.args {
-                    let arg_slot = TypeSlot::Argument(
-                        ctx.scope_path.clone(),
-                        proc.name.clone(),
-                        arg.name.clone(),
-                    );
-                    self.insert_slot(arg_slot.clone(), arg.r#type.as_ref(), Some(stmt.source_location.clone()));
-                    arg_slots.push((arg.name.clone(), arg_slot));
-                }
-
-                ctx.procedures.insert(proc.name.clone(), arg_slots);
-
-                // Recurse into procedure body
-                let mut inner_ctx = ScopeContext {
-                    scope_path: {
-                        let mut p = ctx.scope_path.clone();
-                        p.push(proc.name.clone());
-                        p
-                    },
-                    variables: ctx.variables.clone(),
-                    functions: ctx.functions.clone(),
-                    procedures: ctx.procedures.clone(),
-                };
-
-                for arg in &proc.args {
-                    let arg_slot = TypeSlot::Argument(
-                        ctx.scope_path.clone(),
-                        proc.name.clone(),
-                        arg.name.clone(),
-                    );
-                    inner_ctx.variables.insert(arg.name.clone(), arg_slot);
-                }
-
-                self.discover_slots(&proc.body, &mut inner_ctx)?;
-            }
-            _ => {}
-        }
-        Ok(())
+        result
     }
 
     /// Walk statements looking for assignments and call sites to establish dependencies.

@@ -26,7 +26,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};
 
 use crate::{
-    ast::*, program::expressions::Expr, rosy_lib::{RosyBaseType, RosyType}, syntax_config, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, VariableData, VariableScope}
+    ast::*, program::{expressions::Expr, statements::SourceLocation}, resolve::{ScopeContext, TypeResolver, TypeSlot}, rosy_lib::{RosyBaseType, RosyType}, syntax_config, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, VariableData, VariableScope}
 };
 
 #[derive(Debug)]
@@ -187,7 +187,24 @@ impl FromRule for VarDeclStatement {
         Ok(Some(VarDeclStatement { data }))
     }
 }
-impl TranspileableStatement for VarDeclStatement {}
+impl TranspileableStatement for VarDeclStatement {
+    fn register_declaration(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &mut ScopeContext,
+        source_location: SourceLocation
+    ) -> Option<Result<()>> {
+        let slot = TypeSlot::Variable(
+            ctx.scope_path.clone(),
+            self.data.name.clone(),
+        );
+        
+        resolver.insert_slot(slot.clone(), self.data.r#type.as_ref(), Some(source_location));
+        ctx.variables.insert(self.data.name.clone(), slot);
+
+        Some(Ok(()))
+    }
+}
 impl Transpile for VarDeclStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

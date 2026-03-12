@@ -24,7 +24,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};
 
 use crate::{
-    ast::*, rosy_lib::RosyType, program::statements::*, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationInputFunctionContext, TranspilationOutput, Transpile, VariableData, VariableScope, indent}
+    ast::*, program::statements::*, resolve::{ResolutionRule, ScopeContext, TypeResolver, TypeSlot}, rosy_lib::RosyType, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationInputFunctionContext, TranspilationOutput, Transpile, VariableData, VariableScope, indent}
 };
 
 /// AST node for a user-defined function declaration.
@@ -143,7 +143,91 @@ impl FromRule for FunctionStatement {
         Ok(Some(FunctionStatement { name, args, return_type, body }))
     }
 }
-impl TranspileableStatement for FunctionStatement {}
+impl TranspileableStatement for FunctionStatement {
+    fn register_declaration(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &mut ScopeContext,
+        source_location: SourceLocation
+    ) -> Option<Result<()>> {
+        // Return type slot
+        let ret_slot = TypeSlot::FunctionReturn(
+            ctx.scope_path.clone(),
+            self.name.clone(),
+        );
+        resolver.insert_slot(ret_slot.clone(), self.return_type.as_ref(), Some(source_location.clone()));
+
+        // Argument slots
+        let mut arg_slots = Vec::new();
+        for arg in &self.args {
+            let arg_slot = TypeSlot::Argument(
+                ctx.scope_path.clone(),
+                self.name.clone(),
+                arg.name.clone(),
+            );
+            resolver.insert_slot(arg_slot.clone(), arg.r#type.as_ref(), Some(source_location.clone()));
+            arg_slots.push((arg.name.clone(), arg_slot));
+        }
+
+        ctx.functions.insert(
+            self.name.clone(),
+            (ret_slot.clone(), arg_slots),
+        );
+
+        // Recurse into function body with inner scope
+        let mut inner_ctx = ScopeContext {
+            scope_path: {
+                let mut p = ctx.scope_path.clone();
+                p.push(self.name.clone());
+                p
+            },
+            // Inner scope inherits outer declarations
+            variables: ctx.variables.clone(),
+            functions: ctx.functions.clone(),
+            procedures: ctx.procedures.clone(),
+        };
+
+        // Add args to inner scope as variable references
+        for arg in &self.args {
+            let arg_slot = TypeSlot::Argument(
+                ctx.scope_path.clone(),
+                self.name.clone(),
+                arg.name.clone(),
+            );
+            inner_ctx.variables.insert(arg.name.clone(), arg_slot);
+        }
+
+        // The implicit return variable inside the function body
+        let inner_ret_var_slot = TypeSlot::Variable(
+            inner_ctx.scope_path.clone(),
+            self.name.clone(),
+        );
+        // If the return type is known explicitly, the inner return var is also known
+        resolver.insert_slot(inner_ret_var_slot.clone(), self.return_type.as_ref(), Some(source_location.clone()));
+        inner_ctx.variables.insert(self.name.clone(), inner_ret_var_slot.clone());
+
+        if let Err(e) = resolver.discover_slots(&self.body, &mut inner_ctx) {
+            return Some(Err(e));
+        }
+
+        // If the return type is NOT explicit, it depends on the inner return var
+        if self.return_type.is_none() {
+            if resolver.nodes.contains_key(&inner_ret_var_slot) {
+                let node = resolver.nodes.get_mut(&ret_slot).unwrap();
+                node.rule = ResolutionRule::Mirror {
+                    source: inner_ret_var_slot.clone(),
+                    reason: format!(
+                        "inferred from assignment to return variable '{}'",
+                        self.name
+                    ),
+                };
+                node.depends_on.insert(inner_ret_var_slot);
+            }
+        }
+        
+        Some(Ok(()))
+    }
+}
 impl Transpile for FunctionStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
