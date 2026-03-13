@@ -21,11 +21,11 @@
 //! accumulate multiple errors before failing. Use `.context()` to add
 //! breadcrumbs for error diagnostics.
 
-use std::{any::Any, collections::{BTreeSet, HashMap, HashSet}};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use anyhow::{Result, Error};
-use crate::{program::statements::SourceLocation, resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot}, rosy_lib::RosyType};
+use crate::{program::{expressions::Expr, statements::SourceLocation}, resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot}, rosy_lib::RosyType};
 
-pub trait TranspileableStatement: Transpile + Send + Sync + std::fmt::Debug + Any {
+pub trait TranspileableStatement: Transpile + Send + Sync {
     fn register_declaration(
         &self,
         _resolver: &mut TypeResolver,
@@ -49,8 +49,17 @@ pub trait TranspileableStatement: Transpile + Send + Sync + std::fmt::Debug + An
     ) -> Option<Result<()>> {
         None
     }
+    /// Set the type of an implicit return variable if it matches the given name.
+    /// Used by FunctionStatement to propagate its return type to the first body VarDecl.
+    fn set_implicit_return_type(
+        &mut self,
+        _name: &str,
+        _return_type: &RosyType,
+    ) -> bool {
+        false
+    }
 }
-pub trait TranspileableExpr: Transpile + Send + Sync + std::fmt::Debug + Any {
+pub trait TranspileableExpr: Transpile + Send + Sync {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType>;
     fn discover_expr_function_calls(
         &self,
@@ -67,14 +76,19 @@ pub trait TranspileableExpr: Transpile + Send + Sync + std::fmt::Debug + Any {
     ) -> Option<ExprRecipe> {
         None
     }
+    /// Extend a Concat expression's terms with an additional expression.
+    /// Returns true if this expression is a Concat and the term was added.
+    fn extend_concat(
+        &mut self,
+        _right: Expr,
+    ) -> bool {
+        false
+    }
 }
-pub trait Transpile: std::fmt::Debug + Any {
-    fn transpile ( 
+pub trait Transpile: std::fmt::Debug {
+    fn transpile (
         &self, context: &mut TranspilationInputContext
     ) -> Result<TranspilationOutput, Vec<Error>>;
-    
-    /// Downcast to concrete type for mutable access in the type resolver.
-    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 #[derive(Debug, Clone, PartialEq)]

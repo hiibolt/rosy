@@ -165,7 +165,6 @@ impl TranspileableExpr for VarExpr {
     }
 }
 impl Transpile for VarExpr {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         match self.classify(context)? {
             VarExprKind::FunctionCall => {

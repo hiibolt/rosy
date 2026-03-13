@@ -45,7 +45,6 @@ impl TranspileableExpr for String {
     }
 }
 impl Transpile for String {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, _context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         Ok(TranspilationOutput {
             serialization: format!("&mut String::from(\"{}\")", self),

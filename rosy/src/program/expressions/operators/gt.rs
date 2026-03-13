@@ -55,7 +55,6 @@ impl TranspileableExpr for GtExpr {
     }
 }
 impl Transpile for GtExpr {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         let left_type = self.left.type_of(context)
             .map_err(|e| vec!(e))?;

@@ -59,7 +59,6 @@ impl TranspileableExpr for StringConvertExpr {
     }
 }
 impl Transpile for StringConvertExpr {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         string_convert_transpile_helper(&self.expr, context)
     }

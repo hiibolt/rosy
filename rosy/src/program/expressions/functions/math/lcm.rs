@@ -43,7 +43,6 @@ impl FromRule for LcmExpr {
     }
 }
 impl Transpile for LcmExpr {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(
         &self,
         context: &mut TranspilationInputContext,

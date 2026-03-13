@@ -154,7 +154,6 @@ impl TranspileableStatement for PLoopStatement {
     }
 }
 impl Transpile for PLoopStatement {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         // Verify the start and end expressions are REs
         let start_type = self.start.type_of(context)

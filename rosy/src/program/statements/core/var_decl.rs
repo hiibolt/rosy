@@ -44,7 +44,6 @@ impl VariableDeclarationData {
     }
 }
 impl Transpile for VariableDeclarationData {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     // note that this transpiles as the default value for the type
     fn transpile (
         &self, context: &mut TranspilationInputContext
@@ -225,9 +224,20 @@ impl TranspileableStatement for VarDeclStatement {
         }
         Some(Ok(()))
     }
+    fn set_implicit_return_type(
+        &mut self,
+        name: &str,
+        return_type: &RosyType,
+    ) -> bool {
+        if self.data.name == name && self.data.r#type.is_none() {
+            self.data.r#type = Some(return_type.clone());
+            true
+        } else {
+            false
+        }
+    }
 }
 impl Transpile for VarDeclStatement {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         let resolved_type = self.data.require_type()
             .map_err(|e| vec![e.context(format!("...while transpiling variable declaration for '{}'", self.data.name))])?;

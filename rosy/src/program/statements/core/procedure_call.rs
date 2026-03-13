@@ -64,7 +64,6 @@ impl TranspileableStatement for ProcedureCallStatement {
     }
 }
 impl Transpile for ProcedureCallStatement {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         // Start by checking that the procedure exists
         let proc_context = match context.procedures.get(&self.name) {

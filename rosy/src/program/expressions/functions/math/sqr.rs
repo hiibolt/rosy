@@ -52,7 +52,6 @@ impl FromRule for SqrExpr {
     }
 }
 impl Transpile for SqrExpr {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(
         &self,
         context: &mut TranspilationInputContext,

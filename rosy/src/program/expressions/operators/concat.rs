@@ -91,9 +91,12 @@ impl TranspileableExpr for ConcatExpr {
             .collect();
         Some(ExprRecipe::Concat(recipes))
     }
+    fn extend_concat(&mut self, right: Expr) -> bool {
+        self.terms.push(right);
+        true
+    }
 }
 impl Transpile for ConcatExpr {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         // First, do a type check 
         //

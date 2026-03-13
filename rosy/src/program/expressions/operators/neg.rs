@@ -64,7 +64,6 @@ impl TranspileableExpr for NegExpr {
 }
 
 impl Transpile for NegExpr {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         // Transpile as: RosySub::rosy_sub(&*0.0f64, &*operand)
         let mut serialization = String::from("&mut RosySub::rosy_sub(&*&mut 0.0f64, &*");

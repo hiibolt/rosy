@@ -63,7 +63,6 @@ impl TranspileableExpr for PowExpr {
     }
 }
 impl Transpile for PowExpr {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         // First, ensure the types are compatible
         let left_type = self.left.type_of(context)

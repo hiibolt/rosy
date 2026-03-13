@@ -39,7 +39,6 @@ impl TranspileableExpr for bool {
     }
 }
 impl Transpile for bool {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, _context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         Ok(TranspilationOutput {
             serialization: format!("&mut {}", self),

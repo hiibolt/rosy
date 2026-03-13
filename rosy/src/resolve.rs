@@ -349,7 +349,6 @@ impl TypeResolver {
         }
 
         let mut resolved_count: usize = 0;
-
         while let Some(slot) = queue.pop_front() {
             // Resolve this node if not already resolved
             if self.nodes.get(&slot).map_or(true, |n| n.resolved.is_none()) {

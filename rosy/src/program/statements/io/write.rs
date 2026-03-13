@@ -80,7 +80,6 @@ impl TranspileableStatement for WriteStatement {
     }
 }
 impl Transpile for WriteStatement {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         let mut serialized_exprs = Vec::new();
         let mut requested_variables = BTreeSet::new();

@@ -263,14 +263,8 @@ impl TranspileableStatement for FunctionStatement {
 
         // Resolve the implicit return variable (first stmt in body)
         if let Some(first_stmt) = self.body.first_mut() {
-            if let StatementEnum::VarDecl = first_stmt.enum_variant {
-                if let Some(var_decl) = first_stmt.inner.as_any_mut()
-                    .downcast_mut::<VarDeclStatement>()
-                {
-                    if var_decl.data.name == self.name && var_decl.data.r#type.is_none() {
-                        var_decl.data.r#type = self.return_type.clone();
-                    }
-                }
+            if let Some(return_type) = &self.return_type {
+                first_stmt.inner.set_implicit_return_type(&self.name, return_type);
             }
         }
 
@@ -285,7 +279,6 @@ impl TranspileableStatement for FunctionStatement {
     }
 }
 impl Transpile for FunctionStatement {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         // Resolve the return type (required for transpilation)
         let resolved_return_type = self.return_type

@@ -379,17 +379,11 @@ impl FromRule for Expr {
 
                     // If left is already a Concat, extend its terms instead of nesting
                     if left.enum_variant == ExprEnum::Concat {
-                        // Downcast through Any trait to take ownership of the ConcatExpr
-                        let left_any: Box<dyn std::any::Any> = left.inner;
-                        if let Ok(concat_expr) = left_any.downcast::<ConcatExpr>() {
-                            let mut terms = concat_expr.terms;
-                            terms.push(right);
-                            Ok(Expr {
-                                enum_variant: ExprEnum::Concat,
-                                inner: Box::new(ConcatExpr { terms })
-                            })
+                        let mut left = left;
+                        if left.inner.extend_concat(right) {
+                            Ok(left)
                         } else {
-                            bail!("Failed to downcast Concat expression - internal inconsistency")
+                            bail!("Failed to extend Concat expression - internal inconsistency")
                         }
                     } else {
                         let terms = vec![left, right];
@@ -515,7 +509,6 @@ impl TranspileableExpr for Expr {
     }
 }
 impl Transpile for Expr {
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile (
         &self, context: &mut TranspilationInputContext
     ) -> Result<TranspilationOutput, Vec<Error>> {
