@@ -31,7 +31,7 @@
 //! x := v|2;              { extracts 20 (1-indexed) }
 //! ```
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
@@ -39,6 +39,7 @@ use crate::transpile::TranspileableExpr;
 use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error};
 use crate::rosy_lib::RosyType;
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe, BinaryOpKind};
 
 /// AST node for the extraction operator (`|`).
 #[derive(Debug, PartialEq)]
@@ -69,9 +70,17 @@ impl TranspileableExpr for ExtractExpr {
 
         Ok(result_type)
     }
+    fn discover_expr_function_calls(&self, resolver: &mut TypeResolver, ctx: &ScopeContext) -> Option<Result<()>> {
+        Some(resolver.discover_expr_function_calls(&self.object, ctx)
+            .and_then(|_| resolver.discover_expr_function_calls(&self.index, ctx)))
+    }
+    fn build_expr_recipe(&self, resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        let left = resolver.build_expr_recipe(&self.object, ctx, deps);
+        let right = resolver.build_expr_recipe(&self.index, ctx, deps);
+        Some(ExprRecipe::BinaryOp { op: BinaryOpKind::Extract, left: Box::new(left), right: Box::new(right) })
+    }
 }
 impl Transpile for ExtractExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         // First, ensure the types are compatible

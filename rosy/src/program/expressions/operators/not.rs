@@ -25,6 +25,7 @@
 //! ```
 
 use std::collections::BTreeSet;
+use std::collections::HashSet;
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
@@ -32,6 +33,7 @@ use crate::transpile::TranspileableExpr;
 use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 
 /// Logical NOT expression (unary operator).
 /// Supports both `!x` and `NOT x` syntax.
@@ -54,9 +56,11 @@ impl TranspileableExpr for NotExpr {
             self.operand.type_of(context)?
         ))
     }
+    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        Some(ExprRecipe::Literal(RosyType::LO()))
+    }
 }
 impl Transpile for NotExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         let operand_type = self.operand.type_of(context)

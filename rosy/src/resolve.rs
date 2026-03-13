@@ -1,18 +1,322 @@
-/// Phase 2: Topological Resolution (Kahn's Algorithm)
-///
-/// Processes the dependency graph built in Phase 1, resolving type slots
-/// from leaves inward. Each slot is resolved exactly once. Cycles and
-/// unresolvable slots produce clear error messages.
+//! # Type Resolution
+//!
+//! Dependency-graph-based type inference pass that runs between AST
+//! construction and transpilation. Fills in `Option<RosyType>` fields
+//! left as `None` during parsing.
+//!
+//! ## Algorithm
+//!
+//! 1. Walk the AST to discover all "type slots" (variables, function args,
+//!    function return types, procedure args)
+//! 2. Build a dependency graph between unresolved slots
+//! 3. Topologically sort (Kahn's algorithm) and resolve from leaves inward
+//! 4. Report cycles as errors
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use anyhow::{anyhow, Result};
 use crate::rosy_lib::RosyType;
+use crate::program::Program;
+use crate::program::statements::*;
+use crate::program::expressions::*;
 
-use super::{
-    TypeResolver, TypeSlot, ResolutionRule, ExprRecipe, BinaryOpKind, GraphNode,
-};
+// ─── Type Slot ──────────────────────────────────────────────────────────────
+
+/// A unique identifier for a type slot in the dependency graph.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum TypeSlot {
+    /// A variable declaration: (scope_path, variable_name)
+    Variable(Vec<String>, String),
+    /// A function return type: (scope_path, function_name)
+    FunctionReturn(Vec<String>, String),
+    /// A function/procedure argument: (scope_path, callable_name, arg_name)
+    Argument(Vec<String>, String, String),
+}
+
+impl std::fmt::Display for TypeSlot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TypeSlot::Variable(scope, name) => {
+                if scope.is_empty() {
+                    write!(f, "variable '{}'", name)
+                } else {
+                    write!(f, "variable '{}' (in {})", name, scope.join(" > "))
+                }
+            }
+            TypeSlot::FunctionReturn(scope, name) => {
+                if scope.is_empty() {
+                    write!(f, "return type of function '{}'", name)
+                } else {
+                    write!(f, "return type of function '{}' (in {})", name, scope.join(" > "))
+                }
+            }
+            TypeSlot::Argument(scope, callable, arg) => {
+                if scope.is_empty() {
+                    write!(f, "argument '{}' of '{}'", arg, callable)
+                } else {
+                    write!(f, "argument '{}' of '{}' (in {})", arg, callable, scope.join(" > "))
+                }
+            }
+        }
+    }
+}
+
+// ─── Resolution Rule ────────────────────────────────────────────────────────
+
+/// Describes *how* to compute a slot's type once all its dependencies are resolved.
+#[derive(Debug, Clone)]
+pub enum ResolutionRule {
+    /// The type is already known from an explicit annotation.
+    Explicit(RosyType),
+    /// Inferred from an assignment RHS or call-site argument expression.
+    InferredFrom {
+        recipe: ExprRecipe,
+        /// Human-readable explanation of where this inference came from.
+        reason: String,
+    },
+    /// Mirrors another slot exactly (e.g., return type from implicit return var).
+    Mirror {
+        source: TypeSlot,
+        /// Human-readable explanation of why this slot mirrors another.
+        reason: String,
+    },
+    /// No rule has been established yet — the slot is truly unknown.
+    /// Will remain unresolved and trigger an error if not replaced.
+    Unresolved,
+}
+
+// ─── Expression Recipe ──────────────────────────────────────────────────────
+
+/// A lightweight "recipe" for computing the type of an expression.
+/// Stores just enough info to re-derive the type once dependencies are resolved.
+#[derive(Debug, Clone)]
+pub enum ExprRecipe {
+    /// A literal type — always known.
+    Literal(RosyType),
+    /// A variable reference — look up its slot.
+    Variable(TypeSlot),
+    /// A binary operator applied to two sub-recipes.
+    BinaryOp { op: BinaryOpKind, left: Box<ExprRecipe>, right: Box<ExprRecipe> },
+    /// An n-ary concat of sub-recipes.
+    Concat(Vec<ExprRecipe>),
+    /// SIN intrinsic — result depends on input type.
+    Sin(Box<ExprRecipe>),
+    /// Expression whose type couldn't be determined statically.
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum BinaryOpKind {
+    Add, Sub, Mult, Div, Extract, Derive, Pow,
+}
+
+// ─── Dependency Graph Node ──────────────────────────────────────────────────
+
+#[derive(Debug)]
+pub struct GraphNode {
+    pub slot: TypeSlot,
+    /// How to compute this slot's type once dependencies are met.
+    pub rule: ResolutionRule,
+    /// Slots that this node depends on (must be resolved first).
+    pub depends_on: HashSet<TypeSlot>,
+    /// The resolved type (filled in during topological traversal).
+    pub resolved: Option<RosyType>,
+    /// Where this slot was declared (VARIABLE statement source location).
+    pub declared_at: Option<SourceLocation>,
+    /// Where the assignment that established the type inference rule is.
+    pub assigned_at: Option<SourceLocation>,
+}
+
+// ─── Scope Context (used during graph construction) ─────────────────────────
+
+/// Tracks what's been declared so far in a scope during the discovery walk.
+#[derive(Debug, Clone, Default)]
+pub struct ScopeContext {
+    pub scope_path: Vec<String>,
+    /// Maps variable name → its TypeSlot.
+    pub variables: HashMap<String, TypeSlot>,
+    /// Maps function name → (return_type_slot, vec of (arg_name, arg_slot)).
+    pub functions: HashMap<String, (TypeSlot, Vec<(String, TypeSlot)>)>,
+    /// Maps procedure name → vec of (arg_name, arg_slot).
+    pub procedures: HashMap<String, Vec<(String, TypeSlot)>>,
+}
+
+// ─── Type Resolver ──────────────────────────────────────────────────────────
+
+pub struct TypeResolver {
+    /// All nodes in the dependency graph, keyed by their slot.
+    pub nodes: HashMap<TypeSlot, GraphNode>,
+}
 
 impl TypeResolver {
+    pub fn new() -> Self {
+        TypeResolver {
+            nodes: HashMap::new(),
+        }
+    }
+
+    // ─── Public entry point ─────────────────────────────────────────────
+
+    /// Run type resolution on a program. Mutates the AST in place.
+    pub fn resolve(program: &mut Program) -> Result<()> {
+        let mut resolver = TypeResolver::new();
+        let mut ctx = ScopeContext::default();
+
+        // Phase 1: Walk AST, discover all slots and build dependency graph
+        resolver.discover_slots(&program.statements, &mut ctx)?;
+
+        // Phase 2: Topological sort + resolve
+        resolver.topological_resolve()?;
+
+        // Phase 3: Apply resolved types back to the AST
+        resolver.apply_to_ast(&mut program.statements, &[])?;
+
+        Ok(())
+    }
+
+    // ─── Graph Infrastructure ───────────────────────────────────────────
+
+    /// Insert a node for a slot. If it has an explicit type, mark it resolved.
+    pub fn insert_slot(&mut self, slot: TypeSlot, explicit_type: Option<&RosyType>, declared_at: Option<SourceLocation>) {
+        if let Some(t) = explicit_type {
+            self.nodes.insert(slot.clone(), GraphNode {
+                slot,
+                rule: ResolutionRule::Explicit(t.clone()),
+                depends_on: HashSet::new(),
+                resolved: Some(t.clone()),
+                declared_at,
+                assigned_at: None,
+            });
+        } else {
+            // Placeholder — rule and deps will be set by discover_dependencies
+            self.nodes.entry(slot.clone()).or_insert_with(|| GraphNode {
+                slot,
+                rule: ResolutionRule::Unresolved,
+                depends_on: HashSet::new(),
+                resolved: None,
+                declared_at,
+                assigned_at: None,
+            });
+        }
+    }
+
+    // ─── Phase 1: Discovery ─────────────────────────────────────────────
+
+    /// Walk the AST, creating graph nodes for every type slot and recording
+    /// their dependencies.
+    pub fn discover_slots(
+        &mut self,
+        statements: &[Statement],
+        ctx: &mut ScopeContext,
+    ) -> Result<()> {
+        // First pass: register all declarations so we know what exists
+        for stmt in statements {
+            self.register_declaration(stmt, ctx)?;
+        }
+
+        // Second pass: discover dependencies from assignments and call sites
+        for stmt in statements {
+            self.discover_dependencies(stmt, ctx)?;
+        }
+
+        Ok(())
+    }
+
+    /// Register a declaration, creating graph nodes for its type slots.
+    pub fn register_declaration(
+        &mut self,
+        stmt: &Statement,
+        ctx: &mut ScopeContext,
+    ) -> Result<()> {
+        let Some(result) = stmt.inner.register_declaration(self, ctx, stmt.source_location.clone()) else {
+            return Ok(()); // not a declaration, skip
+        };
+
+        result
+    }
+
+    /// Walk statements looking for assignments and call sites to establish dependencies.
+    pub fn discover_dependencies(
+        &mut self,
+        stmt: &Statement,
+        ctx: &mut ScopeContext,
+    ) -> Result<()> {
+        let Some(result) = stmt.inner.discover_dependencies(self, ctx, stmt.source_location.clone()) else {
+            return Ok(()); // no dependencies to discover, skip
+        };
+
+        result
+    }
+
+    /// Recursively walk an expression tree looking for function calls.
+    /// For each one found, wire up call-site argument dependencies.
+    pub fn discover_expr_function_calls(
+        &mut self,
+        expr: &Expr,
+        ctx: &ScopeContext,
+    ) -> Result<()> {
+        let Some(result) = expr.inner.discover_expr_function_calls(self, ctx) else {
+            return Ok(());
+        };
+
+        result
+    }
+
+    /// For a call site like `F(X, Y)`, if `F` has untyped parameters, add
+    /// dependencies from the parameter slots to the argument expressions.
+    pub fn discover_call_site_deps(
+        &mut self,
+        name: &str,
+        args: &[Expr],
+        is_function: bool,
+        ctx: &ScopeContext,
+    ) -> Result<()> {
+        let param_slots: Option<Vec<(String, TypeSlot)>> = if is_function {
+            ctx.functions.get(name).map(|(_, params)| params.clone())
+        } else {
+            ctx.procedures.get(name).map(|params| params.clone())
+        };
+
+        if let Some(params) = param_slots {
+            for (i, arg_expr) in args.iter().enumerate() {
+                if let Some((_, param_slot)) = params.get(i) {
+                    // Only update if the parameter slot is unresolved
+                    if let Some(param_node) = self.nodes.get(param_slot) {
+                        if param_node.resolved.is_some() {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
+
+                    // Build recipe for the argument expression
+                    let mut deps = HashSet::new();
+                    let recipe = self.build_expr_recipe(arg_expr, ctx, &mut deps);
+
+                    let node = self.nodes.get_mut(param_slot).unwrap();
+                    node.rule = ResolutionRule::InferredFrom {
+                        recipe,
+                        reason: format!("inferred from argument {} at call site", i + 1),
+                    };
+                    node.depends_on = deps;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Build an ExprRecipe from an AST expression, collecting dependency slots.
+    pub fn build_expr_recipe(
+        &self,
+        expr: &Expr,
+        ctx: &ScopeContext,
+        deps: &mut HashSet<TypeSlot>,
+    ) -> ExprRecipe {
+        expr.inner.build_expr_recipe(self, ctx, deps).unwrap_or(ExprRecipe::Unknown)
+    }
+
+    // ─── Phase 2: Topological Resolution ────────────────────────────────
+
     /// Process nodes whose dependencies are all resolved first, resolve them,
     /// then process their dependents, and so on. One pass — no iteration.
     pub fn topological_resolve(&mut self) -> Result<()> {
@@ -296,5 +600,23 @@ impl TypeResolver {
                 Err(anyhow!("Cannot evaluate unknown expression recipe"))
             }
         }
+    }
+
+    // ─── Phase 3: Apply Resolved Types ──────────────────────────────────
+
+    /// Walk the AST and fill in all `None` type fields with resolved types.
+    pub fn apply_to_ast(
+        &self,
+        statements: &mut [Statement],
+        current_scope: &[String],
+    ) -> Result<()> {
+        for stmt in statements.iter_mut() {
+            let Some(result) = stmt.inner.apply_resolved_types(self, current_scope) else {
+                continue;
+            };
+            result?;
+        }
+
+        Ok(())
     }
 }

@@ -28,8 +28,10 @@ use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr};
 use crate::rosy_lib::RosyType;
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 use anyhow::{Result, Error, Context as AnyhowContext};
 use std::collections::BTreeSet;
+use std::collections::HashSet;
 
 /// AST node for the `SIN(expr)` intrinsic function.
 #[derive(Debug, PartialEq)]
@@ -50,7 +52,6 @@ impl FromRule for SinExpr {
     }
 }
 impl Transpile for SinExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(
         &self,
@@ -91,5 +92,12 @@ impl TranspileableExpr for SinExpr {
                     inner_type
                 )
             })
+    }
+    fn discover_expr_function_calls(&self, resolver: &mut TypeResolver, ctx: &ScopeContext) -> Option<Result<()>> {
+        Some(resolver.discover_expr_function_calls(&self.expr, ctx))
+    }
+    fn build_expr_recipe(&self, resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        let inner = resolver.build_expr_recipe(&self.expr, ctx, deps);
+        Some(ExprRecipe::Sin(Box::new(inner)))
     }
 }

@@ -21,9 +21,9 @@
 //! accumulate multiple errors before failing. Use `.context()` to add
 //! breadcrumbs for error diagnostics.
 
-use std::{any::Any, collections::{BTreeSet, HashMap}};
+use std::{any::Any, collections::{BTreeSet, HashMap, HashSet}};
 use anyhow::{Result, Error};
-use crate::{program::statements::SourceLocation, resolve::{ScopeContext, TypeResolver}, rosy_lib::RosyType};
+use crate::{program::statements::SourceLocation, resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot}, rosy_lib::RosyType};
 
 pub trait TranspileableStatement: Transpile + Send + Sync + std::fmt::Debug + Any {
     fn register_declaration(
@@ -42,31 +42,39 @@ pub trait TranspileableStatement: Transpile + Send + Sync + std::fmt::Debug + An
     ) -> Option<Result<()>> {
         None
     }
+    fn apply_resolved_types(
+        &mut self,
+        _resolver: &TypeResolver,
+        _current_scope: &[String],
+    ) -> Option<Result<()>> {
+        None
+    }
 }
 pub trait TranspileableExpr: Transpile + Send + Sync + std::fmt::Debug + Any {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType>;
+    fn discover_expr_function_calls(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &ScopeContext,
+    ) -> Option<Result<()>> {
+        None
+    }
+    fn build_expr_recipe(
+        &self,
+        _resolver: &TypeResolver,
+        _ctx: &ScopeContext,
+        _deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
+        None
+    }
 }
 pub trait Transpile: std::fmt::Debug + Any {
     fn transpile ( 
         &self, context: &mut TranspilationInputContext
     ) -> Result<TranspilationOutput, Vec<Error>>;
     
-    /// Downcast to concrete type for the type resolver.
-    fn as_any(&self) -> &dyn Any;
     /// Downcast to concrete type for mutable access in the type resolver.
     fn as_any_mut(&mut self) -> &mut dyn Any;
-}
-
-/// Macro to implement the `as_any` and `as_any_mut` methods for a concrete type.
-/// Use inside an `impl Transpile for T` block is not possible, so instead we provide
-/// this as a helper to generate standalone impls. Actually, since we need it in the
-/// trait impl itself, we provide a macro that generates the two methods.
-#[macro_export]
-macro_rules! impl_as_any {
-    () => {
-        fn as_any(&self) -> &dyn std::any::Any { self }
-        fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
-    };
 }
 
 #[derive(Debug, Clone, PartialEq)]

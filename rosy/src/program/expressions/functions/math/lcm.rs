@@ -20,7 +20,8 @@ use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr};
 use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 
 /// LCM(n) — Complex memory size estimator (COSY compatibility).
 /// Returns `2*n` as RE. Rosy doesn't need memory management.
@@ -42,7 +43,6 @@ impl FromRule for LcmExpr {
     }
 }
 impl Transpile for LcmExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(
         &self,
@@ -67,5 +67,8 @@ impl Transpile for LcmExpr {
 impl TranspileableExpr for LcmExpr {
     fn type_of(&self, _context: &TranspilationInputContext) -> Result<RosyType> {
         Ok(RosyType::RE())
+    }
+    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        Some(ExprRecipe::Literal(RosyType::RE()))
     }
 }

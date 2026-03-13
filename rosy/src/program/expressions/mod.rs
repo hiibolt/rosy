@@ -33,7 +33,8 @@ pub mod functions;
 pub mod operators;
 pub mod types;
 
-use crate::{ast::{FromRule, PRATT_PARSER, Rule}, rosy_lib::RosyType, transpile::{TranspileableExpr, add_context_to_all}};
+use std::collections::HashSet;
+use crate::{ast::{FromRule, PRATT_PARSER, Rule}, resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot}, rosy_lib::RosyType, transpile::{TranspileableExpr, add_context_to_all}};
 use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 
 use crate::program::expressions::core::var_expr::VarExpr;
@@ -497,9 +498,23 @@ impl TranspileableExpr for Expr {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
         self.inner.type_of(context)
     }
+    fn discover_expr_function_calls(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &ScopeContext,
+    ) -> Option<Result<()>> {
+        self.inner.discover_expr_function_calls(resolver, ctx)
+    }
+    fn build_expr_recipe(
+        &self,
+        resolver: &TypeResolver,
+        ctx: &ScopeContext,
+        deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
+        self.inner.build_expr_recipe(resolver, ctx, deps)
+    }
 }
 impl Transpile for Expr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile (
         &self, context: &mut TranspilationInputContext

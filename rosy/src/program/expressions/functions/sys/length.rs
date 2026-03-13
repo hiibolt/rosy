@@ -35,7 +35,8 @@ use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr};
 use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 
 /// AST node for the `LENGTH(expr)` system function.
 #[derive(Debug, PartialEq)]
@@ -56,7 +57,6 @@ impl FromRule for LengthExpr {
     }
 }
 impl Transpile for LengthExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(
         &self,
@@ -84,11 +84,11 @@ impl Transpile for LengthExpr {
 impl TranspileableExpr for LengthExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         use crate::rosy_lib::intrinsics::length;
-        
+
         // Get the type of the inner expression
         let inner_type = self.expr.type_of(context)
             .context("Failed to determine type of inner expression in LENGTH")?;
-        
+
         // Use the LENGTH registry to get the return type
         length::get_return_type(&inner_type)
             .ok_or_else(|| {
@@ -97,5 +97,8 @@ impl TranspileableExpr for LengthExpr {
                     inner_type
                 )
             })
+    }
+    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        Some(ExprRecipe::Literal(RosyType::RE()))
     }
 }

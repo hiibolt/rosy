@@ -17,10 +17,13 @@
 //! WRITE 6 'The answer is: ' ST(x);
 //! ```
 
+use std::collections::HashSet;
+
 use crate::ast::{FromRule, Rule};
 use crate::transpile::*;
 use crate::program::expressions::Expr;
 use crate::rosy_lib::RosyType;
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 use anyhow::{Result, Error, anyhow, Context};
 
 /// AST node for the `ST(expr)` type conversion function.
@@ -48,9 +51,14 @@ impl TranspileableExpr for StringConvertExpr {
         crate::rosy_lib::intrinsics::st::get_return_type(&expr_type)
             .ok_or(anyhow::anyhow!("Cannot convert type '{expr_type}' to 'ST'!"))
     }
+    fn discover_expr_function_calls(&self, resolver: &mut TypeResolver, ctx: &ScopeContext) -> Option<Result<()>> {
+        Some(resolver.discover_expr_function_calls(&self.expr, ctx))
+    }
+    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        Some(ExprRecipe::Literal(RosyType::ST()))
+    }
 }
 impl Transpile for StringConvertExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         string_convert_transpile_helper(&self.expr, context)

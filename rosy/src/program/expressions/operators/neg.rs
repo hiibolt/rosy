@@ -21,10 +21,12 @@
 //! ```
 
 use std::collections::BTreeSet;
+use std::collections::HashSet;
 
 use anyhow::{Result, Error, anyhow};
 use crate::ast::{FromRule, Rule};
 use crate::rosy_lib::RosyType;
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 use crate::transpile::{Transpile, TranspileableExpr, TranspilationInputContext, TranspilationOutput};
 use crate::program::expressions::Expr;
 
@@ -53,10 +55,15 @@ impl TranspileableExpr for NegExpr {
                 "Cannot negate type '{}' (no subtraction from RE defined)", operand_type
             ))
     }
+    fn discover_expr_function_calls(&self, resolver: &mut TypeResolver, ctx: &ScopeContext) -> Option<Result<()>> {
+        Some(resolver.discover_expr_function_calls(&self.operand, ctx))
+    }
+    fn build_expr_recipe(&self, resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        Some(resolver.build_expr_recipe(&self.operand, ctx, deps))
+    }
 }
 
 impl Transpile for NegExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         // Transpile as: RosySub::rosy_sub(&*0.0f64, &*operand)

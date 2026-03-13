@@ -28,7 +28,8 @@ use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr};
 use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 
 /// AST node for the `VMAX(expr)` function (vector maximum).
 #[derive(Debug, PartialEq)]
@@ -49,7 +50,6 @@ impl FromRule for VmaxExpr {
     }
 }
 impl Transpile for VmaxExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(
         &self,
@@ -75,7 +75,7 @@ impl TranspileableExpr for VmaxExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         let inner_type = self.expr.type_of(context)
             .context("Failed to determine type of inner expression in VMAX")?;
-        
+
         match inner_type {
             t if t == RosyType::VE() => Ok(RosyType::RE()),
             _ => anyhow::bail!(
@@ -83,5 +83,8 @@ impl TranspileableExpr for VmaxExpr {
                 inner_type
             ),
         }
+    }
+    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        Some(ExprRecipe::Literal(RosyType::RE()))
     }
 }

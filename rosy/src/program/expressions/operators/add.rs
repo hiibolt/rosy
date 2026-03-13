@@ -44,7 +44,7 @@
 //! v := v + 10;          { VE + RE → VE (componentwise) }
 //! ```
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
@@ -52,6 +52,7 @@ use crate::transpile::TranspileableExpr;
 use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe, BinaryOpKind};
 
 /// AST node for the binary addition operator (`+`).
 ///
@@ -79,9 +80,17 @@ impl TranspileableExpr for AddExpr {
             self.right.type_of(context)?
         ))
     }
+    fn discover_expr_function_calls(&self, resolver: &mut TypeResolver, ctx: &ScopeContext) -> Option<Result<()>> {
+        Some(resolver.discover_expr_function_calls(&self.left, ctx)
+            .and_then(|_| resolver.discover_expr_function_calls(&self.right, ctx)))
+    }
+    fn build_expr_recipe(&self, resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        let left = resolver.build_expr_recipe(&self.left, ctx, deps);
+        let right = resolver.build_expr_recipe(&self.right, ctx, deps);
+        Some(ExprRecipe::BinaryOp { op: BinaryOpKind::Add, left: Box::new(left), right: Box::new(right) })
+    }
 }
 impl Transpile for AddExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         // First, ensure the types are compatible

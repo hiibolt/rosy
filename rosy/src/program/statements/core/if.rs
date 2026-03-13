@@ -163,9 +163,28 @@ impl TranspileableStatement for IfStatement {
         }
         Some(Ok(()))
     }
+    fn apply_resolved_types(
+        &mut self,
+        resolver: &TypeResolver,
+        current_scope: &[String],
+    ) -> Option<Result<()>> {
+        if let Err(e) = resolver.apply_to_ast(&mut self.then_body, current_scope) {
+            return Some(Err(e));
+        }
+        for elseif in &mut self.elseif_clauses {
+            if let Err(e) = resolver.apply_to_ast(&mut elseif.body, current_scope) {
+                return Some(Err(e));
+            }
+        }
+        if let Some(else_body) = &mut self.else_body {
+            if let Err(e) = resolver.apply_to_ast(else_body, current_scope) {
+                return Some(Err(e));
+            }
+        }
+        Some(Ok(()))
+    }
 }
 impl Transpile for ElseIfClause {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         // Verify the condition is a logical expression
@@ -232,7 +251,6 @@ impl Transpile for ElseIfClause {
     }
 }
 impl Transpile for IfStatement {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         // Verify the condition is a logical expression

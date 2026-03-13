@@ -154,9 +154,36 @@ impl TranspileableStatement for ProcedureStatement {
 
         Some(Ok(()))
     }
+    fn apply_resolved_types(
+        &mut self,
+        resolver: &TypeResolver,
+        current_scope: &[String],
+    ) -> Option<Result<()>> {
+        for arg in &mut self.args {
+            if arg.r#type.is_none() {
+                let slot = TypeSlot::Argument(
+                    current_scope.to_vec(),
+                    self.name.clone(),
+                    arg.name.clone(),
+                );
+                if let Some(node) = resolver.nodes.get(&slot) {
+                    if let Some(t) = &node.resolved {
+                        arg.r#type = Some(t.clone());
+                    }
+                }
+            }
+        }
+
+        let mut inner_scope = current_scope.to_vec();
+        inner_scope.push(self.name.clone());
+        if let Err(e) = resolver.apply_to_ast(&mut self.body, &inner_scope) {
+            return Some(Err(e));
+        }
+
+        Some(Ok(()))
+    }
 }
 impl Transpile for ProcedureStatement {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         // Resolve all argument types (required for transpilation)

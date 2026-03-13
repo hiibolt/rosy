@@ -23,7 +23,8 @@ use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr};
 use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 
 /// LST(n) — String memory size estimator (COSY compatibility).
 /// Returns `n` as RE. Rosy doesn't need memory management, but returns
@@ -46,7 +47,6 @@ impl FromRule for LstExpr {
     }
 }
 impl Transpile for LstExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(
         &self,
@@ -71,5 +71,8 @@ impl Transpile for LstExpr {
 impl TranspileableExpr for LstExpr {
     fn type_of(&self, _context: &TranspilationInputContext) -> Result<RosyType> {
         Ok(RosyType::RE())
+    }
+    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        Some(ExprRecipe::Literal(RosyType::RE()))
     }
 }

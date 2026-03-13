@@ -20,7 +20,9 @@ use crate::transpile::TranspileableExpr;
 use crate::program::expressions::Expr;
 use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error, anyhow, Context};
+use std::collections::HashSet;
 use crate::rosy_lib::RosyType;
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 
 /// AST node for the `LO(expr)` type conversion function.
 #[derive(Debug, PartialEq)]
@@ -46,9 +48,11 @@ impl TranspileableExpr for LogicalConvertExpr {
         crate::rosy_lib::intrinsics::lo::get_return_type(&expr_type)
             .ok_or(anyhow::anyhow!("Cannot convert type '{expr_type}' to 'LO'!"))
     }
+    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        Some(ExprRecipe::Literal(RosyType::LO()))
+    }
 }
 impl Transpile for LogicalConvertExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         // First, ensure the type is convertible to LO

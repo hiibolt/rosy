@@ -44,7 +44,6 @@ impl VariableDeclarationData {
     }
 }
 impl Transpile for VariableDeclarationData {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     // note that this transpiles as the default value for the type
     fn transpile (
@@ -204,9 +203,30 @@ impl TranspileableStatement for VarDeclStatement {
 
         Some(Ok(()))
     }
+    fn apply_resolved_types(
+        &mut self,
+        resolver: &TypeResolver,
+        current_scope: &[String],
+    ) -> Option<Result<()>> {
+        if self.data.r#type.is_none() {
+            let slot = TypeSlot::Variable(
+                current_scope.to_vec(),
+                self.data.name.clone(),
+            );
+            if let Some(node) = resolver.nodes.get(&slot) {
+                if let Some(t) = &node.resolved {
+                    let mut resolved = t.clone();
+                    if !self.data.dimension_exprs.is_empty() {
+                        resolved.dimensions = self.data.dimension_exprs.len();
+                    }
+                    self.data.r#type = Some(resolved);
+                }
+            }
+        }
+        Some(Ok(()))
+    }
 }
 impl Transpile for VarDeclStatement {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         let resolved_type = self.data.require_type()

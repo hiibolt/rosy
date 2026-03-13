@@ -29,7 +29,8 @@ use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr};
 use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
-use std::collections::BTreeSet;
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe, BinaryOpKind};
+use std::collections::{BTreeSet, HashSet};
 
 /// DA%n = partial derivative w.r.t. variable n (positive n)
 /// DA%(-n) = anti-derivative (integral) w.r.t. variable n (negative n)
@@ -40,7 +41,6 @@ pub struct DeriveExpr {
 }
 
 impl Transpile for DeriveExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(
         &self,
@@ -80,5 +80,10 @@ impl TranspileableExpr for DeriveExpr {
                 object_type
             ),
         }
+    }
+    fn build_expr_recipe(&self, resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        let left = resolver.build_expr_recipe(&self.object, ctx, deps);
+        let right = resolver.build_expr_recipe(&self.index, ctx, deps);
+        Some(ExprRecipe::BinaryOp { op: BinaryOpKind::Derive, left: Box::new(left), right: Box::new(right) })
     }
 }

@@ -32,6 +32,7 @@
 //! ```
 
 use std::collections::BTreeSet;
+use std::collections::HashSet;
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
@@ -39,6 +40,7 @@ use crate::transpile::TranspileableExpr;
 use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Context, Error, anyhow};
 use crate::rosy_lib::RosyType;
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 
 /// AST node for the concatenation operator (`&`).
 ///
@@ -75,9 +77,22 @@ impl TranspileableExpr for ConcatExpr {
 
         Ok(r#type)
     }
+    fn discover_expr_function_calls(&self, resolver: &mut TypeResolver, ctx: &ScopeContext) -> Option<Result<()>> {
+        for term in &self.terms {
+            if let Err(e) = resolver.discover_expr_function_calls(term, ctx) {
+                return Some(Err(e));
+            }
+        }
+        Some(Ok(()))
+    }
+    fn build_expr_recipe(&self, resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        let recipes: Vec<ExprRecipe> = self.terms.iter()
+            .map(|t| resolver.build_expr_recipe(t, ctx, deps))
+            .collect();
+        Some(ExprRecipe::Concat(recipes))
+    }
 }
 impl Transpile for ConcatExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         // First, do a type check 

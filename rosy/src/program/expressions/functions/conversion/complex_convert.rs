@@ -23,7 +23,9 @@ use crate::program::expressions::Expr;
 use crate::transpile::TranspileableExpr;
 use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 use anyhow::{Result, Error, Context};
+use std::collections::HashSet;
 use crate::rosy_lib::RosyType;
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 
 /// AST node for the `CM(expr)` type conversion function.
 #[derive(Debug, PartialEq)]
@@ -54,9 +56,11 @@ impl TranspileableExpr for ComplexConvertExpr {
             ))?;
         Ok(result_type)
     }
+    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        Some(ExprRecipe::Literal(RosyType::CM()))
+    }
 }
 impl Transpile for ComplexConvertExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         // First, ensure the type is convertible to CM

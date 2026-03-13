@@ -28,8 +28,10 @@ use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr};
 use crate::rosy_lib::RosyType;
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 use anyhow::{Result, Error, Context as AnyhowContext};
 use std::collections::BTreeSet;
+use std::collections::HashSet;
 
 /// AST node for the `EXP(expr)` intrinsic function (exponential e^x).
 #[derive(Debug, PartialEq)]
@@ -50,7 +52,6 @@ impl FromRule for ExpExpr {
     }
 }
 impl Transpile for ExpExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(
         &self,
@@ -89,5 +90,9 @@ impl TranspileableExpr for ExpExpr {
                     inner_type
                 )
             })
+    }
+    fn build_expr_recipe(&self, resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        let inner = resolver.build_expr_recipe(&self.expr, ctx, deps);
+        Some(ExprRecipe::Sin(Box::new(inner)))
     }
 }

@@ -29,7 +29,9 @@ use crate::{
     transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr}
 };
 use anyhow::{Error, Context};
+use std::collections::HashSet;
 use crate::rosy_lib::RosyType;
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 
 /// AST node for the `DA(n)` constructor expression.
 #[derive(Debug, PartialEq)]
@@ -53,9 +55,11 @@ impl TranspileableExpr for DAExpr {
     fn type_of(&self, _context: &TranspilationInputContext) -> anyhow::Result<RosyType> {
         Ok(RosyType::DA())
     }
+    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        Some(ExprRecipe::Literal(RosyType::DA()))
+    }
 }
 impl Transpile for DAExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(
         &self,

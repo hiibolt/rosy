@@ -71,9 +71,18 @@ impl TranspileableStatement for WhileStatement {
     ) -> Option<Result<()>> {
         Some(resolver.discover_slots(&self.body, &mut ctx.clone()))
     }
+    fn apply_resolved_types(
+        &mut self,
+        resolver: &TypeResolver,
+        current_scope: &[String],
+    ) -> Option<Result<()>> {
+        if let Err(e) = resolver.apply_to_ast(&mut self.body, current_scope) {
+            return Some(Err(e));
+        }
+        Some(Ok(()))
+    }
 }
 impl Transpile for WhileStatement {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         // Verify the condition is a logical expression

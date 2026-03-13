@@ -33,6 +33,9 @@ use anyhow::{Result, Context, Error, anyhow};
 use crate::rosy_lib::RosyType;
 use crate::program::expressions::Expr;
 use std::collections::BTreeSet;
+use std::collections::HashSet;
+
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 
 /// What a `variable_identifier` AST node actually represents,
 /// determined at transpile time via the decision tree.
@@ -151,9 +154,17 @@ impl TranspileableExpr for VarExpr {
             }
         }
     }
+    fn build_expr_recipe(&self, _resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        let ident = &self.identifier;
+        if let Some(slot) = ctx.variables.get(&ident.name) {
+            deps.insert(slot.clone());
+            Some(ExprRecipe::Variable(slot.clone()))
+        } else {
+            Some(ExprRecipe::Unknown)
+        }
+    }
 }
 impl Transpile for VarExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         match self.classify(context)? {

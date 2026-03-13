@@ -9,7 +9,8 @@
 //! FALSE
 //! ```
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 use anyhow::{Result, Error, bail};
 
 use crate::{
@@ -33,9 +34,11 @@ impl TranspileableExpr for bool {
     fn type_of(&self, _context: &TranspilationInputContext) -> Result<RosyType> {
         Ok(RosyType::LO())
     }
+    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        Some(ExprRecipe::Literal(RosyType::LO()))
+    }
 }
 impl Transpile for bool {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile(&self, _context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         Ok(TranspilationOutput {

@@ -16,6 +16,9 @@
 //! | ST | ST | LO | Lexicographic ordering |
 
 use std::collections::BTreeSet;
+use std::collections::HashSet;
+
+use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
@@ -47,9 +50,11 @@ impl TranspileableExpr for GteExpr {
             self.right.type_of(context)?
         ))
     }
+    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        Some(ExprRecipe::Literal(RosyType::LO()))
+    }
 }
 impl Transpile for GteExpr {
-    fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
         let left_type = self.left.type_of(context)
