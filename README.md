@@ -123,20 +123,87 @@ cargo doc --document-private-items --no-deps -p rosy --open
 
 1. Read `manual.md` for the operator/function spec and type tables
 2. Add grammar rule to `rosy/assets/rosy.pest`
-3. Create AST struct in `rosy/src/program/expressions/`
-4. Implement `FromRule`, `Transpile`, and `TranspileableExpr` traits
-5. For operators: define `TypeRule` registry in `rosy/src/rosy_lib/operators/`
-6. `cargo build` auto-generates test files from the registry
-7. Validate against COSY INFINITY output — must match exactly
+3. Create AST struct in `rosy/src/program/expressions/` (e.g. `MyExpr`)
+4. Add a variant to `ExprEnum` in `rosy/src/program/expressions/mod.rs`
+5. Wire it into `Expr::from_rule` (for primaries) or `map_infix` (for binary operators)
+6. Implement three traits on your struct:
+
+   **`Transpile`** — code generation:
+   ```rust
+   impl Transpile for MyExpr {
+       fn transpile(&self, context: &mut TranspilationInputContext)
+           -> Result<TranspilationOutput, Vec<Error>> { /* ... */ }
+   }
+   ```
+
+   **`TranspileableExpr`** — type inference integration:
+   ```rust
+   impl TranspileableExpr for MyExpr {
+       // Required: return this expression's type given the current context
+       fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> { /* ... */ }
+
+       // Optional: recurse into child expressions for function call discovery.
+       // Only needed if this expression contains sub-expressions.
+       // Default returns None (leaf node, nothing to recurse into).
+       fn discover_expr_function_calls(&self, resolver: &mut TypeResolver, ctx: &ScopeContext)
+           -> Option<Result<()>> { /* ... */ }
+
+       // Optional: build an ExprRecipe for type inference.
+       // Literals return ExprRecipe::Literal(...), binary ops return ExprRecipe::BinaryOp {...},
+       // variables return ExprRecipe::Variable(slot). Default returns None (Unknown).
+       fn build_expr_recipe(&self, resolver: &TypeResolver, ctx: &ScopeContext,
+           deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> { /* ... */ }
+   }
+   ```
+
+7. For operators: define `TypeRule` registry in `rosy/src/rosy_lib/operators/`
+8. `cargo build` auto-generates test files from the registry
+9. Validate against COSY INFINITY output — must match exactly
 
 ### Adding a New Statement
 
 1. Read `manual.md` for the statement spec
 2. Add grammar rule to `rosy/assets/rosy.pest`
-3. Create AST struct in `rosy/src/program/statements/`
-4. Add variant to `StatementEnum` and `Statement::from_rule`
-5. Implement `FromRule` and `Transpile` traits
-6. Add integration test to `examples/`
+3. Create AST struct in `rosy/src/program/statements/` (e.g. `MyStatement`)
+4. Add a variant to `StatementEnum` in `rosy/src/program/statements/mod.rs`
+5. Wire it into `Statement::from_rule`
+6. Implement three traits on your struct:
+
+   **`Transpile`** — code generation:
+   ```rust
+   impl Transpile for MyStatement {
+       fn transpile(&self, context: &mut TranspilationInputContext)
+           -> Result<TranspilationOutput, Vec<Error>> { /* ... */ }
+   }
+   ```
+
+   **`TranspileableStatement`** — type inference integration (all methods optional):
+   ```rust
+   impl TranspileableStatement for MyStatement {
+       // Register type slots (variables, args, return types) into the dependency graph.
+       // Implement for declarations (VARIABLE, FUNCTION, PROCEDURE).
+       fn register_declaration(&self, resolver: &mut TypeResolver, ctx: &mut ScopeContext,
+           source_location: SourceLocation) -> Option<Result<()>> { /* ... */ }
+
+       // Discover dependencies between type slots (e.g. assignments, call sites).
+       // Implement for statements that assign values or call functions/procedures.
+       fn discover_dependencies(&self, resolver: &mut TypeResolver, ctx: &mut ScopeContext,
+           source_location: SourceLocation) -> Option<Result<()>> { /* ... */ }
+
+       // Apply resolved types back to the AST after type inference completes.
+       // Implement for statements that contain a body (LOOP, IF, FUNCTION, etc.)
+       // so the resolver can recurse into child statements.
+       fn apply_resolved_types(&mut self, resolver: &TypeResolver,
+           current_scope: &[String]) -> Option<Result<()>> { /* ... */ }
+   }
+   ```
+
+   For simple statements with no type inference involvement, an empty impl suffices:
+   ```rust
+   impl TranspileableStatement for MyStatement {}
+   ```
+
+7. Add integration test to `examples/`
 
 ### Differences from COSY INFINITY
 
