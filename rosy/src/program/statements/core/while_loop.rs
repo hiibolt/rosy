@@ -11,7 +11,8 @@ use anyhow::{Result, Context, Error, anyhow, ensure};
 
 use crate::{
     ast::*,
-    program::{expressions::Expr, statements::Statement},
+    program::{expressions::Expr, statements::{Statement, SourceLocation}},
+    resolve::{ScopeContext, TypeResolver},
     rosy_lib::RosyType,
     transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, indent}
 };
@@ -61,7 +62,16 @@ impl FromRule for WhileStatement {
         Ok(Some(WhileStatement { condition, body }))
     }
 }
-impl TranspileableStatement for WhileStatement {}
+impl TranspileableStatement for WhileStatement {
+    fn discover_dependencies(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &mut ScopeContext,
+        _source_location: SourceLocation
+    ) -> Option<Result<()>> {
+        Some(resolver.discover_slots(&self.body, &mut ctx.clone()))
+    }
+}
 impl Transpile for WhileStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

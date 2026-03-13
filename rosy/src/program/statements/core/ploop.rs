@@ -24,7 +24,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure, bail};
 
 use crate::{
-    ast::*, program::{expressions::{Expr, core::variable_identifier::VariableIdentifier}, statements::Statement}, rosy_lib::RosyType, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, VariableData, VariableScope, indent}
+    ast::*, program::{expressions::{Expr, core::variable_identifier::VariableIdentifier}, statements::{Statement, SourceLocation}}, resolve::{ScopeContext, TypeResolver, TypeSlot}, rosy_lib::RosyType, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, VariableData, VariableScope, indent}
 };
 
 /// AST node for the parallel loop `PLOOP ... ENDPLOOP output;`.
@@ -127,7 +127,22 @@ impl FromRule for PLoopStatement {
         }))
     }
 }
-impl TranspileableStatement for PLoopStatement {}
+impl TranspileableStatement for PLoopStatement {
+    fn discover_dependencies(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &mut ScopeContext,
+        source_location: SourceLocation
+    ) -> Option<Result<()>> {
+        let mut inner_ctx = ctx.clone();
+        let iter_slot = TypeSlot::Variable(
+            ctx.scope_path.clone(),
+            self.iterator.clone(),
+        );
+        resolver.insert_slot(iter_slot.clone(), Some(&RosyType::RE()), Some(source_location));
+        Some(resolver.discover_slots(&self.body, &mut inner_ctx))
+    }
+}
 impl Transpile for PLoopStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

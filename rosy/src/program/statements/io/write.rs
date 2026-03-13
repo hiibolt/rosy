@@ -21,7 +21,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
-    ast::*, program::expressions::{Expr, functions::conversion::string_convert::string_convert_transpile_helper}, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement, add_context_to_all}
+    ast::*, program::{expressions::{Expr, functions::conversion::string_convert::string_convert_transpile_helper}, statements::SourceLocation}, resolve::{ScopeContext, TypeResolver}, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement, add_context_to_all}
 };
 
 /// AST node for the `WRITE unit expr+;` statement.
@@ -62,7 +62,22 @@ impl FromRule for WriteStatement {
         Ok(Some(WriteStatement { unit, exprs }))
     }
 }
-impl TranspileableStatement for WriteStatement {}
+impl TranspileableStatement for WriteStatement {
+    fn discover_dependencies(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &mut ScopeContext,
+        _source_location: SourceLocation
+    ) -> Option<Result<()>> {
+        // Discover function call sites within all write expressions
+        for expr in &self.exprs {
+            if let Err(e) = resolver.discover_expr_function_calls(expr, ctx) {
+                return Some(Err(e.context("...while discovering function call dependencies in WRITE statement")));
+            }
+        }
+        Some(Ok(()))
+    }
+}
 impl Transpile for WriteStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

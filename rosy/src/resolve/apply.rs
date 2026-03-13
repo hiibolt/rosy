@@ -10,7 +10,7 @@ use super::{TypeResolver, TypeSlot};
 
 impl TypeResolver {
     /// Walk the AST and fill in all `None` type fields with resolved types.
-    pub(super) fn apply_to_ast(
+    pub fn apply_to_ast(
         &self,
         statements: &mut [Statement],
         current_scope: &[String],

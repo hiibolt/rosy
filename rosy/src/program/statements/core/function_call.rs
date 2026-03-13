@@ -12,7 +12,7 @@
 use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
-    ast::*, program::expressions::{Expr, core::var_expr::function_call_transpile_helper}, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement}
+    ast::*, program::{expressions::{Expr, core::var_expr::function_call_transpile_helper}, statements::SourceLocation}, resolve::{ScopeContext, TypeResolver}, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement}
 };
 
 /// AST node for a function call used as a statement.
@@ -48,7 +48,16 @@ impl FromRule for FunctionCallStatement {
         Ok(Some(FunctionCallStatement { name, args }))
     }
 }
-impl TranspileableStatement for FunctionCallStatement {}
+impl TranspileableStatement for FunctionCallStatement {
+    fn discover_dependencies(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &mut ScopeContext,
+        _source_location: SourceLocation
+    ) -> Option<Result<()>> {
+        Some(resolver.discover_call_site_deps(&self.name, &self.args, true, ctx))
+    }
+}
 impl Transpile for FunctionCallStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

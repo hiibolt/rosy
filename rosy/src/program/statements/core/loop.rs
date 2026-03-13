@@ -29,7 +29,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};
 
 use crate::{
-    ast::*, program::{expressions::Expr, statements::Statement}, rosy_lib::RosyType, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, VariableData, VariableScope, indent}
+    ast::*, program::{expressions::Expr, statements::{Statement, SourceLocation}}, resolve::{ScopeContext, TypeResolver, TypeSlot}, rosy_lib::RosyType, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, VariableData, VariableScope, indent}
 };
 
 /// AST node for the counted `LOOP i start end [step]; ... ENDLOOP;` statement.
@@ -102,7 +102,24 @@ impl FromRule for LoopStatement {
         Ok(Some(LoopStatement { iterator, start, end, step, body }))
     }
 }
-impl TranspileableStatement for LoopStatement {}
+impl TranspileableStatement for LoopStatement {
+    fn discover_dependencies(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &mut ScopeContext,
+        source_location: SourceLocation
+    ) -> Option<Result<()>> {
+        let mut inner_ctx = ctx.clone();
+        // Loop iterator is always RE
+        let iter_slot = TypeSlot::Variable(
+            ctx.scope_path.clone(),
+            self.iterator.clone(),
+        );
+        resolver.insert_slot(iter_slot.clone(), Some(&RosyType::RE()), Some(source_location));
+        inner_ctx.variables.insert(self.iterator.clone(), iter_slot);
+        Some(resolver.discover_slots(&self.body, &mut inner_ctx))
+    }
+}
 impl Transpile for LoopStatement {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

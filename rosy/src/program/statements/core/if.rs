@@ -32,7 +32,7 @@ use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure, bail};
 
 use crate::{
-    ast::*, program::{expressions::Expr, statements::Statement}, rosy_lib::RosyType, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, indent}
+    ast::*, program::{expressions::Expr, statements::{Statement, SourceLocation}}, resolve::{ScopeContext, TypeResolver}, rosy_lib::RosyType, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, indent}
 };
 
 /// AST node for the `IF ... [ELSEIF ...] [ELSE] ENDIF;` statement.
@@ -141,7 +141,29 @@ impl FromRule for IfStatement {
         Ok(Some(IfStatement { condition, then_body, elseif_clauses, else_body }))
     }
 }
-impl TranspileableStatement for IfStatement {}
+impl TranspileableStatement for IfStatement {
+    fn discover_dependencies(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &mut ScopeContext,
+        _source_location: SourceLocation
+    ) -> Option<Result<()>> {
+        if let Err(e) = resolver.discover_slots(&self.then_body, &mut ctx.clone()) {
+            return Some(Err(e));
+        }
+        for elseif in &self.elseif_clauses {
+            if let Err(e) = resolver.discover_slots(&elseif.body, &mut ctx.clone()) {
+                return Some(Err(e));
+            }
+        }
+        if let Some(else_body) = &self.else_body {
+            if let Err(e) = resolver.discover_slots(else_body, &mut ctx.clone()) {
+                return Some(Err(e));
+            }
+        }
+        Some(Ok(()))
+    }
+}
 impl Transpile for ElseIfClause {
     fn as_any(&self) -> &dyn std::any::Any { self }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }

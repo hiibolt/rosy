@@ -34,6 +34,14 @@ pub trait TranspileableStatement: Transpile + Send + Sync + std::fmt::Debug + An
     ) -> Option<Result<()>> {
         None
     }
+    fn discover_dependencies(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation
+    ) -> Option<Result<()>> {
+        None
+    }
 }
 pub trait TranspileableExpr: Transpile + Send + Sync + std::fmt::Debug + Any {
     fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType>;

@@ -15,7 +15,7 @@ use super::{
 impl TypeResolver {
     /// Process nodes whose dependencies are all resolved first, resolve them,
     /// then process their dependents, and so on. One pass — no iteration.
-    pub(super) fn topological_resolve(&mut self) -> Result<()> {
+    pub fn topological_resolve(&mut self) -> Result<()> {
         // Build reverse dependency map: slot → set of slots that depend on it
         let mut dependents: HashMap<TypeSlot, Vec<TypeSlot>> = HashMap::new();
         let mut in_degree: HashMap<TypeSlot, usize> = HashMap::new();
@@ -244,7 +244,7 @@ impl TypeResolver {
     }
 
     /// Evaluate an ExprRecipe using already-resolved slot types.
-    pub(super) fn evaluate_recipe(&self, recipe: &ExprRecipe) -> Result<RosyType> {
+    pub fn evaluate_recipe(&self, recipe: &ExprRecipe) -> Result<RosyType> {
         match recipe {
             ExprRecipe::Literal(t) => Ok(t.clone()),
             ExprRecipe::Variable(slot) => {
