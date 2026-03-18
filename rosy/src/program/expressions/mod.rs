@@ -45,6 +45,7 @@ use crate::program::expressions::functions::conversion::logical_convert::Logical
 use crate::program::expressions::functions::math::trig::tan::TanExpr;
 use crate::program::expressions::functions::math::trig::sin::SinExpr;
 use crate::program::expressions::functions::math::sqr::SqrExpr;
+use crate::program::expressions::functions::math::sqrt::SqrtExpr;
 use crate::program::expressions::functions::math::exp::ExpExpr;
 use crate::program::expressions::functions::math::vmax::VmaxExpr;
 use crate::program::expressions::functions::math::lst::LstExpr;
@@ -112,6 +113,7 @@ pub enum ExprEnum {
     Length,
     Sin,
     Sqr,
+    Sqrt,
     Exp,
     Tan,
     Vmax,
@@ -261,6 +263,13 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Sqr,
                         inner: Box::new(sqr_expr.ok_or_else(|| anyhow::anyhow!("Expected SqrExpr"))?),
+                    })
+                },
+                Rule::sqrt_fn => {
+                    let sqrt_expr = SqrtExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Sqrt,
+                        inner: Box::new(sqrt_expr.ok_or_else(|| anyhow::anyhow!("Expected SqrtExpr"))?),
                     })
                 },
                 Rule::exp_fn => {

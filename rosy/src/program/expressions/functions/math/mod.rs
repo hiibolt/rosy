@@ -20,4 +20,5 @@ pub mod lcm;
 pub mod lst;
 pub mod pow;
 pub mod sqr;
+pub mod sqrt;
 pub mod vmax;
