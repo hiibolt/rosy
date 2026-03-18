@@ -54,7 +54,7 @@ var_decl = { ^"VARIABLE" ~ type? ~ variable_name ~ memory_size* ~ semicolon }
 memory_size = { expr }
 
 /// Keywords - define all reserved words
-keyword = { ^"BEGIN" | ^"END" | ^"WRITE" | ^"WRITEB" | ^"READ" | ^"READB" | ^"VARIABLE" | ^"PROCEDURE" | ^"ENDPROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"ELSEIF" | ^"ELSE" | ^"ENDIF" | ^"WHILE" | ^"ENDWHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"LENGTH" | ^"SIN" | ^"SQR" | ^"VMAX" | ^"LST" | ^"LCM" | ^"LCD" | ^"LOG" | ^"BREAK" | ^"FIT" | ^"ENDFIT" | ^"OPENF" | ^"OPENFB" | ^"CLOSEF" | ^"FUNCTION" | ^"ENDFUNCTION" | ^"LOOP" | ^"ENDLOOP" | ^"PLOOP" | ^"ENDPLOOP" | ^"ENDWHILE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
+keyword = { ^"BEGIN" | ^"END" | ^"WRITE" | ^"WRITEB" | ^"READ" | ^"READB" | ^"VARIABLE" | ^"PROCEDURE" | ^"ENDPROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"ELSEIF" | ^"ELSE" | ^"ENDIF" | ^"WHILE" | ^"ENDWHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"LENGTH" | ^"SIN" | ^"SQR" | ^"SQRT" | ^"VMAX" | ^"LST" | ^"LCM" | ^"LCD" | ^"LOG" | ^"BREAK" | ^"FIT" | ^"ENDFIT" | ^"OPENF" | ^"OPENFB" | ^"CLOSEF" | ^"FUNCTION" | ^"ENDFUNCTION" | ^"LOOP" | ^"ENDLOOP" | ^"PLOOP" | ^"ENDPLOOP" | ^"ENDWHILE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
 
 /// [ IF / ELSEIF / ELSE / ENDIF ]
 if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
@@ -111,7 +111,7 @@ endif = { ^"ENDIF" ~ semicolon }
   end_fit = { ^"ENDFIT" ~ expr ~ expr ~ expr ~ variable_name+ ~ semicolon }
 
 /// [ INTRINSIC FUNCTIONS ]
-  builtin_function = _{ cm | st | lo | da | cd_intrinsic | length | sin | sqr | exp_fn | log_fn | tan_fn | vmax | lst | lcm | lcd }
+  builtin_function = _{ cm | st | lo | da | cd_intrinsic | length | sin | sqrt_fn | sqr | exp_fn | log_fn | tan_fn | vmax | lst | lcm | lcd }
   /// CM
   cm = { ^"CM" ~ "(" ~ expr ~ ")" }
   /// ST - String conversion
@@ -128,6 +128,8 @@ endif = { ^"ENDIF" ~ semicolon }
   sin = { ^"SIN" ~ "(" ~ expr ~ ")" }
   /// SQR - Compute square
   sqr = { ^"SQR" ~ "(" ~ expr ~ ")" }
+  /// SQRT - Compute square root
+  sqrt_fn = { ^"SQRT" ~ "(" ~ expr ~ ")" }
   /// EXP - Compute exponential
   exp_fn = { ^"EXP" ~ "(" ~ expr ~ ")" }
   /// LOG - Compute natural logarithm

@@ -28,6 +28,7 @@ fn main() {
     codegen::codegen_intrinsic("length");
     codegen::codegen_intrinsic("sin");
     codegen::codegen_intrinsic("sqr");
+    codegen::codegen_intrinsic("sqrt");
     codegen::codegen_intrinsic("exp");
     codegen::codegen_intrinsic("log");
     codegen::codegen_intrinsic("tan");
