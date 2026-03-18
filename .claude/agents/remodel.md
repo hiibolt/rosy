@@ -24,7 +24,7 @@ For each skill in `.claude/skills/`:
 - Are all StatementEnum variants in `rosy/src/program/statements/mod.rs` reflected?
 - Are all intrinsics in `rosy/src/rosy_lib/intrinsics/mod.rs` listed?
 - Are all operators in `rosy/src/rosy_lib/operators/mod.rs` listed?
-- Has the "Not Yet Implemented" list drifted? (items now implemented, or new items discovered in `manual.md`)
+- Has the "Not Yet Implemented" list drifted? (items now implemented, or new items discovered in `cosy_manual/`)
 
 **rosy-idioms:** Compare code recipes against actual patterns.
 - Read a recent operator (e.g., `rosy/src/program/expressions/operators/add.rs`) -- does the recipe still match?

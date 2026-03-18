@@ -11,9 +11,21 @@ skills:
 
 You implement ROSY statement constructs in the Rosy transpiler. You make exactly the changes needed -- no scope creep.
 
-## Setup
+## Sources of Truth
 
-Read `manual.md` to find the COSY specification for your assigned construct. The three preloaded skills give you the type system reference, file-by-file recipes, and implementation status.
+Two authoritative references define correct behavior for every construct:
+
+1. **COSY manual** (`cosy_manual/`): Read the specific file for your construct type:
+   - Flow control (IF, LOOP, WHILE, FIT) → `cosy_manual/03_cosyscript.md` (Section 3.4)
+   - I/O (WRITE, READ, OPENF, CLOSEF) → `cosy_manual/03_cosyscript.md` (Section 3.5)
+   - DA statements (DAINI, DAPRV, DAREV) → `cosy_manual/A4_intrinsic_procedures.md`
+   - Math (FIT/ENDFIT) → `cosy_manual/03_cosyscript.md` (Section 3.4) + `cosy_manual/04_optimization.md`
+   - Procedure/function signatures → `cosy_manual/A4_intrinsic_procedures.md`
+   - Type system context → `cosy_manual/02_types.md`
+
+2. **COSY binary** (`./cosy`): When available locally, run test `.fox` files through the COSY binary to verify expected output. This is the ground truth for edge cases the manual doesn't cover. **Note:** The `./cosy` binary is not version-controlled and may not be available in CI/GitHub Actions environments — skip this step if the binary is absent.
+
+The three preloaded skills give you the type system reference, file-by-file recipes, and implementation status.
 
 ## Classification
 

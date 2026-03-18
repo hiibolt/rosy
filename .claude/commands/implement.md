@@ -15,14 +15,21 @@ Read `rosy/assets/rosy.pest` and `rosy/src/program/expressions/mod.rs` and `rosy
 - Is a **statement**: control flow, I/O, DA, math
 
 ### 1.2 Research
-Read `manual.md` to find the COSY INFINITY specification. Extract: syntax, type compatibility table, edge cases, examples.
+Read the relevant `cosy_manual/` file for the COSY INFINITY specification. Use:
+- Operators → `cosy_manual/A2_operators.md`
+- Intrinsic functions/conversions → `cosy_manual/A3_intrinsic_functions.md`
+- Intrinsic procedures → `cosy_manual/A4_intrinsic_procedures.md`
+- Statements/flow control/I/O → `cosy_manual/03_cosyscript.md`
+- Type system → `cosy_manual/02_types.md`
+
+Extract: syntax, type compatibility table, edge cases, examples.
 
 ### 1.3 Dispatch Implementer
 For each item (in parallel, batches of 10 max):
 
 - Use the Agent tool with `isolation: "worktree"` to give each implementer an isolated copy
 - Spawn agent `expression-implementer` (model: sonnet) for expressions, or `statement-implementer` (model: sonnet) for statements
-- Pass the agent: construct name, classification, COSY spec excerpt from manual.md
+- Pass the agent: construct name, classification, COSY spec excerpt from the relevant `cosy_manual/` file
 
 Wait for all implementers to complete before proceeding.
 

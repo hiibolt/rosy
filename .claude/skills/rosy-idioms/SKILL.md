@@ -48,7 +48,7 @@ Rule::<name> => {
 pub const <NAME>_REGISTRY: &[TypeRule] = &[
     TypeRule::new("RE", "RE", "RE", "-2", "1"),
     TypeRule::with_comment("RE", "VE", "VE", "1", "1&2", "Add Real componentwise"),
-    // ... all type combinations from manual.md Appendix A
+    // ... all type combinations from cosy_manual/A2_operators.md
 ];
 
 pub fn get_return_type(lhs: &RosyType, rhs: &RosyType) -> Option<RosyType> {

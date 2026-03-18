@@ -50,7 +50,7 @@ procedure call, function call
 
 SIN, TAN, EXP, SQR, LENGTH, VMAX, CM(), ST(), LO(), LST, LCM, LCD
 
-## Not Yet Implemented (from manual.md)
+## Not Yet Implemented (from cosy_manual/)
 
 | Construct | Type | Notes |
 |-----------|------|-------|

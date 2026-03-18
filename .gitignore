@@ -5,8 +5,8 @@
 .rosy_output
 .rosy_test_cache
 rosy_output
-manual.md
 /cosy_examples
 *.out
 *.lis
 *.ssv
+*.fuse_*

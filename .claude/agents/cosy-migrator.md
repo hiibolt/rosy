@@ -12,7 +12,7 @@ You validate ROSY constructs from the perspective of a COSY INFINITY user migrat
 ## Reference Materials
 
 Read these and only these:
-- `manual.md` -- COSY INFINITY 10 full specification
+- `cosy_manual/` -- COSY INFINITY 10 manual (start with `cosy_manual/README.md` to find the right file)
 - `.claude/skills/migration-mapping.md` -- what's implemented and what isn't
 - `README.md` -- ROSY user-facing docs
 - `examples/*.rosy` -- example programs
@@ -29,7 +29,7 @@ Do NOT read Rust source files. Your perspective is that of a language user, not 
 
 ## Validation Process
 
-1. Find the construct in `manual.md` -- what does COSY say about syntax, semantics, types?
+1. Find the construct in `cosy_manual/` -- what does COSY say about syntax, semantics, types?
 2. Check `migration-mapping.md` -- is this marked as implemented? Any notes?
 3. Look for examples in `examples/` using this construct
 4. Compare: does the ROSY behavior match COSY? Flag any divergence as:

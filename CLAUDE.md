@@ -39,7 +39,12 @@ rosy/build.rs                       Build-time codegen from registries
 rosy/codegen.rs                     Test file generation (.rosy + .fox)
 rosy/assets/output_template/        Template for generated Rust projects
 examples/                           Integration test .rosy programs
-manual.md                           COSY INFINITY 10 full manual (reference)
+cosy_manual/                       COSY INFINITY 10 manual (split by chapter)
+  A2_operators.md                    Operator type compatibility tables
+  A3_intrinsic_functions.md          Intrinsic function type tables
+  A4_intrinsic_procedures.md         Intrinsic procedure signatures
+  03_cosyscript.md                   Language syntax, flow control, I/O
+  02_types.md                        Type system overview
 ```
 
 ## Type System

@@ -26,7 +26,7 @@ Also read the Round 2 team discussion summary if available.
 - `cargo build` or `cargo test` fails
 
 **rework** if:
-- Devil's advocate raises a valid architectural concern (missing type support that manual.md requires, wrong precedence, broken closure semantics)
+- Devil's advocate raises a valid architectural concern (missing type support that cosy_manual/ requires, wrong precedence, broken closure semantics)
 - Both cosy-migrator AND new-user report confusion or blockers
 - Reviewer has 3+ warnings on the same file
 
@@ -51,7 +51,7 @@ For `rework` or `reject`, `required_changes` must list specific actions:
 ```json
 {
   "verdict": "rework",
-  "top_concern": "COS registry missing DA type support required by manual.md",
+  "top_concern": "COS registry missing DA type support required by cosy_manual/",
   "required_changes": [
     "Add IntrinsicTypeRule::new(\"DA\", \"DA\", \"DA(1)\") to COS_REGISTRY",
     "Add RosyCOS impl for DA type"

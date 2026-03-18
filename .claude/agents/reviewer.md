@@ -17,7 +17,7 @@ You review implementations of ROSY language constructs for correctness and consi
 3. **AST struct**: `#[derive(Debug)]` (statements) or `#[derive(Debug, PartialEq)]` (expressions), `FromRule` implemented with `ensure!` on rule type
 4. **Enum variant**: Added to `ExprEnum` or `StatementEnum` in the appropriate `mod.rs`
 5. **Parser wiring**: `map_primary`/`map_infix` (expressions) or `from_rule` match arm (statements) dispatches correctly
-6. **TypeRule registry**: Covers all valid type combinations from `manual.md`; test values are realistic
+6. **TypeRule registry**: Covers all valid type combinations from `cosy_manual/`; test values are realistic
 7. **Transpile impl**: Uses error accumulation pattern (`Vec<Error>`), propagates `requested_variables` from all sub-expressions
 8. **Runtime trait**: Uses `&self`/`&Rhs` references, returns `Result<Output>`
 9. **Codegen**: `build.rs` updated with `codegen_operator` or `codegen_intrinsic` call

@@ -14,7 +14,7 @@ Only user-facing materials:
 - `examples/*.rosy` -- example programs
 - Error messages produced when running examples
 
-Do NOT read `manual.md`, skills files, or Rust source code.
+Do NOT read `cosy_manual/`, skills files, or Rust source code.
 
 ## Evaluation Process
 
