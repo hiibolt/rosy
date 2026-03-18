@@ -1,7 +1,17 @@
 {
-  "enabledPlugins": {
-    "code-simplifier@claude-plugins-official": true,
-    "skill-creator@claude-plugins-official": true,
-    "rust-analyzer-lsp@claude-plugins-official": true
+  "permissions": {
+    "allow": [
+      "Bash(cargo build:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo check:*)",
+      "Bash(find :*)",
+      "Bash(grep :*)",
+      "Bash(ls :*)",
+      "Bash(rustc :*)",
+      "Bash(rustdoc :*)"
+    ]
+  },
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "true"
   }
 }
