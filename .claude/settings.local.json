@@ -1,9 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cargo build:*)",
-      "Bash(cargo test:*)",
-      "Bash(cargo check:*)"
+      "Bash(git stash:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(nix-shell:*)"
     ]
-  }
+  },
+  "outputStyle": "Explanatory"
 }
