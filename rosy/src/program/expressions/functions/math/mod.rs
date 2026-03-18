@@ -15,6 +15,7 @@
 
 pub mod trig;
 pub mod exp;
+pub mod log;
 pub mod lcd;
 pub mod lcm;
 pub mod lst;
