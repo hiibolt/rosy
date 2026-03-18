@@ -29,6 +29,7 @@ fn main() {
     codegen::codegen_intrinsic("sin");
     codegen::codegen_intrinsic("sqr");
     codegen::codegen_intrinsic("exp");
+    codegen::codegen_intrinsic("log");
     codegen::codegen_intrinsic("tan");
     
     // Generate the embedded files at compile time

@@ -46,6 +46,7 @@ use crate::program::expressions::functions::math::trig::tan::TanExpr;
 use crate::program::expressions::functions::math::trig::sin::SinExpr;
 use crate::program::expressions::functions::math::sqr::SqrExpr;
 use crate::program::expressions::functions::math::exp::ExpExpr;
+use crate::program::expressions::functions::math::log::LogExpr;
 use crate::program::expressions::functions::math::vmax::VmaxExpr;
 use crate::program::expressions::functions::math::lst::LstExpr;
 use crate::program::expressions::functions::math::lcm::LcmExpr;
@@ -113,6 +114,7 @@ pub enum ExprEnum {
     Sin,
     Sqr,
     Exp,
+    Log,
     Tan,
     Vmax,
     Lst,
@@ -268,6 +270,13 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Exp,
                         inner: Box::new(exp_expr.ok_or_else(|| anyhow::anyhow!("Expected ExpExpr"))?),
+                    })
+                },
+                Rule::log_fn => {
+                    let log_expr = LogExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Log,
+                        inner: Box::new(log_expr.ok_or_else(|| anyhow::anyhow!("Expected LogExpr"))?),
                     })
                 },
                 Rule::tan_fn => {
