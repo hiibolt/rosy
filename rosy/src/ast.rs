@@ -26,10 +26,13 @@
 //! All AST nodes implement [`FromRule`] to construct themselves from a pest
 //! parse pair.
 
+use crate::{
+    program::expressions::Expr,
+    rosy_lib::{RosyBaseType, RosyType},
+};
+use anyhow::{Context, Result, ensure};
 use pest::pratt_parser::PrattParser;
 use pest_derive::Parser;
-use anyhow::{ensure, Context, Result};
-use crate::{program::expressions::Expr, rosy_lib::{RosyBaseType, RosyType}};
 
 #[derive(Parser)]
 #[grammar = "../assets/rosy.pest"]
@@ -50,7 +53,7 @@ lazy_static::lazy_static! {
         // - Priority 6: Extraction (|), Derivation (%)
         PrattParser::new()
             // Lowest precedence (Priority 2): concatenation, equality, not-equals, comparisons
-            .op(Op::infix(concat, Left) | Op::infix(eq, Left) | Op::infix(neq, Left) 
+            .op(Op::infix(concat, Left) | Op::infix(eq, Left) | Op::infix(neq, Left)
                 | Op::infix(lt, Left) | Op::infix(gt, Left) | Op::infix(lte, Left) | Op::infix(gte, Left))
             // Priority 3: Addition and Subtraction
             .op(Op::infix(add, Left) | Op::infix(sub, Left))
@@ -64,17 +67,22 @@ lazy_static::lazy_static! {
 }
 
 pub trait FromRule: Sized {
-    fn from_rule ( pair: pest::iterators::Pair<Rule> ) -> Result<Option<Self>>;
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>>;
 }
 // helper to build RosyType from type rule
-pub fn build_type (pair: pest::iterators::Pair<Rule>) -> Result<(RosyType, Vec<Expr>)> {
-    ensure!(pair.as_rule() == Rule::r#type, 
-        "Expected `type` rule when building type, found: {:?}", pair.as_rule());
-        
+pub fn build_type(pair: pest::iterators::Pair<Rule>) -> Result<(RosyType, Vec<Expr>)> {
+    ensure!(
+        pair.as_rule() == Rule::r#type,
+        "Expected `type` rule when building type, found: {:?}",
+        pair.as_rule()
+);
+
     let mut inner_pair = pair.into_inner();
-    let type_str = inner_pair.next()
+    let type_str = inner_pair
+        .next()
         .context("Missing type string when building var decl!")?
-        .as_str().to_string();
+        .as_str()
+        .to_string();
     let mut dimensions: Vec<Expr> = Vec::new();
     while let Some(dim_pair) = inner_pair.next() {
         let expr = Expr::from_rule(dim_pair)
@@ -87,7 +95,8 @@ pub fn build_type (pair: pest::iterators::Pair<Rule>) -> Result<(RosyType, Vec<E
         .as_str()
         .try_into()
         .with_context(|| format!("Unknown type: {type_str}"))?;
-    let r#type = RosyType::new(base_type, dimensions.len()); 
+    let r#type = RosyType::new(base_type, dimensions.len());
 
     Ok((r#type, dimensions))
 }
+

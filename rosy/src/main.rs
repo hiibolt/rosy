@@ -2,7 +2,7 @@
 //!
 //! A modern Rust-based programming language based on the COSY INFINITY syntax,
 //! designed for scientific computing and beam physics applications.
-//! 
+//!
 //! ## Quick Start
 //!
 //! ```bash
@@ -79,22 +79,22 @@
 //! cargo doc --document-private-items --no-deps --open
 //! ```
 
-mod transpile;
 mod ast;
 mod embedded;
 mod program;
 mod resolve;
-mod syntax_config;
 #[allow(unused_imports, dead_code)]
 mod rosy_lib;
+mod syntax_config;
+mod transpile;
 
 use crate::{ast::FromRule, program::Program, transpile::*};
-use std::{fs::write, path::PathBuf, process::Command};
-use anyhow::{ensure, Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, ensure};
+use clap::{Parser as ClapParser, Subcommand};
 use pest::Parser;
+use std::{fs::write, path::PathBuf, process::Command};
 use tracing::info;
 use tracing_subscriber;
-use clap::{Parser as ClapParser, Subcommand};
 
 /// Rosy Transpiler - Converts Rosy source code to executable Rust programs
 #[derive(ClapParser)]
@@ -111,11 +111,11 @@ enum Commands {
     Run {
         /// Path to the Rosy source file
         source: PathBuf,
-        
+
         /// Output directory for build artifacts (default: .rosy_output)
         #[arg(short = 'd', long)]
         output_dir: Option<PathBuf>,
-        
+
         /// Build in release mode with optimizations
         #[arg(short, long)]
         release: bool,
@@ -124,20 +124,20 @@ enum Commands {
         #[arg(long)]
         cosy_syntax: bool,
     },
-    
+
     /// Build a Rosy script and place the binary in PWD
     Build {
         /// Path to the Rosy source file
         source: PathBuf,
-        
+
         /// Output binary name (default: source filename without extension)
         #[arg(short, long)]
         output: Option<String>,
-        
+
         /// Output directory for build artifacts (default: .rosy_output)
         #[arg(short = 'd', long)]
         output_dir: Option<PathBuf>,
-        
+
         /// Build in release mode with optimizations
         #[arg(short, long)]
         release: bool,
@@ -148,14 +148,14 @@ enum Commands {
     },
 }
 
-fn rosy (
-    script_path: &PathBuf,
-    output_dir: Option<PathBuf>,
-    release: bool,
-) -> Result<PathBuf> {
+fn rosy(script_path: &PathBuf, output_dir: Option<PathBuf>, release: bool) -> Result<PathBuf> {
     info!("Loading script...");
-    let script = std::fs::read_to_string(&script_path)
-        .with_context(|| format!("Failed to read script file from `{}`!", script_path.display()))?;
+    let script = std::fs::read_to_string(&script_path).with_context(|| {
+        format!(
+            "Failed to read script file from `{}`!",
+            script_path.display()
+        )
+    })?;
 
     info!("Stage 1 - Parsing");
     let program = ast::CosyParser::parse(ast::Rule::program, &script)
@@ -169,8 +169,7 @@ fn rosy (
         .context("Expected a program")?;
 
     info!("Stage 2.5 - Type Resolution");
-    resolve::TypeResolver::resolve(&mut ast)
-        .context("Failed to resolve types!")?;
+    resolve::TypeResolver::resolve(&mut ast).context("Failed to resolve types!")?;
 
     info!("Stage 3 - Transpilation");
     let TranspilationOutput { serialization, .. } = ast
@@ -182,26 +181,32 @@ fn rosy (
                 for (ind, ctx) in err.chain().enumerate() {
                     body.push_str(&format!("  {}. {}\n", ind + 1, ctx));
                 }
-                combined.push_str(&format!("\n#{}: {}\nContext:\n{}", outer_ind + 1, err.root_cause(), body));
+                combined.push_str(&format!(
+                    "\n#{}: {}\nContext:\n{}",
+                    outer_ind + 1,
+                    err.root_cause(),
+                    body
+                ));
             }
-            anyhow!("Failed to transpile with the following errors:\n{}", combined)
+            anyhow!(
+                "Failed to transpile with the following errors:\n{}",
+                combined
+            )
         })?;
 
     // Determine output directory
-    let rosy_output_path = output_dir.unwrap_or_else(|| {
-        PathBuf::from(".rosy_output")
-    });
-    
+    let rosy_output_path = output_dir.unwrap_or_else(|| PathBuf::from(".rosy_output"));
+
     info!("Creating output project at: {}", rosy_output_path.display());
-    
+
     // Create the output project structure from embedded templates
     embedded::create_output_project(&rosy_output_path)
         .context("Failed to create output project structure")?;
-    
+
     // Inject the transpiled code into main.rs
     let new_contents = embedded::inject_code(&serialization)
         .context("Failed to inject transpiled code into template")?;
-    
+
     write(rosy_output_path.join("src/main.rs"), &new_contents)
         .context("Failed to write Rust output file!")?;
 
@@ -214,7 +219,7 @@ fn rosy (
     if release {
         cargo_args.push("--release");
     }
-    
+
     let output = Command::new("cargo")
         .args(&cargo_args)
         .current_dir(&rosy_output_path)
@@ -224,7 +229,11 @@ fn rosy (
     let stderr = String::from_utf8_lossy(&output.stderr);
     info!("Cargo stdout:\n{}", stdout);
     info!("Cargo stderr:\n{}", stderr);
-    ensure!(output.status.success(), "Compilation failed with exit code: {:?} with stdout:\n{stdout} and stderr:\n{stderr}", output.status.code());
+    ensure!(
+        output.status.success(),
+        "Compilation failed with exit code: {:?} with stdout:\n{stdout} and stderr:\n{stderr}",
+        output.status.code()
+    );
 
     let build_profile = if release { "release" } else { "debug" };
     let binary_path = rosy_output_path.join(format!("target/{}/rosy_output", build_profile));
@@ -246,25 +255,43 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Run { source, output_dir, release, cosy_syntax } => {
+        Commands::Run {
+            source,
+            output_dir,
+            release,
+            cosy_syntax,
+        } => {
             syntax_config::set_cosy_syntax(cosy_syntax);
             info!("Running Rosy script: {}", source.display());
             let binary_path = rosy(&source, output_dir, release)?;
-            info!("Compilation successful! Binary remains at: {}", binary_path.display());
-            
+            info!(
+                "Compilation successful! Binary remains at: {}",
+                binary_path.display()
+            );
+
             // Run the binary, piping stdout and stderr
             let mut run_command = Command::new(&binary_path);
             let status = run_command
                 .status()
                 .with_context(|| format!("Failed to run binary at `{}`!", binary_path.display()))?;
-            ensure!(status.success(), "Execution failed with exit code: {:?}", status.code());
+            ensure!(
+                status.success(),
+                "Execution failed with exit code: {:?}",
+                status.code()
+            );
         }
-        
-        Commands::Build { source, output, output_dir, release, cosy_syntax } => {
+
+        Commands::Build {
+            source,
+            output,
+            output_dir,
+            release,
+            cosy_syntax,
+        } => {
             syntax_config::set_cosy_syntax(cosy_syntax);
             info!("Building Rosy script: {}", source.display());
             let binary_path = rosy(&source, output_dir, release)?;
-            
+
             // Determine output name
             let output_name = output.unwrap_or_else(|| {
                 source
@@ -273,7 +300,7 @@ fn main() -> Result<()> {
                     .unwrap_or("rosy_output")
                     .to_string()
             });
-            
+
             // Copy binary to PWD
             let destination = PathBuf::from(&output_name);
             std::fs::copy(&binary_path, &destination)
