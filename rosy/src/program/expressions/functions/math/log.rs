@@ -90,8 +90,7 @@ impl TranspileableExpr for LogExpr {
                 )
             })
     }
-    fn build_expr_recipe(&self, resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
-        let inner = resolver.build_expr_recipe(&self.expr, ctx, deps);
-        Some(ExprRecipe::Sin(Box::new(inner)))
+    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+        None
     }
 }
