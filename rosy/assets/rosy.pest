@@ -67,7 +67,7 @@ var_decl = { ^"VARIABLE" ~ type? ~ variable_name ~ memory_size* ~ semicolon }
 memory_size = { expr }
 
 /// Keywords - define all reserved words
-keyword = { ^"BEGIN" | ^"END" | ^"WRITE" | ^"WRITEB" | ^"READ" | ^"READB" | ^"VARIABLE" | ^"PROCEDURE" | ^"ENDPROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"ELSEIF" | ^"ELSE" | ^"ENDIF" | ^"WHILE" | ^"ENDWHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"DANOT" | ^"DAEPS" | ^"DATRN" | ^"LENGTH" | ^"SIN" | ^"SQR" | ^"SQRT" | ^"VMAX" | ^"LST" | ^"LCM" | ^"LCD" | ^"LOG" | ^"BREAK" | ^"QUIT" | ^"SCRLEN" | ^"CPUSEC" | ^"OS" | ^"LINV" | ^"LDET" | ^"SUBSTR" | ^"VELSET" | ^"VELGET" | ^"POLVAL" | ^"FIT" | ^"ENDFIT" | ^"OPENF" | ^"OPENFB" | ^"CLOSEF" | ^"FUNCTION" | ^"ENDFUNCTION" | ^"LOOP" | ^"ENDLOOP" | ^"PLOOP" | ^"ENDPLOOP" | ^"ENDWHILE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
+keyword = { ^"BEGIN" | ^"END" | ^"WRITE" | ^"WRITEB" | ^"READ" | ^"READB" | ^"VARIABLE" | ^"PROCEDURE" | ^"ENDPROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"ELSEIF" | ^"ELSE" | ^"ENDIF" | ^"WHILE" | ^"ENDWHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"DANOT" | ^"DAEPS" | ^"DATRN" | ^"LENGTH" | ^"SIN" | ^"COS" | ^"ASIN" | ^"ACOS" | ^"ATAN" | ^"SINH" | ^"COSH" | ^"TANH" | ^"SQR" | ^"SQRT" | ^"VMAX" | ^"VMIN" | ^"ABS" | ^"NORM" | ^"CONS" | ^"INT" | ^"NINT" | ^"TYPE" | ^"REAL" | ^"IMAG" | ^"TRIM" | ^"LTRIM" | ^"ISRT3" | ^"ISRT" | ^"CMPLX" | ^"CONJ" | ^"LST" | ^"LCM" | ^"LCD" | ^"LOG" | ^"BREAK" | ^"QUIT" | ^"SCRLEN" | ^"CPUSEC" | ^"OS" | ^"LINV" | ^"LDET" | ^"SUBSTR" | ^"VELSET" | ^"VELGET" | ^"POLVAL" | ^"FIT" | ^"ENDFIT" | ^"OPENF" | ^"OPENFB" | ^"CLOSEF" | ^"FUNCTION" | ^"ENDFUNCTION" | ^"LOOP" | ^"ENDLOOP" | ^"PLOOP" | ^"ENDPLOOP" | ^"ENDWHILE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
 
 /// [ IF / ELSEIF / ELSE / ENDIF ]
 if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
@@ -124,7 +124,7 @@ endif = { ^"ENDIF" ~ semicolon }
   end_fit = { ^"ENDFIT" ~ expr ~ expr ~ expr ~ variable_name+ ~ semicolon }
 
 /// [ INTRINSIC FUNCTIONS ]
-  builtin_function = _{ cm | st | lo | da | cd_intrinsic | length | sin | sqrt_fn | sqr | exp_fn | log_fn | tan_fn | vmax | lst | lcm | lcd }
+  builtin_function = _{ cm | st | lo | da | cd_intrinsic | length | sin | cos_fn | asin_fn | acos_fn | atan_fn | sinh_fn | cosh_fn | tanh_fn | sqrt_fn | sqr | exp_fn | log_fn | tan_fn | vmax | vmin | abs_fn | norm_fn | cons_fn | int_fn | nint_fn | type_fn | real_fn | imag_fn | re_fn | ve_fn | trim_fn | ltrim_fn | isrt3_fn | isrt_fn | cmplx_fn | conj_fn | lst | lcm | lcd }
   /// CM
   cm = { ^"CM" ~ "(" ~ expr ~ ")" }
   /// ST - String conversion
@@ -139,6 +139,20 @@ endif = { ^"ENDIF" ~ semicolon }
   length = { ^"LENGTH" ~ "(" ~ expr ~ ")" }
   /// SIN - Compute sine
   sin = { ^"SIN" ~ "(" ~ expr ~ ")" }
+  /// COS - Compute cosine
+  cos_fn = { ^"COS" ~ "(" ~ expr ~ ")" }
+  /// ASIN - Compute arcsine
+  asin_fn = { ^"ASIN" ~ "(" ~ expr ~ ")" }
+  /// ACOS - Compute arccosine
+  acos_fn = { ^"ACOS" ~ "(" ~ expr ~ ")" }
+  /// ATAN - Compute arctangent
+  atan_fn = { ^"ATAN" ~ "(" ~ expr ~ ")" }
+  /// SINH - Compute hyperbolic sine
+  sinh_fn = { ^"SINH" ~ "(" ~ expr ~ ")" }
+  /// COSH - Compute hyperbolic cosine
+  cosh_fn = { ^"COSH" ~ "(" ~ expr ~ ")" }
+  /// TANH - Compute hyperbolic tangent
+  tanh_fn = { ^"TANH" ~ "(" ~ expr ~ ")" }
   /// SQR - Compute square
   sqr = { ^"SQR" ~ "(" ~ expr ~ ")" }
   /// SQRT - Compute square root
@@ -151,6 +165,40 @@ endif = { ^"ENDIF" ~ semicolon }
   tan_fn = { ^"TAN" ~ "(" ~ expr ~ ")" }
   /// VMAX - Maximum element of vector
   vmax = { ^"VMAX" ~ "(" ~ expr ~ ")" }
+  /// VMIN - Minimum element of vector
+  vmin = { ^"VMIN" ~ "(" ~ expr ~ ")" }
+  /// ABS - Absolute value
+  abs_fn = { ^"ABS" ~ "(" ~ expr ~ ")" }
+  /// NORM - Compute norm
+  norm_fn = { ^"NORM" ~ "(" ~ expr ~ ")" }
+  /// CONS - Extract constant part
+  cons_fn = { ^"CONS" ~ "(" ~ expr ~ ")" }
+  /// INT - Truncate toward zero
+  int_fn = { ^"INT" ~ "(" ~ expr ~ ")" }
+  /// NINT - Round to nearest integer
+  nint_fn = { ^"NINT" ~ "(" ~ expr ~ ")" }
+  /// TYPE - Return COSY type code
+  type_fn = { ^"TYPE" ~ "(" ~ expr ~ ")" }
+  /// REAL - Determine the real part
+  real_fn = { ^"REAL" ~ "(" ~ expr ~ ")" }
+  /// IMAG - Determine the imaginary part
+  imag_fn = { ^"IMAG" ~ "(" ~ expr ~ ")" }
+  /// RE - Convert to real number
+  re_fn = { ^"RE" ~ "(" ~ expr ~ ")" }
+  /// VE - Convert to vector
+  ve_fn = { ^"VE" ~ "(" ~ expr ~ ")" }
+  /// TRIM - Remove trailing spaces
+  trim_fn = { ^"TRIM" ~ "(" ~ expr ~ ")" }
+  /// LTRIM - Remove leading spaces
+  ltrim_fn = { ^"LTRIM" ~ "(" ~ expr ~ ")" }
+  /// ISRT3 - Inverse cube-root (x^(-3/2)) -- must appear before ISRT
+  isrt3_fn = { ^"ISRT3" ~ "(" ~ expr ~ ")" }
+  /// ISRT - Inverse square root (x^(-1/2))
+  isrt_fn = { ^"ISRT" ~ "(" ~ expr ~ ")" }
+  /// CMPLX - Convert to complex
+  cmplx_fn = { ^"CMPLX" ~ "(" ~ expr ~ ")" }
+  /// CONJ - Complex conjugate
+  conj_fn = { ^"CONJ" ~ "(" ~ expr ~ ")" }
   /// LST - String memory size estimator (compatibility)
   lst = { ^"LST" ~ "(" ~ expr ~ ")" }
   /// LCM - Complex memory size estimator (compatibility)

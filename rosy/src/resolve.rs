@@ -100,6 +100,10 @@ pub enum ExprRecipe {
     Concat(Vec<ExprRecipe>),
     /// SIN intrinsic — result depends on input type.
     Sin(Box<ExprRecipe>),
+    /// REAL intrinsic — result depends on input type (RE/CM->RE, DA->DA).
+    RealFn(Box<ExprRecipe>),
+    /// IMAG intrinsic — result depends on input type (RE/CM->RE, DA->DA).
+    ImagFn(Box<ExprRecipe>),
     /// Expression whose type couldn't be determined statically.
     Unknown,
 }
@@ -594,6 +598,16 @@ impl TypeResolver {
                 let input_type = self.evaluate_recipe(inner)?;
                 crate::rosy_lib::intrinsics::sin::get_return_type(&input_type)
                     .ok_or_else(|| anyhow!("No SIN rule for {}", input_type))
+            }
+            ExprRecipe::RealFn(inner) => {
+                let input_type = self.evaluate_recipe(inner)?;
+                crate::rosy_lib::intrinsics::real_fn::get_return_type(&input_type)
+                    .ok_or_else(|| anyhow!("No REAL rule for {}", input_type))
+            }
+            ExprRecipe::ImagFn(inner) => {
+                let input_type = self.evaluate_recipe(inner)?;
+                crate::rosy_lib::intrinsics::imag_fn::get_return_type(&input_type)
+                    .ok_or_else(|| anyhow!("No IMAG rule for {}", input_type))
             }
             ExprRecipe::Unknown => {
                 Err(anyhow!("Cannot evaluate unknown expression recipe"))

@@ -1,0 +1,35 @@
+BEGIN;
+
+PROCEDURE RUN;
+    { All variable declarations must come first in FOX/COSY }
+    VARIABLE NM 1;
+    VARIABLE INPUT_0 1;
+    VARIABLE RESULT_0 1;
+    VARIABLE INPUT_1 6;
+    VARIABLE RESULT_1 6;
+    VARIABLE INPUT_2 2000;
+    VARIABLE RESULT_2 2000;
+
+    { Initialize DA system for tests that use DA/CD types }
+    { DAINI: order 10, number_of_variables 6, mode 0 (see COSY manual) }
+    DAINI 10 6 0 NM;
+
+    { Test 0: ISRT(RE) => RE }
+    INPUT_0 := 4.0;
+    RESULT_0 := ISRT(INPUT_0);
+    WRITE 6 RESULT_0;
+
+    { Test 1: ISRT(VE) => VE }
+    INPUT_1 := 4.0&9.0&16.0;
+    RESULT_1 := ISRT(INPUT_1);
+    WRITE 6 RESULT_1;
+
+    { Test 2: ISRT(DA) => DA }
+    INPUT_2 := 4.0 + DA(1);
+    RESULT_2 := ISRT(INPUT_2);
+    WRITE 6 RESULT_2;
+
+ENDPROCEDURE;
+
+RUN;
+END;

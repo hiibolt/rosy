@@ -11,3 +11,5 @@
 pub mod complex_convert;
 pub mod logical_convert;
 pub mod string_convert;
+pub mod re_convert;
+pub mod ve_convert;

@@ -42,17 +42,41 @@ use crate::program::expressions::core::var_expr::VarExpr;
 use crate::program::expressions::functions::conversion::complex_convert::ComplexConvertExpr;
 use crate::program::expressions::functions::conversion::string_convert::StringConvertExpr;
 use crate::program::expressions::functions::conversion::logical_convert::LogicalConvertExpr;
+use crate::program::expressions::functions::conversion::re_convert::ReConvertExpr;
+use crate::program::expressions::functions::conversion::ve_convert::VeConvertExpr;
 use crate::program::expressions::functions::math::trig::tan::TanExpr;
 use crate::program::expressions::functions::math::trig::sin::SinExpr;
+use crate::program::expressions::functions::math::trig::cos::CosExpr;
+use crate::program::expressions::functions::math::trig::asin::AsinExpr;
+use crate::program::expressions::functions::math::trig::acos::AcosExpr;
+use crate::program::expressions::functions::math::trig::atan::AtanExpr;
+use crate::program::expressions::functions::math::trig::sinh::SinhExpr;
+use crate::program::expressions::functions::math::trig::cosh::CoshExpr;
+use crate::program::expressions::functions::math::trig::tanh::TanhExpr;
 use crate::program::expressions::functions::math::sqr::SqrExpr;
 use crate::program::expressions::functions::math::sqrt::SqrtExpr;
 use crate::program::expressions::functions::math::exp::ExpExpr;
 use crate::program::expressions::functions::math::log::LogExpr;
 use crate::program::expressions::functions::math::vmax::VmaxExpr;
+use crate::program::expressions::functions::math::vmin::VminExpr;
+use crate::program::expressions::functions::math::abs::AbsExpr;
+use crate::program::expressions::functions::math::norm::NormExpr;
+use crate::program::expressions::functions::math::cons::ConsExpr;
+use crate::program::expressions::functions::math::int_fn::IntExpr;
+use crate::program::expressions::functions::math::nint::NintExpr;
+use crate::program::expressions::functions::math::type_fn::TypeFnExpr;
+use crate::program::expressions::functions::math::isrt::IsrtExpr;
+use crate::program::expressions::functions::math::isrt3::Isrt3Expr;
+use crate::program::expressions::functions::math::cmplx::CmplxExpr;
+use crate::program::expressions::functions::math::conj::ConjExpr;
+use crate::program::expressions::functions::math::real_fn::RealFnExpr;
+use crate::program::expressions::functions::math::imag_fn::ImagFnExpr;
 use crate::program::expressions::functions::math::lst::LstExpr;
 use crate::program::expressions::functions::math::lcm::LcmExpr;
 use crate::program::expressions::functions::math::lcd::LcdExpr;
 use crate::program::expressions::functions::math::pow::PowExpr;
+use crate::program::expressions::functions::sys::trim::TrimExpr;
+use crate::program::expressions::functions::sys::ltrim::LtrimExpr;
 
 use crate::program::expressions::operators::add::AddExpr;
 use crate::program::expressions::operators::sub::SubExpr;
@@ -113,17 +137,41 @@ pub enum ExprEnum {
     CD,
     Length,
     Sin,
+    Cos,
+    Asin,
+    Acos,
+    Atan,
+    Sinh,
+    Cosh,
+    Tanh,
     Sqr,
     Sqrt,
     Exp,
     Log,
     Tan,
     Vmax,
+    Vmin,
+    Abs,
+    Norm,
+    Cons,
+    Int,
+    Nint,
+    TypeFn,
+    Trim,
+    Ltrim,
+    Isrt,
+    Isrt3,
+    Cmplx,
+    Conj,
     Lst,
     Lcm,
     Lcd,
     Neg,
     Derive,
+    RealFn,
+    ImagFn,
+    ReConvert,
+    VeConvert,
 }
 
 impl FromRule for Expr {
@@ -260,6 +308,55 @@ impl FromRule for Expr {
                         inner: Box::new(sin_expr.ok_or_else(|| anyhow::anyhow!("Expected SinExpr"))?),
                     })
                 },
+                Rule::cos_fn => {
+                    let cos_expr = CosExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Cos,
+                        inner: Box::new(cos_expr.ok_or_else(|| anyhow::anyhow!("Expected CosExpr"))?),
+                    })
+                },
+                Rule::asin_fn => {
+                    let asin_expr = AsinExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Asin,
+                        inner: Box::new(asin_expr.ok_or_else(|| anyhow::anyhow!("Expected AsinExpr"))?),
+                    })
+                },
+                Rule::acos_fn => {
+                    let acos_expr = AcosExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Acos,
+                        inner: Box::new(acos_expr.ok_or_else(|| anyhow::anyhow!("Expected AcosExpr"))?),
+                    })
+                },
+                Rule::atan_fn => {
+                    let atan_expr = AtanExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Atan,
+                        inner: Box::new(atan_expr.ok_or_else(|| anyhow::anyhow!("Expected AtanExpr"))?),
+                    })
+                },
+                Rule::sinh_fn => {
+                    let sinh_expr = SinhExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Sinh,
+                        inner: Box::new(sinh_expr.ok_or_else(|| anyhow::anyhow!("Expected SinhExpr"))?),
+                    })
+                },
+                Rule::cosh_fn => {
+                    let cosh_expr = CoshExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Cosh,
+                        inner: Box::new(cosh_expr.ok_or_else(|| anyhow::anyhow!("Expected CoshExpr"))?),
+                    })
+                },
+                Rule::tanh_fn => {
+                    let tanh_expr = TanhExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Tanh,
+                        inner: Box::new(tanh_expr.ok_or_else(|| anyhow::anyhow!("Expected TanhExpr"))?),
+                    })
+                },
                 Rule::sqr => {
                     let sqr_expr = SqrExpr::from_rule(primary)?;
                     Ok(Expr {
@@ -321,6 +418,125 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Lcd,
                         inner: Box::new(lcd_expr.ok_or_else(|| anyhow::anyhow!("Expected LcdExpr"))?),
+                    })
+                },
+                Rule::vmin => {
+                    let vmin_expr = VminExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Vmin,
+                        inner: Box::new(vmin_expr.ok_or_else(|| anyhow::anyhow!("Expected VminExpr"))?),
+                    })
+                },
+                Rule::abs_fn => {
+                    let abs_expr = AbsExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Abs,
+                        inner: Box::new(abs_expr.ok_or_else(|| anyhow::anyhow!("Expected AbsExpr"))?),
+                    })
+                },
+                Rule::norm_fn => {
+                    let norm_expr = NormExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Norm,
+                        inner: Box::new(norm_expr.ok_or_else(|| anyhow::anyhow!("Expected NormExpr"))?),
+                    })
+                },
+                Rule::cons_fn => {
+                    let cons_expr = ConsExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Cons,
+                        inner: Box::new(cons_expr.ok_or_else(|| anyhow::anyhow!("Expected ConsExpr"))?),
+                    })
+                },
+                Rule::int_fn => {
+                    let int_expr = IntExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Int,
+                        inner: Box::new(int_expr.ok_or_else(|| anyhow::anyhow!("Expected IntExpr"))?),
+                    })
+                },
+                Rule::nint_fn => {
+                    let nint_expr = NintExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Nint,
+                        inner: Box::new(nint_expr.ok_or_else(|| anyhow::anyhow!("Expected NintExpr"))?),
+                    })
+                },
+                Rule::type_fn => {
+                    let type_fn_expr = TypeFnExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::TypeFn,
+                        inner: Box::new(type_fn_expr.ok_or_else(|| anyhow::anyhow!("Expected TypeFnExpr"))?),
+                    })
+                },
+                Rule::trim_fn => {
+                    let trim_expr = TrimExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Trim,
+                        inner: Box::new(trim_expr.ok_or_else(|| anyhow::anyhow!("Expected TrimExpr"))?),
+                    })
+                },
+                Rule::ltrim_fn => {
+                    let ltrim_expr = LtrimExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Ltrim,
+                        inner: Box::new(ltrim_expr.ok_or_else(|| anyhow::anyhow!("Expected LtrimExpr"))?),
+                    })
+                },
+                Rule::isrt_fn => {
+                    let isrt_expr = IsrtExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Isrt,
+                        inner: Box::new(isrt_expr.ok_or_else(|| anyhow::anyhow!("Expected IsrtExpr"))?),
+                    })
+                },
+                Rule::isrt3_fn => {
+                    let isrt3_expr = Isrt3Expr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Isrt3,
+                        inner: Box::new(isrt3_expr.ok_or_else(|| anyhow::anyhow!("Expected Isrt3Expr"))?),
+                    })
+                },
+                Rule::cmplx_fn => {
+                    let cmplx_expr = CmplxExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Cmplx,
+                        inner: Box::new(cmplx_expr.ok_or_else(|| anyhow::anyhow!("Expected CmplxExpr"))?),
+                    })
+                },
+                Rule::conj_fn => {
+                    let conj_expr = ConjExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Conj,
+                        inner: Box::new(conj_expr.ok_or_else(|| anyhow::anyhow!("Expected ConjExpr"))?),
+                    })
+                },
+                Rule::real_fn => {
+                    let real_fn_expr = RealFnExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::RealFn,
+                        inner: Box::new(real_fn_expr.ok_or_else(|| anyhow::anyhow!("Expected RealFnExpr"))?),
+                    })
+                },
+                Rule::imag_fn => {
+                    let imag_fn_expr = ImagFnExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::ImagFn,
+                        inner: Box::new(imag_fn_expr.ok_or_else(|| anyhow::anyhow!("Expected ImagFnExpr"))?),
+                    })
+                },
+                Rule::re_fn => {
+                    let re_convert_expr = ReConvertExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::ReConvert,
+                        inner: Box::new(re_convert_expr.ok_or_else(|| anyhow::anyhow!("Expected ReConvertExpr"))?),
+                    })
+                },
+                Rule::ve_fn => {
+                    let ve_convert_expr = VeConvertExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::VeConvert,
+                        inner: Box::new(ve_convert_expr.ok_or_else(|| anyhow::anyhow!("Expected VeConvertExpr"))?),
                     })
                 },
                 Rule::expr => {

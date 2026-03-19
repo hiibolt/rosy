@@ -23,14 +23,14 @@ pub struct TypeRule {
 }
 
 /// Parse ADD_REGISTRY from add/mod.rs source code.
-/// 
+///
 /// This uses simple regex parsing to extract TypeRule::new() calls.
 pub fn parse_registry_from_source(source_path: &Path) -> Vec<TypeRule> {
     let content = fs::read_to_string(source_path)
         .expect("Failed to read operator source file");
-    
+
     let mut rules = Vec::new();
-    
+
     // Simple parser: look for TypeRule::new("X", "Y", "Z") patterns
     for line in content.lines() {
         if line.trim_start().starts_with("TypeRule::new(") {
@@ -45,7 +45,7 @@ pub fn parse_registry_from_source(source_path: &Path) -> Vec<TypeRule> {
             }
         }
     }
-    
+
     rules
 }
 
@@ -55,9 +55,9 @@ fn parse_typefrom_rule_new(line: &str) -> Option<TypeRule> {
     let re = Regex::new(
         r#"TypeRule::new\s*\(\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*\)"#
     ).ok()?;
-    
+
     let captures = re.captures(line)?;
-    
+
     Some(TypeRule {
         lhs: captures.get(1)?.as_str().to_string(),
         rhs: captures.get(2)?.as_str().to_string(),
@@ -74,9 +74,9 @@ fn parse_typefrom_rule_with_comment(line: &str) -> Option<TypeRule> {
     let re = Regex::new(
         r#"TypeRule::with_comment\s*\(\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*\)"#
     ).ok()?;
-    
+
     let captures = re.captures(line)?;
-    
+
     Some(TypeRule {
         lhs: captures.get(1)?.as_str().to_string(),
         rhs: captures.get(2)?.as_str().to_string(),
@@ -93,7 +93,7 @@ pub fn generate_doc_table(rules: &[TypeRule]) -> String {
         "| Left | Right | Result | Comment |\n\
          |---|---|---|---|\n"
     );
-    
+
     for rule in rules {
         table.push_str(&format!(
             "| {} | {} | {} | {} |\n",
@@ -103,7 +103,7 @@ pub fn generate_doc_table(rules: &[TypeRule]) -> String {
             rule.comment
         ));
     }
-    
+
     table
 }
 
@@ -128,30 +128,30 @@ fn get_operator_symbol(operator_name: &str) -> &'static str {
 }
 
 /// Generate ROSY test script.
-/// 
+///
 /// For each type combination, creates variables and performs the operation.
 /// Uses language-appropriate test values for each type.
 pub fn generate_rosy_script(operator_name: &str, rules: &[TypeRule]) -> String {
     let op_symbol = get_operator_symbol(operator_name);
     let mut script = String::from("BEGIN;\n");
-    
+
     for (idx, rule) in rules.iter().enumerate() {
         script.push_str(&format!("    VARIABLE ({}) LHS_{};\n", rule.lhs, idx));
         script.push_str(&format!("    VARIABLE ({}) RHS_{};\n", rule.rhs, idx));
         script.push_str(&format!("    VARIABLE ({}) RESULT_{};\n\n", rule.result, idx));
-        
+
         // Initialize with type-appropriate test values
         script.push_str(&format!("    LHS_{} := {};\n", idx, rule.lhs_test_val));
         script.push_str(&format!("    RHS_{} := {};\n", idx, rule.rhs_test_val));
-        
+
         // Perform operation
         script.push_str(&format!("    RESULT_{} := LHS_{} {} RHS_{};\n", idx, idx, op_symbol, idx));
-        
+
         // Write the result (just output the result value for now)
         // Can't write literal strings in ROSY without ST() conversion
         script.push_str(&format!("    WRITE 6 ST(RESULT_{});\n\n", idx));
     }
-    
+
     script.push_str("END;\n");
     script
 }
@@ -160,23 +160,23 @@ pub fn generate_rosy_script(operator_name: &str, rules: &[TypeRule]) -> String {
 pub fn generate_cosy_script(operator_name: &str, rules: &[TypeRule]) -> String {
     let op_symbol = get_operator_symbol(operator_name);
     let mut script = String::from("BEGIN;\n\nPROCEDURE RUN;\n");
-    
+
     // FOX/COSY requires ALL variable declarations at procedure start
     script.push_str("    { All variable declarations must come first in FOX/COSY }\n");
     script.push_str("    VARIABLE NM 1;\n");
-    
+
     // First pass: declare all variables
     for (idx, rule) in rules.iter().enumerate() {
         script.push_str(&format!("    VARIABLE LHS_{} {};\n", idx, get_cosy_var_size(&rule.lhs)));
         script.push_str(&format!("    VARIABLE RHS_{} {};\n", idx, get_cosy_var_size(&rule.rhs)));
         script.push_str(&format!("    VARIABLE RESULT_{} {};\n", idx, get_cosy_var_size(&rule.result)));
     }
-    
+
     // Initialize DA system (needed for DA/CD types)
     script.push_str("\n    { Initialize DA system for tests that use DA/CD types }\n");
     script.push_str("    { DAINI: order 10, number_of_variables 6, mode 0 (see COSY manual) }\n");
     script.push_str("    DAINI 10 6 0 NM;\n\n");
-    
+
     // Second pass: assignments and operations
     for (idx, rule) in rules.iter().enumerate() {
         script.push_str(&format!("    {{ Test {}: {} {} {} => {} }}\n", idx, rule.lhs, op_symbol, rule.rhs, rule.result));
@@ -185,7 +185,7 @@ pub fn generate_cosy_script(operator_name: &str, rules: &[TypeRule]) -> String {
         script.push_str(&format!("    RESULT_{} := LHS_{} {} RHS_{};\n", idx, idx, op_symbol, idx));
         script.push_str(&format!("    WRITE 6 RESULT_{};\n\n", idx));
     }
-    
+
     script.push_str("ENDPROCEDURE;\n\nRUN;\nEND;\n");
     script
 }
@@ -208,40 +208,40 @@ fn get_cosy_var_size(type_name: &str) -> &'static str {
 pub fn codegen_operator(operator_name: &str) {
     let src_path = Path::new("src/rosy_lib/operators")
         .join(format!("{}.rs", operator_name));
-    
+
     let operator_dir = Path::new("assets/operators").join(operator_name);
-    
+
     // Create the assets directory if it doesn't exist
     fs::create_dir_all(&operator_dir)
         .expect("Failed to create assets directory");
-    
+
     println!("cargo:rerun-if-changed={}", src_path.display());
-    
+
     // Parse registry from source
     let rules = parse_registry_from_source(&src_path);
-    
+
     if rules.is_empty() {
         println!("cargo:warning=No registry found in {}", src_path.display());
         return;
     }
-    
+
     println!("cargo:warning=Generating {} tests for operator '{}'", rules.len(), operator_name);
-    
+
     // Generate documentation table
     let doc_table = generate_doc_table(&rules);
     fs::write(operator_dir.join(format!("{}_table.md", operator_name)), doc_table)
         .expect("Failed to write doc table");
-    
+
     // Generate ROSY script
     let rosy_script = generate_rosy_script(operator_name, &rules);
     fs::write(operator_dir.join(format!("{}.rosy", operator_name)), rosy_script)
         .expect("Failed to write ROSY script");
-    
+
     // Generate COSY script
     let cosy_script = generate_cosy_script(operator_name, &rules);
     fs::write(operator_dir.join(format!("{}.fox", operator_name)), cosy_script)
         .expect("Failed to write COSY script");
-    
+
     println!("cargo:warning=Generated test files for operator '{}'", operator_name);
 }
 
@@ -257,9 +257,9 @@ pub struct IntrinsicTypeRule {
 pub fn parse_intrinsic_registry_from_source(source_path: &Path) -> Vec<IntrinsicTypeRule> {
     let content = fs::read_to_string(source_path)
         .expect("Failed to read intrinsic source file");
-    
+
     let mut rules = Vec::new();
-    
+
     // Look for IntrinsicTypeRule::new() patterns
     for line in content.lines() {
         if line.trim_start().starts_with("IntrinsicTypeRule::new(") {
@@ -268,7 +268,7 @@ pub fn parse_intrinsic_registry_from_source(source_path: &Path) -> Vec<Intrinsic
             }
         }
     }
-    
+
     rules
 }
 
@@ -277,9 +277,9 @@ fn parse_intrinsic_typefrom_rule_new(line: &str) -> Option<IntrinsicTypeRule> {
     let re = Regex::new(
         r#"IntrinsicTypeRule::new\s*\(\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*\)"#
     ).ok()?;
-    
+
     let captures = re.captures(line)?;
-    
+
     Some(IntrinsicTypeRule {
         input: captures.get(1)?.as_str().to_string(),
         result: captures.get(2)?.as_str().to_string(),
@@ -290,21 +290,21 @@ fn parse_intrinsic_typefrom_rule_new(line: &str) -> Option<IntrinsicTypeRule> {
 /// Generate ROSY test script for intrinsic function.
 pub fn generate_intrinsic_rosy_script(intrinsic_name: &str, rules: &[IntrinsicTypeRule]) -> String {
     let mut script = String::from("BEGIN;\n");
-    
+
     for (idx, rule) in rules.iter().enumerate() {
         script.push_str(&format!("    VARIABLE ({}) INPUT_{};\n", rule.input, idx));
         script.push_str(&format!("    VARIABLE ({}) RESULT_{};\n\n", rule.result, idx));
-        
+
         // Initialize with type-appropriate test values
         script.push_str(&format!("    INPUT_{} := {};\n", idx, rule.test_val));
-        
+
         // Call intrinsic function
         script.push_str(&format!("    RESULT_{} := {}(INPUT_{});\n", idx, intrinsic_name.to_uppercase(), idx));
-        
+
         // Write the result
         script.push_str(&format!("    WRITE 6 ST(RESULT_{});\n\n", idx));
     }
-    
+
     script.push_str("END;\n");
     script
 }
@@ -312,22 +312,22 @@ pub fn generate_intrinsic_rosy_script(intrinsic_name: &str, rules: &[IntrinsicTy
 /// Generate COSY INFINITY test script for intrinsic function.
 pub fn generate_intrinsic_cosy_script(intrinsic_name: &str, rules: &[IntrinsicTypeRule]) -> String {
     let mut script = String::from("BEGIN;\n\nPROCEDURE RUN;\n");
-    
+
     // FOX/COSY requires ALL variable declarations at procedure start
     script.push_str("    { All variable declarations must come first in FOX/COSY }\n");
     script.push_str("    VARIABLE NM 1;\n");
-    
+
     // First pass: declare all variables
     for (idx, rule) in rules.iter().enumerate() {
         script.push_str(&format!("    VARIABLE INPUT_{} {};\n", idx, get_cosy_var_size(&rule.input)));
         script.push_str(&format!("    VARIABLE RESULT_{} {};\n", idx, get_cosy_var_size(&rule.result)));
     }
-    
+
     // Initialize DA system (needed for DA/CD types)
     script.push_str("\n    { Initialize DA system for tests that use DA/CD types }\n");
     script.push_str("    { DAINI: order 10, number_of_variables 6, mode 0 (see COSY manual) }\n");
     script.push_str("    DAINI 10 6 0 NM;\n\n");
-    
+
     // Second pass: assignments and function calls
     for (idx, rule) in rules.iter().enumerate() {
         script.push_str(&format!("    {{ Test {}: {}({}) => {} }}\n", idx, intrinsic_name.to_uppercase(), rule.input, rule.result));
@@ -335,9 +335,25 @@ pub fn generate_intrinsic_cosy_script(intrinsic_name: &str, rules: &[IntrinsicTy
         script.push_str(&format!("    RESULT_{} := {}(INPUT_{});\n", idx, intrinsic_name.to_uppercase(), idx));
         script.push_str(&format!("    WRITE 6 RESULT_{};\n\n", idx));
     }
-    
+
     script.push_str("ENDPROCEDURE;\n\nRUN;\nEND;\n");
     script
+}
+
+/// Get the COSY/ROSY function name for an intrinsic module name.
+///
+/// Module naming conventions:
+/// - `int_fn`, `type_fn`, `real_fn`, `imag_fn` strip the `_fn` suffix
+/// - `re_convert` maps to `RE` (the RE() conversion function)
+/// - `ve_convert` maps to `VE` (the VE() conversion function)
+fn get_intrinsic_cosy_name(intrinsic_name: &str) -> String {
+    // Handle special _convert suffix: re_convert -> RE, ve_convert -> VE
+    if let Some(base) = intrinsic_name.strip_suffix("_convert") {
+        return base.to_uppercase();
+    }
+    // Handle _fn suffix: int_fn -> INT, type_fn -> TYPE, etc.
+    let base = intrinsic_name.strip_suffix("_fn").unwrap_or(intrinsic_name);
+    base.to_uppercase()
 }
 
 /// Generate documentation table for intrinsic function.
@@ -346,7 +362,7 @@ pub fn generate_intrinsic_doc_table(rules: &[IntrinsicTypeRule]) -> String {
         "| Input | Result |\n\
          |---|---|\n"
     );
-    
+
     for rule in rules {
         table.push_str(&format!(
             "| {} | {} |\n",
@@ -354,7 +370,7 @@ pub fn generate_intrinsic_doc_table(rules: &[IntrinsicTypeRule]) -> String {
             rule.result
         ));
     }
-    
+
     table
 }
 
@@ -362,39 +378,40 @@ pub fn generate_intrinsic_doc_table(rules: &[IntrinsicTypeRule]) -> String {
 pub fn codegen_intrinsic(intrinsic_name: &str) {
     let src_path = Path::new("src/rosy_lib/intrinsics")
         .join(format!("{}.rs", intrinsic_name));
-    
+
     let intrinsic_dir = Path::new("assets/intrinsics").join(intrinsic_name);
-    
+
     // Create the assets directory if it doesn't exist
     fs::create_dir_all(&intrinsic_dir)
         .expect("Failed to create assets directory");
-    
+
     println!("cargo:rerun-if-changed={}", src_path.display());
-    
+
     // Parse registry from source
     let rules = parse_intrinsic_registry_from_source(&src_path);
-    
+
     if rules.is_empty() {
         println!("cargo:warning=No registry found in {}", src_path.display());
         return;
     }
-    
+
     println!("cargo:warning=Generating {} tests for intrinsic '{}'", rules.len(), intrinsic_name);
-    
+
     // Generate documentation table
     let doc_table = generate_intrinsic_doc_table(&rules);
     fs::write(intrinsic_dir.join(format!("{}_table.md", intrinsic_name)), doc_table)
         .expect("Failed to write doc table");
-    
+
     // Generate ROSY script
-    let rosy_script = generate_intrinsic_rosy_script(intrinsic_name, &rules);
+    let cosy_name = get_intrinsic_cosy_name(intrinsic_name);
+    let rosy_script = generate_intrinsic_rosy_script(&cosy_name, &rules);
     fs::write(intrinsic_dir.join(format!("{}.rosy", intrinsic_name)), rosy_script)
         .expect("Failed to write ROSY script");
-    
+
     // Generate COSY script
-    let cosy_script = generate_intrinsic_cosy_script(intrinsic_name, &rules);
+    let cosy_script = generate_intrinsic_cosy_script(&cosy_name, &rules);
     fs::write(intrinsic_dir.join(format!("{}.fox", intrinsic_name)), cosy_script)
         .expect("Failed to write COSY script");
-    
+
     println!("cargo:warning=Generated test files for intrinsic '{}'", intrinsic_name);
 }

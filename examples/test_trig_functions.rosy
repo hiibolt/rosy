@@ -1,0 +1,84 @@
+{ Test trig functions: COS, ASIN, ACOS, ATAN, SINH, COSH, TANH }
+BEGIN;
+    { COS }
+    VARIABLE (RE) x;
+    VARIABLE (RE) y;
+    x := 0.0;
+    y := COS(x);
+    WRITE 6 ST(y);
+
+    x := 1.5707963267948966;
+    y := COS(x);
+    WRITE 6 ST(y);
+
+    { ASIN }
+    x := 0.5;
+    y := ASIN(x);
+    WRITE 6 ST(y);
+
+    x := 1.0;
+    y := ASIN(x);
+    WRITE 6 ST(y);
+
+    { ACOS }
+    x := 0.5;
+    y := ACOS(x);
+    WRITE 6 ST(y);
+
+    x := 1.0;
+    y := ACOS(x);
+    WRITE 6 ST(y);
+
+    { ATAN }
+    x := 1.0;
+    y := ATAN(x);
+    WRITE 6 ST(y);
+
+    x := 0.0;
+    y := ATAN(x);
+    WRITE 6 ST(y);
+
+    { SINH }
+    x := 0.0;
+    y := SINH(x);
+    WRITE 6 ST(y);
+
+    x := 1.0;
+    y := SINH(x);
+    WRITE 6 ST(y);
+
+    { COSH }
+    x := 0.0;
+    y := COSH(x);
+    WRITE 6 ST(y);
+
+    x := 1.0;
+    y := COSH(x);
+    WRITE 6 ST(y);
+
+    { TANH }
+    x := 0.0;
+    y := TANH(x);
+    WRITE 6 ST(y);
+
+    x := 1.0;
+    y := TANH(x);
+    WRITE 6 ST(y);
+
+    { VE versions }
+    VARIABLE (VE) v;
+    VARIABLE (VE) vr;
+    v := 0.0&1.0&1.5707963267948966;
+    vr := COS(v);
+    WRITE 6 ST(vr);
+
+    vr := SINH(v);
+    WRITE 6 ST(vr);
+
+    vr := COSH(v);
+    WRITE 6 ST(vr);
+
+    vr := TANH(v);
+    WRITE 6 ST(vr);
+
+END;
