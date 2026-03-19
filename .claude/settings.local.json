@@ -1,11 +1,6 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(git stash:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(nix-shell:*)"
-    ]
+    "allow": []
   },
   "outputStyle": "Explanatory"
 }
