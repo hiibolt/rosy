@@ -18,9 +18,12 @@
 //! files opened with `OPENF` / `OPENFB`.
 
 pub mod closef;
+pub mod cpusec;
 pub mod openf;
 pub mod openfb;
+pub mod os_call;
 pub mod read;
 pub mod readb;
+pub mod velget;
 pub mod write;
 pub mod writeb;

@@ -26,7 +26,20 @@ statement   = _{
   | procedure_call
   | if_statement
   | break_statement
-  | fit_statement }
+  | fit_statement
+  | scrlen
+  | cpusec
+  | quit
+  | os_call
+  | danot
+  | daeps
+  | datrn
+  | linv
+  | ldet
+  | substr
+  | velset
+  | velget
+  | polval }
 
 /// BREAK
 break_statement = { ^"BREAK" ~ semicolon }
@@ -54,7 +67,7 @@ var_decl = { ^"VARIABLE" ~ type? ~ variable_name ~ memory_size* ~ semicolon }
 memory_size = { expr }
 
 /// Keywords - define all reserved words
-keyword = { ^"BEGIN" | ^"END" | ^"WRITE" | ^"WRITEB" | ^"READ" | ^"READB" | ^"VARIABLE" | ^"PROCEDURE" | ^"ENDPROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"ELSEIF" | ^"ELSE" | ^"ENDIF" | ^"WHILE" | ^"ENDWHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"LENGTH" | ^"SIN" | ^"SQR" | ^"SQRT" | ^"VMAX" | ^"LST" | ^"LCM" | ^"LCD" | ^"LOG" | ^"BREAK" | ^"FIT" | ^"ENDFIT" | ^"OPENF" | ^"OPENFB" | ^"CLOSEF" | ^"FUNCTION" | ^"ENDFUNCTION" | ^"LOOP" | ^"ENDLOOP" | ^"PLOOP" | ^"ENDPLOOP" | ^"ENDWHILE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
+keyword = { ^"BEGIN" | ^"END" | ^"WRITE" | ^"WRITEB" | ^"READ" | ^"READB" | ^"VARIABLE" | ^"PROCEDURE" | ^"ENDPROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"ELSEIF" | ^"ELSE" | ^"ENDIF" | ^"WHILE" | ^"ENDWHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"DANOT" | ^"DAEPS" | ^"DATRN" | ^"LENGTH" | ^"SIN" | ^"SQR" | ^"SQRT" | ^"VMAX" | ^"LST" | ^"LCM" | ^"LCD" | ^"LOG" | ^"BREAK" | ^"QUIT" | ^"SCRLEN" | ^"CPUSEC" | ^"OS" | ^"LINV" | ^"LDET" | ^"SUBSTR" | ^"VELSET" | ^"VELGET" | ^"POLVAL" | ^"FIT" | ^"ENDFIT" | ^"OPENF" | ^"OPENFB" | ^"CLOSEF" | ^"FUNCTION" | ^"ENDFUNCTION" | ^"LOOP" | ^"ENDLOOP" | ^"PLOOP" | ^"ENDPLOOP" | ^"ENDWHILE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
 
 /// [ IF / ELSEIF / ELSE / ENDIF ]
 if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
@@ -150,6 +163,23 @@ endif = { ^"ENDIF" ~ semicolon }
   daini = { ^"DAINI" ~ expr ~ expr ~ expr? ~ expr? ~ semicolon }
   daprv = { ^"DAPRV" ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   darev = { ^"DAREV" ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  danot = { ^"DANOT" ~ expr ~ semicolon }
+  daeps = { ^"DAEPS" ~ expr ~ semicolon }
+  datrn = { ^"DATRN" ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  /// [ CORE ]
+  scrlen = { ^"SCRLEN" ~ expr ~ semicolon }
+  quit = { ^"QUIT" ~ expr ~ semicolon }
+  os_call = { ^"OS" ~ expr ~ semicolon }
+  substr = { ^"SUBSTR" ~ expr ~ expr ~ expr ~ variable_identifier ~ semicolon }
+  velset = { ^"VELSET" ~ variable_identifier ~ expr ~ expr ~ semicolon }
+  /// [ TIMING ]
+  cpusec = { ^"CPUSEC" ~ variable_identifier ~ semicolon }
+  /// [ VECTOR ACCESS ]
+  velget = { ^"VELGET" ~ expr ~ expr ~ variable_identifier ~ semicolon }
+  /// [ MATH ]
+  linv = { ^"LINV" ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  ldet = { ^"LDET" ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  polval = { ^"POLVAL" ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
 /// [ INTRINSIC TYPES ]
   type = { "(" ~ inner_type ~ expr* ~ ")"}
   inner_type = {

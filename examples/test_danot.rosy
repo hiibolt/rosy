@@ -1,0 +1,12 @@
+BEGIN;
+
+{ Test DANOT: set momentary truncation order }
+{ Use DAINI with 4 args to avoid pre-existing semicolon parse issue }
+DAINI 5 2 6 1;
+
+{ Lower truncation order to 2 }
+DANOT 2;
+
+WRITE 6 'DA truncation order set to 2';
+
+END;

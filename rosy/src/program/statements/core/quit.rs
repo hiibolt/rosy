@@ -1,0 +1,78 @@
+//! # QUIT Statement
+//!
+//! Terminates execution of the program.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! QUIT c;
+//! ```
+//!
+//! ## Semantics
+//!
+//! - `QUIT 0;` — clean exit via `std::process::exit(0)`
+//! - `QUIT 1;` — triggers system traceback via `panic!`
+//! - `QUIT n;` — exits with code `n` cast to i32
+//!
+//! ## Example
+//!
+//! ```text
+//! QUIT 0;
+//! ```
+
+use std::collections::BTreeSet;
+use anyhow::{Result, Context, Error, ensure};
+
+use crate::{
+    ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement, add_context_to_all}
+};
+
+/// AST node for `QUIT c;`.
+#[derive(Debug)]
+pub struct QuitStatement {
+    pub code_expr: Expr,
+}
+
+impl FromRule for QuitStatement {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
+        ensure!(pair.as_rule() == Rule::quit,
+            "Expected `quit` rule when building QUIT statement, found: {:?}", pair.as_rule());
+
+        let mut inner = pair.into_inner();
+
+        let code_pair = inner.next()
+            .context("Missing code expression in QUIT!")?;
+        let code_expr = Expr::from_rule(code_pair)
+            .context("Failed to build code expression in QUIT")?
+            .ok_or_else(|| anyhow::anyhow!("Expected code expression in QUIT"))?;
+
+        Ok(Some(QuitStatement { code_expr }))
+    }
+}
+impl TranspileableStatement for QuitStatement {}
+impl Transpile for QuitStatement {
+    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+        let mut requested_variables = BTreeSet::new();
+
+        let code_output = self.code_expr.transpile(context)
+            .map_err(|e| add_context_to_all(e, "...while transpiling code expression in QUIT".to_string()))?;
+        requested_variables.extend(code_output.requested_variables);
+
+        let serialization = format!(
+            r#"{{
+    let __quit_code = *({}) as i32;
+    if __quit_code == 1 {{
+        panic!("QUIT with traceback requested");
+    }} else {{
+        std::process::exit(__quit_code);
+    }}
+}}"#,
+            code_output.serialization,
+        );
+
+        Ok(TranspilationOutput {
+            serialization,
+            requested_variables,
+        })
+    }
+}

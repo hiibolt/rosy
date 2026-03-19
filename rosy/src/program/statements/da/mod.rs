@@ -9,5 +9,8 @@
 //! | [`darev`] | `DAREV ...;` | Reverse-print DA array values |
 
 pub mod da_init;
+pub mod daeps;
+pub mod danot;
 pub mod daprv;
 pub mod darev;
+pub mod datrn;

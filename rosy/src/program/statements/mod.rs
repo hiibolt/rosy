@@ -49,6 +49,22 @@ pub use io::openfb::OpenfbStatement;
 pub use io::closef::ClosefStatement;
 
 pub use math::fit::FitStatement;
+pub use math::ldet::LdetStatement;
+pub use math::linv::LinvStatement;
+pub use math::polval::PolvalStatement;
+
+pub use core::quit::QuitStatement;
+pub use core::scrlen::ScrlenStatement;
+pub use core::substr::SubstrStatement;
+pub use core::velset::VelsetStatement;
+
+pub use io::cpusec::CpusecStatement;
+pub use io::os_call::OsCallStatement;
+pub use io::velget::VelgetStatement;
+
+pub use da::daeps::DaepsStatement;
+pub use da::danot::DanotStatement;
+pub use da::datrn::DatrnStatement;
 
 use crate::{ast::{FromRule, Rule}, transpile::*};
 use anyhow::{Context, Error, Result, bail};
@@ -114,6 +130,19 @@ pub enum StatementEnum {
     If,
     Break,
     Fit,
+    Cpusec,
+    DaEps,
+    DaNot,
+    DaTrn,
+    Ldet,
+    Linv,
+    OsCall,
+    Polval,
+    Quit,
+    Scrlen,
+    Substr,
+    Velget,
+    Velset,
 }
 impl TranspileableStatement for Statement {}
 impl FromRule for Statement {
@@ -278,8 +307,100 @@ impl FromRule for Statement {
                     source_location: loc.clone(),
                 })),
 
+            Rule::scrlen => ScrlenStatement::from_rule(pair)
+                .context("...while building SCRLEN statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Scrlen,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::cpusec => CpusecStatement::from_rule(pair)
+                .context("...while building CPUSEC statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Cpusec,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::quit => QuitStatement::from_rule(pair)
+                .context("...while building QUIT statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Quit,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::os_call => OsCallStatement::from_rule(pair)
+                .context("...while building OS statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::OsCall,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::danot => DanotStatement::from_rule(pair)
+                .context("...while building DANOT statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::DaNot,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::daeps => DaepsStatement::from_rule(pair)
+                .context("...while building DAEPS statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::DaEps,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::datrn => DatrnStatement::from_rule(pair)
+                .context("...while building DATRN statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::DaTrn,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::linv => LinvStatement::from_rule(pair)
+                .context("...while building LINV statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Linv,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::ldet => LdetStatement::from_rule(pair)
+                .context("...while building LDET statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Ldet,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::substr => SubstrStatement::from_rule(pair)
+                .context("...while building SUBSTR statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Substr,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::velset => VelsetStatement::from_rule(pair)
+                .context("...while building VELSET statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Velset,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::velget => VelgetStatement::from_rule(pair)
+                .context("...while building VELGET statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Velget,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::polval => PolvalStatement::from_rule(pair)
+                .context("...while building POLVAL statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Polval,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+
             // Ignored
-            Rule::begin | Rule::end | Rule::EOI | Rule::end_procedure | 
+            Rule::begin | Rule::end | Rule::EOI | Rule::end_procedure |
             Rule::end_function | Rule::end_loop | Rule::end_while | Rule::endif |
             Rule::end_fit => Ok(None),
             other => bail!("Unexpected statement: {:?}", other),

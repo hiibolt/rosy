@@ -1,0 +1,11 @@
+BEGIN;
+VARIABLE (VE) v;
+VARIABLE (RE) x;
+v := 10.0 & 20.0 & 30.0;
+VELGET v 1 x;
+WRITE 6 x;
+VELGET v 2 x;
+WRITE 6 x;
+VELGET v 3 x;
+WRITE 6 x;
+END;

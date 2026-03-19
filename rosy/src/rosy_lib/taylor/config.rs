@@ -107,6 +107,22 @@ pub fn set_epsilon(epsilon: f64) -> Result<f64> {
     Ok(old_epsilon)
 }
 
+/// Set the momentary truncation order for DA/CD computations.
+///
+/// # Returns
+/// The previous truncation order, or error if not initialized
+pub fn set_truncation_order(order: u32) -> Result<u32> {
+    let mut config = TAYLOR_CONFIG.write()
+        .map_err(|e| anyhow::anyhow!("Failed to acquire config lock: {}", e))?;
+
+    let cfg = config.as_mut()
+        .ok_or_else(|| anyhow::anyhow!("Taylor system not initialized"))?;
+
+    let old_order = cfg.max_order;
+    cfg.max_order = order;
+    Ok(old_order)
+}
+
 /// Check if Taylor system is initialized.
 pub fn is_initialized() -> bool {
     TAYLOR_CONFIG.read()

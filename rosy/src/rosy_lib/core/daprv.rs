@@ -211,6 +211,97 @@ pub fn rosy_darev(
     Ok(())
 }
 
+/// DATRN: Transform independent variables x_i with a_i*x_i + c_i for i = m1..=m2
+///
+/// Arguments:
+/// - `input`: the input DA vector array (`Vec<DA>`)
+/// - `scales`: array of scale factors a_i (one per variable; 1-based indexing used via m1/m2)
+/// - `shifts`: array of translation factors c_i
+/// - `m1`: start index (1-based)
+/// - `m2`: end index (1-based, inclusive)
+/// - `output`: DA vector array to write results into
+pub fn rosy_datrn(
+    input: &Vec<DA>,
+    scales: &Vec<f64>,
+    shifts: &Vec<f64>,
+    m1: usize,
+    m2: usize,
+    output: &mut Vec<DA>,
+) -> Result<()> {
+    use crate::rosy_lib::taylor::MAX_VARS;
+
+    let config = get_config().context("DATRN requires DA to be initialized (call OV first)")?;
+    let num_vars = config.num_vars;
+
+    // Build substitution DAs: for each variable i (1-based), build the DA for the new expression.
+    // Variables outside [m1, m2] are identity: new_x_i = x_i.
+    // Variables inside [m1, m2] become: new_x_i = a_i * x_i + c_i.
+    let mut substitutions: Vec<DA> = Vec::with_capacity(num_vars);
+    for var_idx in 1..=num_vars {
+        if var_idx >= m1 && var_idx <= m2 {
+            // Index into scales/shifts arrays (0-based offset from m1)
+            let arr_idx = var_idx - m1;
+            let a_i = if arr_idx < scales.len() { scales[arr_idx] } else { 1.0 };
+            let c_i = if arr_idx < shifts.len() { shifts[arr_idx] } else { 0.0 };
+
+            // Build: a_i * x_i + c_i
+            let x_i = DA::variable(var_idx)
+                .with_context(|| format!("DATRN: failed to create DA variable {}", var_idx))?;
+            let scaled = (&x_i * a_i)
+                .with_context(|| format!("DATRN: failed to scale DA variable {}", var_idx))?;
+            let shifted = (scaled + DA::from_coeff(c_i))
+                .with_context(|| format!("DATRN: failed to shift DA variable {}", var_idx))?;
+            substitutions.push(shifted);
+        } else {
+            // Identity substitution: new_x_i = x_i
+            let x_i = DA::variable(var_idx)
+                .with_context(|| format!("DATRN: failed to create identity DA variable {}", var_idx))?;
+            substitutions.push(x_i);
+        }
+    }
+
+    // Resize output to match input
+    output.resize_with(input.len(), DA::zero);
+
+    // For each DA in input, perform polynomial composition
+    for (comp_idx, da_in) in input.iter().enumerate() {
+        let mut result = DA::zero();
+
+        // Iterate over each term c * x_1^e1 * x_2^e2 * ... in the input DA
+        for (monomial, &coeff) in da_in.coeffs_iter() {
+            if coeff.abs() <= config.epsilon {
+                continue;
+            }
+
+            // Evaluate monomial at substituted variables:
+            // Monomial contribution = coeff * prod_i (substitutions[i])^exponents[i]
+            let mut term = DA::from_coeff(coeff);
+            for var_0idx in 0..num_vars.min(MAX_VARS) {
+                let exp = monomial.exponents[var_0idx] as usize;
+                if exp == 0 {
+                    continue;
+                }
+                // Raise substitution[var_0idx] to the power `exp`
+                let mut power = DA::from_coeff(1.0);
+                for _ in 0..exp {
+                    power = (&power * &substitutions[var_0idx])
+                        .with_context(|| format!("DATRN: failed to multiply DA powers for var {}", var_0idx + 1))?;
+                }
+                term = (&term * &power)
+                    .with_context(|| format!("DATRN: failed to multiply term by power for var {}", var_0idx + 1))?;
+            }
+
+            // Accumulate into result
+            result = (result + term)
+                .with_context(|| "DATRN: failed to accumulate result DA".to_string())?;
+        }
+
+        output[comp_idx] = result;
+    }
+
+    Ok(())
+}
+
 /// Build exponent string for DAPRV display.
 fn build_exp_str(exponents: &[u8], num_vars: usize) -> String {
     let mut result = String::new();

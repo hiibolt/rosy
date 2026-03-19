@@ -7,3 +7,6 @@
 //! | [`fit`] | `FIT vars; body ENDFIT eps max algo objs;` | Optimization loop |
 
 pub mod fit;
+pub mod ldet;
+pub mod linv;
+pub mod polval;
