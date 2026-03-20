@@ -8,24 +8,55 @@ Rosy transpiles ROSY source code into self-contained, native Rust executables. R
 
 For the **full language reference** — types, operators, statements, intrinsic functions, and examples — see the **[Rustdoc documentation](https://hiibolt.github.io/cosy-rs/rosy/index.html)**.
 
-## Quick Start
+## Installation
 
-### Prerequisites
+### From source (recommended)
 
-**Using Nix Flakes (recommended):**
+Requires the [Rust toolchain](https://rustup.rs/) (stable, edition 2024):
+
+```bash
+git clone https://github.com/hiibolt/rosy.git
+cd rosy
+cargo install --path rosy
+```
+
+This installs the `rosy` binary to `~/.cargo/bin/` (which should already be in your `PATH` if you have Rust installed).
+
+To update:
+
+```bash
+git pull && cargo install --path rosy
+```
+
+### From GitHub Releases
+
+Prebuilt binaries for Linux (x86_64) and macOS (x86_64, aarch64) are available on the [Releases page](https://github.com/hiibolt/rosy/releases/latest). Download the binary for your platform and place it somewhere in your `PATH`.
+
+### Using Nix Flakes
 
 ```bash
 nix develop
 ```
 
-This provides the complete development environment: Rust toolchain and all system dependencies. No manual setup needed.
+This provides the complete development environment: Rust toolchain and all system dependencies.
 
-**Manual setup (without Nix):**
+## Quick Start
 
-You will need:
-- **Rust toolchain** (stable, edition 2024): [rustup.rs](https://rustup.rs/)
+```bash
+# Run a Rosy script directly
+rosy run examples/basic.rosy
 
-**Additional requirements for `PLOOP` (MPI parallel loops):**
+# Build a standalone binary in the current directory
+rosy build examples/basic.rosy
+
+# Build with optimizations
+rosy build examples/basic.rosy --release
+
+# Custom output name
+rosy build examples/basic.rosy -o my_program
+```
+
+### MPI support (`PLOOP`)
 
 Programs that use the `PLOOP` construct require an MPI implementation and LLVM/Clang at compile time. The Rosy transpiler itself does not require these — they are only needed when compiling generated programs that use parallel features.
 
@@ -40,27 +71,15 @@ Programs that use the `PLOOP` construct require an MPI implementation and LLVM/C
   - macOS: `brew install llvm`
   - Arch: `sudo pacman -S clang llvm`
 
-### Building
+### NIU Metis Supercomputer
+
+On the NIU Metis supercomputer, load the MPI module before running any Rosy binary that uses MPI features (e.g., `PLOOP`):
 
 ```bash
-cargo build --release
+module load openmpi/openmpi-5.0.7-gcc-14.2.0-cuda-12.8
 ```
 
-### Running a ROSY Script
-
-```bash
-# Run directly (binary stays in .rosy_output/)
-rosy run examples/basic.rosy
-
-# Build a standalone binary in the current directory
-rosy build examples/basic.rosy
-
-# Build with optimizations
-rosy build examples/basic.rosy --release
-
-# Custom output name
-rosy build examples/basic.rosy -o my_program
-```
+This is only required for *running* MPI-compiled binaries, not for the Rosy transpiler itself.
 
 ## IDE Support
 

@@ -64,6 +64,17 @@ Multi-dimensional arrays: `(RE ** 2)` = `Vec<Vec<f64>>`
 
 Every operator/intrinsic must pass COSY/ROSY output diffing. TypeRule registries auto-generate `.rosy` and `.fox` test files via `codegen.rs` at build time. Run both, diff outputs -- must match exactly.
 
+## Versioning
+
+Uses [Semantic Versioning](https://semver.org/). The version is in `rosy/Cargo.toml`.
+
+- **Every commit to `master`** must bump the version in `rosy/Cargo.toml`
+  - Patch bump (0.1.0 -> 0.1.1): bug fixes, small improvements
+  - Minor bump (0.1.0 -> 0.2.0): new language constructs, features, or breaking changes
+  - Major bump: reserved for 1.0 stable release
+- **To create a release**: push a tag matching `v*.*.*` (e.g. `git tag v0.2.0 && git push --tags`)
+- The GitHub Actions release workflow (`.github/workflows/release.yml`) automatically builds binaries and creates a GitHub Release on tag push
+
 ## Conventions
 
 - Worktrees: `../rosy-work/<item-name>`
