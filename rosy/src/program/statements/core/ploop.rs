@@ -262,16 +262,15 @@ impl Transpile for PLoopStatement {
         let iterator_declaration_serialization = {
             requested_variables.insert("rosy_mpi_context".to_string());
             format!(
-                "let mut {} = rosy_mpi_context.get_group_num(&mut {})? + 1.0f64;",
+                "let mut __ploop_end: f64 = *(&{} as &f64);\n\tlet mut {} = rosy_mpi_context.get_group_num(&mut __ploop_end)? + 1.0f64;",
+                end_serialization,
                 self.iterator,
-                end_serialization
             )
         };
         let coordination_serialization = format!(
-            "rosy_mpi_context.coordinate(&mut {}, {}u8, &mut {})?;",
+            "rosy_mpi_context.coordinate(&mut {}, {}u8, &mut __ploop_end)?;",
             output_serialization,
             self.commutivityfrom_rule.unwrap_or(1),
-            end_serialization
         );
         let serialization = format!(
             "{{\n\t{}\n\n{}\n\n\t{}\n}}",

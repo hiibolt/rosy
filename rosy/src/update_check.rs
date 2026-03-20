@@ -61,14 +61,18 @@ fn check_latest_version() -> Option<String> {
     let local_version = Version::parse(CURRENT_VERSION).ok()?;
 
     if remote_version > local_version {
+        let release_url = format!("https://github.com/hiibolt/rosy/releases/tag/v{remote_version}");
+        let changelog_link = format!(
+            "\x1b]8;;{release_url}\x1b\\changelog\x1b]8;;\x1b\\"
+        );
         Some(format!(
-            "\n\x1b[33mA newer version of Rosy is available: v{remote_version} (current: v{local_version})\n\
+            "\n\x1b[33mA newer version of Rosy is available: v{remote_version} (current: v{local_version}) — {changelog_link}\n\
              \n\
              To update (built from source):\n\
              \x1b[0m  git pull && cargo install --path rosy\n\
              \n\
              \x1b[33mOr download a prebuilt binary from:\n\
-             \x1b[0m  https://github.com/hiibolt/rosy/releases/latest\n"
+             \x1b[0m  {release_url}\n"
         ))
     } else {
         None

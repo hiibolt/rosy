@@ -2,13 +2,15 @@
 
 All notable changes to Rosy are documented here. Versions follow [Semantic Versioning](https://semver.org/).
 
-## [0.3.1] - 2026-03-20
+## [0.3.2] - 2026-03-20
 
 ### Fixed
-- Update notice now appears between transpilation and program output instead of after program output
+- PLOOP codegen: MPI `get_group_num`/`coordinate` calls now correctly pass a mutable value instead of a shared reference
+- Update notice now appears between transpilation and program output instead of after
 
-### Changed
-- Refactored CLI main to extract common transpilation logic before Run/Build dispatch
+### Added
+- Clickable changelog link (OSC 8 hyperlink) in the update notice for supported terminals
+- Update notice download URL now points to the specific version release
 
 ## [0.3.0] - 2026-03-20
 
