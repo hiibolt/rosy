@@ -11,10 +11,12 @@ use num_complex::Complex64;
 
 fn main_wrapper() -> Result<()> {
 	let start = std::time::Instant::now();
+	// <MPI_START>
 	let rosy_mpi_context = RosyMPIContext::new()
 		.context("Failed to initialize Rosy MPI context")?;
 	let group_num = rosy_mpi_context.get_group_num(&mut  &mut 1.0f64)
 		.context("Failed to get group number")? + 1.0f64;
+	// <MPI_END>
 
 	// Initialize Taylor series system (order 10, 6 variables by default)
 	taylor::init_taylor(10, 6)

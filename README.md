@@ -18,13 +18,18 @@ For the **full language reference** — types, operators, statements, intrinsic 
 nix develop
 ```
 
-This provides the complete development environment: Rust toolchain, MPI libraries, LLVM, and all system dependencies. No manual setup needed.
+This provides the complete development environment: Rust toolchain and all system dependencies. No manual setup needed.
 
 **Manual setup (without Nix):**
 
 You will need:
 - **Rust toolchain** (stable, edition 2024): [rustup.rs](https://rustup.rs/)
-- **MPI implementation** (for `PLOOP` parallel loops):
+
+**Additional requirements for `PLOOP` (MPI parallel loops):**
+
+Programs that use the `PLOOP` construct require an MPI implementation and LLVM/Clang at compile time. The Rosy transpiler itself does not require these — they are only needed when compiling generated programs that use parallel features.
+
+- **MPI implementation**:
   - Ubuntu/Debian: `sudo apt install libopenmpi-dev openmpi-bin`
   - Fedora: `sudo dnf install openmpi-devel`
   - macOS: `brew install open-mpi`

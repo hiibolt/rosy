@@ -15,9 +15,10 @@ serial_test.workspace = true
 clap = { version = "4.5", features = ["derive"] }
 
 # Dependencies that were in rosy_lib
-mpi.workspace = true
-bincode.workspace = true
 num-complex.workspace = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("mpi"))'] }
 
 [build-dependencies]
 regex = "1"

@@ -29,7 +29,7 @@
             lockFile = ./Cargo.lock;
           };
 
-          nativeBuildInputs = [ (rustVersion.override { extensions = ["rust-src"]; }) ] ++ (with pkgs; [ 
+          nativeBuildInputs = [ (rustVersion.override { extensions = ["rust-src"]; }) ] ++ (with pkgs; [
             pkg-config
             cargo
             gcc

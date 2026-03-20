@@ -194,17 +194,23 @@ fn rosy(script_path: &PathBuf, output_dir: Option<PathBuf>, release: bool) -> Re
             )
         })?;
 
+    // Detect whether the program uses MPI (only PLOOP generates rosy_mpi_context references)
+    let uses_mpi = serialization.contains("rosy_mpi_context");
+    if uses_mpi {
+        info!("Program uses PLOOP — MPI support enabled in output");
+    }
+
     // Determine output directory
     let rosy_output_path = output_dir.unwrap_or_else(|| PathBuf::from(".rosy_output"));
 
     info!("Creating output project at: {}", rosy_output_path.display());
 
     // Create the output project structure from embedded templates
-    embedded::create_output_project(&rosy_output_path)
+    embedded::create_output_project(&rosy_output_path, uses_mpi)
         .context("Failed to create output project structure")?;
 
     // Inject the transpiled code into main.rs
-    let new_contents = embedded::inject_code(&serialization)
+    let new_contents = embedded::inject_code(&serialization, uses_mpi)
         .context("Failed to inject transpiled code into template")?;
 
     write(rosy_output_path.join("src/main.rs"), &new_contents)

@@ -30,6 +30,7 @@
 pub mod operators;
 pub mod intrinsics;
 pub mod core;
+#[cfg(feature = "mpi")]
 pub mod mpi;
 pub mod taylor;
 pub mod optimizer;
@@ -37,6 +38,7 @@ pub mod optimizer;
 pub use operators::*;
 pub use intrinsics::*;
 pub use core::*;
+#[cfg(feature = "mpi")]
 pub use mpi::*;
 
 pub use taylor::{DA, CD};
