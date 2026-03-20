@@ -1,5 +1,7 @@
 //! # Rosy Transpiler
 //!
+#![doc = concat!("**Version:** `v", env!("CARGO_PKG_VERSION"), "` — [Changelog](https://github.com/hiibolt/rosy/releases)")]
+//!
 //! A modern Rust-based programming language based on the COSY INFINITY syntax,
 //! designed for scientific computing and beam physics applications.
 //!
