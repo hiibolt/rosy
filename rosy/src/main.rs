@@ -323,19 +323,33 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    match cli.command {
-        Commands::Run {
-            source,
-            output_dir,
-            release,
-            cosy_syntax,
-        } => {
-            syntax_config::set_cosy_syntax(cosy_syntax);
-            let binary_path = rosy(&source, output_dir, release)?;
+    // Extract common fields and transpile
+    let (source, output_dir, release, cosy_syntax, output_name) = match &cli.command {
+        Commands::Run { source, output_dir, release, cosy_syntax } => {
+            (source.clone(), output_dir.clone(), *release, *cosy_syntax, None)
+        }
+        Commands::Build { source, output, output_dir, release, cosy_syntax } => {
+            let name = output.clone().unwrap_or_else(|| {
+                source.file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("rosy_output")
+                    .to_string()
+            });
+            (source.clone(), output_dir.clone(), *release, *cosy_syntax, Some(name))
+        }
+    };
 
+    syntax_config::set_cosy_syntax(cosy_syntax);
+    let binary_path = rosy(&source, output_dir, release)?;
+
+    // Show update notice after transpilation (network has had time)
+    update_handle.finish();
+
+    // Run or copy the binary
+    match cli.command {
+        Commands::Run { .. } => {
             eprintln!("{BOLD}{CYAN}     Running{RESET} {}\n", source.display());
 
-            // Run the binary, piping stdout and stderr
             let status = Command::new(&binary_path)
                 .status()
                 .with_context(|| format!("Failed to run binary at `{}`!", binary_path.display()))?;
@@ -345,28 +359,8 @@ fn main() -> Result<()> {
                 status.code()
             );
         }
-
-        Commands::Build {
-            source,
-            output,
-            output_dir,
-            release,
-            cosy_syntax,
-        } => {
-            syntax_config::set_cosy_syntax(cosy_syntax);
-            let binary_path = rosy(&source, output_dir, release)?;
-
-            // Determine output name
-            let output_name = output.unwrap_or_else(|| {
-                source
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("rosy_output")
-                    .to_string()
-            });
-
-            // Copy binary to PWD
-            let destination = PathBuf::from(&output_name);
+        Commands::Build { .. } => {
+            let destination = PathBuf::from(output_name.unwrap());
             std::fs::copy(&binary_path, &destination)
                 .context("Failed to copy binary to current directory")?;
             eprintln!(
@@ -375,9 +369,6 @@ fn main() -> Result<()> {
             );
         }
     }
-
-    // Show update notice if a newer version was found
-    update_handle.finish();
 
     Ok(())
 }
