@@ -1,11 +1,9 @@
-//! # Core Expression Nodes
+//! # Variables & Identifiers
 //!
-//! Fundamental expression building blocks shared across the AST.
+//! How ROSY resolves variable names, array indexing, and function calls.
 //!
-//! | Module | Description |
-//! |--------|-------------|
-//! | [`var_expr`] | Variable references & function call disambiguation |
-//! | [`variable_identifier`] | Parsed identifier with optional indexing / arguments |
+//! - **[`var_expr`]** — Variable references and function call disambiguation
+//! - **[`variable_identifier`]** — Parsed identifiers with optional indexing/arguments
 
 pub mod var_expr;
 pub mod variable_identifier;

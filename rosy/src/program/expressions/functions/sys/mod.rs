@@ -1,10 +1,8 @@
-//! # System Functions
+//! # String & Utility Functions
 //!
-//! Utility functions for querying properties of values.
-//!
-//! | Function | Description |
-//! |----------|-------------|
-//! | [`length`] `LENGTH(x)` | Returns the length/size of any value |
+//! - **[`length`]** — `LENGTH(x)` — returns the length/size of any value
+//! - **[`trim`]** — `TRIM(s)` — remove trailing whitespace
+//! - **[`ltrim`]** — `LTRIM(s)` — remove leading whitespace
 
 pub mod length;
 pub mod trim;

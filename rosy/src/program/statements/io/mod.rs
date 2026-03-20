@@ -1,21 +1,18 @@
 //! # I/O Statements
 //!
-//! File and console input/output operations.
+//! File and console input/output. Unit `6` is standard output (console);
+//! other unit numbers map to files opened with `OPENF`/`OPENFB`.
 //!
-//! | Module | Statement | Description |
-//! |--------|-----------|-------------|
-//! | [`mod@write`] | `WRITE unit exprs;` | Write formatted text |
-//! | [`read`] | `READ unit var;` | Read a value from a unit |
-//! | [`writeb`] | `WRITEB unit exprs;` | Write binary data |
-//! | [`readb`] | `READB unit var;` | Read binary data |
-//! | [`openf`] | `OPENF unit file status;` | Open a text file |
-//! | [`openfb`] | `OPENFB unit file status;` | Open a binary file |
-//! | [`closef`] | `CLOSEF unit;` | Close a file unit |
-//!
-//! ## Unit Numbers
-//!
-//! Unit `6` is standard output (console). Other unit numbers map to
-//! files opened with `OPENF` / `OPENFB`.
+//! - **[`mod@write`]** — `WRITE unit exprs;` — print formatted text
+//! - **[`read`]** — `READ unit var;` — read a value
+//! - **[`writeb`]** — `WRITEB unit exprs;` — write binary data
+//! - **[`readb`]** — `READB unit var;` — read binary data
+//! - **[`openf`]** — `OPENF unit file status;` — open a text file
+//! - **[`openfb`]** — `OPENFB unit file status;` — open a binary file
+//! - **[`closef`]** — `CLOSEF unit;` — close a file
+//! - **[`cpusec`]** — `CPUSEC var;` — get CPU time
+//! - **[`os_call`]** — `OS cmd;` — execute a shell command
+//! - **[`velget`]** — `VELGET unit var;` — read a vector from a file
 
 pub mod closef;
 pub mod cpusec;

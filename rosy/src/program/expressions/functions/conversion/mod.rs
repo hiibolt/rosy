@@ -1,12 +1,12 @@
 //! # Type Conversion Functions
 //!
-//! Functions that convert values between ROSY base types.
+//! Convert values between ROSY base types.
 //!
-//! | Function | Description |
-//! |----------|-------------|
-//! | [`complex_convert`] `CM(expr)` | Convert to complex number |
-//! | [`string_convert`] `ST(expr)` | Convert to string |
-//! | [`logical_convert`] `LO(expr)` | Convert to logical (boolean) |
+//! - **[`re_convert`]** — `RE(expr)` — convert to real
+//! - **[`string_convert`]** — `ST(expr)` — convert to string
+//! - **[`complex_convert`]** — `CM(expr)` — convert to complex
+//! - **[`logical_convert`]** — `LO(expr)` — convert to logical
+//! - **[`ve_convert`]** — `VE(expr)` — convert to vector
 
 pub mod complex_convert;
 pub mod logical_convert;

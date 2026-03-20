@@ -21,9 +21,10 @@ cargo run --bin rosy -- build examples/basic.rosy   # Build standalone binary
 rosy/assets/rosy.pest              PEG grammar (syntax source of truth)
 rosy/src/ast.rs                    FromRule trait, PrattParser, CosyParser
 rosy/src/program/expressions/      Expression AST nodes
-  operators/                         Binary/unary: add.rs, sub.rs, mult.rs, ...
-  functions/math/                    Intrinsics: sqr.rs, sin.rs, exp.rs, ...
-  functions/conversion/              Type conversions: CM(), ST(), LO()
+  operators/                         arithmetic/, comparison/, unary/, collection/
+  functions/math/                    trig/, exponential/, complex/, rounding/, vector/, query/, memory/
+  functions/conversion/              Type conversions: CM(), ST(), LO(), RE(), VE()
+  functions/sys/                     LENGTH, TRIM, LTRIM
   types/                             Literals: number.rs, string.rs, da.rs, ...
   core/                              Variable references
 rosy/src/program/statements/        Statement AST nodes
@@ -72,8 +73,7 @@ Uses [Semantic Versioning](https://semver.org/). The version is in `rosy/Cargo.t
   - Patch bump (0.1.0 -> 0.1.1): bug fixes, small improvements
   - Minor bump (0.1.0 -> 0.2.0): new language constructs, features, or breaking changes
   - Major bump: reserved for 1.0 stable release
-- **To create a release**: push a tag matching `v*.*.*` (e.g. `git tag v0.2.0 && git push --tags`)
-- The GitHub Actions release workflow (`.github/workflows/release.yml`) automatically builds binaries and creates a GitHub Release on tag push
+- **Releases are automatic**: when a version bump in `rosy/Cargo.toml` is pushed to `master`, the GitHub Actions release workflow builds binaries, creates a git tag, and publishes a GitHub Release
 
 ## Conventions
 

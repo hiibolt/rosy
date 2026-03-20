@@ -1,31 +1,36 @@
 //! # Expressions
 //!
-//! All expression types in the ROSY language. Expressions produce values and
-//! have types determined at transpilation time via the [`TranspileableExpr`] trait.
+//! Everything in ROSY that produces a value — operators, functions, literals,
+//! and variable references.
 //!
-//! ## Sub-modules
+//! ## Looking for something?
 //!
-//! - **[`operators`]** — Binary and unary operators (`+`, `-`, `*`, `/`, `&`, `|`, `%`, comparisons, `NOT`, negation)
-//! - **[`functions`]** — Built-in functions (math, conversion, system)
-//! - **[`types`]** — Literal values (numbers, strings, booleans, `DA()`, `CD()`)
-//! - **[`core`]** — Variable references and function call disambiguation
-//!
-//! ## Pratt Parser
-//!
-//! Binary operators are parsed using a Pratt parser with precedence levels
-//! defined in the [`PRATT_PARSER`]. The parser produces an [`Expr`] AST node
-//! wrapping a concrete expression type (e.g., [`AddExpr`]).
+//! | I want to... | Go to |
+//! |--------------|-------|
+//! | Use `+`, `-`, `*`, `/` | **[`operators::arithmetic`]** |
+//! | Compare with `=`, `<`, `>`, etc. | **[`operators::comparison`]** |
+//! | Use `&` (concat), `\|` (extract), `%` (derive) | **[`operators::collection`]** |
+//! | Use `NOT` or unary `-` | **[`operators::unary`]** |
+//! | Call `SIN`, `COS`, `TAN`, ... | **[`functions::math::trig`]** |
+//! | Call `EXP`, `LOG`, `SQRT`, `SQR`, `^` | **[`functions::math::exponential`]** |
+//! | Call `CMPLX`, `CONJ`, `REAL`, `IMAG` | **[`functions::math::complex`]** |
+//! | Call `ABS`, `INT`, `NINT`, `NORM`, `CONS` | **[`functions::math::rounding`]** |
+//! | Call `VMIN`, `VMAX` | **[`functions::math::vector`]** |
+//! | Call `TYPE`, `ISRT`, `ISRT3` | **[`functions::math::query`]** |
+//! | Convert types with `ST()`, `CM()`, `RE()`, `LO()`, `VE()` | **[`functions::conversion`]** |
+//! | Use `LENGTH`, `TRIM`, `LTRIM` | **[`functions::sys`]** |
+//! | Write a literal number, string, or boolean | **[`types`]** |
+//! | Construct `DA(n)` or `CD(n)` | **[`types::da`]**, **[`types::cd`]** |
 //!
 //! ## Example
 //!
 //! ```text
-//! {ROSY expression examples}
-//! x + y * 2           {arithmetic with precedence}
-//! 1 & 2 & 3           {vector concatenation}
-//! vec|3               {extract 3rd element}
-//! SIN(x)              {intrinsic function}
-//! ST(42)              {type conversion}
-//! DA(1)               {DA variable constructor}
+//! x + y * 2           { arithmetic with precedence }
+//! 1 & 2 & 3           { vector concatenation }
+//! vec|3               { extract 3rd element }
+//! SIN(x)              { intrinsic function }
+//! ST(42)              { type conversion }
+//! DA(1)               { DA variable constructor }
 //! ```
 
 pub mod core;
@@ -53,46 +58,46 @@ use crate::program::expressions::functions::math::trig::atan::AtanExpr;
 use crate::program::expressions::functions::math::trig::sinh::SinhExpr;
 use crate::program::expressions::functions::math::trig::cosh::CoshExpr;
 use crate::program::expressions::functions::math::trig::tanh::TanhExpr;
-use crate::program::expressions::functions::math::sqr::SqrExpr;
-use crate::program::expressions::functions::math::sqrt::SqrtExpr;
-use crate::program::expressions::functions::math::exp::ExpExpr;
-use crate::program::expressions::functions::math::log::LogExpr;
-use crate::program::expressions::functions::math::vmax::VmaxExpr;
-use crate::program::expressions::functions::math::vmin::VminExpr;
-use crate::program::expressions::functions::math::abs::AbsExpr;
-use crate::program::expressions::functions::math::norm::NormExpr;
-use crate::program::expressions::functions::math::cons::ConsExpr;
-use crate::program::expressions::functions::math::int_fn::IntExpr;
-use crate::program::expressions::functions::math::nint::NintExpr;
-use crate::program::expressions::functions::math::type_fn::TypeFnExpr;
-use crate::program::expressions::functions::math::isrt::IsrtExpr;
-use crate::program::expressions::functions::math::isrt3::Isrt3Expr;
-use crate::program::expressions::functions::math::cmplx::CmplxExpr;
-use crate::program::expressions::functions::math::conj::ConjExpr;
-use crate::program::expressions::functions::math::real_fn::RealFnExpr;
-use crate::program::expressions::functions::math::imag_fn::ImagFnExpr;
-use crate::program::expressions::functions::math::lst::LstExpr;
-use crate::program::expressions::functions::math::lcm::LcmExpr;
-use crate::program::expressions::functions::math::lcd::LcdExpr;
-use crate::program::expressions::functions::math::pow::PowExpr;
+use crate::program::expressions::functions::math::exponential::sqr::SqrExpr;
+use crate::program::expressions::functions::math::exponential::sqrt::SqrtExpr;
+use crate::program::expressions::functions::math::exponential::exp::ExpExpr;
+use crate::program::expressions::functions::math::exponential::log::LogExpr;
+use crate::program::expressions::functions::math::exponential::pow::PowExpr;
+use crate::program::expressions::functions::math::complex::cmplx::CmplxExpr;
+use crate::program::expressions::functions::math::complex::conj::ConjExpr;
+use crate::program::expressions::functions::math::complex::real_fn::RealFnExpr;
+use crate::program::expressions::functions::math::complex::imag_fn::ImagFnExpr;
+use crate::program::expressions::functions::math::rounding::abs::AbsExpr;
+use crate::program::expressions::functions::math::rounding::norm::NormExpr;
+use crate::program::expressions::functions::math::rounding::cons::ConsExpr;
+use crate::program::expressions::functions::math::rounding::int_fn::IntExpr;
+use crate::program::expressions::functions::math::rounding::nint::NintExpr;
+use crate::program::expressions::functions::math::vector::vmax::VmaxExpr;
+use crate::program::expressions::functions::math::vector::vmin::VminExpr;
+use crate::program::expressions::functions::math::query::type_fn::TypeFnExpr;
+use crate::program::expressions::functions::math::query::isrt::IsrtExpr;
+use crate::program::expressions::functions::math::query::isrt3::Isrt3Expr;
+use crate::program::expressions::functions::math::memory::lst::LstExpr;
+use crate::program::expressions::functions::math::memory::lcm::LcmExpr;
+use crate::program::expressions::functions::math::memory::lcd::LcdExpr;
 use crate::program::expressions::functions::sys::trim::TrimExpr;
 use crate::program::expressions::functions::sys::ltrim::LtrimExpr;
 
-use crate::program::expressions::operators::add::AddExpr;
-use crate::program::expressions::operators::sub::SubExpr;
-use crate::program::expressions::operators::mult::MultExpr;
-use crate::program::expressions::operators::div::DivExpr;
-use crate::program::expressions::operators::eq::EqExpr;
-use crate::program::expressions::operators::neq::NeqExpr;
-use crate::program::expressions::operators::lt::LtExpr;
-use crate::program::expressions::operators::gt::GtExpr;
-use crate::program::expressions::operators::lte::LteExpr;
-use crate::program::expressions::operators::gte::GteExpr;
-use crate::program::expressions::operators::not::NotExpr;
-use crate::program::expressions::operators::neg::NegExpr;
-use crate::program::expressions::operators::concat::ConcatExpr;
-use crate::program::expressions::operators::extract::ExtractExpr;
-use crate::program::expressions::operators::derive::DeriveExpr;
+use crate::program::expressions::operators::arithmetic::add::AddExpr;
+use crate::program::expressions::operators::arithmetic::sub::SubExpr;
+use crate::program::expressions::operators::arithmetic::mult::MultExpr;
+use crate::program::expressions::operators::arithmetic::div::DivExpr;
+use crate::program::expressions::operators::comparison::eq::EqExpr;
+use crate::program::expressions::operators::comparison::neq::NeqExpr;
+use crate::program::expressions::operators::comparison::lt::LtExpr;
+use crate::program::expressions::operators::comparison::gt::GtExpr;
+use crate::program::expressions::operators::comparison::lte::LteExpr;
+use crate::program::expressions::operators::comparison::gte::GteExpr;
+use crate::program::expressions::operators::unary::not::NotExpr;
+use crate::program::expressions::operators::unary::neg::NegExpr;
+use crate::program::expressions::operators::collection::concat::ConcatExpr;
+use crate::program::expressions::operators::collection::extract::ExtractExpr;
+use crate::program::expressions::operators::collection::derive::DeriveExpr;
 
 use crate::program::expressions::functions::sys::length::LengthExpr;
 

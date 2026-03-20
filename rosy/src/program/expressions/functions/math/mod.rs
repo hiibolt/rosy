@@ -1,38 +1,19 @@
 //! # Mathematical Functions
 //!
-//! Built-in math functions and operators.
+//! All built-in math functions in the ROSY language, grouped by category.
 //!
-//! | Module | Function | Description |
-//! |--------|----------|-------------|
-//! | [`trig`] | `SIN`, `TAN` | Trigonometric functions |
-//! | [`exp`] | `EXP` | Exponential (e^x) |
-//! | [`sqr`] | `SQR` | Square root |
-//! | [`pow`] | `^` | Power / exponentiation |
-//! | [`vmax`] | `VMAX` | Vector maximum |
-//! | [`lst`] | `LST` | String memory estimate (COSY compat) |
-//! | [`lcm`] | `LCM` | Complex memory estimate (COSY compat) |
-//! | [`lcd`] | `LCD` | DA memory estimate (COSY compat) |
+//! - **[`trig`]** — `SIN`, `COS`, `TAN`, `ASIN`, `ACOS`, `ATAN`, `SINH`, `COSH`, `TANH`
+//! - **[`exponential`]** — `EXP`, `LOG`, `SQR`, `SQRT`, `^` (power)
+//! - **[`complex`]** — `CMPLX`, `CONJ`, `REAL`, `IMAG`
+//! - **[`rounding`]** — `ABS`, `INT`, `NINT`, `NORM`, `CONS`
+//! - **[`vector`]** — `VMIN`, `VMAX`
+//! - **[`query`]** — `TYPE`, `ISRT`, `ISRT3`
+//! - **[`memory`]** — `LST`, `LCM`, `LCD` (COSY compatibility, always return 0)
 
 pub mod trig;
-pub mod exp;
-pub mod log;
-pub mod lcd;
-pub mod lcm;
-pub mod lst;
-pub mod pow;
-pub mod sqr;
-pub mod sqrt;
-pub mod vmax;
-pub mod vmin;
-pub mod abs;
-pub mod norm;
-pub mod cons;
-pub mod int_fn;
-pub mod nint;
-pub mod type_fn;
-pub mod isrt;
-pub mod isrt3;
-pub mod cmplx;
-pub mod conj;
-pub mod real_fn;
-pub mod imag_fn;
+pub mod exponential;
+pub mod complex;
+pub mod rounding;
+pub mod vector;
+pub mod memory;
+pub mod query;

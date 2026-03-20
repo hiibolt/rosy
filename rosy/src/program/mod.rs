@@ -1,25 +1,16 @@
-//! # Program Module
+//! # ROSY Language Reference
 //!
-//! The top-level AST representation for a ROSY program.
+//! This is the complete reference for the ROSY programming language. A ROSY
+//! program is a `BEGIN; ... END;` block containing [`statements`] that operate
+//! on [`expressions`].
 //!
-//! A [`Program`] is a sequence of [`Statement`]s parsed from a `BEGIN; ... END;` block.
-//! It implements the [`Transpile`] trait to generate Rust source code from the AST.
+//! ## Where to start
 //!
-//! ## Architecture
+//! - **Writing statements** (declarations, loops, I/O, etc.) → **[`statements`]**
+//! - **Using expressions** (operators, functions, literals) → **[`expressions`]**
 //!
-//! ```text
-//! Program
-//!   ├── statements/     ← Control flow, declarations, I/O
-//!   │   ├── core/        ← VARIABLE, assignment, IF, LOOP, WHILE, PROCEDURE, FUNCTION, etc.
-//!   │   ├── io/          ← WRITE, READ, OPENF, CLOSEF, WRITEB, READB
-//!   │   ├── da/          ← DAINI, DAPRV, DAREV
-//!   │   └── math/        ← FIT
-//!   └── expressions/     ← Values and computations
-//!       ├── operators/   ← +, -, *, /, &, |, %, comparisons, NOT, negation
-//!       ├── functions/   ← SIN, COS, EXP, SQR, LENGTH, CM(), ST(), LO(), etc.
-//!       ├── types/       ← Literal numbers, strings, booleans, DA(), CD()
-//!       └── core/        ← Variable references and function calls
-//! ```
+//! Both modules have "Looking for something?" tables that link directly to
+//! every language construct.
 
 use std::collections::BTreeSet;
 

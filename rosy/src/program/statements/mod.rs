@@ -1,23 +1,27 @@
 //! # Statements
 //!
-//! All executable statements in the ROSY language. Each statement is represented
-//! as a [`Statement`] struct wrapping a [`StatementEnum`] variant and a boxed
-//! [`Transpile`] implementation.
+//! Everything in ROSY that *does* something — declarations, control flow, I/O,
+//! and more.
 //!
-//! ## Sub-modules
+//! ## Looking for something?
 //!
-//! | Module | Contents |
-//! |--------|----------|
-//! | [`core`] | Variable declarations, assignment, control flow, functions, procedures |
-//! | [`io`] | File I/O — `WRITE`, `READ`, `OPENF`, `CLOSEF`, binary I/O |
-//! | [`da`] | Differential Algebra — `OV` (DA init), `DAPRV`, `DAREV` |
-//! | [`math`] | Optimization — `FIT` loop |
-//!
-//! ## Statement Lifecycle
-//!
-//! 1. **Parse** — pest grammar matches a rule
-//! 2. **AST build** — `Statement::from_rule` dispatches to the correct `FromRule` impl
-//! 3. **Transpile** — `Transpile::transpile` generates equivalent Rust code
+//! | I want to... | Go to |
+//! |--------------|-------|
+//! | Declare a variable (`VARIABLE`) | **[`core::var_decl`]** |
+//! | Assign a value (`:=`) | **[`core::assign`]** |
+//! | Use `IF` / `ELSEIF` / `ELSE` | **[`core::if`]** |
+//! | Use `LOOP` or `WHILE` | **[`core::loop`]**, **[`core::while_loop`]** |
+//! | Use `PLOOP` (MPI parallel loop) | **[`core::ploop`]** |
+//! | Define a `FUNCTION` or `PROCEDURE` | **[`core::function`]**, **[`core::procedure`]** |
+//! | Call a function or procedure | **[`core::function_call`]**, **[`core::procedure_call`]** |
+//! | Print output (`WRITE`) | **[`io::write`]** |
+//! | Read input (`READ`) | **[`io::read`]** |
+//! | Open/close files | **[`io::openf`]**, **[`io::closef`]** |
+//! | Use binary I/O | **[`io::writeb`]**, **[`io::readb`]** |
+//! | Initialize DA (`OV`) | **[`da::da_init`]** |
+//! | Print DA values | **[`da::daprv`]**, **[`da::darev`]** |
+//! | Use `FIT` (optimization) | **[`math::fit`]** |
+//! | Use `BREAK` or `QUIT` | **[`core::break_statement`]**, **[`core::quit`]** |
 
 pub mod core;
 pub mod da;

@@ -1,14 +1,12 @@
-//! # Type Literals
+//! # Literals
 //!
-//! AST representations of literal values in the ROSY language.
+//! How to write literal values in ROSY.
 //!
-//! | Module | ROSY Type | Rust Type | Example Literal |
-//! |--------|-----------|-----------|-----------------|
-//! | [`number`] | `RE` | `f64` | `3.14`, `42`, `-7` |
-//! | [`string`] | `ST` | `String` | `'hello'` |
-//! | [`boolean`] | `LO` | `bool` | `TRUE`, `FALSE` |
-//! | [`da`] | `DA` | Taylor series | `DA(1)` |
-//! | [`cd`] | `CD` | Complex Taylor | `CD(1)` |
+//! - **[`number`]** — `3.14`, `42`, `-7` (type `RE`)
+//! - **[`string`]** — `'hello'` (type `ST`)
+//! - **[`boolean`]** — `TRUE`, `FALSE` (type `LO`)
+//! - **[`da`]** — `DA(1)` (Differential Algebra variable)
+//! - **[`cd`]** — `CD(1)` (Complex DA variable)
 
 pub mod boolean;
 pub mod cd;

@@ -1,20 +1,25 @@
 //! # Core Statements
 //!
-//! Fundamental control flow and declaration statements.
+//! Declarations, control flow, functions, and procedures.
 //!
-//! | Module | Statement | Syntax |
-//! |--------|-----------|--------|
-//! | [`var_decl`] | Variable declaration | `VARIABLE (type) name;` |
-//! | [`assign`] | Assignment | `name := expr;` |
-//! | `loop` | Counted loop | `LOOP i start end [step]; ... ENDLOOP;` |
-//! | [`while_loop`] | While loop | `WHILE cond; ... ENDWHILE;` |
-//! | [`ploop`] | Parallel loop (MPI) | `PLOOP ... ENDPLOOP;` |
-//! | `if` | Conditional | `IF cond; ... [ELSEIF ...;] [ELSE;] ENDIF;` |
-//! | [`function`] | Function definition | `FUNCTION type name args; ... ENDFUNCTION;` |
-//! | [`function_call`] | Function call (stmt) | `name args;` |
-//! | [`procedure`] | Procedure definition | `PROCEDURE name args; ... ENDPROCEDURE;` |
-//! | [`procedure_call`] | Procedure call | `name args;` |
-//! | [`break_statement`] | Loop exit | `BREAK;` |
+//! ## Declarations & Assignment
+//!
+//! - **[`var_decl`]** — `VARIABLE (type) name;`
+//! - **[`assign`]** — `name := expr;`
+//!
+//! ## Control Flow
+//!
+//! - **[`r#loop`]** — `LOOP i start end [step]; ... ENDLOOP;`
+//! - **[`while_loop`]** — `WHILE cond; ... ENDWHILE;`
+//! - **[`ploop`]** — `PLOOP ... ENDPLOOP;` (MPI parallel)
+//! - **[`r#if`]** — `IF cond; ... [ELSEIF ...;] [ELSE;] ENDIF;`
+//! - **[`break_statement`]** — `BREAK;`
+//! - **[`quit`]** — `QUIT;`
+//!
+//! ## Functions & Procedures
+//!
+//! - **[`function`]** / **[`function_call`]** — define and call functions
+//! - **[`procedure`]** / **[`procedure_call`]** — define and call procedures
 
 pub mod assign;
 pub mod break_statement;

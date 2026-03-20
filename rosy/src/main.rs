@@ -1,85 +1,104 @@
-//! # Rosy Transpiler
+//! # Rosy
 //!
 #![doc = concat!("**Version:** `v", env!("CARGO_PKG_VERSION"), "` — [Changelog](https://github.com/hiibolt/rosy/releases)")]
 //!
-//! A modern Rust-based programming language based on the COSY INFINITY syntax,
-//! designed for scientific computing and beam physics applications.
+//! A modern transpiler for the ROSY scientific programming language,
+//! designed for beam physics and differential algebra applications.
+//! ROSY programs are transpiled into self-contained, native Rust executables.
 //!
 //! ## Quick Start
 //!
 //! ```bash
-//! # Run a Rosy script directly
-//! rosy run examples/basic.rosy
-//!
-//! # Build a standalone binary
-//! rosy build examples/basic.rosy
-//!
-//! # Build with optimizations
-//! rosy build examples/basic.rosy --release
+//! rosy run examples/basic.rosy          # run a script
+//! rosy build examples/basic.rosy -o out # build a binary
 //! ```
 //!
-//! ## Rosy Language Example
+//! ## Language Reference
 //!
-//! ```text
-//! BEGIN;
-//!     FUNCTION (RE) ADD_TWO a (RE) b (RE);
-//!         ADD_TWO := a + b;
-//!     ENDFUNCTION;
+//! Jump directly to what you need:
 //!
-//!     PROCEDURE RUN;
-//!         VARIABLE (RE) x;
-//!         VARIABLE (RE) y;
-//!         x := 3;
-//!         y := 4;
-//!         WRITE 6 "Result: " ST(ADD_TWO(x, y));
-//!     ENDPROCEDURE;
+//! ### Statements — things that *do* something
 //!
-//!     RUN;
-//! END;
-//! ```
+//! | I want to... | Syntax | Link |
+//! |--------------|--------|------|
+//! | Declare a variable | `VARIABLE (RE) x;` | [`statements::core::var_decl`](program::statements::core::var_decl) |
+//! | Assign a value | `x := expr;` | [`statements::core::assign`](program::statements::core::assign) |
+//! | Branch with if/else | `IF cond; ... ENDIF;` | [`statements::core::if`](program::statements::core::r#if) |
+//! | Loop (counted) | `LOOP i 1 10; ... ENDLOOP;` | [`statements::core::loop`](program::statements::core::r#loop) |
+//! | Loop (conditional) | `WHILE cond; ... ENDWHILE;` | [`statements::core::while_loop`](program::statements::core::while_loop) |
+//! | Loop (MPI parallel) | `PLOOP ... ENDPLOOP;` | [`statements::core::ploop`](program::statements::core::ploop) |
+//! | Define a function | `FUNCTION (RE) F x (RE); ... ENDFUNCTION;` | [`statements::core::function`](program::statements::core::function) |
+//! | Define a procedure | `PROCEDURE P; ... ENDPROCEDURE;` | [`statements::core::procedure`](program::statements::core::procedure) |
+//! | Print output | `WRITE 6 'hello';` | [`statements::io::write`](program::statements::io::write) |
+//! | Read input | `READ 5 x;` | [`statements::io::read`](program::statements::io::read) |
+//! | Work with files | `OPENF`, `CLOSEF` | [`statements::io`](program::statements::io) |
+//! | Initialize DA | `OV 5 3;` | [`statements::da::da_init`](program::statements::da::da_init) |
+//! | Print DA values | `DAPRV`, `DAREV` | [`statements::da`](program::statements::da) |
+//! | Optimize (FIT) | `FIT ... ENDFIT;` | [`statements::math::fit`](program::statements::math::fit) |
+//!
+//! ### Operators
+//!
+//! | Operator | Symbol | Link |
+//! |----------|--------|------|
+//! | Arithmetic | `+`, `-`, `*`, `/` | [`operators::arithmetic`](program::expressions::operators::arithmetic) |
+//! | Comparison | `=`, `<>`, `<`, `>`, `<=`, `>=` | [`operators::comparison`](program::expressions::operators::comparison) |
+//! | Unary | `-x`, `NOT x` | [`operators::unary`](program::expressions::operators::unary) |
+//! | Collection | `&` (concat), `\|` (extract), `%` (derive) | [`operators::collection`](program::expressions::operators::collection) |
+//! | Power | `^` | [`exponential::pow`](program::expressions::functions::math::exponential::pow) |
+//!
+//! ### Built-in Functions
+//!
+//! | Category | Functions | Link |
+//! |----------|-----------|------|
+//! | Trigonometry | `SIN`, `COS`, `TAN`, `ASIN`, `ACOS`, `ATAN`, `SINH`, `COSH`, `TANH` | [`math::trig`](program::expressions::functions::math::trig) |
+//! | Exponential | `EXP`, `LOG`, `SQR`, `SQRT` | [`math::exponential`](program::expressions::functions::math::exponential) |
+//! | Complex | `CMPLX`, `CONJ`, `REAL`, `IMAG` | [`math::complex`](program::expressions::functions::math::complex) |
+//! | Rounding | `ABS`, `INT`, `NINT`, `NORM`, `CONS` | [`math::rounding`](program::expressions::functions::math::rounding) |
+//! | Vector | `VMIN`, `VMAX` | [`math::vector`](program::expressions::functions::math::vector) |
+//! | Query | `TYPE`, `ISRT`, `ISRT3` | [`math::query`](program::expressions::functions::math::query) |
+//! | Type conversion | `ST()`, `CM()`, `RE()`, `LO()`, `VE()` | [`conversion`](program::expressions::functions::conversion) |
+//! | String/utility | `LENGTH`, `TRIM`, `LTRIM` | [`sys`](program::expressions::functions::sys) |
+//!
+//! ### Literals
+//!
+//! | Type | Example | Link |
+//! |------|---------|------|
+//! | `RE` (real) | `3.14`, `42` | [`types::number`](program::expressions::types::number) |
+//! | `ST` (string) | `'hello'` | [`types::string`](program::expressions::types::string) |
+//! | `LO` (boolean) | `TRUE`, `FALSE` | [`types::boolean`](program::expressions::types::boolean) |
+//! | `DA` | `DA(1)` | [`types::da`](program::expressions::types::da) |
+//! | `CD` | `CD(1)` | [`types::cd`](program::expressions::types::cd) |
 //!
 //! ## Type System
 //!
-//! Rosy supports the following base types:
+//! | Type | Description |
+//! |------|-------------|
+//! | `RE` | Real number (64-bit float) |
+//! | `ST` | String |
+//! | `LO` | Logical (boolean) |
+//! | `CM` | Complex number |
+//! | `VE` | Vector of reals |
+//! | `DA` | Differential Algebra (Taylor series) |
+//! | `CD` | Complex Differential Algebra |
 //!
-//! | Type | Description | Rust Equivalent |
-//! |------|-----------|----------------|
-//! | `RE` | Real number | `f64` |
-//! | `ST` | String | `String` |
-//! | `LO` | Logical (boolean) | `bool` |
-//! | `CM` | Complex number | `Complex64` |
-//! | `VE` | Vector of reals | `Vec<f64>` |
-//! | `DA` | Differential Algebra (Taylor series) | `DA` |
-//! | `CD` | Complex Differential Algebra | `CD` |
+//! Multi-dimensional arrays are supported: `(RE 2 2)` creates a 2×2 matrix of reals.
 //!
-//! Multi-dimensional arrays are supported: `(RE 2 2)` is a 2x2 VE of reals.
+//! ## Example Program
 //!
-//! ## Ways to Learn Rosy
-//! ### View All Language Features and Documentation
-//! - **[`program`]** — The AST structure: expressions and statements
-//!   - [`program::expressions`] — All expression types (operators, functions, literals, etc.)
-//!   - [`program::statements`] — All statement types (control flow, I/O, declarations, etc.)
-//! ### View Example Rosy Programs
-//! - **[Link to GitHub](https://github.com/hiibolt/rosy/tree/master/examples)** — A collection of example Rosy scripts demonstrating various features and use cases
-//!
-//! ## IDE Support
-//!
-//! A VSCode extension for Rosy syntax highlighting is available. To generate and install it:
-//!
-//! 1. Generate the extension:
-//!    ```bash
-//!    cargo run --bin generate_vscode_extension
-//!    ```
-//! 2. Copy the `rosy-vscode-extension/` folder to your VSCode extensions directory:
-//!    - **Linux/macOS**: `~/.vscode/extensions/`
-//!    - **Windows**: `%USERPROFILE%\.vscode\extensions\`
-//! 3. Reload VSCode — any `.rosy` or `.fox` file will have syntax highlighting
-//!
-//! ## Building the Docs
-//!
-//! ```bash
-//! cargo doc --document-private-items --no-deps --open
+//! ```text
+//! BEGIN;
+//!     VARIABLE (RE) x;
+//!     VARIABLE (RE) y;
+//!     x := 3;
+//!     y := SIN(x) + 1;
+//!     WRITE 6 'y = ' ST(y);
+//! END;
 //! ```
+//!
+//! ## More Resources
+//!
+//! - **[Example programs](https://github.com/hiibolt/rosy/tree/master/examples)** on GitHub
+//! - **[Installation & usage](https://github.com/hiibolt/rosy)** in the README
 
 mod ast;
 mod embedded;

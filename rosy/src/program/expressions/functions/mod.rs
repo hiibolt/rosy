@@ -1,14 +1,10 @@
 //! # Built-in Functions
 //!
-//! Intrinsic functions provided by the ROSY language.
+//! All intrinsic functions provided by the ROSY language.
 //!
-//! ## Sub-modules
-//!
-//! | Module | Contents |
-//! |--------|----------|
-//! | [`conversion`] | Type conversion — `CM()`, `ST()`, `LO()` |
-//! | [`math`] | Mathematical — `SIN`, `TAN`, `SQR`, `EXP`, `^`, `VMAX`, memory estimators |
-//! | [`sys`] | System utilities — `LENGTH` |
+//! - **[`math`]** — Mathematical functions: trig, exponential, complex, rounding, vector, and more
+//! - **[`conversion`]** — Type conversions: `CM()`, `ST()`, `RE()`, `LO()`, `VE()`
+//! - **[`sys`]** — Utilities: `LENGTH`, `TRIM`, `LTRIM`
 
 pub mod conversion;
 pub mod math;

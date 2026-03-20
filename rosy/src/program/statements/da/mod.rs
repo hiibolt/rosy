@@ -1,12 +1,13 @@
 //! # Differential Algebra (DA) Statements
 //!
-//! Statements for initializing and printing Taylor series (DA/CD) values.
+//! Statements for initializing and working with Taylor series (DA/CD) values.
 //!
-//! | Module | Statement | Description |
-//! |--------|-----------|-------------|
-//! | [`da_init`] | `OV order nvars;` | Initialize the Taylor series environment |
-//! | [`daprv`] | `DAPRV ...;` | Print DA array values |
-//! | [`darev`] | `DAREV ...;` | Reverse-print DA array values |
+//! - **[`da_init`]** — `OV order nvars;` — initialize the DA environment
+//! - **[`daprv`]** — `DAPRV ...;` — print DA values
+//! - **[`darev`]** — `DAREV ...;` — reverse-print DA values
+//! - **[`daeps`]** — `DAEPS eps;` — set DA epsilon
+//! - **[`danot`]** — `DANOT order;` — set DA notation order
+//! - **[`datrn`]** — `DATRN var;` — DA truncation
 
 pub mod da_init;
 pub mod daeps;
