@@ -9,6 +9,8 @@ PROCEDURE RUN;
     VARIABLE RESULT_1 1;
     VARIABLE INPUT_2 2000;
     VARIABLE RESULT_2 2000;
+    VARIABLE INPUT_3 4000;
+    VARIABLE RESULT_3 2000;
 
     { Initialize DA system for tests that use DA/CD types }
     { DAINI: order 10, number_of_variables 6, mode 0 (see COSY manual) }
@@ -28,6 +30,11 @@ PROCEDURE RUN;
     INPUT_2 := DA(1);
     RESULT_2 := REAL(INPUT_2);
     WRITE 6 RESULT_2;
+
+    { Test 3: REAL(CD) => DA }
+    INPUT_3 := CD(1);
+    RESULT_3 := REAL(INPUT_3);
+    WRITE 6 RESULT_3;
 
 ENDPROCEDURE;
 

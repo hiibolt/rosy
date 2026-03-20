@@ -12,6 +12,7 @@ use crate::rosy_lib::{RE, VE, DA, CD};
 pub const NORM_REGISTRY: &[IntrinsicTypeRule] = &[
     IntrinsicTypeRule::new("VE", "VE", "1.5&2.5&3.5"),
     IntrinsicTypeRule::new("DA", "RE", "DA(1)"),
+    IntrinsicTypeRule::new("CD", "RE", "CD(1)"),
 ];
 
 /// Get the return type of NORM for a given input type.

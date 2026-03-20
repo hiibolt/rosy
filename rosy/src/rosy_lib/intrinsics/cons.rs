@@ -16,6 +16,7 @@ pub const CONS_REGISTRY: &[IntrinsicTypeRule] = &[
     IntrinsicTypeRule::new("CM", "CM", "CM(1.5&2.5)"),
     IntrinsicTypeRule::new("VE", "RE", "1.5&2.5&3.5"),
     IntrinsicTypeRule::new("DA", "RE", "DA(1)"),
+    IntrinsicTypeRule::new("CD", "CM", "CD(1)"),
 ];
 
 /// Get the return type of CONS for a given input type.

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::rosy_lib::{IntrinsicTypeRule, RosyType};
-use crate::rosy_lib::{RE, CM, VE, DA};
+use crate::rosy_lib::{RE, CM, VE, DA, CD};
 
 /// Type registry for ABS intrinsic function.
 ///
@@ -15,6 +15,7 @@ pub const ABS_REGISTRY: &[IntrinsicTypeRule] = &[
     IntrinsicTypeRule::new("CM", "RE", "CM(3.0&4.0)"),
     IntrinsicTypeRule::new("VE", "RE", "1.5&2.5&3.5"),
     IntrinsicTypeRule::new("DA", "RE", "DA(1)"),
+    IntrinsicTypeRule::new("CD", "RE", "CD(1)"),
 ];
 
 /// Get the return type of ABS for a given input type.
@@ -25,6 +26,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
         m.insert(RosyType::CM(), RosyType::RE());
         m.insert(RosyType::VE(), RosyType::RE());
         m.insert(RosyType::DA(), RosyType::RE());
+        m.insert(RosyType::CD(), RosyType::RE());
         m
     };
     registry.get(input).copied()
@@ -68,5 +70,14 @@ impl RosyABS for DA {
             .map(|(_, c)| c.abs())
             .fold(0.0_f64, f64::max);
         Ok(max_coeff)
+    }
+}
+
+/// ABS for CD - returns max absolute value (norm) among all complex coefficients
+impl RosyABS for CD {
+    type Output = RE;
+    fn rosy_abs(&self) -> anyhow::Result<RE> {
+        use crate::rosy_lib::taylor::DACoefficient;
+        Ok(self.coeffs_iter().map(|(_, c)| c.abs()).fold(0.0_f64, f64::max))
     }
 }

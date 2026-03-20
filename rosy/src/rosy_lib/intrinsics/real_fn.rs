@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::rosy_lib::{IntrinsicTypeRule, RosyType};
-use crate::rosy_lib::{RE, CM, DA};
+use crate::rosy_lib::{RE, CM, DA, CD};
 
 /// Type registry for REAL intrinsic function.
 ///
@@ -13,6 +13,7 @@ pub const REAL_FN_REGISTRY: &[IntrinsicTypeRule] = &[
     IntrinsicTypeRule::new("RE", "RE", "1.5"),
     IntrinsicTypeRule::new("CM", "RE", "CM(1.5&2.5)"),
     IntrinsicTypeRule::new("DA", "DA", "DA(1)"),
+    IntrinsicTypeRule::new("CD", "DA", "CD(1)"),
 ];
 
 /// Get the return type of REAL for a given input type.
@@ -23,6 +24,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
             (RosyType::RE(), RosyType::RE()),
             (RosyType::CM(), RosyType::RE()),
             (RosyType::DA(), RosyType::DA()),
+            (RosyType::CD(), RosyType::DA()),
         ];
         for (input_type, result_type) in all {
             m.insert(input_type, result_type);
@@ -60,6 +62,14 @@ impl RosyREAL for DA {
     type Output = DA;
     fn rosy_real(&self) -> anyhow::Result<Self::Output> {
         Ok(self.clone())
+    }
+}
+
+/// REAL for CD - extract real part of each complex coefficient
+impl RosyREAL for CD {
+    type Output = DA;
+    fn rosy_real(&self) -> anyhow::Result<Self::Output> {
+        Ok(self.real_part())
     }
 }
 

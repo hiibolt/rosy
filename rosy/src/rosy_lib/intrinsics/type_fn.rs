@@ -12,6 +12,7 @@ pub const TYPE_REGISTRY: &[IntrinsicTypeRule] = &[
     IntrinsicTypeRule::new("CM", "RE", "CM(1.5&2.5)"),
     IntrinsicTypeRule::new("VE", "RE", "1.5&2.5&3.5"),
     IntrinsicTypeRule::new("DA", "RE", "DA(1)"),
+    IntrinsicTypeRule::new("CD", "RE", "CD(1)"),
 ];
 
 /// Get the return type of TYPE for a given input type.

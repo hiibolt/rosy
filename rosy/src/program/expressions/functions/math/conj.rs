@@ -14,6 +14,7 @@
 //! |-------|--------|
 //! | RE | RE |
 //! | CM | CM |
+//! | CD | CD |
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;

@@ -16,6 +16,7 @@ pub const SQR_REGISTRY: &[IntrinsicTypeRule] = &[
     IntrinsicTypeRule::new("CM", "CM", "CM(1.5&2.5)"),
     IntrinsicTypeRule::new("VE", "VE", "1.5&2.5&3.5"),
     IntrinsicTypeRule::new("DA", "DA", "DA(1)"),
+    IntrinsicTypeRule::new("CD", "CD", "CD(1)"),
 ];
 
 /// Get the return type of SQR for a given input type.

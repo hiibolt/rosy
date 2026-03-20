@@ -14,6 +14,8 @@
 //! |-------|--------|
 //! | RE | CM |
 //! | CM | CM |
+//! | DA | CD |
+//! | CD | CD |
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
@@ -82,8 +84,8 @@ impl TranspileableExpr for CmplxExpr {
         Some(resolver.discover_expr_function_calls(&self.expr, ctx))
     }
     fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
-        // CMPLX always returns CM regardless of input type (RE->CM, CM->CM).
-        // Use a literal CM recipe so the type resolver knows the result type.
-        Some(ExprRecipe::Literal(RosyType::CM()))
+        // CMPLX has non-uniform output types (RE/CM->CM, DA/CD->CD).
+        // Defer to type_of() which calls get_return_type().
+        None
     }
 }

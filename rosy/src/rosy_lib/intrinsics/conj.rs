@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::rosy_lib::{IntrinsicTypeRule, RosyType};
-use crate::rosy_lib::{RE, CM};
+use crate::rosy_lib::{RE, CM, CD};
 
 /// Type registry for CONJ intrinsic function (complex conjugate).
 ///
@@ -11,6 +11,7 @@ use crate::rosy_lib::{RE, CM};
 pub const CONJ_REGISTRY: &[IntrinsicTypeRule] = &[
     IntrinsicTypeRule::new("RE", "RE", "1.5"),
     IntrinsicTypeRule::new("CM", "CM", "CM(1.5&2.5)"),
+    IntrinsicTypeRule::new("CD", "CD", "CD(1)"),
 ];
 
 /// Get the return type of CONJ for a given input type.
@@ -20,6 +21,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
         let all = vec![
             (RosyType::RE(), RosyType::RE()),
             (RosyType::CM(), RosyType::CM()),
+            (RosyType::CD(), RosyType::CD()),
         ];
         for (input_type, result_type) in all {
             m.insert(input_type, result_type);
@@ -49,6 +51,20 @@ impl RosyCONJ for CM {
     type Output = CM;
     fn rosy_conj(&self) -> anyhow::Result<Self::Output> {
         Ok(self.conj())
+    }
+}
+
+/// CONJ for CD: conjugate each complex coefficient in the Taylor series
+impl RosyCONJ for CD {
+    type Output = CD;
+    fn rosy_conj(&self) -> anyhow::Result<Self::Output> {
+        use crate::rosy_lib::taylor::{DACoefficient, Monomial};
+        use num_complex::Complex64;
+        let mut result = CD::from_coeff(Complex64::zero());
+        for (monomial, coeff) in self.coeffs_iter() {
+            result.set_coeff(monomial.clone(), coeff.conj());
+        }
+        Ok(result)
     }
 }
 

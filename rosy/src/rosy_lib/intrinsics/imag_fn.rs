@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::rosy_lib::{IntrinsicTypeRule, RosyType};
-use crate::rosy_lib::{RE, CM, DA};
+use crate::rosy_lib::{RE, CM, DA, CD};
 
 /// Type registry for IMAG intrinsic function.
 ///
@@ -13,6 +13,7 @@ pub const IMAG_FN_REGISTRY: &[IntrinsicTypeRule] = &[
     IntrinsicTypeRule::new("RE", "RE", "1.5"),
     IntrinsicTypeRule::new("CM", "RE", "CM(1.5&2.5)"),
     IntrinsicTypeRule::new("DA", "DA", "DA(1)"),
+    IntrinsicTypeRule::new("CD", "DA", "CD(1)"),
 ];
 
 /// Get the return type of IMAG for a given input type.
@@ -23,6 +24,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
             (RosyType::RE(), RosyType::RE()),
             (RosyType::CM(), RosyType::RE()),
             (RosyType::DA(), RosyType::DA()),
+            (RosyType::CD(), RosyType::DA()),
         ];
         for (input_type, result_type) in all {
             m.insert(input_type, result_type);
@@ -60,6 +62,14 @@ impl RosyIMAG for DA {
     type Output = DA;
     fn rosy_imag(&self) -> anyhow::Result<Self::Output> {
         Ok(DA::from_coeff(0.0))
+    }
+}
+
+/// IMAG for CD - extract imaginary part of each complex coefficient
+impl RosyIMAG for CD {
+    type Output = DA;
+    fn rosy_imag(&self) -> anyhow::Result<Self::Output> {
+        Ok(self.imag_part())
     }
 }
 

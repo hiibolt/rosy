@@ -15,6 +15,7 @@ pub const COS_REGISTRY: &[IntrinsicTypeRule] = &[
     IntrinsicTypeRule::new("CM", "CM", "CM(1.5&2.5)"),
     IntrinsicTypeRule::new("VE", "VE", "1.5&2.5&3.5"),
     IntrinsicTypeRule::new("DA", "DA", "DA(1)"),
+    IntrinsicTypeRule::new("CD", "CD", "CD(1)"),
 ];
 
 /// Get the return type of COS for a given input type.
@@ -25,7 +26,8 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
             (RosyType::RE(), RosyType::RE()),
             (RosyType::CM(), RosyType::CM()),
             (RosyType::VE(), RosyType::VE()),
-            (RosyType::DA(), RosyType::DA())
+            (RosyType::DA(), RosyType::DA()),
+            (RosyType::CD(), RosyType::CD()),
         ];
         for (input_type, result_type) in all {
             m.insert(input_type, result_type);
