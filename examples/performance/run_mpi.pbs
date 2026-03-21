@@ -17,9 +17,7 @@ cd $PBS_O_WORKDIR
 module purge
 module load openmpi/openmpi-5.0.7-gcc-14.2.0-cuda-12.8
 
-COSY_BIN="$PBS_O_WORKDIR/../../cosy"
-BUILD_DIR=$(mktemp -d /tmp/rosy_mpi_XXXXXX)
-trap "rm -rf $BUILD_DIR" EXIT
+COSY_BIN="$PBS_O_WORKDIR/../../cosy_mpi"
 NP=20
 
 echo ""
@@ -52,8 +50,10 @@ for dir in mpi/*/; do
     [[ -f "$rosy_file" ]] || continue
     NUM=$((NUM + 1))
 
-    # Build Rosy
+    # Build Rosy (fresh build dir per benchmark to avoid stale LTO artifacts)
+    BUILD_DIR=$(mktemp -d /tmp/rosy_mpi_XXXXXX)
     if ! rosy build "$rosy_file" --release -d "$BUILD_DIR" -o "$dir/bench_rosy" 2>/dev/null; then
+        rm -rf "$BUILD_DIR"
         printf "%-30s %11s\n" "$name" "BUILD FAIL"
         continue
     fi
@@ -65,9 +65,9 @@ for dir in mpi/*/; do
         TOTAL_ROSY=$(awk "BEGIN { printf \"%.6f\", $TOTAL_ROSY + $rosy_cpusec }")
     fi
 
-    # Run COSY with MPI
+    # Run COSY with MPI (COSY reads filename as CLI arg)
     if $HAS_COSY && [[ -f "$fox_file" ]]; then
-        (cd "$dir" && echo "bench" | mpirun -np $NP -hostfile $PBS_NODEFILE "$COSY_BIN") > "$dir/cosy_output.txt" 2>&1
+        (cd "$dir" && mpirun -np $NP -hostfile $PBS_NODEFILE "$COSY_BIN" bench.fox) > "$dir/cosy_output.txt" 2>&1
 
         if grep -qE "### ERROR|ERROR OCCURED" "$dir/cosy_output.txt" 2>/dev/null; then
             printf "%-30s %11s %11s %10s\n" "$name" "${rosy_cpusec:-N/A}" "COSY ERR" "N/A"
@@ -86,6 +86,7 @@ for dir in mpi/*/; do
     fi
 
     rm -f "$dir/bench_rosy"
+    rm -rf "$BUILD_DIR"
 done
 
 echo ""
