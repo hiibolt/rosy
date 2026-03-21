@@ -1,14 +1,14 @@
 #!/bin/bash
-#PBS -N rosy_mpi
+#PBS -N rosy_mpi_opt
 #PBS -l select=32:ncpus=1:mpiprocs=1
 #PBS -l walltime=01:00:00
 #PBS -j oe
-#PBS -o rosy_mpi.out
+#PBS -o rosy_mpi_optimized.out
 
 # ============================================================================
-#  Rosy MPI Performance Suite (--release)
+#  Rosy MPI Performance Suite (--optimized)
 # ============================================================================
-#  Runs all PLOOP benchmarks on 20 ranks with --release builds.
+#  Runs all PLOOP benchmarks on 20 ranks with --optimized builds (LTO + SIMD).
 #  Requests 32 nodes to accommodate the scaling test (06).
 # ============================================================================
 
@@ -16,7 +16,7 @@ cd $PBS_O_WORKDIR
 
 echo ""
 echo "================================================================"
-echo "       Rosy MPI Performance Suite (--release)"
+echo "       Rosy MPI Performance Suite (--optimized)"
 echo "================================================================"
 echo "  Date:  $(date)"
 echo "  Nodes: $(cat $PBS_NODEFILE | wc -l)"
@@ -45,7 +45,7 @@ for dir in mpi/*/; do
     fi
 
     # Build
-    if ! rosy build "$rosy_file" --release -d "$BUILD_DIR" -o "$dir/bench_rosy" 2>/dev/null; then
+    if ! rosy build "$rosy_file" --optimized -d "$BUILD_DIR" -o "$dir/bench_rosy" 2>/dev/null; then
         printf "%-30s %11s\n" "$name" "BUILD FAIL"
         continue
     fi
@@ -53,13 +53,13 @@ for dir in mpi/*/; do
     # Special handling for scaling test
     if [[ "$name" == *"scaling"* ]]; then
         for SCALE_NP in 1 2 4 8 16 32; do
-            mpirun -np $SCALE_NP -hostfile $PBS_NODEFILE "$dir/bench_rosy" > "$dir/rosy_output_np${SCALE_NP}.txt" 2>&1
-            cpusec=$(grep -oP 'CPUSEC:\s*\K[\d.]+' "$dir/rosy_output_np${SCALE_NP}.txt" | head -1)
+            mpirun -np $SCALE_NP -hostfile $PBS_NODEFILE "$dir/bench_rosy" > "$dir/rosy_output_optimized_np${SCALE_NP}.txt" 2>&1
+            cpusec=$(grep -oP 'CPUSEC:\s*\K[\d.]+' "$dir/rosy_output_optimized_np${SCALE_NP}.txt" | head -1)
             printf "%-30s %11s  (np=%d)\n" "$name" "${cpusec:-N/A}" "$SCALE_NP"
         done
     else
-        mpirun -np $NP -hostfile $PBS_NODEFILE "$dir/bench_rosy" > "$dir/rosy_output.txt" 2>&1
-        cpusec=$(grep -oP 'CPUSEC:\s*\K[\d.]+' "$dir/rosy_output.txt" | head -1)
+        mpirun -np $NP -hostfile $PBS_NODEFILE "$dir/bench_rosy" > "$dir/rosy_output_optimized.txt" 2>&1
+        cpusec=$(grep -oP 'CPUSEC:\s*\K[\d.]+' "$dir/rosy_output_optimized.txt" | head -1)
         printf "%-30s %11s\n" "$name" "${cpusec:-N/A}"
     fi
 
