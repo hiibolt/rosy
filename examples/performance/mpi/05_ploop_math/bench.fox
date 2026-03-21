@@ -1,20 +1,20 @@
 { Benchmark: PLOOP distributing math function evaluations }
 { Tests: parallel transcendental function throughput }
-{ 100 iterations, each doing 1M math function calls }
+{ 20 iterations, each doing 5M math function calls }
 BEGIN ;
 
 VARIABLE T1 1 ;
 VARIABLE T2 1 ;
 VARIABLE NP 1 ;
 VARIABLE INNER 1 ;
-VARIABLE RESULTS 1 100 ;
+VARIABLE RESULTS 1 20 ;
 VARIABLE ACC 1 ;
 VARIABLE X 1 ;
 
-NP := 100 ;
-INNER := 1000000 ;
+NP := 20 ;
+INNER := 5000000 ;
 
-WRITE 6 'PLOOP Math Benchmark: 100 iterations x 1M math ops each' ;
+WRITE 6 'PLOOP Math Benchmark: 20 iterations x 5M math ops each' ;
 
 CPUSEC T1 ;
 
@@ -30,8 +30,8 @@ ENDPLOOP RESULTS ;
 CPUSEC T2 ;
 
 WRITE 6 'Results(1) = ' RESULTS(1) ;
-WRITE 6 'Results(50) = ' RESULTS(50) ;
-WRITE 6 'Results(100) = ' RESULTS(100) ;
+WRITE 6 'Results(10) = ' RESULTS(10) ;
+WRITE 6 'Results(20) = ' RESULTS(20) ;
 WRITE 6 'CPUSEC: ' T2 - T1 ;
 
 END ;

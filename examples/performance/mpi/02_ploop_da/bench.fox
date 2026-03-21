@@ -1,6 +1,6 @@
 { Benchmark: PLOOP distributing DA polynomial computations }
 { Tests: parallel DA evaluation, per-rank Taylor series overhead }
-{ 50 iterations, each doing DA order 6, 3 vars polynomial math }
+{ 20 iterations, each doing DA order 6, 3 vars polynomial math }
 BEGIN ;
 
 VARIABLE T1 1 ;
@@ -9,18 +9,18 @@ VARIABLE NP 1 ;
 VARIABLE ORDER 1 ;
 VARIABLE NVARS 1 ;
 VARIABLE NM 1 ;
-VARIABLE RESULTS 1 50 ;
+VARIABLE RESULTS 1 20 ;
 VARIABLE X 100 ;
 VARIABLE Y 100 ;
 VARIABLE Z 100 ;
 VARIABLE R 100 ;
 
-NP := 50 ;
+NP := 20 ;
 ORDER := 6 ;
 NVARS := 3 ;
 DAINI ORDER NVARS 0 NM ;
 
-WRITE 6 'PLOOP DA Benchmark: 50 iterations of DA order 6, 3 vars' ;
+WRITE 6 'PLOOP DA Benchmark: 20 iterations of DA order 6, 3 vars' ;
 WRITE 6 'Monomials per DA vector: ' NM ;
 
 CPUSEC T1 ;
@@ -30,7 +30,7 @@ PLOOP I 1 NP ;
     Y := DA(2) + I * 0.05 ;
     Z := DA(3) ;
 
-    LOOP K 1 200 ;
+    LOOP K 1 500 ;
         R := SIN(X) * COS(Y) + EXP(Z * 0.1) ;
         R := R * R + X * Y * Z ;
         R := R * (X + Y + Z) ;
@@ -42,8 +42,8 @@ ENDPLOOP RESULTS ;
 CPUSEC T2 ;
 
 WRITE 6 'Results(1) = ' RESULTS(1) ;
-WRITE 6 'Results(25) = ' RESULTS(25) ;
-WRITE 6 'Results(50) = ' RESULTS(50) ;
+WRITE 6 'Results(10) = ' RESULTS(10) ;
+WRITE 6 'Results(20) = ' RESULTS(20) ;
 WRITE 6 'CPUSEC: ' T2 - T1 ;
 
 END ;

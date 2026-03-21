@@ -1,7 +1,7 @@
 { Benchmark: PLOOP strong scaling test }
 { Tests: how well parallelism scales with rank count }
-{ 200 iterations of moderate work - designed to show scaling behavior }
-{ Run with different -np values: 1, 2, 4, 8, 16, 32 to measure scaling }
+{ 20 iterations of heavy work - designed to show scaling behavior }
+{ NP must match MPI world size (run with -np 20) }
 BEGIN ;
 
 VARIABLE (RE) T1 ;
@@ -9,13 +9,13 @@ VARIABLE (RE) T2 ;
 VARIABLE (RE) NP ;
 VARIABLE (RE) INNER ;
 
-NP := 200 ;
-INNER := 2000000 ;
+NP := 20 ;
+INNER := 20000000 ;
 
 VARIABLE (RE NP) RESULTS ;
 
-WRITE 6 'PLOOP Scaling Benchmark: 200 iterations x 2M ops each' ;
-WRITE 6 'Run with varying -np to measure strong scaling' ;
+WRITE 6 'PLOOP Scaling Benchmark: 20 iterations x 20M ops each' ;
+WRITE 6 'Run with -np 20' ;
 
 CPUSEC T1 ;
 
@@ -35,8 +35,8 @@ ENDPLOOP RESULTS ;
 CPUSEC T2 ;
 
 WRITE 6 'Results(1) = ' RESULTS(1) ;
-WRITE 6 'Results(100) = ' RESULTS(100) ;
-WRITE 6 'Results(200) = ' RESULTS(200) ;
+WRITE 6 'Results(10) = ' RESULTS(10) ;
+WRITE 6 'Results(20) = ' RESULTS(20) ;
 WRITE 6 'CPUSEC: ' T2 - T1 ;
 
 END ;

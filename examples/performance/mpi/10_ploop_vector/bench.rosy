@@ -1,6 +1,6 @@
 { Benchmark: PLOOP distributing vector operations }
 { Tests: parallel vector construction, NORM, element access }
-{ 100 iterations, each building vectors and computing norms }
+{ 20 iterations, each building vectors and computing norms }
 BEGIN ;
 
 VARIABLE (RE) T1 ;
@@ -8,12 +8,12 @@ VARIABLE (RE) T2 ;
 VARIABLE (RE) NP ;
 VARIABLE (RE) INNER ;
 
-NP := 100 ;
-INNER := 10000 ;
+NP := 20 ;
+INNER := 50000 ;
 
 VARIABLE (RE NP) RESULTS ;
 
-WRITE 6 'PLOOP Vector Benchmark: 100 iterations x 10000 vector ops each' ;
+WRITE 6 'PLOOP Vector Benchmark: 20 iterations x 50000 vector ops each' ;
 
 CPUSEC T1 ;
 
@@ -34,8 +34,8 @@ ENDPLOOP RESULTS ;
 CPUSEC T2 ;
 
 WRITE 6 'Results(1) = ' RESULTS(1) ;
-WRITE 6 'Results(50) = ' RESULTS(50) ;
-WRITE 6 'Results(100) = ' RESULTS(100) ;
+WRITE 6 'Results(10) = ' RESULTS(10) ;
+WRITE 6 'Results(20) = ' RESULTS(20) ;
 WRITE 6 'CPUSEC: ' T2 - T1 ;
 
 END ;

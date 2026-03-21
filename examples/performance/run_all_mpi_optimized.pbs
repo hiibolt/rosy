@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N rosy_mpi_opt
-#PBS -l select=32:ncpus=1:mpiprocs=1
+#PBS -l select=20:ncpus=1:mpiprocs=1
 #PBS -l walltime=01:00:00
 #PBS -j oe
 #PBS -o rosy_mpi_optimized.out
@@ -9,7 +9,7 @@
 #  Rosy MPI Performance Suite (--optimized)
 # ============================================================================
 #  Runs all PLOOP benchmarks on 20 ranks with --optimized builds (LTO + SIMD).
-#  Requests 32 nodes to accommodate the scaling test (06).
+#  All benchmarks use NP=20 (matching MPI world size).
 # ============================================================================
 
 cd $PBS_O_WORKDIR
@@ -50,18 +50,9 @@ for dir in mpi/*/; do
         continue
     fi
 
-    # Special handling for scaling test
-    if [[ "$name" == *"scaling"* ]]; then
-        for SCALE_NP in 1 2 4 8 16 32; do
-            mpirun -np $SCALE_NP -hostfile $PBS_NODEFILE "$dir/bench_rosy" > "$dir/rosy_output_optimized_np${SCALE_NP}.txt" 2>&1
-            cpusec=$(grep -oP 'CPUSEC:\s*\K[\d.]+' "$dir/rosy_output_optimized_np${SCALE_NP}.txt" | head -1)
-            printf "%-30s %11s  (np=%d)\n" "$name" "${cpusec:-N/A}" "$SCALE_NP"
-        done
-    else
-        mpirun -np $NP -hostfile $PBS_NODEFILE "$dir/bench_rosy" > "$dir/rosy_output_optimized.txt" 2>&1
-        cpusec=$(grep -oP 'CPUSEC:\s*\K[\d.]+' "$dir/rosy_output_optimized.txt" | head -1)
-        printf "%-30s %11s\n" "$name" "${cpusec:-N/A}"
-    fi
+    mpirun -np $NP -hostfile $PBS_NODEFILE "$dir/bench_rosy" > "$dir/rosy_output_optimized.txt" 2>&1
+    cpusec=$(grep -oP 'CPUSEC:\s*\K[\d.]+' "$dir/rosy_output_optimized.txt" | head -1)
+    printf "%-30s %11s\n" "$name" "${cpusec:-N/A}"
 
     rm -f "$dir/bench_rosy"
 done

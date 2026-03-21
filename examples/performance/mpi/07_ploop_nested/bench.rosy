@@ -1,7 +1,7 @@
 { Benchmark: Nested PLOOP for 2D parameter grid }
 { Tests: nested MPI parallelism, 2D decomposition }
-{ Outer: 6 iterations, Inner: 6 iterations = 36 total work units }
-{ Each unit does heavy arithmetic }
+{ Outer: 20 iterations, Inner: 20 iterations = 400 total work units }
+{ Each unit does 180K arithmetic ops (total work preserved from 6x6x2M) }
 BEGIN ;
 
 VARIABLE (RE) T1 ;
@@ -10,13 +10,13 @@ VARIABLE (RE) NOUTER ;
 VARIABLE (RE) NINNER ;
 VARIABLE (RE) WORK ;
 
-NOUTER := 6 ;
-NINNER := 6 ;
-WORK := 2000000 ;
+NOUTER := 20 ;
+NINNER := 20 ;
+WORK := 180000 ;
 
 VARIABLE (RE NOUTER) OUTER_RESULTS ;
 
-WRITE 6 'PLOOP Nested Benchmark: 6x6 grid, 2M ops per cell' ;
+WRITE 6 'PLOOP Nested Benchmark: 20x20 grid, 180K ops per cell' ;
 
 CPUSEC T1 ;
 
@@ -48,8 +48,8 @@ ENDPLOOP OUTER_RESULTS ;
 CPUSEC T2 ;
 
 WRITE 6 'Outer Results(1) = ' OUTER_RESULTS(1) ;
-WRITE 6 'Outer Results(3) = ' OUTER_RESULTS(3) ;
-WRITE 6 'Outer Results(6) = ' OUTER_RESULTS(6) ;
+WRITE 6 'Outer Results(10) = ' OUTER_RESULTS(10) ;
+WRITE 6 'Outer Results(20) = ' OUTER_RESULTS(20) ;
 WRITE 6 'CPUSEC: ' T2 - T1 ;
 
 END ;
