@@ -9,7 +9,7 @@
 #  Rosy vs COSY — MPI Benchmarks (--release, 20 ranks)
 # ============================================================================
 #  All PLOOP benchmarks use NP=20 (matching MPI world size).
-#  COSY runs single-process as sequential baseline (no MPI COSY binary).
+#  COSY runs with mpirun at matching rank count for fair comparison.
 # ============================================================================
 
 cd $PBS_O_WORKDIR
@@ -29,7 +29,7 @@ echo "================================================================"
 echo "  Date:  $(date)"
 echo "  Nodes: $(cat $PBS_NODEFILE | wc -l)"
 echo "  Rosy:  $(rosy --version 2>/dev/null || echo 'unknown')"
-echo "  COSY:  $([[ -x $COSY_BIN ]] && echo 'found (sequential)' || echo 'not found')"
+echo "  COSY:  $([[ -x $COSY_BIN ]] && echo 'found' || echo 'not found')"
 echo ""
 
 HAS_COSY=false
@@ -65,9 +65,9 @@ for dir in mpi/*/; do
         TOTAL_ROSY=$(awk "BEGIN { printf \"%.6f\", $TOTAL_ROSY + $rosy_cpusec }")
     fi
 
-    # Run COSY single-process
+    # Run COSY with MPI
     if $HAS_COSY && [[ -f "$fox_file" ]]; then
-        (cd "$dir" && echo "bench" | "$COSY_BIN") > "$dir/cosy_output.txt" 2>&1
+        (cd "$dir" && echo "bench" | mpirun -np $NP -hostfile $PBS_NODEFILE "$COSY_BIN") > "$dir/cosy_output.txt" 2>&1
 
         if grep -qE "### ERROR|ERROR OCCURED" "$dir/cosy_output.txt" 2>/dev/null; then
             printf "%-30s %11s %11s %10s\n" "$name" "${rosy_cpusec:-N/A}" "COSY ERR" "N/A"
@@ -94,8 +94,7 @@ if $HAS_COSY; then
     total_speedup=$(awk "BEGIN { if ($TOTAL_ROSY > 0.0001) printf \"%.1f\", $TOTAL_COSY / $TOTAL_ROSY; else print \"N/A\" }")
     printf "%-30s %11.4f %11.4f %9sx\n" "TOTAL ($NUM benchmarks)" "$TOTAL_ROSY" "$TOTAL_COSY" "$total_speedup"
     echo ""
-    echo "  Note: COSY runs single-process (sequential baseline)."
-    echo "  Rosy speedup > 1x = MPI parallelism outweighs overhead."
+    echo "  Both Rosy and COSY run with $NP MPI ranks."
 fi
 echo ""
 echo "================================================================"

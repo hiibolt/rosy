@@ -5,7 +5,6 @@ BEGIN ;
 
 VARIABLE T1 1 ;
 VARIABLE T2 1 ;
-VARIABLE NP 1 ;
 VARIABLE ORDER 1 ;
 VARIABLE NVARS 1 ;
 VARIABLE NM 1 ;
@@ -15,7 +14,6 @@ VARIABLE Y 100 ;
 VARIABLE Z 100 ;
 VARIABLE R 100 ;
 
-NP := 20 ;
 ORDER := 6 ;
 NVARS := 3 ;
 DAINI ORDER NVARS 0 NM ;
@@ -25,7 +23,7 @@ WRITE 6 'Monomials per DA vector: ' NM ;
 
 CPUSEC T1 ;
 
-PLOOP I 1 NP ;
+PLOOP I 1 20 ;
     X := DA(1) + I * 0.1 ;
     Y := DA(2) + I * 0.05 ;
     Z := DA(3) ;

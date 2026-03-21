@@ -5,7 +5,6 @@ BEGIN ;
 
 VARIABLE T1 1 ;
 VARIABLE T2 1 ;
-VARIABLE NP 1 ;
 VARIABLE RESULTS 1 20 ;
 
 FUNCTION FIB N ;
@@ -16,13 +15,11 @@ FUNCTION FIB N ;
     ENDIF ;
 ENDFUNCTION ;
 
-NP := 20 ;
-
 WRITE 6 'PLOOP Fibonacci Benchmark: 20 iterations, Fib(25+I)' ;
 
 CPUSEC T1 ;
 
-PLOOP I 1 NP ;
+PLOOP I 1 20 ;
     { Each rank computes Fibonacci of a different N }
     { Fib(25) to Fib(44) - varying difficulty per rank }
     RESULTS(I) := FIB(24 + I) ;

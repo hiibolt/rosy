@@ -5,22 +5,20 @@ BEGIN ;
 
 VARIABLE T1 1 ;
 VARIABLE T2 1 ;
-VARIABLE NP 1 ;
 VARIABLE INNER 1 ;
 VARIABLE RESULTS 1 20 ;
 VARIABLE ACC 1 ;
 VARIABLE X 1 ;
 
-NP := 20 ;
 INNER := 5000000 ;
 
 WRITE 6 'PLOOP Math Benchmark: 20 iterations x 5M math ops each' ;
 
 CPUSEC T1 ;
 
-PLOOP I 1 NP ;
+PLOOP I 1 20 ;
     ACC := 0.0 ;
-    LOOP J 1 INNER ;
+    LOOP J 1 5000000 ;
         X := (I * INNER + J) * 0.00000001 ;
         ACC := ACC + SIN(X) * COS(X) + EXP(X * 0.01) ;
     ENDLOOP ;

@@ -5,23 +5,18 @@ BEGIN ;
 
 VARIABLE T1 1 ;
 VARIABLE T2 1 ;
-VARIABLE NP 1 ;
-VARIABLE INNER 1 ;
 VARIABLE RESULTS 1 20 ;
 VARIABLE ACC 1 ;
 VARIABLE X 1 ;
-
-NP := 20 ;
-INNER := 25000000 ;
 
 WRITE 6 'PLOOP Arithmetic Benchmark: 20 iterations x 25M ops each' ;
 
 CPUSEC T1 ;
 
-PLOOP I 1 NP ;
+PLOOP I 1 20 ;
     ACC := 0.0 ;
     X := I * 0.01 ;
-    LOOP J 1 INNER ;
+    LOOP J 1 25000000 ;
         ACC := ACC + X * X - X / (X + 1.0) + SQRT(ABS(X)) ;
         X := X + 0.0000001 ;
     ENDLOOP ;

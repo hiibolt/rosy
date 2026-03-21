@@ -5,20 +5,17 @@ BEGIN ;
 
 VARIABLE T1 1 ;
 VARIABLE T2 1 ;
-VARIABLE NP 1 ;
 VARIABLE RESULTS 1 20 ;
 VARIABLE A 1 ;
 VARIABLE B 1 ;
 VARIABLE OBJ 1 ;
 VARIABLE EPS 1 ;
 
-NP := 20 ;
-
 WRITE 6 'PLOOP Optimization Benchmark: 20 parallel Simplex runs' ;
 
 CPUSEC T1 ;
 
-PLOOP I 1 NP ;
+PLOOP I 1 20 ;
     { Different starting point per rank }
     A := -5.0 + I * 0.5 ;
     B := -5.0 + I * 0.3 ;

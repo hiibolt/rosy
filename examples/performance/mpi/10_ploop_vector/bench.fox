@@ -5,22 +5,17 @@ BEGIN ;
 
 VARIABLE T1 1 ;
 VARIABLE T2 1 ;
-VARIABLE NP 1 ;
-VARIABLE INNER 1 ;
 VARIABLE RESULTS 1 20 ;
 VARIABLE ACC 1 ;
 VARIABLE V 8 ;
-
-NP := 20 ;
-INNER := 50000 ;
 
 WRITE 6 'PLOOP Vector Benchmark: 20 iterations x 50000 vector ops each' ;
 
 CPUSEC T1 ;
 
-PLOOP I 1 NP ;
+PLOOP I 1 20 ;
     ACC := 0.0 ;
-    LOOP J 1 INNER ;
+    LOOP J 1 50000 ;
         V := SIN(I * J * 0.0001) & COS(I * J * 0.0001)
            & SIN(I * J * 0.0002) & COS(I * J * 0.0002)
            & SIN(I * J * 0.0003) & COS(I * J * 0.0003)

@@ -6,28 +6,21 @@ BEGIN ;
 
 VARIABLE T1 1 ;
 VARIABLE T2 1 ;
-VARIABLE NOUTER 1 ;
-VARIABLE NINNER 1 ;
-VARIABLE WORK 1 ;
 VARIABLE OUTER_RESULTS 1 20 ;
 VARIABLE INNER_RESULTS 1 20 ;
 VARIABLE INNER_SUM 1 ;
 VARIABLE ACC 1 ;
 VARIABLE X 1 ;
 
-NOUTER := 20 ;
-NINNER := 20 ;
-WORK := 180000 ;
-
 WRITE 6 'PLOOP Nested Benchmark: 20x20 grid, 180K ops per cell' ;
 
 CPUSEC T1 ;
 
-PLOOP I 1 NOUTER ;
-    PLOOP J 1 NINNER ;
+PLOOP I 1 20 ;
+    PLOOP J 1 20 ;
         ACC := 0.0 ;
         X := I * 0.1 + J * 0.01 ;
-        LOOP K 1 WORK ;
+        LOOP K 1 180000 ;
             ACC := ACC + SIN(X) * COS(X) + X * X ;
             X := X + 0.0000001 ;
         ENDLOOP ;
@@ -36,7 +29,7 @@ PLOOP I 1 NOUTER ;
 
     { Sum up inner results }
     INNER_SUM := 0.0 ;
-    LOOP J 1 NINNER ;
+    LOOP J 1 20 ;
         INNER_SUM := INNER_SUM + INNER_RESULTS(J) ;
     ENDLOOP ;
 

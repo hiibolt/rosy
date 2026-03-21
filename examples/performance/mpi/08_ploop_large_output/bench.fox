@@ -5,8 +5,6 @@ BEGIN ;
 
 VARIABLE T1 1 ;
 VARIABLE T2 1 ;
-VARIABLE NP 1 ;
-VARIABLE INNER 1 ;
 VARIABLE RESULTS 1 20 ;
 VARIABLE ACC 1 ;
 VARIABLE X 1 ;
@@ -14,18 +12,15 @@ VARIABLE Y 1 ;
 VARIABLE Z 1 ;
 VARIABLE SUM 1 ;
 
-NP := 20 ;
-INNER := 7500000 ;
-
 WRITE 6 'PLOOP Large Output Benchmark: 20 iterations x 7.5M ops, heavy gather' ;
 
 CPUSEC T1 ;
 
-PLOOP I 1 NP ;
+PLOOP I 1 20 ;
     ACC := 0.0 ;
     X := I * 0.01 ;
     Y := I * 0.02 ;
-    LOOP J 1 INNER ;
+    LOOP J 1 7500000 ;
         Z := SIN(X) * COS(Y) + SQRT(ABS(X * Y)) ;
         ACC := ACC + Z ;
         X := X + 0.0000001 ;
@@ -38,7 +33,7 @@ CPUSEC T2 ;
 
 { Verify all results are populated }
 SUM := 0.0 ;
-LOOP I 1 NP ;
+LOOP I 1 20 ;
     SUM := SUM + RESULTS(I) ;
 ENDLOOP ;
 

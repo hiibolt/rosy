@@ -5,7 +5,6 @@ BEGIN ;
 
 VARIABLE T1 1 ;
 VARIABLE T2 1 ;
-VARIABLE NP 1 ;
 VARIABLE RESULTS 1 20 ;
 VARIABLE A 1 10 10 ;
 VARIABLE B 1 10 10 ;
@@ -13,13 +12,11 @@ VARIABLE N 1 ;
 VARIABLE ADIM 1 ;
 VARIABLE ERR 1 ;
 
-NP := 20 ;
-
 WRITE 6 'PLOOP Matrix Benchmark: 20 iterations x 25 LINV each' ;
 
 CPUSEC T1 ;
 
-PLOOP I 1 NP ;
+PLOOP I 1 20 ;
     N := 10 ;
     ADIM := 10 ;
 
