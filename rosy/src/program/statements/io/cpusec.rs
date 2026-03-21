@@ -92,12 +92,11 @@ impl Transpile for CpusecStatement {
             }
         };
 
+        // Use the `start` Instant created at the top of main_wrapper() in the
+        // output template.  This matches COSY INFINITY's CPUSEC semantics: elapsed
+        // wall-clock time since the program began execution.
         let serialization = format!(
-            "{}{} = {{\n\
-                static __CPUSEC_START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();\n\
-                let __start = __CPUSEC_START.get_or_init(std::time::Instant::now);\n\
-                __start.elapsed().as_secs_f64()\n\
-            }};",
+            "{}{} = start.elapsed().as_secs_f64();",
             dereference, serialized_identifier
         );
 
