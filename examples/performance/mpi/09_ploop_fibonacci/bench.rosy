@@ -1,6 +1,6 @@
-{ Benchmark: PLOOP distributing recursive Fibonacci computations }
-{ Tests: parallel function call overhead, per-rank recursion }
-{ 20 iterations, each computing Fibonacci of varying N }
+{ Benchmark: PLOOP distributing Fibonacci computations }
+{ Tests: parallel computation overhead, per-rank iterative work }
+{ 20 iterations, each computing Fibonacci of varying N iteratively }
 BEGIN ;
 
 VARIABLE (RE) T1 ;
@@ -11,22 +11,29 @@ NP := 20 ;
 
 VARIABLE (RE NP) RESULTS ;
 
-FUNCTION (RE) FIB N (RE) ;
-    IF N <= 1 ;
-        FIB := N ;
-    ELSEIF LO(1) ;
-        FIB := FIB(N - 1) + FIB(N - 2) ;
-    ENDIF ;
-ENDFUNCTION ;
-
 WRITE 6 'PLOOP Fibonacci Benchmark: 20 iterations, Fib(25+I)' ;
 
 CPUSEC T1 ;
 
 PLOOP I 1 NP ;
-    { Each rank computes Fibonacci of a different N }
+    VARIABLE (RE) N ;
+    VARIABLE (RE) A ;
+    VARIABLE (RE) B ;
+    VARIABLE (RE) C ;
+    { Each rank computes Fibonacci of a different N iteratively }
     { Fib(25) to Fib(44) - varying difficulty per rank }
-    RESULTS(I) := FIB(24 + I) ;
+    N := 24 + I ;
+    { Repeat the computation 500000 times for substantial work }
+    LOOP J 1 500000 ;
+        A := 0 ;
+        B := 1 ;
+        LOOP K 1 N ;
+            C := A + B ;
+            A := B ;
+            B := C ;
+        ENDLOOP ;
+    ENDLOOP ;
+    RESULTS(I) := B ;
 ENDPLOOP RESULTS ;
 
 CPUSEC T2 ;

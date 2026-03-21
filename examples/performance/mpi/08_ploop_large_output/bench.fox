@@ -11,6 +11,9 @@ VARIABLE X 1 ;
 VARIABLE Y 1 ;
 VARIABLE Z 1 ;
 VARIABLE SUM 1 ;
+VARIABLE I 1 ;
+VARIABLE J 1 ;
+VARIABLE DT 1 ;
 
 WRITE 6 'PLOOP Large Output Benchmark: 20 iterations x 7.5M ops, heavy gather' ;
 
@@ -40,6 +43,7 @@ ENDLOOP ;
 WRITE 6 'Sum of all results: ' SUM ;
 WRITE 6 'Results(1) = ' RESULTS(1) ;
 WRITE 6 'Results(20) = ' RESULTS(20) ;
-WRITE 6 'CPUSEC: ' T2 - T1 ;
+DT := T2 - T1 ;
+WRITE 6 'CPUSEC: ' DT ;
 
 END ;

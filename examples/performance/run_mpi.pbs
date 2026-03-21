@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N rosy_mpi
-#PBS -l select=20:ncpus=1:mpiprocs=1
+#PBS -l select=20:ncpus=1:mpiprocs=1:mem=4gb
 #PBS -l walltime=01:00:00
 #PBS -j oe
 #PBS -o rosy_mpi.out
@@ -65,14 +65,16 @@ for dir in mpi/*/; do
         TOTAL_ROSY=$(awk "BEGIN { printf \"%.6f\", $TOTAL_ROSY + $rosy_cpusec }")
     fi
 
-    # Run COSY with MPI (COSY reads filename as CLI arg)
+    # Run COSY with MPI (COSY reads filename from stdin on rank 0, foxyinp.dat on others)
     if $HAS_COSY && [[ -f "$fox_file" ]]; then
-        (cd "$dir" && mpirun -np $NP -hostfile $PBS_NODEFILE "$COSY_BIN" bench.fox) > "$dir/cosy_output.txt" 2>&1
+        rm -f "$dir"/*.lis
+        echo "bench" > "$dir/foxyinp.dat"
+        (cd "$dir" && echo "bench" | mpirun -np $NP -hostfile $PBS_NODEFILE "$COSY_BIN") > "$dir/cosy_output.txt" 2>&1
 
         if grep -qE "### ERROR|ERROR OCCURED" "$dir/cosy_output.txt" 2>/dev/null; then
             printf "%-30s %11s %11s %10s\n" "$name" "${rosy_cpusec:-N/A}" "COSY ERR" "N/A"
         else
-            cosy_cpusec=$(grep -oP 'CPUSEC:\s*\K[\d.]+' "$dir/cosy_output.txt" | tail -1)
+            cosy_cpusec=$(grep -A1 'CPUSEC:' "$dir/cosy_output.txt" | grep -v 'CPUSEC:' | tail -1 | awk '{printf "%.6f", $1}')
             if [[ -n "$cosy_cpusec" && -n "$rosy_cpusec" ]]; then
                 TOTAL_COSY=$(awk "BEGIN { printf \"%.6f\", $TOTAL_COSY + $cosy_cpusec }")
                 speedup=$(awk "BEGIN { if ($rosy_cpusec > 0.0001) printf \"%.1f\", $cosy_cpusec / $rosy_cpusec; else print \"INF\" }")

@@ -8,6 +8,9 @@ VARIABLE T2 1 ;
 VARIABLE RESULTS 1 20 ;
 VARIABLE ACC 1 ;
 VARIABLE V 8 ;
+VARIABLE I 1 ;
+VARIABLE J 1 ;
+VARIABLE DT 1 ;
 
 WRITE 6 'PLOOP Vector Benchmark: 20 iterations x 50000 vector ops each' ;
 
@@ -30,6 +33,7 @@ CPUSEC T2 ;
 WRITE 6 'Results(1) = ' RESULTS(1) ;
 WRITE 6 'Results(10) = ' RESULTS(10) ;
 WRITE 6 'Results(20) = ' RESULTS(20) ;
-WRITE 6 'CPUSEC: ' T2 - T1 ;
+DT := T2 - T1 ;
+WRITE 6 'CPUSEC: ' DT ;
 
 END ;

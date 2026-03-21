@@ -10,6 +10,9 @@ VARIABLE RESULTS 1 20 ;
 VARIABLE ACC 1 ;
 VARIABLE X 1 ;
 VARIABLE Y 1 ;
+VARIABLE I 1 ;
+VARIABLE J 1 ;
+VARIABLE DT 1 ;
 
 WRITE 6 'PLOOP Scaling Benchmark: 20 iterations x 20M ops each' ;
 WRITE 6 'Run with -np 20' ;
@@ -31,6 +34,7 @@ CPUSEC T2 ;
 WRITE 6 'Results(1) = ' RESULTS(1) ;
 WRITE 6 'Results(10) = ' RESULTS(10) ;
 WRITE 6 'Results(20) = ' RESULTS(20) ;
-WRITE 6 'CPUSEC: ' T2 - T1 ;
+DT := T2 - T1 ;
+WRITE 6 'CPUSEC: ' DT ;
 
 END ;

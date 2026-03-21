@@ -11,6 +11,11 @@ VARIABLE B 1 10 10 ;
 VARIABLE N 1 ;
 VARIABLE ADIM 1 ;
 VARIABLE ERR 1 ;
+VARIABLE C 1 ;
+VARIABLE I 1 ;
+VARIABLE K 1 ;
+VARIABLE R 1 ;
+VARIABLE DT 1 ;
 
 WRITE 6 'PLOOP Matrix Benchmark: 20 iterations x 25 LINV each' ;
 
@@ -23,10 +28,10 @@ PLOOP I 1 20 ;
     { Fill matrix - diagonally dominant with variation by I }
     LOOP R 1 10 ;
         LOOP C 1 10 ;
-            IF R = C ;
-                A(R)(C) := 10.0 + R + I * 0.01 ;
+            IF (R=C) ;
+                A(R,C) := 10.0 + R + I * 0.01 ;
             ELSEIF LO(1) ;
-                A(R)(C) := SIN(R * 0.3 + I * 0.1) * COS(C * 0.7) ;
+                A(R,C) := SIN(R * 0.3 + I * 0.1) * COS(C * 0.7) ;
             ENDIF ;
         ENDLOOP ;
     ENDLOOP ;
@@ -37,12 +42,12 @@ PLOOP I 1 20 ;
         { Use result as next input }
         LOOP R 1 10 ;
             LOOP C 1 10 ;
-                A(R)(C) := B(R)(C) ;
+                A(R,C) := B(R,C) ;
             ENDLOOP ;
         ENDLOOP ;
     ENDLOOP ;
 
-    RESULTS(I) := B(1)(1) ;
+    RESULTS(I) := B(1,1) ;
 ENDPLOOP RESULTS ;
 
 CPUSEC T2 ;
@@ -50,6 +55,7 @@ CPUSEC T2 ;
 WRITE 6 'Results(1) = ' RESULTS(1) ;
 WRITE 6 'Results(10) = ' RESULTS(10) ;
 WRITE 6 'Results(20) = ' RESULTS(20) ;
-WRITE 6 'CPUSEC: ' T2 - T1 ;
+DT := T2 - T1 ;
+WRITE 6 'CPUSEC: ' DT ;
 
 END ;

@@ -10,6 +10,8 @@ VARIABLE A 1 ;
 VARIABLE B 1 ;
 VARIABLE OBJ 1 ;
 VARIABLE EPS 1 ;
+VARIABLE I 1 ;
+VARIABLE DT 1 ;
 
 WRITE 6 'PLOOP Optimization Benchmark: 20 parallel Simplex runs' ;
 
@@ -33,6 +35,7 @@ CPUSEC T2 ;
 WRITE 6 'Results(1) = ' RESULTS(1) ;
 WRITE 6 'Results(10) = ' RESULTS(10) ;
 WRITE 6 'Results(20) = ' RESULTS(20) ;
-WRITE 6 'CPUSEC: ' T2 - T1 ;
+DT := T2 - T1 ;
+WRITE 6 'CPUSEC: ' DT ;
 
 END ;

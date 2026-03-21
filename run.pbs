@@ -24,9 +24,9 @@ echo "" && \
 echo "[ Starting ROSY Program ]" && \
 time mpirun -np 10 -hostfile $PBS_NODEFILE ./rosy_output
 
-# Test with regular COSY
-echo ""
-echo "[ Testing with COSY ]"
-COSY_BIN=/home/z1994244/projects/cosy/types/cosy
-COSY_SRCFILE=/home/z1994244/projects/cosy/types/ploop_stresstest.fox
-time mpirun -np 10 -hostfile $PBS_NODEFILE $COSY_BIN $COSY_SRCFILE
+# Test with regular COSY (requires matching .fox file)
+# echo ""
+# echo "[ Testing with COSY ]"
+# COSY_BIN=$PBS_O_WORKDIR/cosy
+# COSY_SRCFILE=$PBS_O_WORKDIR/ploop_stresstest.fox
+# time mpirun -np 10 -hostfile $PBS_NODEFILE $COSY_BIN $COSY_SRCFILE
