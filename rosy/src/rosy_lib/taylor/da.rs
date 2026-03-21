@@ -207,7 +207,8 @@ impl<T: DACoefficient> Add<&DA<T>> for &DA<T> {
 
     fn add(self, rhs: &DA<T>) -> Self::Output {
         let config = get_config()?;
-        let mut result = HashMap::default();
+        let capacity = self.coeffs.len() + rhs.coeffs.len();
+        let mut result = HashMap::with_capacity_and_hasher(capacity, Default::default());
 
         // Add coefficients from self
         for (monomial, &coeff) in &self.coeffs {
@@ -382,7 +383,8 @@ impl<T: DACoefficient> Mul<&DA<T>> for &DA<T> {
 
     fn mul(self, rhs: &DA<T>) -> Self::Output {
         let config = get_config()?;
-        let mut result = HashMap::default();
+        let capacity = self.coeffs.len().max(rhs.coeffs.len());
+        let mut result = HashMap::with_capacity_and_hasher(capacity, Default::default());
 
         // Multiply each term in self by each term in rhs
         for (m1, &c1) in &self.coeffs {

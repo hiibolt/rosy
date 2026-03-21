@@ -306,8 +306,8 @@ pub fn function_call_transpile_helper (
     // (the prefix avoids shadowing by the implicit return variable).
     let rust_fn_name = format!("__fn_{}", name);
     let serialization = format!(
-        "&mut ({}({}).context(\"...while calling function '{}'\")? as {})",
-        rust_fn_name, serialized_args.join(", "), name, func_context.return_type.as_rust_type()
+        "&mut ({}({})? as {})",
+        rust_fn_name, serialized_args.join(", "), func_context.return_type.as_rust_type()
     );
     if errors.is_empty() {
         Ok(TranspilationOutput {

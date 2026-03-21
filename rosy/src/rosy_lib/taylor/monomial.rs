@@ -69,7 +69,10 @@ impl Monomial {
         for i in 0..MAX_VARS {
             result_exponents[i] = self.exponents[i].saturating_add(other.exponents[i]);
         }
-        Self::new(result_exponents)
+        Self {
+            exponents: result_exponents,
+            total_order: self.total_order.saturating_add(other.total_order),
+        }
     }
 
     /// Check if this monomial is within the given maximum order.
