@@ -125,7 +125,7 @@ for dir in "$SCRIPT_DIR"/non_mpi/*/; do
         printf "  [%d] %s %s...\r" "$NUM_TESTS" "$name" "$tier_label" >&2
 
         # ── Build Rosy ────────────────────────────────────────────────
-        if ! "$ROSY_BIN" build "$rosy_file" --release --optimized -d "$BUILD_DIR" -o "$dir/bench_rosy_t${tier}" 2>/dev/null; then
+        if ! "$ROSY_BIN" build "$rosy_file" --release -d "$BUILD_DIR" -o "$dir/bench_rosy_t${tier}" 2>/dev/null; then
             printf "\r%80s\r" "" >&2
             printf "%-28s %-4s %11s\n" "$name" "$tier_label" "BUILD FAIL"
             continue
