@@ -65,23 +65,29 @@ impl TranspileableExpr for NegExpr {
 
 impl Transpile for NegExpr {
     fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
-        // Transpile as: RosySub::rosy_sub(&*0.0f64, &*operand)
-        let mut serialization = String::from("&mut RosySub::rosy_sub(&*&mut 0.0f64, &*");
+        let operand_type = self.operand.type_of(context).map_err(|e| vec!(e))?;
         let mut errors = Vec::new();
         let mut requested_variables = BTreeSet::new();
 
-        match self.operand.transpile(context) {
+        let operand_ser = match self.operand.transpile(context) {
             Ok(output) => {
-                serialization.push_str(&output.serialization);
                 requested_variables.extend(output.requested_variables);
+                output.serialization
             },
             Err(mut e) => {
                 for err in e.drain(..) {
                     errors.push(err.context("...while transpiling operand of negation"));
                 }
+                String::new()
             }
-        }
-        serialization.push_str(")?");
+        };
+
+        use crate::rosy_lib::RosyBaseType;
+        let serialization = if operand_type.base_type == RosyBaseType::RE && operand_type.dimensions == 0 {
+            format!("&mut (-(*{}))", operand_ser)
+        } else {
+            format!("&mut RosySub::rosy_sub(&*&mut 0.0f64, &*{})?", operand_ser)
+        };
 
         if errors.is_empty() {
             Ok(TranspilationOutput {

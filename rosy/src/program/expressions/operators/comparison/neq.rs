@@ -78,37 +78,42 @@ impl Transpile for NeqExpr {
         }
 
         // Then, transpile both sides and combine
-        let mut serialization = String::from("&mut RosyNeq::rosy_neq(&*");
         let mut errors = Vec::new();
         let mut requested_variables = BTreeSet::new();
 
-        // Transpile left
-        match self.left.transpile(context) {
+        let left_ser = match self.left.transpile(context) {
             Ok(output) => {
-                serialization.push_str(&output.serialization);
                 requested_variables.extend(output.requested_variables);
+                output.serialization
             },
             Err(mut e) => {
                 for err in e.drain(..) {
                     errors.push(err.context("...while transpiling left-hand side of not-equals"));
                 }
+                String::new()
             }
-        }
+        };
 
-        // Transpile right
-        serialization.push_str(", &*");
-        match self.right.transpile(context) {
+        let right_ser = match self.right.transpile(context) {
             Ok(output) => {
-                serialization.push_str(&output.serialization);
                 requested_variables.extend(output.requested_variables);
+                output.serialization
             },
             Err(mut e) => {
                 for err in e.drain(..) {
                     errors.push(err.context("...while transpiling right-hand side of not-equals"));
                 }
+                String::new()
             }
-        }
-        serialization.push_str(")?");
+        };
+
+        use crate::rosy_lib::RosyBaseType;
+        let serialization = match (&left_type.base_type, &right_type.base_type) {
+            (RosyBaseType::RE, RosyBaseType::RE) | (RosyBaseType::ST, RosyBaseType::ST)
+                if left_type.dimensions == 0 && right_type.dimensions == 0
+                => format!("&mut ((*{}) != (*{}))", left_ser, right_ser),
+            _ => format!("&mut RosyNeq::rosy_neq(&*{}, &*{})?", left_ser, right_ser),
+        };
 
         if errors.is_empty() {
             Ok(TranspilationOutput {
