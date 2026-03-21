@@ -1,3 +1,3 @@
 DA Multiply Benchmark: order 8, 4 vars, 5000 iterations
 Result constant part:  0.000000000000000    
-CPUSEC: 0.2942000000000000E-02
+CPUSEC: 0.3040500000000000E-02

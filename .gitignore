@@ -4,6 +4,7 @@
 */target
 .rosy_output
 .rosy_test_cache
+.rosy_output_bench
 rosy_output
 /cosy_examples
 *.out
@@ -12,3 +13,4 @@ rosy_output
 *.fuse_*
 **/foxyinp.dat
 **/*_output.txt
+bench_t4

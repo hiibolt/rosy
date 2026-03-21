@@ -1,3 +1,3 @@
 DA High-Order Multiply Benchmark T3: order 7, 6 vars, 1000 iterations
 Result constant part:  0.000000000000000    
-CPUSEC: 0.1143600000000000E-02
+CPUSEC: 0.1179800000000001E-02

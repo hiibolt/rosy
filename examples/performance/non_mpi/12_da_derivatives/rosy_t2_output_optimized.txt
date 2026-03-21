@@ -1,3 +1,3 @@
 DA Derivatives Benchmark T2: order 10, 3 vars, 5000 iterations
 Result constant part:  0.000000000000000    
-CPUSEC: 0.2129500000000000E-01
+CPUSEC: 0.2019900300000000E-01
