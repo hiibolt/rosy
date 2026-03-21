@@ -403,10 +403,15 @@ impl Transpile for FunctionStatement {
         // Serialize return type
         let serialized_return_type = resolved_return_type.as_rust_type();
 
-        // Serialize the entire function
+        // Serialize the entire function.
+        // The Rust function name is prefixed with `__fn_` to avoid shadowing
+        // the implicit return variable (which uses the original ROSY name).
+        // This allows recursive calls like `FIB(N-1)` to resolve to the
+        // function `__fn_FIB` rather than trying to index the local `FIB: f64`.
+        let rust_fn_name = format!("__fn_{}", self.name);
         let serialization = format!(
             "fn {} ( {} ) -> Result<{}> {{\n{}\n\tOk({})\n}}",
-            self.name, serialized_args.join(", "), 
+            rust_fn_name, serialized_args.join(", "),
             serialized_return_type,
             indent(serialized_statements.join("\n")),
             self.name

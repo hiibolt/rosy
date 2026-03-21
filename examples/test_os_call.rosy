@@ -1,3 +1,0 @@
-BEGIN;
-  OS 'echo Hello from OS statement';
-END;

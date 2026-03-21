@@ -12,8 +12,18 @@
 //! |-------------|----------------|-----------------|--------|
 //! | 0 | — | any | Variable |
 //! | 1 | multiple | — | Function call |
-//! | 1 | 1 | — | Context-dependent |
+//! | 1 | 1 | — | Context-dependent (see below) |
 //! | ≥2 | 1 each | — | Multi-dim index (Variable) |
+//!
+//! ### Single-arg disambiguation (1 paren group, 1 arg)
+//!
+//! | Variable? | Function? | Variable dims | Result |
+//! |-----------|-----------|---------------|--------|
+//! | yes | no | — | Variable (index) |
+//! | no | yes | — | Function call |
+//! | yes | yes | >0 (array) | Variable (index) |
+//! | yes | yes | 0 (scalar) | Function call (recursion) |
+//! | no | no | — | Error |
 //!
 //! ## Example
 //!
@@ -98,9 +108,23 @@ impl VarExpr {
                             Ok(VarExprKind::FunctionCall)
                         }
                         (true, true) => {
-                            // Both exist — prefer variable (indexing), since function calls
-                            // typically have multiple arguments
-                            Ok(VarExprKind::Variable)
+                            // Both exist — disambiguate by checking variable dimensions.
+                            // A scalar variable (0 dimensions) cannot be indexed, so
+                            // parentheses must be a function call (e.g. recursion where
+                            // the function name doubles as the return variable).
+                            let var_data = context.variables.get(&ident.name).unwrap();
+                            if var_data.data.r#type.dimensions > 0 {
+                                // Variable is an array — prefer indexing
+                                Ok(VarExprKind::Variable)
+                            } else {
+                                // Variable is a scalar — can't index, must be a function call
+                                if has_brackets {
+                                    return Err(vec![anyhow::anyhow!(
+                                        "'{}': function call with bracket indexing is not valid", ident.name
+                                    )]);
+                                }
+                                Ok(VarExprKind::FunctionCall)
+                            }
                         }
                         (false, false) => {
                             Err(vec![anyhow::anyhow!(
@@ -277,10 +301,13 @@ pub fn function_call_transpile_helper (
         }
     }
 
-    // Serialize the entire function
+    // Serialize the function call.
+    // Uses the `__fn_` prefix to match the generated Rust function name
+    // (the prefix avoids shadowing by the implicit return variable).
+    let rust_fn_name = format!("__fn_{}", name);
     let serialization = format!(
         "&mut ({}({}).context(\"...while calling function '{}'\")? as {})",
-        name, serialized_args.join(", "), name, func_context.return_type.as_rust_type()
+        rust_fn_name, serialized_args.join(", "), name, func_context.return_type.as_rust_type()
     );
     if errors.is_empty() {
         Ok(TranspilationOutput {

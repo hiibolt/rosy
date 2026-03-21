@@ -1,6 +1,0 @@
-BEGIN;
-  VARIABLE (RE) x;
-  SCRLEN 100;
-  x := 42;
-  WRITE 6 x;
-END;

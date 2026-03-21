@@ -1,5 +1,0 @@
-BEGIN;
-WRITE 6 "Before QUIT";
-QUIT 0;
-WRITE 6 "After QUIT (should not print)";
-END;
