@@ -109,21 +109,19 @@ fn da_asin(da: &DA) -> anyhow::Result<DA> {
         }
     }
 
-    // Build result: asin(f₀) + Σ_{n=1}^{max_order} (derivs[n] / n!) * (δf)^n
-    let mut result = DA::from_coeff(derivs[0]);
-    let mut term = da_prime.clone();
+    // Precompute Taylor coefficients c_n = derivs[n] / n!
+    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
     let mut factorial = 1.0;
+    for n in 0..=max_order {
+        if n > 0 { factorial *= n as f64; }
+        taylor_coeffs.push(derivs[n] / factorial);
+    }
 
-    for n in 1..=max_order {
-        factorial *= n as f64;
-        let coefficient = derivs[n] / factorial;
-
-        let scaled_term = (&term * DA::from_coeff(coefficient))?;
-        result = (&result + &scaled_term)?;
-
-        if n < max_order {
-            term = (&term * &da_prime)?;
-        }
+    // Horner's evaluation
+    let mut result = DA::from_coeff(taylor_coeffs[max_order]);
+    for n in (0..max_order).rev() {
+        result = (&result * &da_prime)?;
+        result.add_constant_in_place(taylor_coeffs[n]);
     }
 
     Ok(result)

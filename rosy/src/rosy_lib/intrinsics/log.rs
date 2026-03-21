@@ -82,8 +82,6 @@ impl RosyLOG for DA {
 }
 
 fn da_log(da: &DA) -> anyhow::Result<DA> {
-    use crate::rosy_lib::taylor::DACoefficient;
-
     let config = crate::rosy_lib::taylor::get_config()?;
     let max_order = config.max_order as usize;
 
@@ -92,7 +90,6 @@ fn da_log(da: &DA) -> anyhow::Result<DA> {
 
     let ln_f0 = f0.ln();
 
-    // δf = f - f₀
     let mut da_prime = da.clone();
     da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
 
@@ -100,18 +97,19 @@ fn da_log(da: &DA) -> anyhow::Result<DA> {
     let u = (&da_prime * DA::from_coeff(1.0 / f0))?;
 
     // ln(f) = ln(f₀) + u - u²/2 + u³/3 - ...
-    let mut result = DA::from_coeff(ln_f0);
-    let mut u_power = u.clone();
-
+    // Precompute: c_0 = ln(f₀), c_n = (-1)^(n+1) / n
+    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
+    taylor_coeffs.push(ln_f0);
     for n in 1..=max_order {
         let sign = if n % 2 == 1 { 1.0 } else { -1.0 };
-        let coeff = sign / (n as f64);
-        let term = (&u_power * DA::from_coeff(coeff))?;
-        result = (&result + &term)?;
+        taylor_coeffs.push(sign / (n as f64));
+    }
 
-        if n < max_order {
-            u_power = (&u_power * &u)?;
-        }
+    // Horner's on u
+    let mut result = DA::from_coeff(taylor_coeffs[max_order]);
+    for n in (0..max_order).rev() {
+        result = (&result * &u)?;
+        result.add_constant_in_place(taylor_coeffs[n]);
     }
 
     Ok(result)

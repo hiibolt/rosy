@@ -100,22 +100,20 @@ fn da_sqrt(da: &DA) -> anyhow::Result<DA> {
     da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
     let da_delta = (&da_prime * DA::from_coeff(1.0 / f0))?;
 
-    // Build sqrt(1 + u) = sum C(1/2, n) * u^n
-    // C(1/2, 0) = 1
-    // C(1/2, n) = C(1/2, n-1) * (1/2 - (n-1)) / n
-    let mut result = DA::from_coeff(1.0);
-    let mut term = da_delta.clone();
-    let mut binom_coeff = 0.5_f64; // C(1/2, 1)
-
+    // Precompute binomial coefficients C(1/2, n)
+    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
+    taylor_coeffs.push(1.0); // C(1/2, 0) = 1
+    let mut binom_coeff = 0.5_f64;
     for n in 1..=max_order {
-        let scaled_term = (&term * DA::from_coeff(binom_coeff))?;
-        result = (&result + &scaled_term)?;
+        taylor_coeffs.push(binom_coeff);
+        binom_coeff *= (0.5 - n as f64) / (n as f64 + 1.0);
+    }
 
-        if n < max_order {
-            term = (&term * &da_delta)?;
-            // C(1/2, n+1) = C(1/2, n) * (1/2 - n) / (n+1)
-            binom_coeff *= (0.5 - n as f64) / (n as f64 + 1.0);
-        }
+    // Horner's evaluation of (1 + u)^(1/2)
+    let mut result = DA::from_coeff(taylor_coeffs[max_order]);
+    for n in (0..max_order).rev() {
+        result = (&result * &da_delta)?;
+        result.add_constant_in_place(taylor_coeffs[n]);
     }
 
     // Multiply by sqrt(f0)

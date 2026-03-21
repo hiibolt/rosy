@@ -84,82 +84,69 @@ impl RosyEXP for CD {
     }
 }
 
-/// Compute exponential of a DA object using Taylor series composition.
-/// 
-/// Uses: exp(f) = exp(f₀) * exp(δf)
-/// where exp(δf) = 1 + δf + (δf)²/2! + (δf)³/3! + ...
+/// Compute exponential of a DA object using Horner's method.
+///
+/// exp(f) = exp(f₀) · (1 + δf + δf²/2! + ...) evaluated via Horner's.
 fn da_exp(da: &DA) -> anyhow::Result<DA> {
-    use crate::rosy_lib::taylor::DACoefficient;
-    
     let config = crate::rosy_lib::taylor::get_config()?;
     let max_order = config.max_order as usize;
-    
+
     let f0 = da.constant_part();
     let exp_f0 = f0.exp();
-    
-    // Create DA with constant part removed (δf = f - f₀)
+
     let mut da_prime = da.clone();
     da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
-    
-    // Build exp(δf) = 1 + δf + (δf)²/2! + ...
-    let mut result = DA::from_coeff(1.0);
-    let mut term = da_prime.clone();
+
+    // Precompute c_n = 1/n! (then multiply by exp_f0 at end)
+    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
     let mut factorial = 1.0;
-    
-    for n in 1..=max_order {
-        factorial *= n as f64;
-        
-        // Add current term: (δf)^n / n!
-        let scaled_term = (&term * DA::from_coeff(1.0 / factorial))?;
-        result = (&result + &scaled_term)?;
-        
-        // Prepare next term
-        if n < max_order {
-            term = (&term * &da_prime)?;
-        }
+    for n in 0..=max_order {
+        if n > 0 { factorial *= n as f64; }
+        taylor_coeffs.push(1.0 / factorial);
     }
-    
+
+    // Horner's evaluation of exp(δf)
+    let mut result = DA::from_coeff(taylor_coeffs[max_order]);
+    for n in (0..max_order).rev() {
+        result = (&result * &da_prime)?;
+        result.add_constant_in_place(taylor_coeffs[n]);
+    }
+
     // Multiply by exp(f₀)
     result = (&result * DA::from_coeff(exp_f0))?;
-    
+
     Ok(result)
 }
 
-/// Compute exponential of a CD object using Taylor series composition.
+/// Compute exponential of a CD object using Horner's method.
 fn cd_exp(cd: &CD) -> anyhow::Result<CD> {
     use crate::rosy_lib::taylor::DACoefficient;
     use num_complex::Complex64;
-    
+
     let config = crate::rosy_lib::taylor::get_config()?;
     let max_order = config.max_order as usize;
-    
+
     let f0 = cd.constant_part();
     let exp_f0 = f0.exp();
-    
-    // Create CD with constant part removed
+
     let mut cd_prime = cd.clone();
     cd_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), Complex64::zero());
-    
-    // Build exp(δf) = 1 + δf + (δf)²/2! + ...
-    let mut result = CD::from_coeff(Complex64::one());
-    let mut term = cd_prime.clone();
+
+    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
     let mut factorial = 1.0;
-    
-    for n in 1..=max_order {
-        factorial *= n as f64;
-        
-        let scale = Complex64::new(1.0 / factorial, 0.0);
-        let scaled_term = (&term * CD::from_coeff(scale))?;
-        result = (&result + &scaled_term)?;
-        
-        if n < max_order {
-            term = (&term * &cd_prime)?;
-        }
+    for n in 0..=max_order {
+        if n > 0 { factorial *= n as f64; }
+        taylor_coeffs.push(Complex64::new(1.0 / factorial, 0.0));
     }
-    
-    // Multiply by exp(f₀)
+
+    let mut result = CD::from_coeff(taylor_coeffs[max_order]);
+    for n in (0..max_order).rev() {
+        result = (&result * &cd_prime)?;
+        result.add_constant_in_place(taylor_coeffs[n]);
+    }
+
     result = (&result * CD::from_coeff(exp_f0))?;
-    
+
     Ok(result)
 }
 

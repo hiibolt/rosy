@@ -86,12 +86,9 @@ impl RosyCOS for CD {
 
 /// Compute cosine of a DA object using Taylor series composition.
 ///
-/// Uses the Taylor series: cos(f) = cos(f₀) - sin(f₀)·δf - cos(f₀)·(δf)²/2! + sin(f₀)·(δf)³/3! + ...
-/// where f₀ is the constant part and δf = f - f₀
-/// Coefficients cycle: [-sin_f0, -cos_f0, sin_f0, cos_f0]
+/// Evaluates P(δf) = c₀ + δf·(c₁ + δf·(c₂ + ...)) using Horner's method
+/// where c_n = d^n(cos)(f₀)/n!, cycle: [cos, -sin, -cos, sin]
 fn da_cos(da: &DA) -> anyhow::Result<DA> {
-    use crate::rosy_lib::taylor::DACoefficient;
-
     let config = crate::rosy_lib::taylor::get_config()?;
     let max_order = config.max_order as usize;
 
@@ -99,38 +96,27 @@ fn da_cos(da: &DA) -> anyhow::Result<DA> {
     let sin_f0 = f0.sin();
     let cos_f0 = f0.cos();
 
-    // Create DA with constant part removed (δf = f - f₀)
     let mut da_prime = da.clone();
     da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
 
-    // Build result using Taylor composition
-    // Pattern: cos(f₀), -sin(f₀), -cos(f₀), sin(f₀), cos(f₀), ...
-    let mut result = DA::from_coeff(cos_f0);
-    let mut term = da_prime.clone();
+    let cycle = [cos_f0, -sin_f0, -cos_f0, sin_f0];
+    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
     let mut factorial = 1.0;
+    for n in 0..=max_order {
+        if n > 0 { factorial *= n as f64; }
+        taylor_coeffs.push(cycle[n % 4] / factorial);
+    }
 
-    // Cycle through: -sin, -cos, sin, cos, -sin, -cos, sin, cos, ...
-    let coeffs = [-sin_f0, -cos_f0, sin_f0, cos_f0];
-
-    for n in 1..=max_order {
-        factorial *= n as f64;
-        let coeff_index = (n - 1) % 4;
-        let coefficient = coeffs[coeff_index];
-
-        // Add current term
-        let scaled_term = (&term * DA::from_coeff(coefficient / factorial))?;
-        result = (&result + &scaled_term)?;
-
-        // Prepare next term
-        if n < max_order {
-            term = (&term * &da_prime)?;
-        }
+    let mut result = DA::from_coeff(taylor_coeffs[max_order]);
+    for n in (0..max_order).rev() {
+        result = (&result * &da_prime)?;
+        result.add_constant_in_place(taylor_coeffs[n]);
     }
 
     Ok(result)
 }
 
-/// Compute cosine of a CD object using Taylor series composition.
+/// Compute cosine of a CD object using Horner's method.
 fn cd_cos(cd: &CD) -> anyhow::Result<CD> {
     use crate::rosy_lib::taylor::DACoefficient;
     use num_complex::Complex64;
@@ -142,29 +128,21 @@ fn cd_cos(cd: &CD) -> anyhow::Result<CD> {
     let sin_f0 = f0.sin();
     let cos_f0 = f0.cos();
 
-    // Create CD with constant part removed
     let mut cd_prime = cd.clone();
     cd_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), Complex64::zero());
 
-    // Build result using Taylor composition
-    let mut result = CD::from_coeff(cos_f0);
-    let mut term = cd_prime.clone();
+    let cycle = [cos_f0, -sin_f0, -cos_f0, sin_f0];
+    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
     let mut factorial = 1.0;
+    for n in 0..=max_order {
+        if n > 0 { factorial *= n as f64; }
+        taylor_coeffs.push(cycle[n % 4] / factorial);
+    }
 
-    // Cycle through: -sin, -cos, sin, cos, -sin, -cos, sin, cos, ...
-    let coeffs = [-sin_f0, -cos_f0, sin_f0, cos_f0];
-
-    for n in 1..=max_order {
-        factorial *= n as f64;
-        let coeff_index = (n - 1) % 4;
-        let coefficient = coeffs[coeff_index];
-
-        let scaled_term = (&term * CD::from_coeff(coefficient / factorial))?;
-        result = (&result + &scaled_term)?;
-
-        if n < max_order {
-            term = (&term * &cd_prime)?;
-        }
+    let mut result = CD::from_coeff(taylor_coeffs[max_order]);
+    for n in (0..max_order).rev() {
+        result = (&result * &cd_prime)?;
+        result.add_constant_in_place(taylor_coeffs[n]);
     }
 
     Ok(result)

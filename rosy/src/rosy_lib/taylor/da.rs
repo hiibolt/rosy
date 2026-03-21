@@ -177,6 +177,15 @@ impl<T: DACoefficient> DA<T> {
     pub fn coeffs_iter(&self) -> impl Iterator<Item = (&Monomial, &T)> {
         self.coeffs.iter()
     }
+
+    /// Add a scalar to the constant coefficient in-place (O(1), no allocation).
+    ///
+    /// Used by Horner's method in transcendental functions to avoid
+    /// creating intermediate DA objects for scalar additions.
+    pub fn add_constant_in_place(&mut self, value: T) {
+        let const_mono = Monomial::constant();
+        *self.coeffs.entry(const_mono).or_insert(T::zero()) += value;
+    }
 }
 
 // ============================================================================

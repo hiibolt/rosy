@@ -62,56 +62,14 @@ impl RosyTAN for VE {
 impl RosyTAN for DA {
     type Output = DA;
     fn rosy_tan(&self) -> anyhow::Result<Self::Output> {
-        use crate::rosy_lib::taylor::DACoefficient;
         use crate::rosy_lib::intrinsics::sin::RosySIN;
+        use crate::rosy_lib::intrinsics::cos::RosyCOS;
 
-        // Just compute sin(f)/cos(f) using existing implementations
         let sin_f = self.rosy_sin()?;
-        let cos_f = da_cos(self)?;
-        
-        // Divide sin by cos
+        let cos_f = self.rosy_cos()?;
+
         (&sin_f / &cos_f).map_err(|e| e)
     }
-}
-
-/// Compute cosine of a DA for internal use by TAN.
-fn da_cos(da: &DA) -> anyhow::Result<DA> {
-    use crate::rosy_lib::taylor::DACoefficient;
-    
-    let config = crate::rosy_lib::taylor::get_config()?;
-    let max_order = config.max_order as usize;
-    
-    let f0 = da.constant_part();
-    let cos_f0 = f0.cos();
-    let sin_f0 = f0.sin();
-    
-    // Create DA with constant part removed
-    let mut da_prime = da.clone();
-    da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
-    
-    // Build cos(f₀ + δf) using Taylor series
-    // cos(f₀ + δf) = cos(f₀) - sin(f₀)·δf - cos(f₀)·(δf)²/2! + sin(f₀)·(δf)³/3! + ...
-    let mut result = DA::from_coeff(cos_f0);
-    let mut term = da_prime.clone();
-    let mut factorial = 1.0;
-    
-    // Cycle: -sin, -cos, sin, cos, -sin, -cos, sin, cos, ...
-    let coeffs = [-sin_f0, -cos_f0, sin_f0, cos_f0];
-    
-    for n in 1..=max_order {
-        factorial *= n as f64;
-        let coeff_index = (n - 1) % 4;
-        let coefficient = coeffs[coeff_index];
-        
-        let scaled_term = (&term * DA::from_coeff(coefficient / factorial))?;
-        result = (&result + &scaled_term)?;
-        
-        if n < max_order {
-            term = (&term * &da_prime)?;
-        }
-    }
-    
-    Ok(result)
 }
 
 #[cfg(test)]

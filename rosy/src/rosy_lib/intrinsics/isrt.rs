@@ -89,20 +89,20 @@ fn da_isrt(da: &DA) -> anyhow::Result<DA> {
     da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
     let da_delta = (&da_prime * DA::from_coeff(1.0 / f0))?;
 
-    // Build (1 + u)^alpha = sum C(alpha, n) * u^n
-    let mut result = DA::from_coeff(1.0);
-    let mut term = da_delta.clone();
-    let mut binom_coeff = alpha; // C(alpha, 1)
-
+    // Precompute binomial coefficients C(alpha, n)
+    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
+    taylor_coeffs.push(1.0); // C(alpha, 0) = 1
+    let mut binom_coeff = alpha;
     for n in 1..=max_order {
-        let scaled_term = (&term * DA::from_coeff(binom_coeff))?;
-        result = (&result + &scaled_term)?;
+        taylor_coeffs.push(binom_coeff);
+        binom_coeff *= (alpha - n as f64) / (n as f64 + 1.0);
+    }
 
-        if n < max_order {
-            term = (&term * &da_delta)?;
-            // C(alpha, n+1) = C(alpha, n) * (alpha - n) / (n+1)
-            binom_coeff *= (alpha - n as f64) / (n as f64 + 1.0);
-        }
+    // Horner's evaluation of (1 + u)^alpha
+    let mut result = DA::from_coeff(taylor_coeffs[max_order]);
+    for n in (0..max_order).rev() {
+        result = (&result * &da_delta)?;
+        result.add_constant_in_place(taylor_coeffs[n]);
     }
 
     // Multiply by f0^alpha

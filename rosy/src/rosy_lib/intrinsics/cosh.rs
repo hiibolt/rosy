@@ -74,13 +74,10 @@ impl RosyCOSH for DA {
     }
 }
 
-/// Compute hyperbolic cosine of a DA object using Taylor series composition.
+/// Compute hyperbolic cosine of a DA object using Horner's method.
 ///
-/// cosh(f₀ + δf) = cosh(f₀) + sinh(f₀)·δf + cosh(f₀)·(δf)²/2! + sinh(f₀)·(δf)³/3! + ...
-/// Coefficients cycle with period 2 (always positive): [sinh_f0, cosh_f0, sinh_f0, cosh_f0, ...]
+/// c_n = [cosh_f0, sinh_f0][n%2] / n!
 fn da_cosh(da: &DA) -> anyhow::Result<DA> {
-    use crate::rosy_lib::taylor::DACoefficient;
-
     let config = crate::rosy_lib::taylor::get_config()?;
     let max_order = config.max_order as usize;
 
@@ -88,29 +85,21 @@ fn da_cosh(da: &DA) -> anyhow::Result<DA> {
     let sinh_f0 = f0.sinh();
     let cosh_f0 = f0.cosh();
 
-    // Create DA with constant part removed (δf = f - f₀)
     let mut da_prime = da.clone();
     da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
 
-    // Build result using Taylor composition
-    // Coefficients for n-th derivative of cosh at f₀: [sinh_f0, cosh_f0, sinh_f0, cosh_f0, ...]
-    let mut result = DA::from_coeff(cosh_f0);
-    let mut term = da_prime.clone();
+    let cycle = [cosh_f0, sinh_f0];
+    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
     let mut factorial = 1.0;
+    for n in 0..=max_order {
+        if n > 0 { factorial *= n as f64; }
+        taylor_coeffs.push(cycle[n % 2] / factorial);
+    }
 
-    let coeffs = [sinh_f0, cosh_f0];
-
-    for n in 1..=max_order {
-        factorial *= n as f64;
-        let coeff_index = (n - 1) % 2;
-        let coefficient = coeffs[coeff_index];
-
-        let scaled_term = (&term * DA::from_coeff(coefficient / factorial))?;
-        result = (&result + &scaled_term)?;
-
-        if n < max_order {
-            term = (&term * &da_prime)?;
-        }
+    let mut result = DA::from_coeff(taylor_coeffs[max_order]);
+    for n in (0..max_order).rev() {
+        result = (&result * &da_prime)?;
+        result.add_constant_in_place(taylor_coeffs[n]);
     }
 
     Ok(result)
