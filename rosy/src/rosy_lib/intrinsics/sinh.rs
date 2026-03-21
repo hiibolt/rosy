@@ -96,13 +96,7 @@ fn da_sinh(da: &DA) -> anyhow::Result<DA> {
         taylor_coeffs.push(cycle[n % 2] / factorial);
     }
 
-    let mut result = DA::from_coeff(taylor_coeffs[max_order]);
-    for n in (0..max_order).rev() {
-        result = (&result * &da_prime)?;
-        result.add_constant_in_place(taylor_coeffs[n]);
-    }
-
-    Ok(result)
+    DA::horner_eval(&da_prime, &taylor_coeffs)
 }
 
 #[cfg(test)]

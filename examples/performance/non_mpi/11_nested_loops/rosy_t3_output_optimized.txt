@@ -1,0 +1,3 @@
+Nested Loops Benchmark T3: 200^3 = 8,000,000 iterations
+Accumulated result:  879106.7943137714    
+CPUSEC: 0.3891800000000000E-01

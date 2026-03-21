@@ -109,14 +109,7 @@ fn da_sin(da: &DA) -> anyhow::Result<DA> {
         taylor_coeffs.push(cycle[n % 4] / factorial);
     }
 
-    // Horner's: result = c_N, then result = result * δf + c_{n} for n = N-1..0
-    let mut result = DA::from_coeff(taylor_coeffs[max_order]);
-    for n in (0..max_order).rev() {
-        result = (&result * &da_prime)?;
-        result.add_constant_in_place(taylor_coeffs[n]);
-    }
-
-    Ok(result)
+    DA::horner_eval(&da_prime, &taylor_coeffs)
 }
 
 /// Compute sine of a CD object using Horner's method for Taylor composition.
@@ -142,13 +135,7 @@ fn cd_sin(cd: &CD) -> anyhow::Result<CD> {
         taylor_coeffs.push(cycle[n % 4] / factorial);
     }
 
-    let mut result = CD::from_coeff(taylor_coeffs[max_order]);
-    for n in (0..max_order).rev() {
-        result = (&result * &cd_prime)?;
-        result.add_constant_in_place(taylor_coeffs[n]);
-    }
-
-    Ok(result)
+    CD::horner_eval(&cd_prime, &taylor_coeffs)
 }
 
 #[cfg(test)]

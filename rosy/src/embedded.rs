@@ -40,9 +40,9 @@ fn write_vendored_lib(output_dir: &Path) -> Result<()> {
         // since when vendored, this IS the rosy_lib crate
         let mut transformed_content = embedded_file.content.replace("crate::rosy_lib::", "crate::");
 
-        // Add warning suppressions to the lib.rs file
+        // Add warning suppressions and feature gates to the lib.rs file
         if embedded_file.path == "mod.rs" {
-            transformed_content = format!("#![allow(unused_imports)]\n#![allow(dead_code)]\n\n{}", transformed_content);
+            transformed_content = format!("#![cfg_attr(feature = \"nightly-simd\", feature(portable_simd))]\n#![allow(unused_imports)]\n#![allow(dead_code)]\n\n{}", transformed_content);
         }
 
         // Write the file content
@@ -50,7 +50,7 @@ fn write_vendored_lib(output_dir: &Path) -> Result<()> {
             .with_context(|| format!("Failed to write file: {}", target_path.display()))?;
     }
 
-    // Write Cargo.toml for rosy_lib with MPI as an optional feature
+    // Write Cargo.toml for rosy_lib with MPI and SIMD as optional features
     let lib_cargo_toml = r#"[package]
 name = "rosy_lib"
 version = "0.1.0"
@@ -58,6 +58,7 @@ edition = "2024"
 
 [features]
 mpi = ["dep:mpi", "dep:bincode"]
+nightly-simd = []
 
 [dependencies]
 anyhow = "1.0"
@@ -76,16 +77,22 @@ rustc-hash = "2"
 
 /// Generates a Cargo.toml for the output project
 fn generate_cargo_toml(uses_mpi: bool, optimized: bool) -> String {
-    let mpi_dep = if uses_mpi {
-        "rosy_lib = { path = \"./vendored/rosy_lib\", features = [\"mpi\"] }"
+    let mut features = Vec::new();
+    if uses_mpi { features.push("\"mpi\""); }
+    if optimized { features.push("\"nightly-simd\""); }
+
+    let mpi_dep = if features.is_empty() {
+        "rosy_lib = { path = \"./vendored/rosy_lib\" }".to_string()
     } else {
-        "rosy_lib = { path = \"./vendored/rosy_lib\" }"
+        format!("rosy_lib = {{ path = \"./vendored/rosy_lib\", features = [{}] }}", features.join(", "))
     };
 
     let profile_section = if optimized {
         "\n[profile.release]\nopt-level = 3\nlto = \"fat\"\ncodegen-units = 1\npanic = \"abort\"\n"
     } else {
-        ""
+        // codegen-units = 1 is essential: DA hot paths span taylor/ and intrinsics/ modules,
+        // and cross-unit inlining requires LTO or single codegen unit.
+        "\n[profile.release]\ncodegen-units = 1\n"
     };
 
     format!(

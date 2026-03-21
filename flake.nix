@@ -12,7 +12,7 @@
           inherit system;
           overlays = [ rust-overlay.overlays.default ];
         };
-        rustVersion = pkgs.rust-bin.stable.latest.default;
+        rustVersion = pkgs.rust-bin.nightly.latest.default;
 
         rustPlatform = pkgs.makeRustPlatform {
           cargo = rustVersion;

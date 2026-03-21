@@ -110,11 +110,7 @@ fn da_sqrt(da: &DA) -> anyhow::Result<DA> {
     }
 
     // Horner's evaluation of (1 + u)^(1/2)
-    let mut result = DA::from_coeff(taylor_coeffs[max_order]);
-    for n in (0..max_order).rev() {
-        result = (&result * &da_delta)?;
-        result.add_constant_in_place(taylor_coeffs[n]);
-    }
+    let mut result = DA::horner_eval(&da_delta, &taylor_coeffs)?;
 
     // Multiply by sqrt(f0)
     result = (&result * DA::from_coeff(sqrt_f0))?;

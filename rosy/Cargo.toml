@@ -1,7 +1,10 @@
 [package]
 name = "rosy"
-version = "0.7.3"
+version = "0.8.0"
 edition = "2024"
+
+[features]
+nightly-simd = []
 
 [dependencies]
 anyhow.workspace = true
@@ -22,7 +25,7 @@ num-complex.workspace = true
 rustc-hash.workspace = true
 
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("mpi"))'] }
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("mpi", "nightly-simd"))'] }
 
 [build-dependencies]
 regex = "1"

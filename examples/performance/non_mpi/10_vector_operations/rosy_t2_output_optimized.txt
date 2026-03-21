@@ -1,0 +1,3 @@
+Vector Operations Benchmark: 5000 iterations of build+VMAX+VMIN+ABS
+Accumulated result:  40998.98640753614    
+CPUSEC: 0.2685000000000000E-03

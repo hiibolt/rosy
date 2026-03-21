@@ -1,0 +1,3 @@
+DA Derivatives Benchmark T3: order 10, 3 vars, 50000 iterations
+Result constant part:  0.000000000000000    
+CPUSEC: 0.2085568000000000    

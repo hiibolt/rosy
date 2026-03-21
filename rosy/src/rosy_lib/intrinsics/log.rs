@@ -106,13 +106,7 @@ fn da_log(da: &DA) -> anyhow::Result<DA> {
     }
 
     // Horner's on u
-    let mut result = DA::from_coeff(taylor_coeffs[max_order]);
-    for n in (0..max_order).rev() {
-        result = (&result * &u)?;
-        result.add_constant_in_place(taylor_coeffs[n]);
-    }
-
-    Ok(result)
+    DA::horner_eval(&u, &taylor_coeffs)
 }
 
 #[cfg(test)]

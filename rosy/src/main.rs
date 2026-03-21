@@ -1,3 +1,4 @@
+#![cfg_attr(feature = "nightly-simd", feature(portable_simd))]
 //! # Rosy
 //!
 #![doc = concat!("**Version:** `v", env!("CARGO_PKG_VERSION"), "` — [Changelog](https://github.com/hiibolt/rosy/releases)")]
@@ -162,7 +163,7 @@ enum Commands {
         #[arg(short, long)]
         release: bool,
 
-        /// Aggressive optimizations: LTO, single codegen unit, panic=abort (slower builds, faster binaries)
+        /// Aggressive optimizations: LTO, single codegen unit, panic=abort, SIMD DA (slower builds, faster binaries; requires nightly Rust)
         #[arg(long)]
         optimized: bool,
 
@@ -188,7 +189,7 @@ enum Commands {
         #[arg(short, long)]
         release: bool,
 
-        /// Aggressive optimizations: LTO, single codegen unit, panic=abort (slower builds, faster binaries)
+        /// Aggressive optimizations: LTO, single codegen unit, panic=abort, SIMD DA (slower builds, faster binaries; requires nightly Rust)
         #[arg(long)]
         optimized: bool,
 

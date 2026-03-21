@@ -106,11 +106,7 @@ fn da_exp(da: &DA) -> anyhow::Result<DA> {
     }
 
     // Horner's evaluation of exp(δf)
-    let mut result = DA::from_coeff(taylor_coeffs[max_order]);
-    for n in (0..max_order).rev() {
-        result = (&result * &da_prime)?;
-        result.add_constant_in_place(taylor_coeffs[n]);
-    }
+    let mut result = DA::horner_eval(&da_prime, &taylor_coeffs)?;
 
     // Multiply by exp(f₀)
     result = (&result * DA::from_coeff(exp_f0))?;
@@ -139,11 +135,7 @@ fn cd_exp(cd: &CD) -> anyhow::Result<CD> {
         taylor_coeffs.push(Complex64::new(1.0 / factorial, 0.0));
     }
 
-    let mut result = CD::from_coeff(taylor_coeffs[max_order]);
-    for n in (0..max_order).rev() {
-        result = (&result * &cd_prime)?;
-        result.add_constant_in_place(taylor_coeffs[n]);
-    }
+    let mut result = CD::horner_eval(&cd_prime, &taylor_coeffs)?;
 
     result = (&result * CD::from_coeff(exp_f0))?;
 

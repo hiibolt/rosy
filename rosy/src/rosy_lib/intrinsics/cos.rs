@@ -107,13 +107,7 @@ fn da_cos(da: &DA) -> anyhow::Result<DA> {
         taylor_coeffs.push(cycle[n % 4] / factorial);
     }
 
-    let mut result = DA::from_coeff(taylor_coeffs[max_order]);
-    for n in (0..max_order).rev() {
-        result = (&result * &da_prime)?;
-        result.add_constant_in_place(taylor_coeffs[n]);
-    }
-
-    Ok(result)
+    DA::horner_eval(&da_prime, &taylor_coeffs)
 }
 
 /// Compute cosine of a CD object using Horner's method.
@@ -139,13 +133,7 @@ fn cd_cos(cd: &CD) -> anyhow::Result<CD> {
         taylor_coeffs.push(cycle[n % 4] / factorial);
     }
 
-    let mut result = CD::from_coeff(taylor_coeffs[max_order]);
-    for n in (0..max_order).rev() {
-        result = (&result * &cd_prime)?;
-        result.add_constant_in_place(taylor_coeffs[n]);
-    }
-
-    Ok(result)
+    CD::horner_eval(&cd_prime, &taylor_coeffs)
 }
 
 #[cfg(test)]

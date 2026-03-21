@@ -1,0 +1,3 @@
+Nested Loops Benchmark T2: 50^3 = 125,000 iterations
+Accumulated result:  3534.748008240928    
+CPUSEC: 0.5806000000000000E-03

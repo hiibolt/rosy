@@ -98,11 +98,7 @@ fn da_isrt3(da: &DA) -> anyhow::Result<DA> {
     }
 
     // Horner's evaluation of (1 + u)^alpha
-    let mut result = DA::from_coeff(taylor_coeffs[max_order]);
-    for n in (0..max_order).rev() {
-        result = (&result * &da_delta)?;
-        result.add_constant_in_place(taylor_coeffs[n]);
-    }
+    let mut result = DA::horner_eval(&da_delta, &taylor_coeffs)?;
 
     // Multiply by f0^alpha
     result = (&result * DA::from_coeff(f0_alpha))?;

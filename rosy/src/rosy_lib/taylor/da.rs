@@ -827,3 +827,4 @@ impl DA<Complex64> {
         DA { coeffs, nonzero }
     }
 }
+

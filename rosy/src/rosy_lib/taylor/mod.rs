@@ -6,10 +6,12 @@
 pub mod monomial;
 pub mod config;
 pub mod da;
+pub mod horner;
 
 pub use monomial::{Monomial, enumerate_monomials};
 pub use config::{TaylorConfig, TaylorRuntime, init_taylor, cleanup_taylor, get_config, get_runtime, set_epsilon, set_truncation_order};
 pub use da::DACoefficient;
+pub use horner::FixedMultiplier;
 
 // Core generic differential algebra type
 use num_complex::Complex64;
