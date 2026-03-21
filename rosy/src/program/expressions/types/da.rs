@@ -82,6 +82,7 @@ impl Transpile for DAExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables: index_output.requested_variables,
+            ..Default::default()
         })
     }
 }

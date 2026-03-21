@@ -93,6 +93,7 @@ impl Transpile for NegExpr {
             Ok(TranspilationOutput {
                 serialization,
                 requested_variables,
+                ..Default::default()
             })
         } else {
             Err(errors)

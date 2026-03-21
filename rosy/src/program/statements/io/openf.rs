@@ -91,6 +91,7 @@ impl Transpile for OpenfStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

@@ -242,7 +242,8 @@ impl Transpile for ElseIfClause {
         if errors.is_empty() {
             Ok(TranspilationOutput {
                 serialization,
-                requested_variables
+                requested_variables,
+                ..Default::default()
             })
         } else {
             Err(errors)
@@ -357,7 +358,8 @@ impl Transpile for IfStatement {
         if errors.is_empty() {
             Ok(TranspilationOutput {
                 serialization,
-                requested_variables
+                requested_variables,
+                ..Default::default()
             })
         } else {
             Err(errors)

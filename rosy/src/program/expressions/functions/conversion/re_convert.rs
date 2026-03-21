@@ -73,7 +73,8 @@ impl Transpile for ReConvertExpr {
 
         let TranspilationOutput {
             serialization: expr_serialization,
-            requested_variables
+            requested_variables,
+            ..
         } = self.expr.transpile(context)
             .map_err(|e| e.into_iter().map(|err| {
                 err.context("...while transpiling expression for RE conversion")
@@ -85,7 +86,8 @@ impl Transpile for ReConvertExpr {
         );
         Ok(TranspilationOutput {
             serialization,
-            requested_variables
+            requested_variables,
+            ..Default::default()
         })
     }
 }

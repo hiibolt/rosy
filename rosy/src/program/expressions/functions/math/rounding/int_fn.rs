@@ -59,6 +59,7 @@ impl Transpile for IntExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

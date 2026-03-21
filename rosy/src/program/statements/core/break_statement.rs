@@ -38,6 +38,7 @@ impl Transpile for BreakStatement {
         Ok(TranspilationOutput {
             serialization: "break;".to_string(),
             requested_variables: BTreeSet::new(),
+            ..Default::default()
         })
     }
 }

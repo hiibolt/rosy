@@ -86,7 +86,8 @@ impl Transpile for WriteStatement {
         for expr in &self.exprs {
             let TranspilationOutput {
                 serialization: serialized_expr,
-                requested_variables: expr_requested_variables
+                requested_variables: expr_requested_variables,
+                ..
             } = string_convert_transpile_helper(expr, context)
                 .map_err(|err_vec| {
                     add_context_to_all(err_vec, format!(
@@ -109,7 +110,8 @@ impl Transpile for WriteStatement {
                 );
                 Ok(TranspilationOutput {
                     serialization,
-                    requested_variables
+                    requested_variables,
+                    ..Default::default()
                 })
             },
             unit => {
@@ -124,7 +126,8 @@ impl Transpile for WriteStatement {
                 }
                 Ok(TranspilationOutput {
                     serialization: stmts.join("\n"),
-                    requested_variables
+                    requested_variables,
+                    ..Default::default()
                 })
             },
         }

@@ -65,6 +65,7 @@ impl Transpile for DanotStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables: order_output.requested_variables,
+            ..Default::default()
         })
     }
 }

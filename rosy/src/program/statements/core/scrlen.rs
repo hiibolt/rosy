@@ -66,6 +66,7 @@ impl Transpile for ScrlenStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

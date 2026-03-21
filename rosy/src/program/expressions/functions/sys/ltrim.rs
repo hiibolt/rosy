@@ -59,6 +59,7 @@ impl Transpile for LtrimExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

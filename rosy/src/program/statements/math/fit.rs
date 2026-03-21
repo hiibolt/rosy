@@ -344,6 +344,7 @@ impl Transpile for FitStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

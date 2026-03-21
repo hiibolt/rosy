@@ -116,6 +116,7 @@ impl Transpile for LdetStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

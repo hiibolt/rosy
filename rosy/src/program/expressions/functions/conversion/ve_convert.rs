@@ -70,7 +70,8 @@ impl Transpile for VeConvertExpr {
 
         let TranspilationOutput {
             serialization: expr_serialization,
-            requested_variables
+            requested_variables,
+            ..
         } = self.expr.transpile(context)
             .map_err(|e| e.into_iter().map(|err| {
                 err.context("...while transpiling expression for VE conversion")
@@ -82,7 +83,8 @@ impl Transpile for VeConvertExpr {
         );
         Ok(TranspilationOutput {
             serialization,
-            requested_variables
+            requested_variables,
+            ..Default::default()
         })
     }
 }

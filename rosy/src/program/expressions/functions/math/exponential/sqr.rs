@@ -72,6 +72,7 @@ impl Transpile for SqrExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

@@ -68,6 +68,7 @@ impl Transpile for AtanExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

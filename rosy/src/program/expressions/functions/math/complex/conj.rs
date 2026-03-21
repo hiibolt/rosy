@@ -61,6 +61,7 @@ impl Transpile for ConjExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

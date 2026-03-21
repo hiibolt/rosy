@@ -62,6 +62,7 @@ impl Transpile for CmplxExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

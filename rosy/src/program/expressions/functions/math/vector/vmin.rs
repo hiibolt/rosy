@@ -58,6 +58,7 @@ impl Transpile for VminExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

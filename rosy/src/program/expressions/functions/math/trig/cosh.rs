@@ -62,6 +62,7 @@ impl Transpile for CoshExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

@@ -71,7 +71,8 @@ impl Transpile for ComplexConvertExpr {
         // Then, transpile the expression
         let TranspilationOutput {
             serialization: expr_serialization,
-            requested_variables
+            requested_variables,
+            ..
         } = self.expr.transpile(context)
             .map_err(|e| e.into_iter().map(|err| {
                 err.context("...while transpiling expression for CM conversion")
@@ -81,7 +82,8 @@ impl Transpile for ComplexConvertExpr {
         let serialization = format!("&mut RosyCM::rosy_cm(&*{}).context(\"...while trying to convert to (CM)\")?", expr_serialization);
         Ok(TranspilationOutput {
             serialization,
-            requested_variables
+            requested_variables,
+            ..Default::default()
         })
     }
 }

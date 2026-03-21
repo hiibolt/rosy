@@ -99,6 +99,7 @@ impl Transpile for ReadbStatement {
             Ok(TranspilationOutput {
                 serialization,
                 requested_variables,
+                ..Default::default()
             })
         } else {
             Err(errors)

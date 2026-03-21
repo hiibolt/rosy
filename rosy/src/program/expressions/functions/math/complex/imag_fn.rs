@@ -63,6 +63,7 @@ impl Transpile for ImagFnExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

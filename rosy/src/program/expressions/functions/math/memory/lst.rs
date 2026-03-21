@@ -64,6 +64,7 @@ impl Transpile for LstExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

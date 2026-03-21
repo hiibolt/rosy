@@ -72,6 +72,7 @@ impl Transpile for ExpExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

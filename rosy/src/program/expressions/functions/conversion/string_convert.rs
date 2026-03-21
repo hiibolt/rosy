@@ -79,7 +79,8 @@ pub fn string_convert_transpile_helper (
     // Then, transpile the expression
     let TranspilationOutput {
         serialization: expr_serialization,
-        requested_variables
+        requested_variables,
+        ..
     } = expr.transpile(context)
         .map_err(|e| e.into_iter().map(|err| {
             err.context("...while transpiling expression for STRING conversion")
@@ -89,6 +90,7 @@ pub fn string_convert_transpile_helper (
     let serialization = format!("&mut RosyST::rosy_to_string(&*{})", expr_serialization);
     Ok(TranspilationOutput {
         serialization,
-        requested_variables
+        requested_variables,
+        ..Default::default()
     })
 }

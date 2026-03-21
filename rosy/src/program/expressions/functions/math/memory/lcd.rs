@@ -62,6 +62,7 @@ impl Transpile for LcdExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

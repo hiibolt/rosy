@@ -65,7 +65,8 @@ impl Transpile for LogicalConvertExpr {
         // Then, transpile the expression
         let TranspilationOutput {
             serialization: expr_serialization,
-            requested_variables
+            requested_variables,
+            ..
         } = self.expr.transpile(context)
             .map_err(|e| e.into_iter().map(|err| {
                 err.context("...while transpiling expression for LO conversion")
@@ -75,7 +76,8 @@ impl Transpile for LogicalConvertExpr {
         let serialization = format!("&mut RosyLO::rosy_to_logical(&*{})", expr_serialization);
         Ok(TranspilationOutput {
             serialization,
-            requested_variables
+            requested_variables,
+            ..Default::default()
         })
     }
 }

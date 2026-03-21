@@ -90,7 +90,8 @@ impl Transpile for NotExpr {
         if errors.is_empty() {
             Ok(TranspilationOutput {
                 serialization,
-                requested_variables
+                requested_variables,
+                ..Default::default()
             })
         } else {
             Err(errors)

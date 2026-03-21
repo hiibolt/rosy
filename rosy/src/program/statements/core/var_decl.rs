@@ -100,7 +100,8 @@ impl Transpile for VariableDeclarationData {
         if errors.is_empty() {
             Ok(TranspilationOutput {
                 serialization,
-                requested_variables
+                requested_variables,
+                ..Default::default()
             })
         } else {
             Err(errors)
@@ -255,7 +256,8 @@ impl Transpile for VarDeclStatement {
 
         let TranspilationOutput { 
             serialization: data_default_serialization,
-            requested_variables 
+            requested_variables ,
+            ..
         } = self.data.transpile(context)?;
 
         let serialization = format!(
@@ -266,7 +268,8 @@ impl Transpile for VarDeclStatement {
         );
         Ok(TranspilationOutput {
             serialization,
-            requested_variables
+            requested_variables,
+            ..Default::default()
         })
     }
 }

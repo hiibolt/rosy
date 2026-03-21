@@ -60,6 +60,7 @@ impl Transpile for OsCallStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

@@ -59,6 +59,7 @@ impl Transpile for TrimExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

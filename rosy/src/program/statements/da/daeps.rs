@@ -65,6 +65,7 @@ impl Transpile for DaepsStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables: epsilon_output.requested_variables,
+            ..Default::default()
         })
     }
 }

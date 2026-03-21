@@ -60,6 +60,7 @@ impl Transpile for LcmExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

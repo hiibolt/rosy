@@ -202,7 +202,8 @@ impl Transpile for VarExpr {
             VarExprKind::Variable => {
                 let TranspilationOutput {
                     serialization: serialized_identifier,
-                    requested_variables
+                    requested_variables,
+                    ..
                 } = self.identifier.transpile(context)
                     .map_err(|e| e.into_iter().map(|err| {
                         err.context(format!(
@@ -220,7 +221,8 @@ impl Transpile for VarExpr {
                 };
                 Ok(TranspilationOutput {
                     serialization: format!("{}{}", reference, serialized_identifier),
-                    requested_variables
+                    requested_variables,
+                    ..Default::default()
                 })
             }
         }
@@ -312,7 +314,8 @@ pub fn function_call_transpile_helper (
     if errors.is_empty() {
         Ok(TranspilationOutput {
             serialization,
-            requested_variables
+            requested_variables,
+            ..Default::default()
         })
     } else {
         Err(errors)

@@ -61,6 +61,7 @@ impl Transpile for ClosefStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

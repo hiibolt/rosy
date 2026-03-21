@@ -72,6 +72,7 @@ impl Transpile for SinExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

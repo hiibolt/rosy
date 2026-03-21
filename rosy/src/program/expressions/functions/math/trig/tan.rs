@@ -71,6 +71,7 @@ impl Transpile for TanExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

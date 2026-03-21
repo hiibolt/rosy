@@ -90,6 +90,7 @@ impl Transpile for OpenfbStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

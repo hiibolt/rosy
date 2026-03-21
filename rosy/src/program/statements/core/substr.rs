@@ -130,6 +130,7 @@ impl Transpile for SubstrStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

@@ -111,6 +111,7 @@ impl Transpile for VelgetStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

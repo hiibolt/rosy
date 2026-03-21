@@ -73,6 +73,7 @@ impl Transpile for QuitStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

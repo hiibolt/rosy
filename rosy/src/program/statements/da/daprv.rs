@@ -103,6 +103,7 @@ impl Transpile for DaprvStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

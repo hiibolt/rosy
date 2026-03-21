@@ -68,6 +68,7 @@ impl Transpile for AsinExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

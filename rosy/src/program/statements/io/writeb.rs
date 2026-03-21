@@ -89,6 +89,7 @@ impl Transpile for WritebStatement {
         Ok(TranspilationOutput {
             serialization: serialized_stmts.join("\n"),
             requested_variables,
+            ..Default::default()
         })
     }
 }

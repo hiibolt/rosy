@@ -104,6 +104,7 @@ impl Transpile for DarevStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

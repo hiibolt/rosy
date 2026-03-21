@@ -72,6 +72,7 @@ impl Transpile for CosExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

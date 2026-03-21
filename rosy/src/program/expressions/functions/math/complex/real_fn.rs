@@ -63,6 +63,7 @@ impl Transpile for RealFnExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

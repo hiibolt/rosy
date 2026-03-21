@@ -64,6 +64,7 @@ impl Transpile for ConsExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

@@ -106,6 +106,7 @@ impl Transpile for VelsetStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

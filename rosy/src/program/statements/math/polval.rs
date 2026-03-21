@@ -119,6 +119,7 @@ impl Transpile for PolvalStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

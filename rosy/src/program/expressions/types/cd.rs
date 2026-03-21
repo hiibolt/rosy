@@ -74,6 +74,7 @@ impl Transpile for CDExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables: index_output.requested_variables,
+            ..Default::default()
         })
     }
 }

@@ -61,6 +61,7 @@ impl Transpile for IsrtExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

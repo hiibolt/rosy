@@ -66,6 +66,7 @@ impl Transpile for TypeFnExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

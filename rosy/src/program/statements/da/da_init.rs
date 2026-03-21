@@ -119,6 +119,7 @@ impl Transpile for DAInitStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

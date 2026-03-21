@@ -72,6 +72,7 @@ impl Transpile for LogExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

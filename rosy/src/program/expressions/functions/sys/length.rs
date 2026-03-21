@@ -77,6 +77,7 @@ impl Transpile for LengthExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

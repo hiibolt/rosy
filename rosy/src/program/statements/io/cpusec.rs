@@ -104,6 +104,7 @@ impl Transpile for CpusecStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

@@ -62,6 +62,7 @@ impl Transpile for AbsExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

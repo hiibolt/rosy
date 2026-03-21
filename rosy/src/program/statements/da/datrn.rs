@@ -133,6 +133,7 @@ impl Transpile for DatrnStatement {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

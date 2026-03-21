@@ -125,10 +125,67 @@ pub struct TranspilationInputContext {
     pub procedures: HashMap<String, TranspilationInputProcedureContext>,
     pub in_loop: bool,
 }
+/// Whether an expression produces an owned value or a reference.
+///
+/// This drives how consumers wrap the expression:
+/// - Owned + needs ref → `&expr`
+/// - Ref + needs owned (Copy) → `expr` (auto-deref)
+/// - Ref + needs owned (non-Copy) → `expr.clone()`
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum ValueKind {
+    /// A fresh value: literals, operator results, function returns.
+    /// Can be moved into assignment without cloning.
+    #[default]
+    Owned,
+    /// A reference to an existing variable (`&X` or `X` where X: &T).
+    /// Must be cloned to own for non-Copy types.
+    Ref,
+}
+
 #[derive(Default)]
 pub struct TranspilationOutput {
     pub serialization: String,
-    pub requested_variables: BTreeSet<String>
+    pub requested_variables: BTreeSet<String>,
+    pub value_kind: ValueKind,
+}
+
+impl TranspilationOutput {
+    /// Get this expression as an owned value for assignment or value context.
+    /// - Owned → expr (move/copy)
+    /// - Ref + Copy → *expr (deref copy)
+    /// - Ref + non-Copy → expr.clone()
+    pub fn as_owned(&self, ty: &RosyType) -> String {
+        match self.value_kind {
+            ValueKind::Owned => self.serialization.clone(),
+            ValueKind::Ref => {
+                if ty.is_copy() {
+                    format!("(*{})", self.serialization)
+                } else {
+                    format!("({}).clone()", self.serialization)
+                }
+            }
+        }
+    }
+
+    /// Get this expression as a shared reference for trait method arguments.
+    /// - Owned → &expr (borrow temporary)
+    /// - Ref → expr (already a reference)
+    pub fn as_ref(&self) -> String {
+        match self.value_kind {
+            ValueKind::Owned => format!("&{}", self.serialization),
+            ValueKind::Ref => self.serialization.clone(),
+        }
+    }
+
+    /// Get this expression as a plain value (for Copy-type arithmetic, conditions).
+    /// - Owned → expr
+    /// - Ref → *expr (deref)
+    pub fn as_value(&self) -> String {
+        match self.value_kind {
+            ValueKind::Owned => self.serialization.clone(),
+            ValueKind::Ref => format!("(*{})", self.serialization),
+        }
+    }
 }
 
 

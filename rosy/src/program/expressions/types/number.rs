@@ -43,7 +43,8 @@ impl Transpile for f64 {
     fn transpile(&self, _context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         Ok(TranspilationOutput {
             serialization: format!("&mut {}f64", self),
-            requested_variables: BTreeSet::new()
+            requested_variables: BTreeSet::new(),
+            ..Default::default()
         })
     }
 }

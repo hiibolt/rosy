@@ -63,6 +63,7 @@ impl Transpile for DeriveExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

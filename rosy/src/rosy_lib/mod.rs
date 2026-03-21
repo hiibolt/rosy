@@ -132,6 +132,16 @@ impl RosyType {
         }
     }
 
+    /// Returns true if this type implements Copy in Rust (cheap to duplicate).
+    /// RE (f64), LO (bool), CM (Complex64) are Copy at dimension 0.
+    /// All array types (dimensions > 0) are non-Copy (Vec<...>).
+    pub fn is_copy(&self) -> bool {
+        if self.dimensions > 0 {
+            return false; // arrays are Vec<...>, not Copy
+        }
+        matches!(self.base_type, RosyBaseType::RE | RosyBaseType::LO | RosyBaseType::CM)
+    }
+
     pub fn as_rust_type (&self) -> String {
         let base = match self.base_type {
             RosyBaseType::RE => "f64",

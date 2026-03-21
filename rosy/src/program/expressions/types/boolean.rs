@@ -42,7 +42,8 @@ impl Transpile for bool {
     fn transpile(&self, _context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         Ok(TranspilationOutput {
             serialization: format!("&mut {}", self),
-            requested_variables: BTreeSet::new()
+            requested_variables: BTreeSet::new(),
+            ..Default::default()
         })
     }
 }

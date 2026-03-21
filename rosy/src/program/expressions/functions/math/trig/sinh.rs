@@ -62,6 +62,7 @@ impl Transpile for SinhExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

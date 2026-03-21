@@ -62,6 +62,7 @@ impl Transpile for NormExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

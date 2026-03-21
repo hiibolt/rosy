@@ -67,6 +67,7 @@ impl Transpile for VmaxExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }

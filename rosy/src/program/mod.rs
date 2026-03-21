@@ -65,6 +65,7 @@ impl Transpile for Program {
             Ok(TranspilationOutput {
                 serialization: serialization.join("\n"),
                 requested_variables: BTreeSet::new(),
+                ..Default::default()
             })
         } else {
             Err(errors)

@@ -59,6 +59,7 @@ impl Transpile for NintExpr {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
+            ..Default::default()
         })
     }
 }
