@@ -137,7 +137,7 @@ impl RosyDisplay for &DA {
         // Output in COSY format: multi-line with all coefficients
         
         // Get all coefficients
-        let coeffs: Vec<_> = self.coeffs_iter().collect();
+        let coeffs: Vec<_> = self.coeffs_iter();
         if coeffs.is_empty() {
             return "     I  COEFFICIENT            ORDER EXPONENTS\n     1   0.000000000000000       0   0 0\n     -----------------------------------".to_string();
         }
@@ -198,10 +198,10 @@ impl RosyDisplay for &CD {
         // Combine all monomials from both parts
         let mut all_monomials = std::collections::HashSet::new();
         for (m, _) in real_part.coeffs_iter() {
-            all_monomials.insert(*m);
+            all_monomials.insert(m);
         }
         for (m, _) in imag_part.coeffs_iter() {
-            all_monomials.insert(*m);
+            all_monomials.insert(m);
         }
         
         if all_monomials.is_empty() {

@@ -66,7 +66,7 @@ fn evaluate_da_at_re(
 ) -> Result<f64> {
     let mut result = 0.0_f64;
 
-    for (monomial, &coeff) in poly.coeffs_iter() {
+    for (monomial, coeff) in poly.coeffs_iter().into_iter() {
         let exponents = &monomial.exponents;
         let mut term = coeff;
 

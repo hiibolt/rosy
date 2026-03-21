@@ -1,42 +1,62 @@
-//! DA (Differential Algebra) - Generic Taylor series implementation.
+//! DA (Differential Algebra) — Flat-array Taylor series with non-zero index tracking.
+//!
+//! This is the high-performance DA engine. Key design choices:
+//!
+//! - **Flat dense array**: Coefficients stored in a `Vec<T>` of length `num_monomials`,
+//!   indexed by graded lexicographic monomial order. Eliminates HashMap overhead.
+//!
+//! - **Non-zero index tracking**: A `Vec<u32>` lists which coefficient indices are non-zero.
+//!   Multiplication iterates only K² pairs (K = non-zero count) instead of N² (N = total
+//!   monomials), giving 4–11× fewer iterations at typical beam physics sparsity.
+//!
+//! - **Precomputed multiplication table**: `mult_table[i*N + j]` = flat index of the
+//!   product monomial, computed once at `init_taylor()`. Eliminates runtime exponent
+//!   addition and hash lookups from the multiply inner loop.
+//!
+//! - **FMA in the hot loop**: `ci.mul_add(bj, result_k)` compiles to a single `vfmadd`
+//!   instruction on modern x86, giving better accuracy and throughput.
 
-use rustc_hash::FxHashMap as HashMap;
-use std::f32::consts::E;
 use std::ops::{Add, Neg, Sub, Mul, Div, AddAssign};
 use std::fmt;
 use anyhow::{Result, Context};
 use num_complex::Complex64;
+use rustc_hash::FxHashMap;
 
-use super::{Monomial, get_config, MAX_VARS};
+use super::{Monomial, MAX_VARS};
+use super::config::{get_runtime, get_config, MULT_INVALID, TaylorRuntime};
+
+// ============================================================================
+// Coefficient trait
+// ============================================================================
 
 /// Trait for types that can be used as Taylor series coefficients.
 ///
 /// Requires arithmetic operations, zero/one identities, and magnitude measurement.
-pub trait DACoefficient: 
-    Clone + Copy + 
-    Add<Output=Self> + Sub<Output=Self> + Mul<Output=Self> + Div<Output=Self> + 
-    AddAssign + MulAdd + 
+pub trait DACoefficient:
+    Clone + Copy +
+    Add<Output=Self> + Sub<Output=Self> + Mul<Output=Self> + Div<Output=Self> +
+    AddAssign + MulAdd +
     Neg<Output=Self> +
     PartialEq + fmt::Debug + fmt::Display
 {
-    /// The additive identity (0).
     fn zero() -> Self;
-    
-    /// The multiplicative identity (1).
     fn one() -> Self;
-    
-    /// Magnitude/absolute value for epsilon comparisons.
     fn abs(&self) -> f64;
 }
 
 impl DACoefficient for f64 {
-    fn zero() -> Self { 0.0 }
-    fn one() -> Self { 1.0 }
-    fn abs(&self) -> f64 { f64::abs(*self) }
+    #[inline(always)] fn zero() -> Self { 0.0 }
+    #[inline(always)] fn one() -> Self { 1.0 }
+    #[inline(always)] fn abs(&self) -> f64 { f64::abs(*self) }
 }
 
-// Extension trait for FMA operations (when available)
-// f64 has hardware FMA on most modern CPUs
+impl DACoefficient for Complex64 {
+    #[inline(always)] fn zero() -> Self { Complex64::new(0.0, 0.0) }
+    #[inline(always)] fn one() -> Self { Complex64::new(1.0, 0.0) }
+    #[inline(always)] fn abs(&self) -> f64 { self.norm() }
+}
+
+/// Fused multiply-add: `self * a + b` in a single rounding operation.
 pub trait MulAdd {
     fn mul_add(self, a: Self, b: Self) -> Self;
 }
@@ -44,8 +64,6 @@ pub trait MulAdd {
 impl MulAdd for f64 {
     #[inline(always)]
     fn mul_add(self, a: Self, b: Self) -> Self {
-        // Hardware FMA: self * a + b
-        // Single rounding operation, more accurate than separate mul+add
         f64::mul_add(self, a, b)
     }
 }
@@ -53,600 +71,560 @@ impl MulAdd for f64 {
 impl MulAdd for Complex64 {
     #[inline(always)]
     fn mul_add(self, a: Self, b: Self) -> Self {
-        // Complex multiplication doesn't have hardware FMA, but still more efficient
-        // than separate operations due to instruction pipelining
         self * a + b
     }
 }
 
-impl DACoefficient for Complex64 {
-    fn zero() -> Self { Complex64::new(0.0, 0.0) }
-    fn one() -> Self { Complex64::new(1.0, 0.0) }
-    fn abs(&self) -> f64 { self.norm() }
+// ============================================================================
+// DA struct
+// ============================================================================
+
+/// Generic Taylor polynomial with flat-array storage and non-zero tracking.
+///
+/// `T` is the coefficient type: `f64` for real DA, `Complex64` for complex DA (CD).
+///
+/// # Representation
+///
+/// - `coeffs[i]` is the coefficient of monomial `monomial_list[i]` (from the runtime tables).
+/// - `nonzero` lists the indices where `coeffs[i]` is significant (above epsilon).
+/// - Index 0 is always the constant monomial.
+/// - Indices 1..num_vars are the variable monomials x₁..xₙ.
+#[derive(Clone)]
+pub struct DA<T: DACoefficient> {
+    /// Dense coefficient array, length = `num_monomials` from `TaylorRuntime`.
+    pub coeffs: Vec<T>,
+    /// Indices of non-zero coefficients (not necessarily sorted).
+    pub nonzero: Vec<u32>,
 }
 
-/// Generic Taylor polynomial with type-parameterized coefficients.
-///
-/// Represents truncated multivariate Taylor series for automatic differentiation.
-/// Optimized for sparse representation - most polynomials have <100 non-zero terms.
-///
-/// Type parameter `T` can be:
-/// - `f64` for real differential algebra (traditional DA)
-/// - `Complex64` for complex differential algebra (CD)
-#[derive(Clone, PartialEq)]
-pub struct DA<T: DACoefficient> {
-    /// Sparse coefficient storage: monomial -> coefficient
-    coeffs: HashMap<Monomial, T>,
+impl<T: DACoefficient> PartialEq for DA<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.coeffs == other.coeffs
+    }
 }
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/// Scan all coefficients, zero out those below epsilon or above max_order,
+/// and return the list of non-zero indices.
+fn build_nonzero_filtered<T: DACoefficient>(
+    coeffs: &mut [T],
+    epsilon: f64,
+    max_order: u8,
+    monomial_orders: &[u8],
+) -> Vec<u32> {
+    let mut nonzero = Vec::new();
+    for (i, coeff) in coeffs.iter_mut().enumerate() {
+        if monomial_orders[i] > max_order || coeff.abs() <= epsilon {
+            *coeff = T::zero();
+        } else {
+            nonzero.push(i as u32);
+        }
+    }
+    nonzero
+}
+
+// ============================================================================
+// Basic methods
+// ============================================================================
 
 impl<T: DACoefficient> DA<T> {
-    /// Create a new zero DA object.
+    /// Create a zero DA (all coefficients zero).
     pub fn zero() -> Self {
+        let rt = get_runtime().expect("Taylor system not initialized (call OV first)");
         Self {
-            coeffs: HashMap::default(),
+            coeffs: vec![T::zero(); rt.num_monomials],
+            nonzero: Vec::new(),
         }
     }
 
     /// Create a DA constant from a coefficient value.
-    ///
-    /// # Arguments
-    /// * `value` - The constant coefficient value
     pub fn from_coeff(value: T) -> Self {
-        let mut coeffs = HashMap::default();
-        let epsilon = get_config().ok().map(|c| c.epsilon).unwrap_or(1e-15);
+        let rt = get_runtime().expect("Taylor system not initialized");
+        let epsilon = rt.config.epsilon;
+        let mut coeffs = vec![T::zero(); rt.num_monomials];
+        let mut nonzero = Vec::new();
         if value.abs() > epsilon {
-            coeffs.insert(Monomial::constant(), value);
+            coeffs[0] = value;
+            nonzero.push(0);
         }
-        Self { coeffs }
+        Self { coeffs, nonzero }
     }
 
-    /// Create a DA variable.
+    /// Create a DA variable (1-based index, matching COSY convention).
     ///
-    /// # Arguments
-    /// * `var_index` - Index of the variable (1-based, matching COSY convention)
-    ///
-    /// # Returns
-    /// A DA representing the variable, or error if var_index is invalid
-    ///
-    /// # Example
-    /// ```
-    /// let x1 = DA::variable(1)?;  // First variable
-    /// let x2 = DA::variable(2)?;  // Second variable
-    /// ```
+    /// `DA::variable(1)` creates x₁ (first variable), etc.
     pub fn variable(var_index: usize) -> Result<Self> {
-        let config = get_config()?;
-        
+        let rt = get_runtime()?;
+        let config = rt.config;
+
         if var_index == 0 || var_index > config.num_vars {
             anyhow::bail!(
                 "Variable index {} out of range [1, {}]",
-                var_index,
-                config.num_vars
+                var_index, config.num_vars
             );
         }
 
-        let mut coeffs = HashMap::default();
-        coeffs.insert(Monomial::variable(var_index - 1), T::one());
-        Ok(Self { coeffs })
+        let flat_idx = rt.variable_indices[var_index - 1];
+        let mut coeffs = vec![T::zero(); rt.num_monomials];
+        coeffs[flat_idx as usize] = T::one();
+        Ok(Self {
+            coeffs,
+            nonzero: vec![flat_idx],
+        })
     }
 
-    /// Get the constant (order-0) coefficient.
+    /// Get the constant (order-0) coefficient. Always at index 0.
+    #[inline]
     pub fn constant_part(&self) -> T {
-        self.coeffs.get(&Monomial::constant()).copied().unwrap_or(T::zero())
+        self.coeffs[0]
     }
 
-    /// Get a coefficient for a specific monomial.
+    /// Get a coefficient for a specific monomial (via runtime index lookup).
     pub fn get_coeff(&self, monomial: &Monomial) -> T {
-        self.coeffs.get(monomial).copied().unwrap_or(T::zero())
-    }
-
-    /// Set a coefficient for a specific monomial.
-    ///
-    /// Small coefficients (< epsilon) are automatically removed.
-    pub fn set_coeff(&mut self, monomial: Monomial, value: T) {
-        let epsilon = get_config().ok().map(|c| c.epsilon).unwrap_or(1e-15);
-        
-        if value.abs() > epsilon {
-            self.coeffs.insert(monomial, value);
+        let rt = get_runtime().expect("Taylor system not initialized");
+        if let Some(&idx) = rt.monomial_index.get(monomial) {
+            self.coeffs[idx as usize]
         } else {
-            self.coeffs.remove(&monomial);
+            T::zero()
         }
     }
 
-    /// Trim small coefficients below epsilon threshold.
-    pub fn trim(&mut self) {
-        let epsilon = get_config().ok().map(|c| c.epsilon).unwrap_or(1e-15);
-        self.coeffs.retain(|_, coeff| coeff.abs() > epsilon);
+    /// Set a coefficient for a specific monomial. Updates non-zero tracking.
+    pub fn set_coeff(&mut self, monomial: Monomial, value: T) {
+        let rt = get_runtime().expect("Taylor system not initialized");
+        let epsilon = rt.config.epsilon;
+
+        let idx = match rt.monomial_index.get(&monomial) {
+            Some(&i) => i,
+            None => return, // Monomial not in enumeration (e.g., beyond max_order)
+        };
+
+        let was_nz = self.coeffs[idx as usize].abs() > epsilon;
+        self.coeffs[idx as usize] = value;
+        let is_nz = value.abs() > epsilon;
+
+        if is_nz && !was_nz {
+            self.nonzero.push(idx);
+        } else if !is_nz && was_nz {
+            if let Some(pos) = self.nonzero.iter().position(|&i| i == idx) {
+                self.nonzero.swap_remove(pos);
+            }
+            self.coeffs[idx as usize] = T::zero();
+        }
     }
 
-    /// Get the number of non-zero coefficients.
+    /// Trim small coefficients below epsilon and rebuild the non-zero list.
+    pub fn trim(&mut self) {
+        let rt = get_runtime().expect("Taylor system not initialized");
+        let epsilon = rt.config.epsilon;
+        self.nonzero = build_nonzero_filtered(
+            &mut self.coeffs, epsilon,
+            rt.config.max_order as u8, &rt.monomial_orders,
+        );
+    }
+
+    /// Number of non-zero coefficients.
+    #[inline]
     pub fn num_terms(&self) -> usize {
-        self.coeffs.len()
+        self.nonzero.len()
     }
 
     /// Check if this DA is effectively zero.
+    #[inline]
     pub fn is_zero(&self) -> bool {
-        self.coeffs.is_empty()
+        self.nonzero.is_empty()
     }
 
-    /// Create a DA from raw coefficients (used internally).
-    pub fn from_coeffs(coeffs: HashMap<Monomial, T>) -> Self {
-        Self { coeffs }
+    /// Create a DA from a HashMap of monomial→coefficient (compatibility bridge).
+    pub fn from_coeffs(hash_coeffs: FxHashMap<Monomial, T>) -> Self {
+        let rt = get_runtime().expect("Taylor system not initialized");
+        let epsilon = rt.config.epsilon;
+        let mut coeffs = vec![T::zero(); rt.num_monomials];
+        for (mono, coeff) in hash_coeffs {
+            if let Some(&idx) = rt.monomial_index.get(&mono) {
+                if coeff.abs() > epsilon {
+                    coeffs[idx as usize] = coeff;
+                }
+            }
+        }
+        let nonzero = build_nonzero_filtered(
+            &mut coeffs, epsilon,
+            rt.config.max_order as u8, &rt.monomial_orders,
+        );
+        Self { coeffs, nonzero }
     }
 
-    /// Iterate over coefficients.
-    pub fn coeffs_iter(&self) -> impl Iterator<Item = (&Monomial, &T)> {
-        self.coeffs.iter()
-    }
-
-    /// Add a scalar to the constant coefficient in-place (O(1), no allocation).
+    /// Iterate non-zero entries as (Monomial, coefficient) pairs.
     ///
-    /// Used by Horner's method in transcendental functions to avoid
-    /// creating intermediate DA objects for scalar additions.
+    /// Requires a runtime reference (caller should hold one to avoid repeated locking).
+    pub fn coeffs_entries<'a>(&'a self, rt: &'a TaylorRuntime) -> impl Iterator<Item = (&'a Monomial, T)> + 'a {
+        self.nonzero.iter().map(move |&i| (
+            &rt.monomial_list[i as usize],
+            self.coeffs[i as usize],
+        ))
+    }
+
+    /// Iterate non-zero entries as (Monomial, coefficient) pairs (self-contained, allocates).
+    ///
+    /// Acquires the runtime lock internally. For hot-path code, prefer `coeffs_entries()`.
+    pub fn coeffs_iter(&self) -> Vec<(Monomial, T)> {
+        let rt = get_runtime().expect("Taylor system not initialized");
+        self.nonzero.iter().map(|&i| (
+            rt.monomial_list[i as usize],
+            self.coeffs[i as usize],
+        )).collect()
+    }
+
+    /// Add a scalar to the constant coefficient in-place.
+    ///
+    /// O(1) amortized. Used by Horner's method in transcendental functions.
     pub fn add_constant_in_place(&mut self, value: T) {
-        let const_mono = Monomial::constant();
-        *self.coeffs.entry(const_mono).or_insert(T::zero()) += value;
+        let was_nz = self.coeffs[0].abs() > 1e-15;
+        self.coeffs[0] = self.coeffs[0] + value;
+        let is_nz = self.coeffs[0].abs() > 1e-15;
+
+        if is_nz && !was_nz {
+            self.nonzero.push(0);
+        } else if !is_nz && was_nz {
+            if let Some(pos) = self.nonzero.iter().position(|&i| i == 0) {
+                self.nonzero.swap_remove(pos);
+            }
+            self.coeffs[0] = T::zero();
+        }
     }
 }
 
 // ============================================================================
-// Arithmetic Operations
+// Addition: DA + DA
 // ============================================================================
 
-/// Addition: DA + DA
-impl<T: DACoefficient> Add<DA<T>> for DA<T> {
-    type Output = Result<DA<T>>;
-
-    fn add(self, rhs: DA<T>) -> Self::Output {
-        &self + &rhs
-    }
-}
-
-/// Addition: &DA + &DA (preferred - avoids clones)
 impl<T: DACoefficient> Add<&DA<T>> for &DA<T> {
     type Output = Result<DA<T>>;
 
     fn add(self, rhs: &DA<T>) -> Self::Output {
-        let config = get_config()?;
-        let capacity = self.coeffs.len() + rhs.coeffs.len();
-        let mut result = HashMap::with_capacity_and_hasher(capacity, Default::default());
+        let rt = get_runtime()?;
+        let epsilon = rt.config.epsilon;
+        let max_order = rt.config.max_order as u8;
 
-        // Add coefficients from self
-        for (monomial, &coeff) in &self.coeffs {
-            if monomial.within_order(config.max_order) {
-                result.insert(*monomial, coeff);
-            }
+        let mut coeffs = self.coeffs.clone();
+        for &j in &rhs.nonzero {
+            coeffs[j as usize] = coeffs[j as usize] + rhs.coeffs[j as usize];
         }
-
-        // Add coefficients from rhs
-        for (monomial, &coeff) in &rhs.coeffs {
-            if monomial.within_order(config.max_order) {
-                *result.entry(*monomial).or_insert(T::zero()) += coeff;
-            }
-        }
-
-        // Remove small coefficients
-        result.retain(|_, &mut coeff| coeff.abs() > config.epsilon);
-
-        Ok(DA { coeffs: result })
+        let nonzero = build_nonzero_filtered(&mut coeffs, epsilon, max_order, &rt.monomial_orders);
+        Ok(DA { coeffs, nonzero })
     }
 }
 
-/// Addition: DA + &DA
+impl<T: DACoefficient> Add<DA<T>> for DA<T> {
+    type Output = Result<DA<T>>;
+    fn add(self, rhs: DA<T>) -> Self::Output { &self + &rhs }
+}
+
 impl<T: DACoefficient> Add<&DA<T>> for DA<T> {
     type Output = Result<DA<T>>;
-
-    fn add(self, rhs: &DA<T>) -> Self::Output {
-        &self + rhs
-    }
+    fn add(self, rhs: &DA<T>) -> Self::Output { &self + rhs }
 }
 
-/// Addition: &DA + DA
 impl<T: DACoefficient> Add<DA<T>> for &DA<T> {
     type Output = Result<DA<T>>;
-
-    fn add(self, rhs: DA<T>) -> Self::Output {
-        self + &rhs
-    }
+    fn add(self, rhs: DA<T>) -> Self::Output { self + &rhs }
 }
 
-/// Addition: DA + T
+// Addition: DA + scalar
 impl<T: DACoefficient> Add<T> for DA<T> {
     type Output = Result<DA<T>>;
-
-    fn add(self, rhs: T) -> Self::Output {
-        &self + rhs
-    }
+    fn add(self, rhs: T) -> Self::Output { &self + rhs }
 }
 
-/// Addition: &DA + T
 impl<T: DACoefficient> Add<T> for &DA<T> {
     type Output = Result<DA<T>>;
-
     fn add(self, rhs: T) -> Self::Output {
-        let config = get_config()?;
         let mut result = self.clone();
-        
-        let const_monomial = Monomial::constant();
-        *result.coeffs.entry(const_monomial).or_insert(T::zero()) += rhs;
-        
-        // Trim if needed
-        if let Some(&coeff) = result.coeffs.get(&const_monomial) {
-            if coeff.abs() <= config.epsilon {
-                result.coeffs.remove(&const_monomial);
-            }
-        }
-        
+        result.add_constant_in_place(rhs);
         Ok(result)
     }
 }
 
 // ============================================================================
-// Note: T + DA and T + &DA impls removed due to Rust orphan rules
-// Users should write DA + T instead
+// Negation
 // ============================================================================
 
-/// Negation: -DA
 impl<T: DACoefficient> Neg for DA<T> {
     type Output = DA<T>;
-
-    fn neg(self) -> Self::Output {
-        -&self
-    }
+    fn neg(self) -> Self::Output { -&self }
 }
 
-/// Negation: -&DA
 impl<T: DACoefficient> Neg for &DA<T> {
     type Output = DA<T>;
-
     fn neg(self) -> Self::Output {
         DA {
-            coeffs: self.coeffs.iter().map(|(&m, &c)| (m, -c)).collect(),
+            coeffs: self.coeffs.iter().map(|&c| -c).collect(),
+            nonzero: self.nonzero.clone(),
         }
     }
 }
 
-/// Subtraction: DA - DA
-impl<T: DACoefficient> Sub<DA<T>> for DA<T> {
-    type Output = Result<DA<T>>;
+// ============================================================================
+// Subtraction: DA - DA (direct, avoids intermediate negation)
+// ============================================================================
 
-    fn sub(self, rhs: DA<T>) -> Self::Output {
-        &self - &rhs
-    }
-}
-
-/// Subtraction: &DA - &DA
 impl<T: DACoefficient> Sub<&DA<T>> for &DA<T> {
     type Output = Result<DA<T>>;
 
     fn sub(self, rhs: &DA<T>) -> Self::Output {
-        self + &(-rhs)
+        let rt = get_runtime()?;
+        let epsilon = rt.config.epsilon;
+        let max_order = rt.config.max_order as u8;
+
+        let mut coeffs = self.coeffs.clone();
+        for &j in &rhs.nonzero {
+            coeffs[j as usize] = coeffs[j as usize] - rhs.coeffs[j as usize];
+        }
+        let nonzero = build_nonzero_filtered(&mut coeffs, epsilon, max_order, &rt.monomial_orders);
+        Ok(DA { coeffs, nonzero })
     }
 }
 
-/// Subtraction: DA - &DA
+impl<T: DACoefficient> Sub<DA<T>> for DA<T> {
+    type Output = Result<DA<T>>;
+    fn sub(self, rhs: DA<T>) -> Self::Output { &self - &rhs }
+}
+
 impl<T: DACoefficient> Sub<&DA<T>> for DA<T> {
     type Output = Result<DA<T>>;
-
-    fn sub(self, rhs: &DA<T>) -> Self::Output {
-        &self - rhs
-    }
+    fn sub(self, rhs: &DA<T>) -> Self::Output { &self - rhs }
 }
 
-/// Subtraction: &DA - DA
 impl<T: DACoefficient> Sub<DA<T>> for &DA<T> {
     type Output = Result<DA<T>>;
-
-    fn sub(self, rhs: DA<T>) -> Self::Output {
-        self - &rhs
-    }
+    fn sub(self, rhs: DA<T>) -> Self::Output { self - &rhs }
 }
 
-/// Subtraction: DA - T
+// Subtraction: DA - scalar
 impl<T: DACoefficient> Sub<T> for DA<T> {
     type Output = Result<DA<T>>;
-
-    fn sub(self, rhs: T) -> Self::Output {
-        &self - rhs
-    }
+    fn sub(self, rhs: T) -> Self::Output { &self - rhs }
 }
 
-/// Subtraction: &DA - T
 impl<T: DACoefficient> Sub<T> for &DA<T> {
     type Output = Result<DA<T>>;
-
     fn sub(self, rhs: T) -> Self::Output {
         self + (-rhs)
     }
 }
 
 // ============================================================================
-// Note: T - DA and T - &DA impls removed due to Rust orphan rules
-// Users should write -(DA - T) or similar patterns
+// Multiplication: DA * DA
 // ============================================================================
 
-// ============================================================================
-// Multiplication Operations
-// ============================================================================
-
-/// Multiplication: DA * DA
-impl<T: DACoefficient> Mul<DA<T>> for DA<T> {
-    type Output = Result<DA<T>>;
-
-    fn mul(self, rhs: DA<T>) -> Self::Output {
-        &self * &rhs
-    }
-}
-
-/// Multiplication: &DA * &DA (preferred - implements actual DA multiplication)
 impl<T: DACoefficient> Mul<&DA<T>> for &DA<T> {
     type Output = Result<DA<T>>;
 
     fn mul(self, rhs: &DA<T>) -> Self::Output {
-        let config = get_config()?;
-        let capacity = self.coeffs.len().max(rhs.coeffs.len());
-        let mut result = HashMap::with_capacity_and_hasher(capacity, Default::default());
+        let rt = get_runtime()?;
+        let n = rt.num_monomials;
+        let epsilon = rt.config.epsilon;
+        let max_order = rt.config.max_order;
+        let order_check = max_order < rt.init_order;
 
-        // Multiply each term in self by each term in rhs
-        for (m1, &c1) in &self.coeffs {
-            for (m2, &c2) in &rhs.coeffs {
-                let product_monomial = m1.multiply(m2);
-                
-                // Only include terms within the truncation order
-                if product_monomial.within_order(config.max_order) {
-                    *result.entry(product_monomial)
-                        .or_insert(T::zero()) += c1 * c2;
+        let mut result = vec![T::zero(); n];
+
+        if let Some(table) = &rt.mult_table {
+            // Fast path: precomputed multiplication table
+            for &i in &self.nonzero {
+                let ci = self.coeffs[i as usize];
+                let row = i as usize * n;
+                for &j in &rhs.nonzero {
+                    let k = table[row + j as usize];
+                    if k != MULT_INVALID
+                        && (!order_check || rt.monomial_orders[k as usize] as u32 <= max_order)
+                    {
+                        result[k as usize] = ci.mul_add(rhs.coeffs[j as usize], result[k as usize]);
+                    }
+                }
+            }
+        } else {
+            // Fallback: compute product index on the fly
+            for &i in &self.nonzero {
+                let ci = self.coeffs[i as usize];
+                for &j in &rhs.nonzero {
+                    let product = rt.monomial_list[i as usize].multiply(&rt.monomial_list[j as usize]);
+                    if product.within_order(max_order) {
+                        if let Some(&k) = rt.monomial_index.get(&product) {
+                            result[k as usize] = ci.mul_add(rhs.coeffs[j as usize], result[k as usize]);
+                        }
+                    }
                 }
             }
         }
 
-        // Remove small coefficients
-        result.retain(|_, &mut coeff| coeff.abs() > config.epsilon);
-
-        Ok(DA { coeffs: result })
+        let nonzero = build_nonzero_filtered(
+            &mut result, epsilon, max_order as u8, &rt.monomial_orders,
+        );
+        Ok(DA { coeffs: result, nonzero })
     }
 }
 
-/// Multiplication: DA * &DA
+impl<T: DACoefficient> Mul<DA<T>> for DA<T> {
+    type Output = Result<DA<T>>;
+    fn mul(self, rhs: DA<T>) -> Self::Output { &self * &rhs }
+}
+
 impl<T: DACoefficient> Mul<&DA<T>> for DA<T> {
     type Output = Result<DA<T>>;
-
-    fn mul(self, rhs: &DA<T>) -> Self::Output {
-        &self * rhs
-    }
+    fn mul(self, rhs: &DA<T>) -> Self::Output { &self * rhs }
 }
 
-/// Multiplication: &DA * DA
 impl<T: DACoefficient> Mul<DA<T>> for &DA<T> {
     type Output = Result<DA<T>>;
-
-    fn mul(self, rhs: DA<T>) -> Self::Output {
-        self * &rhs
-    }
+    fn mul(self, rhs: DA<T>) -> Self::Output { self * &rhs }
 }
 
-/// Multiplication: DA * T
+// Multiplication: DA * scalar
 impl<T: DACoefficient> Mul<T> for DA<T> {
     type Output = Result<DA<T>>;
-
-    fn mul(self, rhs: T) -> Self::Output {
-        &self * rhs
-    }
+    fn mul(self, rhs: T) -> Self::Output { &self * rhs }
 }
 
-/// Multiplication: &DA * T (scalar multiplication)
 impl<T: DACoefficient> Mul<T> for &DA<T> {
     type Output = Result<DA<T>>;
-
     fn mul(self, rhs: T) -> Self::Output {
-        let config = get_config()?;
-        
-        if rhs.abs() <= config.epsilon {
+        let rt = get_runtime()?;
+        let epsilon = rt.config.epsilon;
+
+        if rhs.abs() <= epsilon {
             return Ok(DA::zero());
         }
 
-        let coeffs: HashMap<Monomial, T> = self.coeffs
-            .iter()
-            .map(|(&m, &c)| (m, c * rhs))
-            .collect();
-
-        Ok(DA { coeffs })
+        let mut coeffs: Vec<T> = self.coeffs.iter().map(|&c| c * rhs).collect();
+        let nonzero = build_nonzero_filtered(
+            &mut coeffs, epsilon,
+            rt.config.max_order as u8, &rt.monomial_orders,
+        );
+        Ok(DA { coeffs, nonzero })
     }
 }
 
 // ============================================================================
-// Note: T * DA and T * &DA impls removed due to Rust orphan rules
-// Users should write DA * T instead (commutative anyway)
+// Division: DA / DA (order-by-order algorithm)
 // ============================================================================
 
-// ============================================================================
-// Division
-// ============================================================================
-
-/// Division: DA / DA
-impl<T: DACoefficient> Div<DA<T>> for DA<T> {
-    type Output = Result<DA<T>>;
-
-    fn div(self, rhs: DA<T>) -> Self::Output {
-        &self / &rhs
-    }
-}
-
-/// Division: &DA / &DA (preferred - avoids clones)
-/// 
-/// Uses an optimized order-by-order Taylor series division algorithm:
-/// q_m = (f_m - Σ_{k<m} g_k * q_{m-k}) / g_0
-/// 
-/// Optimizations:
-/// - Pre-sort divisor monomials once for deterministic iteration
-/// - Early skip on zero coefficients
-/// - Minimize hashmap lookups by caching frequently accessed values
-/// - Process in order-by-order fashion ensuring all dependencies are satisfied
 impl<T: DACoefficient> Div<&DA<T>> for &DA<T> {
     type Output = Result<DA<T>>;
 
     fn div(self, rhs: &DA<T>) -> Self::Output {
-        let g0 = rhs.constant_part();
-        
+        let g0 = rhs.coeffs[0]; // constant part of divisor
+
         if g0.abs() < 1e-15 {
             return Err(anyhow::anyhow!("Division by zero"))
                 .with_context(|| format!("...while dividing with {rhs:#?}"));
         }
-        
-        let config = get_config()?;
-        let max_order = config.max_order;
-        let epsilon = config.epsilon;
-        let num_vars = config.num_vars;
-        
-        // Pre-compute inverse of g0 (one division vs many)
+
+        let rt = get_runtime()?;
+        let n = rt.num_monomials;
+        let max_order = rt.config.max_order;
+        let epsilon = rt.config.epsilon;
+
         let g0_inv = T::one() / g0;
-        
-        // Pre-sort divisor monomials for deterministic iteration (matches COSY)
-        let mut sorted_g_monomials: Vec<_> = rhs.coeffs
-            .iter()
-            .filter(|(m, _)| **m != Monomial::constant())  // Skip constant term
-            .map(|(m, c)| (*m, *c))
+
+        // Collect non-zero divisor terms (excluding constant), sorted by index
+        let mut g_entries: Vec<(u32, T)> = rhs.nonzero.iter()
+            .filter(|&&i| i != 0)
+            .map(|&i| (i, rhs.coeffs[i as usize]))
             .collect();
-        sorted_g_monomials.sort_by_key(|(m, _)| *m);
-        
-        let mut result = DA::zero();
-        
-        // Process order by order - ensures q_{m-k} computed before q_m
-        for order in 0..=max_order {
-            let monomials_at_order = generate_monomials_of_order(order as u8, num_vars);
-            
-            for monomial in monomials_at_order {
-                // Start with numerator coefficient
-                let f_m = self.coeffs.get(&monomial).copied().unwrap_or(T::zero());
-                
-                // Early skip if numerator is zero and no contributions expected
-                if f_m.abs() <= epsilon && order == 0 {
-                    continue;
-                }
-                
-                // Accumulate: Σ g_k * q_{m-k}
-                let mut subtraction_sum = T::zero();
-                
-                for &(g_mono, g_coeff) in &sorted_g_monomials {
-                    // Compute m - k (monomial difference)
-                    let mut diff_exponents = [0u8; MAX_VARS];
-                    let mut valid = true;
-                    
-                    for i in 0..MAX_VARS {
-                        if monomial.exponents[i] >= g_mono.exponents[i] {
-                            diff_exponents[i] = monomial.exponents[i] - g_mono.exponents[i];
-                        } else {
-                            valid = false;
-                            break;
-                        }
-                    }
-                    
-                    if valid {
-                        let diff_mono = Monomial::new(diff_exponents);
-                        if let Some(&q_coeff) = result.coeffs.get(&diff_mono) {
-                            // FMA: sum = g_k * q_{m-k} + sum (hardware-accelerated)
-                            subtraction_sum = g_coeff.mul_add(q_coeff, subtraction_sum);
-                        }
+        g_entries.sort_unstable_by_key(|&(i, _)| i);
+
+        let mut result = vec![T::zero(); n];
+
+        // Process monomials in graded lex order (index 0..n).
+        // Since monomials are stored in graded lex order, all dependencies
+        // (lower-order quotient coefficients) are computed before they're needed.
+        for m_idx in 0..n {
+            if rt.monomial_orders[m_idx] as u32 > max_order {
+                break;
+            }
+
+            let f_m = self.coeffs[m_idx];
+
+            // Accumulate: Σ g_k * q_{m-k}
+            let mut sum = T::zero();
+            let mono_m = &rt.monomial_list[m_idx];
+
+            for &(g_idx, g_coeff) in &g_entries {
+                let mono_g = &rt.monomial_list[g_idx as usize];
+
+                // Compute monomial difference: m - g (exponent-wise subtraction)
+                let mut diff = [0u8; MAX_VARS];
+                let mut valid = true;
+                for v in 0..MAX_VARS {
+                    if mono_m.exponents[v] >= mono_g.exponents[v] {
+                        diff[v] = mono_m.exponents[v] - mono_g.exponents[v];
+                    } else {
+                        valid = false;
+                        break;
                     }
                 }
-                
-                // Compute: q_m = (f_m - sum) / g_0
-                // Using pre-computed inverse: q_m = (f_m - sum) * g0_inv
-                let q_m = (f_m - subtraction_sum) * g0_inv;
-                
-                // Store if significant
-                if q_m.abs() > epsilon {
-                    result.coeffs.insert(monomial, q_m);
+
+                if valid {
+                    let diff_mono = Monomial::new(diff);
+                    if let Some(&diff_idx) = rt.monomial_index.get(&diff_mono) {
+                        sum = g_coeff.mul_add(result[diff_idx as usize], sum);
+                    }
                 }
             }
+
+            let q_m = (f_m - sum) * g0_inv;
+            if q_m.abs() > epsilon {
+                result[m_idx] = q_m;
+            }
         }
-        
-        Ok(result)
+
+        let nonzero = build_nonzero_filtered(
+            &mut result, epsilon, max_order as u8, &rt.monomial_orders,
+        );
+        Ok(DA { coeffs: result, nonzero })
     }
 }
 
-/// Generate all monomials of a specific total order for a given number of variables.
-///
-/// This is a helper function for division algorithm.
-fn generate_monomials_of_order(target_order: u8, num_vars: usize) -> Vec<Monomial> {
-    let mut result = Vec::new();
-    let mut exponents = [0u8; MAX_VARS];
-    
-    // Use recursive generation
-    fn generate_recursive(
-        exponents: &mut [u8; MAX_VARS],
-        var_index: usize,
-        remaining_order: u8,
-        num_vars: usize,
-        result: &mut Vec<Monomial>,
-    ) {
-        if var_index >= num_vars {
-            if remaining_order == 0 {
-                result.push(Monomial::new(*exponents));
-            }
-            return;
-        }
-        
-        // Try all possible exponents for this variable
-        for exp in 0..=remaining_order {
-            exponents[var_index] = exp;
-            generate_recursive(exponents, var_index + 1, remaining_order - exp, num_vars, result);
-        }
-        exponents[var_index] = 0;  // Reset for next iteration
-    }
-    
-    generate_recursive(&mut exponents, 0, target_order, num_vars, &mut result);
-    result
+impl<T: DACoefficient> Div<DA<T>> for DA<T> {
+    type Output = Result<DA<T>>;
+    fn div(self, rhs: DA<T>) -> Self::Output { &self / &rhs }
 }
 
-/// Division: &DA / DA
 impl<T: DACoefficient> Div<DA<T>> for &DA<T> {
     type Output = Result<DA<T>>;
-
-    fn div(self, rhs: DA<T>) -> Self::Output {
-        self / &rhs
-    }
+    fn div(self, rhs: DA<T>) -> Self::Output { self / &rhs }
 }
 
-/// Division: DA / &DA
 impl<T: DACoefficient> Div<&DA<T>> for DA<T> {
     type Output = Result<DA<T>>;
-
-    fn div(self, rhs: &DA<T>) -> Self::Output {
-        &self / rhs
-    }
+    fn div(self, rhs: &DA<T>) -> Self::Output { &self / rhs }
 }
 
-/// Division: DA / T
+// Division: DA / scalar
 impl<T: DACoefficient> Div<T> for DA<T> {
     type Output = Result<DA<T>>;
-
-    fn div(self, rhs: T) -> Self::Output {
-        &self / rhs
-    }
+    fn div(self, rhs: T) -> Self::Output { &self / rhs }
 }
 
-/// Division: &DA / T (preferred - avoids clones)
 impl<T: DACoefficient> Div<T> for &DA<T> {
     type Output = Result<DA<T>>;
-
     fn div(self, rhs: T) -> Self::Output {
         if rhs.abs() < 1e-15 {
             anyhow::bail!("Division by zero");
         }
-        
-        let coeffs: HashMap<Monomial, T> = self.coeffs
-            .iter()
-            .map(|(&m, &c)| (m, c / rhs))
-            .collect();
 
-        Ok(DA { coeffs })
+        let coeffs: Vec<T> = self.coeffs.iter().map(|&c| c / rhs).collect();
+        // Nonzero pattern preserved (dividing non-zero by non-zero stays non-zero)
+        Ok(DA {
+            coeffs,
+            nonzero: self.nonzero.clone(),
+        })
     }
 }
-
-// ============================================================================
-// Note: T / DA and T / &DA impls removed due to Rust orphan rules
-// Users should write DA::from_coeff(value) / da instead
-// ============================================================================
 
 // ============================================================================
 // Display & Debug
@@ -654,17 +632,18 @@ impl<T: DACoefficient> Div<T> for &DA<T> {
 
 impl<T: DACoefficient> fmt::Debug for DA<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let rt = get_runtime().map_err(|_| fmt::Error)?;
         write!(f, "DA[")?;
-        let mut sorted: Vec<_> = self.coeffs.iter().collect();
-        sorted.sort_by_key(|(m, _)| *m);
-        
-        for (i, (monomial, coeff)) in sorted.iter().enumerate() {
-            if i > 0 {
-                write!(f, " + ")?;
-            }
-            write!(f, "{}*{}", coeff, monomial)?;
+        let mut entries: Vec<_> = self.nonzero.iter()
+            .map(|&i| (i, self.coeffs[i as usize]))
+            .collect();
+        entries.sort_by_key(|&(i, _)| i);
+
+        for (idx, (i, coeff)) in entries.iter().enumerate() {
+            if idx > 0 { write!(f, " + ")?; }
+            write!(f, "{}*{}", coeff, rt.monomial_list[*i as usize])?;
         }
-        if sorted.is_empty() {
+        if entries.is_empty() {
             write!(f, "0")?;
         }
         write!(f, "]")
@@ -673,20 +652,22 @@ impl<T: DACoefficient> fmt::Debug for DA<T> {
 
 impl<T: DACoefficient> fmt::Display for DA<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.coeffs.is_empty() {
+        if self.nonzero.is_empty() {
             return write!(f, "0");
         }
 
-        let mut sorted: Vec<_> = self.coeffs.iter().collect();
-        sorted.sort_by_key(|(m, _)| *m);
-        
-        for (i, (monomial, coeff)) in sorted.iter().enumerate() {
-            if i > 0 {
-                write!(f, " + ")?;
-            }
+        let rt = get_runtime().map_err(|_| fmt::Error)?;
+        let mut entries: Vec<_> = self.nonzero.iter()
+            .map(|&i| (i, self.coeffs[i as usize]))
+            .collect();
+        entries.sort_by_key(|&(i, _)| i);
+
+        for (idx, &(i, coeff)) in entries.iter().enumerate() {
+            if idx > 0 { write!(f, " + ")?; }
+            let mono = &rt.monomial_list[i as usize];
             write!(f, "{}", coeff)?;
-            if monomial.total_order > 0 {
-                write!(f, "*{}", monomial)?;
+            if mono.total_order > 0 {
+                write!(f, "*{}", mono)?;
             }
         }
         Ok(())
@@ -694,11 +675,8 @@ impl<T: DACoefficient> fmt::Display for DA<T> {
 }
 
 // ============================================================================
-// Convenience Constructors
+// Convenience constructors
 // ============================================================================
-
-// These are kept on the generic DA<T> for specific coefficient types.
-// The type aliases (DA = DA<f64>, CD = DA<Complex64>) are defined in mod.rs
 
 impl DA<f64> {
     /// Create a real DA constant from an f64 value.
@@ -707,75 +685,71 @@ impl DA<f64> {
     }
 }
 
-impl DA<num_complex::Complex64> {
+impl DA<Complex64> {
     /// Create a complex DA constant from a real value.
     pub fn constant(value: f64) -> Self {
-        Self::from_coeff(num_complex::Complex64::new(value, 0.0))
+        Self::from_coeff(Complex64::new(value, 0.0))
     }
 
     /// Create a complex DA constant from a complex value.
-    pub fn complex_constant(value: num_complex::Complex64) -> Self {
+    pub fn complex_constant(value: Complex64) -> Self {
         Self::from_coeff(value)
     }
 
-    /// Create a CD from a DA (real becomes real part, imaginary is zero).
-    ///
-    /// # Arguments
-    /// * `da` - The DA to use as the real part
-    ///
-    /// # Returns
-    /// A CD with the given real part and zero imaginary part
+    /// Create a CD from a DA (real part; imaginary is zero).
     pub fn from_da(da: &DA<f64>) -> Self {
-        use num_complex::Complex64;
-        let coeffs: HashMap<Monomial, Complex64> = da.coeffs_iter()
-            .map(|(m, &v)| (*m, Complex64::new(v, 0.0)))
-            .collect();
-        
-        Self { coeffs }
+        let rt = get_runtime().expect("Taylor system not initialized");
+        let mut coeffs = vec![Complex64::new(0.0, 0.0); rt.num_monomials];
+        for &i in &da.nonzero {
+            coeffs[i as usize] = Complex64::new(da.coeffs[i as usize], 0.0);
+        }
+        Self {
+            coeffs,
+            nonzero: da.nonzero.clone(),
+        }
     }
 
     /// Create a CD from separate real and imaginary DA parts.
-    ///
-    /// # Arguments
-    /// * `real` - The DA to use as the real part
-    /// * `imag` - The DA to use as the imaginary part
-    ///
-    /// # Returns
-    /// A CD combining the real and imaginary parts
     pub fn from_da_parts(real: &DA<f64>, imag: &DA<f64>) -> Self {
-        use num_complex::Complex64;
-        
-        // Get all monomials from both real and imaginary parts
-        let mut coeffs = HashMap::default();
-        
-        // Add real part coefficients
-        for (monomial, &re_coeff) in real.coeffs_iter() {
-            coeffs.insert(*monomial, Complex64::new(re_coeff, 0.0));
+        let rt = get_runtime().expect("Taylor system not initialized");
+        let epsilon = rt.config.epsilon;
+        let mut coeffs = vec![Complex64::new(0.0, 0.0); rt.num_monomials];
+
+        for &i in &real.nonzero {
+            coeffs[i as usize].re = real.coeffs[i as usize];
         }
-        
-        // Add/update imaginary part coefficients
-        for (monomial, &im_coeff) in imag.coeffs_iter() {
-            coeffs.entry(*monomial)
-                .and_modify(|c| c.im = im_coeff)
-                .or_insert(Complex64::new(0.0, im_coeff));
+        for &i in &imag.nonzero {
+            coeffs[i as usize].im = imag.coeffs[i as usize];
         }
-        
-        Self { coeffs }
+
+        let nonzero = build_nonzero_filtered(
+            &mut coeffs, epsilon,
+            rt.config.max_order as u8, &rt.monomial_orders,
+        );
+        Self { coeffs, nonzero }
     }
 
-    /// Extract the real part of a complex DA as a real DA.
+    /// Extract the real part as a real DA.
     pub fn real_part(&self) -> DA<f64> {
-        let coeffs: HashMap<Monomial, f64> = self.coeffs_iter()
-            .map(|(m, c)| (*m, c.re))
-            .collect();
-        DA { coeffs }
+        let rt = get_runtime().expect("Taylor system not initialized");
+        let epsilon = rt.config.epsilon;
+        let mut coeffs: Vec<f64> = self.coeffs.iter().map(|c| c.re).collect();
+        let nonzero = build_nonzero_filtered(
+            &mut coeffs, epsilon,
+            rt.config.max_order as u8, &rt.monomial_orders,
+        );
+        DA { coeffs, nonzero }
     }
 
-    /// Extract the imaginary part of a complex DA as a real DA.
+    /// Extract the imaginary part as a real DA.
     pub fn imag_part(&self) -> DA<f64> {
-        let coeffs: HashMap<Monomial, f64> = self.coeffs_iter()
-            .map(|(m, c)| (*m, c.im))
-            .collect();
-        DA { coeffs }
+        let rt = get_runtime().expect("Taylor system not initialized");
+        let epsilon = rt.config.epsilon;
+        let mut coeffs: Vec<f64> = self.coeffs.iter().map(|c| c.im).collect();
+        let nonzero = build_nonzero_filtered(
+            &mut coeffs, epsilon,
+            rt.config.max_order as u8, &rt.monomial_orders,
+        );
+        DA { coeffs, nonzero }
     }
 }

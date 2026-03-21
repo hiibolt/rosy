@@ -16,16 +16,16 @@ fn da_derivative<T: DACoefficient>(da: &crate::rosy_lib::taylor::da::DA<T>, var_
     
     // For each term c * x1^a1 * x2^a2 * ... * xn^an,
     // d/dx_i = a_i * c * x1^a1 * ... * x_i^(a_i - 1) * ... * xn^an
-    for (monomial, &coeff) in da.coeffs_iter() {
+    for (monomial, coeff) in da.coeffs_iter().into_iter() {
         let exp_i = monomial.exponents[var_idx];
         if exp_i == 0 {
             continue; // This term vanishes under differentiation
         }
-        
+
         let mut new_exponents = monomial.exponents;
         new_exponents[var_idx] -= 1;
         let new_monomial = Monomial::new(new_exponents);
-        
+
         // Multiply coefficient by the exponent
         let mut factor = T::zero();
         for _ in 0..exp_i {
@@ -61,7 +61,7 @@ fn da_antiderivative<T: DACoefficient>(da: &crate::rosy_lib::taylor::da::DA<T>, 
     
     // For each term c * x1^a1 * x2^a2 * ... * xn^an,
     // integral w.r.t. x_i = c/(a_i + 1) * x1^a1 * ... * x_i^(a_i + 1) * ... * xn^an
-    for (monomial, &coeff) in da.coeffs_iter() {
+    for (monomial, coeff) in da.coeffs_iter().into_iter() {
         let exp_i = monomial.exponents[var_idx];
         let new_exp = exp_i + 1;
         

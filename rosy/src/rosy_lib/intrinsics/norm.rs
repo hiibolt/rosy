@@ -51,7 +51,7 @@ impl RosyNORM for VE {
 impl RosyNORM for DA {
     type Output = RE;
     fn rosy_norm(&self) -> anyhow::Result<Self::Output> {
-        Ok(self.coeffs_iter().map(|(_, c)| c.abs()).fold(0.0f64, f64::max))
+        Ok(self.coeffs_iter().into_iter().map(|(_, c)| c.abs()).fold(0.0f64, f64::max))
     }
 }
 
@@ -60,6 +60,6 @@ impl RosyNORM for CD {
     type Output = RE;
     fn rosy_norm(&self) -> anyhow::Result<Self::Output> {
         use crate::rosy_lib::taylor::DACoefficient;
-        Ok(self.coeffs_iter().map(|(_, c)| c.abs()).fold(0.0f64, f64::max))
+        Ok(self.coeffs_iter().into_iter().map(|(_, c)| c.abs()).fold(0.0f64, f64::max))
     }
 }

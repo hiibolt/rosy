@@ -53,8 +53,8 @@ fn format_daprv(
     let mut all_monomials: Vec<Monomial> = Vec::new();
     for i in 0..num_components.min(array.len()) {
         for (m, _) in array[i].coeffs_iter() {
-            if !all_monomials.contains(m) {
-                all_monomials.push(*m);
+            if !all_monomials.contains(&m) {
+                all_monomials.push(m);
             }
         }
     }
@@ -268,7 +268,7 @@ pub fn rosy_datrn(
         let mut result = DA::zero();
 
         // Iterate over each term c * x_1^e1 * x_2^e2 * ... in the input DA
-        for (monomial, &coeff) in da_in.coeffs_iter() {
+        for (monomial, coeff) in da_in.coeffs_iter() {
             if coeff.abs() <= config.epsilon {
                 continue;
             }

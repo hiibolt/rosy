@@ -1,139 +1,231 @@
-//! Global configuration for Taylor series computations.
+//! Global configuration and precomputed runtime tables for Taylor series computations.
+//!
+//! `init_taylor()` builds the monomial ordering, index mappings, and (when feasible)
+//! the N×N multiplication index table. All tables are immutable after init; only
+//! `epsilon` and `max_order` can be changed at runtime via `set_epsilon()` /
+//! `set_truncation_order()`.
 
 use std::sync::RwLock;
-use anyhow::{Result, Context, bail};
+use anyhow::{Result, bail};
+use rustc_hash::FxHashMap;
 
-use super::DEFAULT_EPSILON;
+use super::{DEFAULT_EPSILON, MAX_VARS, Monomial, monomial::enumerate_monomials};
 
-/// Configuration for Taylor series computations.
+/// Scalar configuration for Taylor series computations.
 #[derive(Debug, Clone, Copy)]
 pub struct TaylorConfig {
-    /// Maximum order of polynomials
+    /// Maximum order of polynomials (can be changed by DANOT)
     pub max_order: u32,
     /// Number of variables
     pub num_vars: usize,
-    /// Epsilon threshold for coefficient truncation
+    /// Epsilon threshold for coefficient truncation (can be changed by DAEPS)
     pub epsilon: f64,
 }
 
 impl TaylorConfig {
-    /// Create a new Taylor configuration.
-    ///
-    /// # Arguments
-    /// * `max_order` - Maximum polynomial order
-    /// * `num_vars` - Number of variables (must be <= MAX_VARS)
-    /// * `epsilon` - Truncation threshold for small coefficients
-    ///
-    /// # Returns
-    /// A new configuration, or error if num_vars exceeds MAX_VARS
     pub fn new(max_order: u32, num_vars: usize, epsilon: f64) -> Result<Self> {
-        if num_vars > super::MAX_VARS {
+        if num_vars > MAX_VARS {
             bail!(
                 "Number of variables ({}) exceeds maximum ({})",
-                num_vars,
-                super::MAX_VARS
+                num_vars, MAX_VARS
             );
         }
-        
-        Ok(Self {
-            max_order,
-            num_vars,
-            epsilon,
-        })
+        Ok(Self { max_order, num_vars, epsilon })
     }
 }
 
-/// Global Taylor configuration (COSY-style global state for easier transpilation)
-static TAYLOR_CONFIG: RwLock<Option<TaylorConfig>> = RwLock::new(None);
+/// Sentinel value in `mult_table` indicating the product exceeds `init_order`.
+pub const MULT_INVALID: u32 = u32::MAX;
 
-/// Initialize the Taylor series system.
+/// Maximum memory (bytes) for the multiplication index table.
+/// Above this threshold, DA multiply falls back to on-the-fly index computation.
+const MAX_MULT_TABLE_BYTES: usize = 256 * 1024 * 1024;
+
+/// Precomputed runtime tables for fast DA operations.
 ///
-/// Must be called before any DA/CD operations.
+/// Built once at `init_taylor()` time. The multiplication table enables
+/// O(1) product-index lookup instead of runtime exponent addition + hash.
+pub struct TaylorRuntime {
+    /// Mutable configuration (epsilon and max_order can change via DAEPS/DANOT)
+    pub config: TaylorConfig,
+    /// The order used when building the mult_table
+    pub init_order: u32,
+    /// Total number of monomials: C(max_order + num_vars, num_vars)
+    pub num_monomials: usize,
+    /// Index → Monomial mapping (graded lexicographic order)
+    pub monomial_list: Vec<Monomial>,
+    /// Monomial → Index mapping (for set_coeff, get_coeff, division)
+    pub monomial_index: FxHashMap<Monomial, u32>,
+    /// Index → total_order (fast lookup for DANOT truncation checks)
+    pub monomial_orders: Vec<u8>,
+    /// Flat-index of each variable's monomial: variable_indices[v] = index of x_{v+1}
+    pub variable_indices: [u32; MAX_VARS],
+    /// Multiplication index table: `mult_table[i * num_monomials + j]` = index of
+    /// monomial_i × monomial_j, or `MULT_INVALID` if the product exceeds init_order.
+    /// `None` when num_monomials is too large for a table (falls back to on-the-fly).
+    pub mult_table: Option<Vec<u32>>,
+}
+
+/// Read guard wrapper that dereferences directly to `TaylorRuntime`.
+pub struct RuntimeRef(std::sync::RwLockReadGuard<'static, Option<TaylorRuntime>>);
+
+impl std::ops::Deref for RuntimeRef {
+    type Target = TaylorRuntime;
+    #[inline]
+    fn deref(&self) -> &TaylorRuntime {
+        // SAFETY: get_runtime() checks is_some() before constructing RuntimeRef
+        unsafe { self.0.as_ref().unwrap_unchecked() }
+    }
+}
+
+static TAYLOR_RUNTIME: RwLock<Option<TaylorRuntime>> = RwLock::new(None);
+
+/// Initialize the Taylor series system and precompute runtime tables.
+///
+/// Must be called before any DA/CD operations. Builds:
+/// - Monomial enumeration in graded lexicographic order
+/// - Monomial → flat-index mapping
+/// - N×N multiplication index table (when memory permits)
 ///
 /// # Arguments
 /// * `max_order` - Maximum order of Taylor expansions
-/// * `num_vars` - Number of variables
-///
-/// # Returns
-/// Ok(()) on success, or error if already initialized or invalid parameters
-///
-/// # Example
-/// ```
-/// use rosy_lib::taylor::init_taylor;
-/// 
-/// init_taylor(10, 3)?;  // Order 10, 3 variables
-/// ```
+/// * `num_vars` - Number of variables (≤ MAX_VARS)
 pub fn init_taylor(max_order: u32, num_vars: usize) -> Result<()> {
-    let mut config = TAYLOR_CONFIG.write()
-        .map_err(|e| anyhow::anyhow!("Failed to acquire config lock: {}", e))?;
-    
-    if config.is_some() {
+    let mut guard = TAYLOR_RUNTIME.write()
+        .map_err(|e| anyhow::anyhow!("Failed to acquire runtime lock: {}", e))?;
+
+    if guard.is_some() {
         bail!("Taylor system already initialized. Call cleanup_taylor() first.");
     }
-    
-    *config = Some(TaylorConfig::new(max_order, num_vars, DEFAULT_EPSILON)?);
+
+    let config = TaylorConfig::new(max_order, num_vars, DEFAULT_EPSILON)?;
+
+    // Build monomial list in graded lexicographic order
+    let monomial_list = enumerate_monomials(max_order, num_vars as u32);
+    let num_monomials = monomial_list.len();
+
+    // Build reverse index: Monomial → flat index
+    let mut monomial_index = FxHashMap::with_capacity_and_hasher(num_monomials, Default::default());
+    for (i, mono) in monomial_list.iter().enumerate() {
+        monomial_index.insert(*mono, i as u32);
+    }
+
+    // Build order lookup table
+    let monomial_orders: Vec<u8> = monomial_list.iter().map(|m| m.total_order).collect();
+
+    // Build variable index lookup
+    let mut variable_indices = [0u32; MAX_VARS];
+    for v in 0..num_vars {
+        let mono = Monomial::variable(v);
+        variable_indices[v] = *monomial_index.get(&mono)
+            .unwrap_or_else(|| panic!(
+                "BUG: variable monomial x{} missing from enumeration (order={}, nvars={})",
+                v + 1, max_order, num_vars
+            ));
+    }
+
+    // Build multiplication table (if it fits in memory)
+    let table_bytes = (num_monomials as u128) * (num_monomials as u128) * 4;
+    let mult_table = if table_bytes <= MAX_MULT_TABLE_BYTES as u128 {
+        let n = num_monomials;
+        let mut table = vec![MULT_INVALID; n * n];
+        for i in 0..n {
+            let row = i * n;
+            for j in 0..n {
+                let product = monomial_list[i].multiply(&monomial_list[j]);
+                if product.within_order(max_order) {
+                    if let Some(&idx) = monomial_index.get(&product) {
+                        table[row + j] = idx;
+                    }
+                }
+            }
+        }
+        Some(table)
+    } else {
+        None
+    };
+
+    *guard = Some(TaylorRuntime {
+        config,
+        init_order: max_order,
+        num_monomials,
+        monomial_list,
+        monomial_index,
+        monomial_orders,
+        variable_indices,
+        mult_table,
+    });
+
     Ok(())
 }
 
-/// Get the current Taylor configuration.
+/// Get a read-locked reference to the runtime tables.
 ///
-/// # Returns
-/// The current configuration, or error if not initialized
+/// The returned `RuntimeRef` holds a read lock for its lifetime.
+/// In single-threaded Rosy programs, this has no contention.
+#[inline]
+pub fn get_runtime() -> Result<RuntimeRef> {
+    let guard = TAYLOR_RUNTIME.read()
+        .map_err(|e| anyhow::anyhow!("Failed to acquire runtime lock: {}", e))?;
+    if guard.is_none() {
+        bail!("Taylor system not initialized. Call init_taylor() first.");
+    }
+    Ok(RuntimeRef(guard))
+}
+
+/// Get the current Taylor configuration (convenience wrapper).
 pub fn get_config() -> Result<TaylorConfig> {
-    let config = TAYLOR_CONFIG.read()
-        .map_err(|e| anyhow::anyhow!("Failed to acquire config lock: {}", e))?;
-    
-    config.ok_or_else(|| {
-        anyhow::anyhow!("Taylor system not initialized. Call init_taylor() first.")
-    })
+    let rt = get_runtime()?;
+    Ok(rt.config)
 }
 
 /// Set the epsilon value for coefficient truncation.
 ///
-/// # Arguments
-/// * `epsilon` - New epsilon value
-///
 /// # Returns
-/// The previous epsilon value, or error if not initialized
+/// The previous epsilon value
 pub fn set_epsilon(epsilon: f64) -> Result<f64> {
-    let mut config = TAYLOR_CONFIG.write()
-        .map_err(|e| anyhow::anyhow!("Failed to acquire config lock: {}", e))?;
-    
-    let cfg = config.as_mut()
+    let mut guard = TAYLOR_RUNTIME.write()
+        .map_err(|e| anyhow::anyhow!("Failed to acquire runtime lock: {}", e))?;
+    let rt = guard.as_mut()
         .ok_or_else(|| anyhow::anyhow!("Taylor system not initialized"))?;
-    
-    let old_epsilon = cfg.epsilon;
-    cfg.epsilon = epsilon;
-    Ok(old_epsilon)
+    let old = rt.config.epsilon;
+    rt.config.epsilon = epsilon;
+    Ok(old)
 }
 
-/// Set the momentary truncation order for DA/CD computations.
+/// Set the momentary truncation order for DA/CD computations (DANOT).
+///
+/// Cannot exceed the order used at initialization.
 ///
 /// # Returns
-/// The previous truncation order, or error if not initialized
+/// The previous truncation order
 pub fn set_truncation_order(order: u32) -> Result<u32> {
-    let mut config = TAYLOR_CONFIG.write()
-        .map_err(|e| anyhow::anyhow!("Failed to acquire config lock: {}", e))?;
-
-    let cfg = config.as_mut()
+    let mut guard = TAYLOR_RUNTIME.write()
+        .map_err(|e| anyhow::anyhow!("Failed to acquire runtime lock: {}", e))?;
+    let rt = guard.as_mut()
         .ok_or_else(|| anyhow::anyhow!("Taylor system not initialized"))?;
-
-    let old_order = cfg.max_order;
-    cfg.max_order = order;
-    Ok(old_order)
+    if order > rt.init_order {
+        bail!(
+            "Cannot set truncation order ({}) above init order ({})",
+            order, rt.init_order
+        );
+    }
+    let old = rt.config.max_order;
+    rt.config.max_order = order;
+    Ok(old)
 }
 
 /// Check if Taylor system is initialized.
 pub fn is_initialized() -> bool {
-    TAYLOR_CONFIG.read()
-        .map(|c| c.is_some())
+    TAYLOR_RUNTIME.read()
+        .map(|g| g.is_some())
         .unwrap_or(false)
 }
 
 /// Clean up the Taylor system (for re-initialization).
 pub fn cleanup_taylor() {
-    if let Ok(mut config) = TAYLOR_CONFIG.write() {
-        *config = None;
+    if let Ok(mut guard) = TAYLOR_RUNTIME.write() {
+        *guard = None;
     }
 }
 
@@ -157,18 +249,81 @@ mod tests {
 
     #[test]
     fn test_global_init() {
-        cleanup_taylor(); // Clean slate
-        
+        cleanup_taylor();
+
         assert!(!is_initialized());
-        
+
         init_taylor(5, 2).unwrap();
         assert!(is_initialized());
-        
+
         let cfg = get_config().unwrap();
         assert_eq!(cfg.max_order, 5);
         assert_eq!(cfg.num_vars, 2);
-        
+
+        // Check runtime tables
+        let rt = get_runtime().unwrap();
+        // C(5+2, 2) = 21 monomials for order 5, 2 vars
+        assert_eq!(rt.num_monomials, 21);
+        assert_eq!(rt.monomial_list.len(), 21);
+        assert!(rt.mult_table.is_some());
+        let table = rt.mult_table.as_ref().unwrap();
+        assert_eq!(table.len(), 21 * 21);
+
+        // Constant monomial is at index 0
+        assert_eq!(rt.monomial_list[0], Monomial::constant());
+        // Variable indices are populated
+        assert!(rt.variable_indices[0] > 0); // x1 is not the constant
+        assert!(rt.variable_indices[1] > 0); // x2 is not the constant
+
+        drop(rt);
         cleanup_taylor();
         assert!(!is_initialized());
+    }
+
+    #[test]
+    fn test_mult_table_correctness() {
+        cleanup_taylor();
+        init_taylor(3, 2).unwrap();
+
+        let rt = get_runtime().unwrap();
+        let table = rt.mult_table.as_ref().unwrap();
+        let n = rt.num_monomials;
+
+        // Verify: for every valid (i,j), table[i*n+j] gives the correct product index
+        for i in 0..n {
+            for j in 0..n {
+                let product = rt.monomial_list[i].multiply(&rt.monomial_list[j]);
+                let k = table[i * n + j];
+                if product.within_order(3) {
+                    assert_ne!(k, MULT_INVALID, "Product of monomials {} and {} should be valid", i, j);
+                    assert_eq!(rt.monomial_list[k as usize], product);
+                } else {
+                    assert_eq!(k, MULT_INVALID, "Product of monomials {} and {} should be INVALID", i, j);
+                }
+            }
+        }
+
+        drop(rt);
+        cleanup_taylor();
+    }
+
+    #[test]
+    fn test_danot_cannot_exceed_init_order() {
+        cleanup_taylor();
+        init_taylor(5, 2).unwrap();
+
+        // Can reduce
+        let old = set_truncation_order(3).unwrap();
+        assert_eq!(old, 5);
+
+        // Can restore
+        let old = set_truncation_order(5).unwrap();
+        assert_eq!(old, 3);
+
+        // Cannot exceed
+        let result = set_truncation_order(6);
+        assert!(result.is_err());
+
+        cleanup_taylor();
     }
 }

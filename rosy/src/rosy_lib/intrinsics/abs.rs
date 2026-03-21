@@ -67,6 +67,7 @@ impl RosyABS for DA {
     type Output = RE;
     fn rosy_abs(&self) -> anyhow::Result<RE> {
         let max_coeff = self.coeffs_iter()
+            .into_iter()
             .map(|(_, c)| c.abs())
             .fold(0.0_f64, f64::max);
         Ok(max_coeff)
@@ -78,6 +79,6 @@ impl RosyABS for CD {
     type Output = RE;
     fn rosy_abs(&self) -> anyhow::Result<RE> {
         use crate::rosy_lib::taylor::DACoefficient;
-        Ok(self.coeffs_iter().map(|(_, c)| c.abs()).fold(0.0_f64, f64::max))
+        Ok(self.coeffs_iter().into_iter().map(|(_, c)| c.abs()).fold(0.0_f64, f64::max))
     }
 }

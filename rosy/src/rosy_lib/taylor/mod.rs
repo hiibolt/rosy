@@ -4,11 +4,11 @@
 //! for automatic differentiation and polynomial manipulation in beam physics simulations.
 
 pub mod monomial;
-mod config;
+pub mod config;
 pub mod da;
 
 pub use monomial::{Monomial, enumerate_monomials};
-pub use config::{TaylorConfig, init_taylor, cleanup_taylor, get_config, set_epsilon, set_truncation_order};
+pub use config::{TaylorConfig, TaylorRuntime, init_taylor, cleanup_taylor, get_config, get_runtime, set_epsilon, set_truncation_order};
 pub use da::DACoefficient;
 
 // Core generic differential algebra type
