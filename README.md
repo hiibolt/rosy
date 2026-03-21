@@ -65,10 +65,26 @@ nix develop   # Enters a shell with nightly Rust + all dependencies
 rosy run examples/basic.rosy                   # run directly
 rosy build examples/basic.rosy -o out          # build a binary
 rosy build examples/basic.rosy --release       # release build
-rosy build examples/basic.rosy --optimized     # max performance (LTO + SIMD DA)
+rosy build examples/basic.rosy --optimized     # max performance (recommended)
 ```
 
-The `--optimized` flag enables LTO, single codegen unit, and SIMD-accelerated differential algebra operations. Use it for production beam physics work — builds are slower but binaries are significantly faster.
+## Build Modes
+
+Use `--optimized` for any real computation. It produces significantly faster binaries at the cost of longer compile times.
+
+| Flag | Compile time | Runtime | Use case |
+|------|-------------|---------|----------|
+| *(none)* | ~1s | Slowest | Syntax checking, debugging |
+| `--release` | ~2s | Fast | Quick iteration during development |
+| **`--optimized`** | **~5s** | **Fastest** | **Production runs, benchmarks, beam physics** |
+
+`--optimized` enables:
+- **LTO** (link-time optimization) — whole-program optimization across all crate boundaries
+- **Single codegen unit** — allows inlining of DA hot paths across `taylor/` and `intrinsics/` modules
+- **SIMD DA operations** — `portable_simd` acceleration for differential algebra (requires nightly Rust)
+- **`panic = abort`** — eliminates unwinding overhead
+
+> **Recommendation:** Always use `--optimized` for actual physics runs. The extra ~3s of compile time is negligible compared to the runtime savings on any non-trivial computation. Reserve `--release` for rapid edit-run cycles during development.
 
 ## Language Documentation
 
