@@ -182,7 +182,12 @@ impl TranspileableExpr for VarExpr {
         let ident = &self.identifier;
         if let Some(slot) = ctx.variables.get(&ident.name) {
             deps.insert(slot.clone());
-            Some(ExprRecipe::Variable(slot.clone()))
+            let num_indices = ident.num_index_dimensions();
+            if num_indices > 0 {
+                Some(ExprRecipe::IndexedVariable(slot.clone(), num_indices))
+            } else {
+                Some(ExprRecipe::Variable(slot.clone()))
+            }
         } else {
             Some(ExprRecipe::Unknown)
         }

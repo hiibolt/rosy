@@ -94,6 +94,9 @@ pub enum ExprRecipe {
     Literal(RosyType),
     /// A variable reference — look up its slot.
     Variable(TypeSlot),
+    /// An indexed variable reference — look up its slot and reduce dimensions.
+    /// e.g., `A(R)(C)` on a 2D array has num_indices=2, reducing RE** to RE.
+    IndexedVariable(TypeSlot, usize),
     /// A binary operator applied to two sub-recipes.
     BinaryOp { op: BinaryOpKind, left: Box<ExprRecipe>, right: Box<ExprRecipe> },
     /// An n-ary concat of sub-recipes.
@@ -558,6 +561,12 @@ impl TypeResolver {
                 self.nodes.get(slot)
                     .and_then(|n| n.resolved.clone())
                     .ok_or_else(|| anyhow!("Variable slot {} not resolved", slot))
+            }
+            ExprRecipe::IndexedVariable(slot, num_indices) => {
+                let base = self.nodes.get(slot)
+                    .and_then(|n| n.resolved.clone())
+                    .ok_or_else(|| anyhow!("Variable slot {} not resolved", slot))?;
+                Ok(RosyType::new(base.base_type, base.dimensions.saturating_sub(*num_indices)))
             }
             ExprRecipe::BinaryOp { op, left, right } => {
                 let left_type = self.evaluate_recipe(left)?;
