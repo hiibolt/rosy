@@ -49,6 +49,42 @@ rustup update nightly
 cargo install --path rosy
 ```
 
+### Migrating from Rust Stable to Nightly
+
+If you previously installed Rosy with Rust stable, switch to nightly for `--optimized` support:
+
+```bash
+rustup default nightly
+cd rosy && git pull
+cargo install --path rosy --force
+```
+
+### NIU Metis Quick Start
+
+```bash
+# First-time setup
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
+rustup default nightly
+git clone https://github.com/hiibolt/rosy.git
+cd rosy && cargo install --path rosy
+
+# For MPI programs (PLOOP)
+module load openmpi/openmpi-5.0.7-gcc-14.2.0-cuda-12.8
+
+# Run a program
+rosy run examples/basic.rosy
+rosy build examples/basic.rosy --optimized -o my_program
+```
+
+To update:
+
+```bash
+cd ~/rosy && git pull
+rustup update nightly
+cargo install --path rosy --force
+```
+
 ### From GitHub Releases
 
 Prebuilt binaries for Linux (x86_64) and macOS (x86_64, aarch64) are available on the [Releases page](https://github.com/hiibolt/rosy/releases/latest).
