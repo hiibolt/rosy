@@ -18,7 +18,7 @@ CPUSEC T1 ;
 
 PLOOP I 1 20 ;
     ACC := 0.0 ;
-    LOOP J 1 50000 ;
+    LOOP J 1 3000000 ;
         V := SIN(I * J * 0.0001) & COS(I * J * 0.0001)
            & SIN(I * J * 0.0002) & COS(I * J * 0.0002)
            & SIN(I * J * 0.0003) & COS(I * J * 0.0003)

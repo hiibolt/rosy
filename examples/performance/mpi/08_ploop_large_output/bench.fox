@@ -23,7 +23,7 @@ PLOOP I 1 20 ;
     ACC := 0.0 ;
     X := I * 0.01 ;
     Y := I * 0.02 ;
-    LOOP J 1 7500000 ;
+    LOOP J 1 150000000 ;
         Z := SIN(X) * COS(Y) + SQRT(ABS(X * Y)) ;
         ACC := ACC + Z ;
         X := X + 0.0000001 ;

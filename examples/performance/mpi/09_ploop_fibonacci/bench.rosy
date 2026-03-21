@@ -24,7 +24,7 @@ PLOOP I 1 NP ;
     { Fib(25) to Fib(44) - varying difficulty per rank }
     N := 24 + I ;
     { Repeat the computation 500000 times for substantial work }
-    LOOP J 1 500000 ;
+    LOOP J 1 12000000 ;
         A := 0 ;
         B := 1 ;
         LOOP K 1 N ;

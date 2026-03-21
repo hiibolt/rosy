@@ -21,14 +21,17 @@ PLOOP I 1 NP ;
     VARIABLE (RE) OBJ ;
     VARIABLE (RE) EPS ;
 
-    { Different starting point per rank }
-    A := -5.0 + I * 0.5 ;
-    B := -5.0 + I * 0.3 ;
-    EPS := 0.0000000001 ;
+    { Repeat optimization 60 times per rank for substantial work }
+    LOOP REP 1 60 ;
+        { Different starting point per rank and rep }
+        A := -5.0 + I * 0.5 + REP * 0.01 ;
+        B := -5.0 + I * 0.3 + REP * 0.01 ;
+        EPS := 0.0000000001 ;
 
-    FIT A B ;
-        OBJ := 100 * (B - A * A) ^ 2 + (1 - A) ^ 2 ;
-    ENDFIT EPS 10000 1 OBJ ;
+        FIT A B ;
+            OBJ := 100 * (B - A * A) ^ 2 + (1 - A) ^ 2 ;
+        ENDFIT EPS 10000 1 OBJ ;
+    ENDLOOP ;
 
     RESULTS(I) := OBJ ;
 ENDPLOOP RESULTS ;

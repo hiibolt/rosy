@@ -24,7 +24,7 @@ PLOOP I 1 20 ;
     LOOP J 1 20 ;
         ACC := 0.0 ;
         X := I * 0.1 + J * 0.01 ;
-        LOOP K 1 180000 ;
+        LOOP K 1 6000000 ;
             ACC := ACC + SIN(X) * COS(X) + X * X ;
             X := X + 0.0000001 ;
         ENDLOOP ;

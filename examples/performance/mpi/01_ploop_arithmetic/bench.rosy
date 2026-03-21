@@ -1,6 +1,6 @@
 { Benchmark: PLOOP with heavy arithmetic per iteration }
 { Tests: embarrassingly parallel FP workload distribution }
-{ 20 iterations, each doing 25M arithmetic operations }
+{ 20 iterations, each doing 300M arithmetic operations }
 BEGIN ;
 
 VARIABLE (RE) T1 ;
@@ -9,7 +9,7 @@ VARIABLE (RE) NP ;
 VARIABLE (RE) INNER ;
 
 NP := 20 ;
-INNER := 25000000 ;
+INNER := 300000000 ;
 
 VARIABLE (RE NP) RESULTS ;
 

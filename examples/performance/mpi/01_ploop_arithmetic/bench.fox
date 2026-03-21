@@ -1,6 +1,6 @@
 { Benchmark: PLOOP with heavy arithmetic per iteration }
 { Tests: embarrassingly parallel FP workload distribution }
-{ 20 iterations, each doing 25M arithmetic operations }
+{ 20 iterations, each doing 300M arithmetic operations }
 BEGIN ;
 
 VARIABLE T1 1 ;
@@ -19,7 +19,7 @@ CPUSEC T1 ;
 PLOOP I 1 20 ;
     ACC := 0.0 ;
     X := I * 0.01 ;
-    LOOP J 1 25000000 ;
+    LOOP J 1 300000000 ;
         ACC := ACC + X * X - X / (X + 1.0) + SQRT(ABS(X)) ;
         X := X + 0.0000001 ;
     ENDLOOP ;
