@@ -1,0 +1,30 @@
+{ Test POLVAL: basic polynomial evaluation }
+BEGIN;
+  DAINI 2 1 0 0;
+
+  VARIABLE (DA) p1;
+  VARIABLE (DA) p2;
+  VARIABLE (RE) a1;
+  VARIABLE (RE) r1;
+  VARIABLE (RE) r2;
+
+  { p1(x) = 2 + 3*x + x^2, evaluated at x=2 => 12 }
+  p1 := 2.0 + 3.0*DA(1) + DA(1)^2;
+  { p2(x) = 1 + x, evaluated at x=2 => 3 }
+  p2 := 1.0 + DA(1);
+  a1 := 2.0;
+
+  { Simple single-DA evaluation using POLVAL }
+  VARIABLE (DA) parr 2;
+  VARIABLE (RE) aarr 1;
+  VARIABLE (RE) rarr 2;
+
+  parr(1) := p1;
+  parr(2) := p2;
+  aarr(1) := a1;
+
+  POLVAL 1 parr 2 aarr 1 rarr 2;
+
+  WRITE 6 rarr(1);
+  WRITE 6 rarr(2);
+END;

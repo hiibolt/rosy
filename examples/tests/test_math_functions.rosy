@@ -1,0 +1,99 @@
+{ Test math functions: VMIN, ABS, INT, NINT, NORM, CONS, TYPE }
+BEGIN;
+    { VMIN - min element of a vector }
+    VARIABLE (VE) v;
+    VARIABLE (RE) r;
+
+    v := 3.0&1.0&2.0;
+    r := VMIN(v);
+    WRITE 6 ST(r);
+
+    v := -5.0&3.0&-2.0;
+    r := VMIN(v);
+    WRITE 6 ST(r);
+
+    { ABS - absolute value }
+    VARIABLE (RE) x;
+    x := -3.5;
+    r := ABS(x);
+    WRITE 6 ST(r);
+
+    x := 3.5;
+    r := ABS(x);
+    WRITE 6 ST(r);
+
+    x := 0.0;
+    r := ABS(x);
+    WRITE 6 ST(r);
+
+    { ABS of complex: returns modulus }
+    VARIABLE (CM) c;
+    c := CM(3.0&4.0);
+    r := ABS(c);
+    WRITE 6 ST(r);
+
+    c := CM(0.0&0.0);
+    r := ABS(c);
+    WRITE 6 ST(r);
+
+    { ABS of VE: sum of abs values }
+    v := 1.0&-2.0&3.0;
+    r := ABS(v);
+    WRITE 6 ST(r);
+
+    { INT - truncate toward zero }
+    x := 2.9;
+    r := INT(x);
+    WRITE 6 ST(r);
+
+    x := -2.9;
+    r := INT(x);
+    WRITE 6 ST(r);
+
+    x := 2.0;
+    r := INT(x);
+    WRITE 6 ST(r);
+
+    { INT of VE }
+    VARIABLE (VE) vint;
+    v := 1.5&2.7&-3.9;
+    vint := INT(v);
+    WRITE 6 ST(vint);
+
+    { NINT - round to nearest integer }
+    x := 2.4;
+    r := NINT(x);
+    WRITE 6 ST(r);
+
+    x := 2.5;
+    r := NINT(x);
+    WRITE 6 ST(r);
+
+    x := -2.5;
+    r := NINT(x);
+    WRITE 6 ST(r);
+
+    { NINT of VE }
+    v := 1.4&2.6&-3.5;
+    vint := NINT(v);
+    WRITE 6 ST(vint);
+
+    { TYPE - returns type code as RE }
+    VARIABLE (RE) tcode;
+    tcode := TYPE(x);
+    WRITE 6 ST(tcode);
+
+    VARIABLE (ST) s;
+    s := "hello";
+    tcode := TYPE(s);
+    WRITE 6 ST(tcode);
+
+    tcode := TYPE(v);
+    WRITE 6 ST(tcode);
+
+    VARIABLE (LO) l;
+    l := TRUE;
+    tcode := TYPE(l);
+    WRITE 6 ST(tcode);
+
+END;

@@ -1,0 +1,28 @@
+                        
+                        
+                        
+                        
+                       ************************************
+                       *                                  *
+                       *    C O S Y    I N F I N I T Y    *
+                       *                                  *
+                       *       FOXY LANGUAGE SYSTEM       *
+                       *                                  *
+                       *           VERSION  10.2          *
+                       *                                  *
+                       *           (C) MSU 2022           *
+                       *                                  *
+                       ************************************
+                        
+                        
+                        
+                        
+ GIVE SOURCE FILE NAME WITHOUT EXTENSION .FOX
+ bench_t3                                                                       
+ --- BEGINNING COMPILATION 
+ --- BEGINNING EXECUTION
+Arithmetic Loop Benchmark: 500M iterations
+Result Z = 
+  1599744892.592534     
+CPUSEC: 
+  15.46836462785723     

@@ -1,0 +1,32 @@
+                        
+                        
+                        
+                        
+                       ************************************
+                       *                                  *
+                       *    C O S Y    I N F I N I T Y    *
+                       *                                  *
+                       *       FOXY LANGUAGE SYSTEM       *
+                       *                                  *
+                       *           VERSION  10.2          *
+                       *                                  *
+                       *           (C) MSU 2022           *
+                       *                                  *
+                       ************************************
+                        
+                        
+                        
+                        
+ GIVE SOURCE FILE NAME WITHOUT EXTENSION .FOX
+ bench_t3                                                                       
+ --- BEGINNING COMPILATION 
+ --- BEGINNING EXECUTION
+String Operations Benchmark T4: 1000000 iterations
+Last string: 
+Value= 3141590.000000000 Index= 1000000.000000000
+Last substr: 
+Value=
+Last length: 
+  49.00000000000000     
+CPUSEC: 
+  1.291724970156793     

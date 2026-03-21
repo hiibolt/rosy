@@ -1,0 +1,3 @@
+Arithmetic Loop Benchmark: 100M iterations
+Result Z =  277459822.7735369    
+CPUSEC: 0.0000000000000000E-07

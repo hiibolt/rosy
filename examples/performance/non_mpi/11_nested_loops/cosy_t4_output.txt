@@ -1,0 +1,28 @@
+                        
+                        
+                        
+                        
+                       ************************************
+                       *                                  *
+                       *    C O S Y    I N F I N I T Y    *
+                       *                                  *
+                       *       FOXY LANGUAGE SYSTEM       *
+                       *                                  *
+                       *           VERSION  10.2          *
+                       *                                  *
+                       *           (C) MSU 2022           *
+                       *                                  *
+                       ************************************
+                        
+                        
+                        
+                        
+ GIVE SOURCE FILE NAME WITHOUT EXTENSION .FOX
+ bench_t3                                                                       
+ --- BEGINNING COMPILATION 
+ --- BEGINNING EXECUTION
+Nested Loops Benchmark T4: 500^3 = 125,000,000 iterations
+Accumulated result: 
+  31621969.44784490     
+CPUSEC: 
+  4.613870197557844     

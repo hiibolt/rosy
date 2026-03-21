@@ -1,0 +1,50 @@
+BEGIN ;
+
+{ Test 1: Simplex optimizer - find min of (X-3)^2 + (Y-7)^2 }
+VARIABLE (RE) X ;
+VARIABLE (RE) Y ;
+VARIABLE (RE) OBJ ;
+
+VARIABLE (RE) EPS ;
+
+X := 0 ;
+Y := 0 ;
+EPS := 0.0000000001 ;
+
+FIT X Y ;
+  OBJ := (X - 3)*(X - 3) + (Y - 7)*(Y - 7) ;
+ENDFIT EPS 1000 1 OBJ ;
+
+WRITE 6 'SIMPLEX RESULT: X=' X 'Y=' Y 'OBJ=' OBJ ;
+
+{ Test 2: LMDIF optimizer - same problem }
+X := 0 ;
+Y := 0 ;
+
+FIT X Y ;
+  OBJ := (X - 3)*(X - 3) + (Y - 7)*(Y - 7) ;
+ENDFIT EPS 1000 4 OBJ ;
+
+WRITE 6 'LMDIF RESULT: X=' X 'Y=' Y 'OBJ=' OBJ ;
+
+{ Test 3: SA optimizer - same problem }
+X := 0 ;
+Y := 0 ;
+
+FIT X Y ;
+  OBJ := (X - 3)*(X - 3) + (Y - 7)*(Y - 7) ;
+ENDFIT EPS 1000 3 OBJ ;
+
+WRITE 6 'SA RESULT: X=' X 'Y=' Y 'OBJ=' OBJ ;
+
+{ Test 4: max=0 means execute body once, no optimization }
+X := 5 ;
+Y := 10 ;
+
+FIT X Y ;
+  OBJ := (X - 3)*(X - 3) + (Y - 7)*(Y - 7) ;
+ENDFIT EPS 0 1 OBJ ;
+
+WRITE 6 'NO-OPT RESULT: X=' X 'Y=' Y 'OBJ=' OBJ ;
+
+END ;

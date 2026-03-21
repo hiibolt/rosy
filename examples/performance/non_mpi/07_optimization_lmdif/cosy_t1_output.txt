@@ -1,0 +1,40 @@
+                        
+                        
+                        
+                        
+                       ************************************
+                       *                                  *
+                       *    C O S Y    I N F I N I T Y    *
+                       *                                  *
+                       *       FOXY LANGUAGE SYSTEM       *
+                       *                                  *
+                       *           VERSION  10.2          *
+                       *                                  *
+                       *           (C) MSU 2022           *
+                       *                                  *
+                       ************************************
+                        
+                        
+                        
+                        
+ GIVE SOURCE FILE NAME WITHOUT EXTENSION .FOX
+ bench_t2                                                                       
+ --- BEGINNING COMPILATION 
+ --- BEGINNING EXECUTION
+Optimization LMDIF Benchmark: 4-var Rosenbrock, 5 starting points
+Final: A=
+ 0.7953357557490449     
+ B=
+ 0.6451343002253161     
+ C=
+ 0.4239204080045246     
+ D=
+ 0.1762476185784611     
+Final OBJ1=
+ 0.5770136005490961E-001
+ OBJ2=
+ 0.1318928136294590     
+ OBJ3=
+ 0.3330654748645802     
+CPUSEC: 
+ 0.5955000000540167E-002

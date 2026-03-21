@@ -1,0 +1,92 @@
+BEGIN;
+    { Test all comparison and boolean operators }
+    VARIABLE (RE) x;
+    VARIABLE (RE) y;
+    VARIABLE (LO) result;
+    VARIABLE (ST) s1;
+    VARIABLE (ST) s2;
+
+    x := 5.0;
+    y := 10.0;
+
+    { Less than }
+    WRITE 6 "=== Less Than (<) ===";
+    result := x < y;
+    WRITE 6 "5 < 10: " & ST(result);
+    result := y < x;
+    WRITE 6 "10 < 5: " & ST(result);
+
+    { Greater than }
+    WRITE 6 "=== Greater Than (>) ===";
+    result := x > y;
+    WRITE 6 "5 > 10: " & ST(result);
+    result := y > x;
+    WRITE 6 "10 > 5: " & ST(result);
+
+    { Less than or equal (ROSY extension) }
+    WRITE 6 "=== Less Than or Equal (<=) ===";
+    result := x <= y;
+    WRITE 6 "5 <= 10: " & ST(result);
+    result := x <= 5.0;
+    WRITE 6 "5 <= 5: " & ST(result);
+    result := y <= x;
+    WRITE 6 "10 <= 5: " & ST(result);
+
+    { Greater than or equal (ROSY extension) }
+    WRITE 6 "=== Greater Than or Equal (>=) ===";
+    result := y >= x;
+    WRITE 6 "10 >= 5: " & ST(result);
+    result := x >= 5.0;
+    WRITE 6 "5 >= 5: " & ST(result);
+    result := x >= y;
+    WRITE 6 "5 >= 10: " & ST(result);
+
+    { NOT operator (ROSY extension) }
+    WRITE 6 "=== NOT Operator ===";
+    result := TRUE;
+    result := !result;
+    WRITE 6 "!TRUE: " & ST(result);
+    result := !FALSE;
+    WRITE 6 "!FALSE (was NOT FALSE): " & ST(result);
+    result := !TRUE;
+    WRITE 6 "!TRUE (was NOT TRUE): " & ST(result);
+
+    { Combining comparisons with NOT }
+    WRITE 6 "=== Combined Expressions ===";
+    result := !(x > y);
+    WRITE 6 "!(5 > 10): " & ST(result);
+    result := !(x = y);
+    WRITE 6 "!(5 = 10): " & ST(result);
+
+    { String comparisons }
+    WRITE 6 "=== String Comparisons ===";
+    s1 := "apple";
+    s2 := "banana";
+    result := s1 < s2;
+    WRITE 6 "'apple' < 'banana': " & ST(result);
+    result := s1 > s2;
+    WRITE 6 "'apple' > 'banana': " & ST(result);
+    result := s1 <= "apple";
+    WRITE 6 "'apple' <= 'apple': " & ST(result);
+    result := s2 >= "banana";
+    WRITE 6 "'banana' >= 'banana': " & ST(result);
+
+    { Logical AND (via multiplication) and OR (via addition) }
+    WRITE 6 "=== Logical AND/OR ===";
+    result := TRUE * TRUE;
+    WRITE 6 "TRUE AND TRUE: " & ST(result);
+    result := TRUE * FALSE;
+    WRITE 6 "TRUE AND FALSE: " & ST(result);
+    result := FALSE + TRUE;
+    WRITE 6 "FALSE OR TRUE: " & ST(result);
+    result := FALSE + FALSE;
+    WRITE 6 "FALSE OR FALSE: " & ST(result);
+
+    { Complex boolean expression }
+    WRITE 6 "=== Complex Boolean Expression ===";
+    result := (x < y) * (y > 0);
+    WRITE 6 "(5 < 10) AND (10 > 0): " & ST(result);
+    result := (x > y) + (y > 0);
+    WRITE 6 "(5 > 10) OR (10 > 0): " & ST(result);
+
+END;

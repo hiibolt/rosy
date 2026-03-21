@@ -1,0 +1,36 @@
+                        
+                        
+                        
+                        
+                       ************************************
+                       *                                  *
+                       *    C O S Y    I N F I N I T Y    *
+                       *                                  *
+                       *       FOXY LANGUAGE SYSTEM       *
+                       *                                  *
+                       *           VERSION  10.2          *
+                       *                                  *
+                       *           (C) MSU 2022           *
+                       *                                  *
+                       ************************************
+                        
+                        
+                        
+                        
+ GIVE SOURCE FILE NAME WITHOUT EXTENSION .FOX
+ bench_t3                                                                       
+ --- BEGINNING COMPILATION 
+ --- BEGINNING EXECUTION
+Optimization Simplex Benchmark: 4-var Rosenbrock, 5000 starting points
+Final: A=
+ -.7756601912919565     
+ B=
+ 0.6130944377160865     
+ C=
+ 0.3820639042894846     
+ D=
+ 0.1459727389656224     
+Final OBJ=
+  3.701428610455044     
+CPUSEC: 
+  1.081730951205827     

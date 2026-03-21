@@ -1,0 +1,28 @@
+                        
+                        
+                        
+                        
+                       ************************************
+                       *                                  *
+                       *    C O S Y    I N F I N I T Y    *
+                       *                                  *
+                       *       FOXY LANGUAGE SYSTEM       *
+                       *                                  *
+                       *           VERSION  10.2          *
+                       *                                  *
+                       *           (C) MSU 2022           *
+                       *                                  *
+                       ************************************
+                        
+                        
+                        
+                        
+ GIVE SOURCE FILE NAME WITHOUT EXTENSION .FOX
+ bench_t1                                                                       
+ --- BEGINNING COMPILATION 
+ --- BEGINNING EXECUTION
+Math Functions Benchmark: 500000 iterations of SIN+COS+EXP+LOG+SQRT
+Accumulated result: 
+  1530797.243381905     
+CPUSEC: 
+ 0.2860099921235815E-001

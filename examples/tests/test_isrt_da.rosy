@@ -1,0 +1,14 @@
+{ Test ISRT and ISRT3 with DA inputs }
+BEGIN;
+    { ISRT of DA: 1/sqrt(4 + x1) }
+    VARIABLE (DA) da;
+    VARIABLE (DA) dar;
+    da := 4.0 + DA(1);
+    dar := ISRT(da);
+    WRITE 6 ST(dar);
+
+    { ISRT3 of DA: (4 + x1)^(-3/2) }
+    dar := ISRT3(da);
+    WRITE 6 ST(dar);
+
+END;

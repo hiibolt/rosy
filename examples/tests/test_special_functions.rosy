@@ -1,0 +1,73 @@
+{ Test ISRT, ISRT3, CMPLX, CONJ, RE(), VE() }
+BEGIN;
+    { ISRT - inverse square root: 1/sqrt(x) }
+    VARIABLE (RE) x;
+    VARIABLE (RE) r;
+    x := 4.0;
+    r := ISRT(x);
+    WRITE 6 ST(r);
+
+    x := 1.0;
+    r := ISRT(x);
+    WRITE 6 ST(r);
+
+    { ISRT of VE }
+    VARIABLE (VE) v;
+    VARIABLE (VE) vr;
+    v := 4.0&9.0&16.0;
+    vr := ISRT(v);
+    WRITE 6 ST(vr);
+
+    { ISRT3 - x^(-3/2) }
+    x := 4.0;
+    r := ISRT3(x);
+    WRITE 6 ST(r);
+
+    x := 1.0;
+    r := ISRT3(x);
+    WRITE 6 ST(r);
+
+    { ISRT3 of VE }
+    v := 4.0&8.0&16.0;
+    vr := ISRT3(v);
+    WRITE 6 ST(vr);
+
+    { CMPLX - convert to complex }
+    VARIABLE (CM) c;
+    x := 3.0;
+    c := CMPLX(x);
+    WRITE 6 ST(c);
+
+    { CMPLX of CM (identity) }
+    VARIABLE (CM) c2;
+    c := CM(2.0&5.0);
+    c2 := CMPLX(c);
+    WRITE 6 ST(c2);
+
+    { CONJ - complex conjugate }
+    c := CM(3.0&4.0);
+    c2 := CONJ(c);
+    WRITE 6 ST(c2);
+
+    { CONJ of RE (identity) }
+    x := 5.0;
+    r := CONJ(x);
+    WRITE 6 ST(r);
+
+    { RE() conversion }
+    r := RE(x);
+    WRITE 6 ST(r);
+
+    r := RE(c);
+    WRITE 6 ST(r);
+
+    { VE() conversion from CM }
+    vr := VE(c);
+    WRITE 6 ST(vr);
+
+    { VE() from VE identity }
+    v := 1.0&2.0&3.0;
+    vr := VE(v);
+    WRITE 6 ST(vr);
+
+END;

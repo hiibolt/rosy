@@ -1,0 +1,38 @@
+{ Benchmark: PLOOP with heavy arithmetic per iteration }
+{ Tests: embarrassingly parallel FP workload distribution }
+{ 100 iterations, each doing 5M arithmetic operations }
+BEGIN ;
+
+VARIABLE T1 1 ;
+VARIABLE T2 1 ;
+VARIABLE NP 1 ;
+VARIABLE INNER 1 ;
+VARIABLE RESULTS 1 100 ;
+VARIABLE ACC 1 ;
+VARIABLE X 1 ;
+
+NP := 100 ;
+INNER := 5000000 ;
+
+WRITE 6 'PLOOP Arithmetic Benchmark: 100 iterations x 5M ops each' ;
+
+CPUSEC T1 ;
+
+PLOOP I 1 NP ;
+    ACC := 0.0 ;
+    X := I * 0.01 ;
+    LOOP J 1 INNER ;
+        ACC := ACC + X * X - X / (X + 1.0) + SQRT(ABS(X)) ;
+        X := X + 0.0000001 ;
+    ENDLOOP ;
+    RESULTS(I) := ACC ;
+ENDPLOOP RESULTS ;
+
+CPUSEC T2 ;
+
+WRITE 6 'Results(1) = ' RESULTS(1) ;
+WRITE 6 'Results(50) = ' RESULTS(50) ;
+WRITE 6 'Results(100) = ' RESULTS(100) ;
+WRITE 6 'CPUSEC: ' T2 - T1 ;
+
+END ;

@@ -1,0 +1,3 @@
+Recursive Fibonacci Benchmark: Fib(5)
+Fib(5) =  5.000000000000000    
+CPUSEC:  0.000000000000000    

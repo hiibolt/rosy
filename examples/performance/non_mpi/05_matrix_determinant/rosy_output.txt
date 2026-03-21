@@ -1,0 +1,3 @@
+Matrix Determinant Benchmark: 15x15, 200 repetitions
+Last determinant:  50947492503385006    
+CPUSEC: -.0000000000000000E-07

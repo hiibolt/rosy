@@ -1,0 +1,30 @@
+                        
+                        
+                        
+                        
+                       ************************************
+                       *                                  *
+                       *    C O S Y    I N F I N I T Y    *
+                       *                                  *
+                       *       FOXY LANGUAGE SYSTEM       *
+                       *                                  *
+                       *           VERSION  10.2          *
+                       *                                  *
+                       *           (C) MSU 2022           *
+                       *                                  *
+                       ************************************
+                        
+                        
+                        
+                        
+ GIVE SOURCE FILE NAME WITHOUT EXTENSION .FOX
+ bench_t2                                                                       
+ --- BEGINNING COMPILATION 
+ --- BEGINNING EXECUTION
+DA Derivatives Benchmark T3: order 10, 3 vars, 50000 iterations
+Monomials per DA vector: 
+  286.0000000000000     
+Result constant part: 
+  0.000000000000000     
+CPUSEC: 
+ 0.1288019954808988     

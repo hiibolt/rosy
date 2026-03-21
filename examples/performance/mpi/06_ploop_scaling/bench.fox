@@ -1,0 +1,41 @@
+{ Benchmark: PLOOP strong scaling test }
+{ Tests: how well parallelism scales with rank count }
+{ 200 iterations of moderate work - designed to show scaling behavior }
+{ Run with different -np values: 1, 2, 4, 8, 16, 32 to measure scaling }
+BEGIN ;
+
+VARIABLE T1 1 ;
+VARIABLE T2 1 ;
+VARIABLE NP 1 ;
+VARIABLE INNER 1 ;
+VARIABLE RESULTS 1 200 ;
+VARIABLE ACC 1 ;
+VARIABLE X 1 ;
+VARIABLE Y 1 ;
+
+NP := 200 ;
+INNER := 2000000 ;
+
+WRITE 6 'PLOOP Scaling Benchmark: 200 iterations x 2M ops each' ;
+WRITE 6 'Run with varying -np to measure strong scaling' ;
+
+CPUSEC T1 ;
+
+PLOOP I 1 NP ;
+    ACC := 0.0 ;
+    X := I * 0.001 ;
+    LOOP J 1 INNER ;
+        Y := X + J * 0.0000001 ;
+        ACC := ACC + SIN(Y) + COS(Y) + SQRT(ABS(Y)) ;
+    ENDLOOP ;
+    RESULTS(I) := ACC ;
+ENDPLOOP RESULTS ;
+
+CPUSEC T2 ;
+
+WRITE 6 'Results(1) = ' RESULTS(1) ;
+WRITE 6 'Results(100) = ' RESULTS(100) ;
+WRITE 6 'Results(200) = ' RESULTS(200) ;
+WRITE 6 'CPUSEC: ' T2 - T1 ;
+
+END ;

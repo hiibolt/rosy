@@ -1,0 +1,38 @@
+BEGIN;
+PROCEDURE MAIN;
+    VARIABLE (DA) X;
+    VARIABLE (DA) Y;
+    VARIABLE (DA) Z;
+    VARIABLE (DA) W;
+    
+    { Test 1: Simple division }
+    X := DA(1);
+    Y := DA(2);
+    Z := X / Y;
+    WRITE 6 'Test 1 - DA(1) / DA(2):';
+    WRITE 6 Z;
+    
+    { Test 2: Division creating higher order terms }
+    X := 1 + DA(1);
+    Y := 2 + DA(2);
+    Z := X / Y;
+    WRITE 6 'Test 2 - (1+DA(1)) / (2+DA(2)):';
+    WRITE 6 Z;
+    
+    { Test 3: More complex expression }
+    X := 3 + 2*DA(1) + DA(2);
+    Y := 1 + DA(1);
+    Z := X / Y;
+    WRITE 6 'Test 3 - (3+2*DA(1)+DA(2)) / (1+DA(1)):';
+    WRITE 6 Z;
+    
+    { Test 4: Division by constant }
+    X := 10 + DA(1);
+    Z := X / 5;
+    WRITE 6 'Test 4 - (10+DA(1)) / 5:';
+    WRITE 6 Z;
+    
+ENDPROCEDURE;
+
+MAIN;
+END;

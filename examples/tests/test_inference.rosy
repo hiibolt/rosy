@@ -1,0 +1,18 @@
+BEGIN;
+    {Test 1: Successful inference - function args + return from call site}
+    FUNCTION ADDTWONUMS X Y;
+        ADDTWONUMS := X + Y;
+    ENDFUNCTION;
+
+    PROCEDURE RUN;
+        VARIABLE X;
+        X := 3;
+        
+        VARIABLE Y ;
+        Y := 4;
+
+        WRITE 6 "Result: " ST(ADDTWONUMS(X, Y));
+    ENDPROCEDURE;
+
+    RUN;
+END;

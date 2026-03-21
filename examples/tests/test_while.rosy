@@ -1,0 +1,58 @@
+BEGIN;
+    { Test WHILE loop }
+    VARIABLE (RE) counter;
+    VARIABLE (RE) sum;
+    
+    { Basic while loop - sum numbers 1 to 5 }
+    counter := 1;
+    sum := 0;
+    WHILE counter <= 5;
+        sum := sum + counter;
+        counter := counter + 1;
+    ENDWHILE;
+    WRITE 6 "Sum of 1 to 5: " & ST(sum);
+    
+    { Countdown }
+    WRITE 6 "Countdown:";
+    counter := 5;
+    WHILE counter > 0;
+        WRITE 6 ST(counter);
+        counter := counter - 1;
+    ENDWHILE;
+    WRITE 6 "Liftoff!";
+    
+    { While with complex condition }
+    VARIABLE (LO) keep_going;
+    counter := 0;
+    keep_going := TRUE;
+    WHILE keep_going;
+        counter := counter + 1;
+        IF counter >= 3;
+            keep_going := FALSE;
+        ENDIF;
+    ENDWHILE;
+    WRITE 6 "Stopped at counter = " & ST(counter);
+    
+    { Empty while (condition immediately false) }
+    WRITE 6 "Testing false condition:";
+    counter := 10;
+    WHILE counter < 5;
+        WRITE 6 "This should not print";
+    ENDWHILE;
+    WRITE 6 "Skipped loop body (as expected)";
+    
+    { Nested while loops }
+    VARIABLE (RE) i;
+    VARIABLE (RE) j;
+    WRITE 6 "Nested loops (multiplication table 1-3):";
+    i := 1;
+    WHILE i <= 3;
+        j := 1;
+        WHILE j <= 3;
+            WRITE 6 ST(i) & " x " & ST(j) & " = " & ST(i * j);
+            j := j + 1;
+        ENDWHILE;
+        i := i + 1;
+    ENDWHILE;
+    
+END;
