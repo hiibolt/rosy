@@ -18,8 +18,8 @@ fn main_wrapper() -> Result<()> {
 		.context("Failed to get group number")? + 1.0f64;
 	// <MPI_END>
 
-	// Initialize Taylor series system (order 10, 6 variables by default)
-	taylor::init_taylor(10, 6)
+	// Initialize Taylor series system (lightweight default — DAINI/OV overrides this)
+	taylor::init_taylor(3, 6)
 		.context("Failed to initialize Taylor system")?;
 
     // <INJECT_START>
