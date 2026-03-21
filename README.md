@@ -25,9 +25,16 @@ y =  1.141120008059867E-001
 
 ### From source (recommended)
 
-Requires the [Rust toolchain](https://rustup.rs/) (stable, edition 2024):
+Requires the [Rust nightly toolchain](https://rustup.rs/) (needed for `--optimized` SIMD support):
 
 ```bash
+# Install Rust (if you don't have it)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Switch to nightly (required for --optimized builds)
+rustup default nightly
+
+# Build and install Rosy
 git clone https://github.com/hiibolt/rosy.git
 cd rosy
 cargo install --path rosy
@@ -36,7 +43,10 @@ cargo install --path rosy
 To update:
 
 ```bash
-git pull && cargo install --path rosy
+cd rosy
+git pull
+rustup update nightly
+cargo install --path rosy
 ```
 
 ### From GitHub Releases
@@ -46,16 +56,19 @@ Prebuilt binaries for Linux (x86_64) and macOS (x86_64, aarch64) are available o
 ### Using Nix Flakes
 
 ```bash
-nix develop
+nix develop   # Enters a shell with nightly Rust + all dependencies
 ```
 
 ## Quick Start
 
 ```bash
-rosy run examples/basic.rosy              # run directly
-rosy build examples/basic.rosy -o out     # build a binary
-rosy build examples/basic.rosy --release  # optimized build
+rosy run examples/basic.rosy                   # run directly
+rosy build examples/basic.rosy -o out          # build a binary
+rosy build examples/basic.rosy --release       # release build
+rosy build examples/basic.rosy --optimized     # max performance (LTO + SIMD DA)
 ```
+
+The `--optimized` flag enables LTO, single codegen unit, and SIMD-accelerated differential algebra operations. Use it for production beam physics work — builds are slower but binaries are significantly faster.
 
 ## Language Documentation
 
