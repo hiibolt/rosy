@@ -27,7 +27,7 @@ use anyhow::{Result, Error, anyhow};
 use crate::ast::{FromRule, Rule};
 use crate::rosy_lib::RosyType;
 use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
-use crate::transpile::{Transpile, TranspileableExpr, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::{Transpile, TranspileableExpr, TranspilationInputContext, TranspilationOutput, ValueKind};
 use crate::program::expressions::Expr;
 
 /// Unary negation expression: `-expr`
@@ -69,31 +69,29 @@ impl Transpile for NegExpr {
         let mut errors = Vec::new();
         let mut requested_variables = BTreeSet::new();
 
-        let operand_ser = match self.operand.transpile(context) {
-            Ok(output) => {
-                requested_variables.extend(output.requested_variables);
-                output.serialization
-            },
+        let operand_output = match self.operand.transpile(context) {
+            Ok(output) => output,
             Err(mut e) => {
                 for err in e.drain(..) {
                     errors.push(err.context("...while transpiling operand of negation"));
                 }
-                String::new()
+                TranspilationOutput::default()
             }
         };
+        requested_variables.extend(operand_output.requested_variables.iter().cloned());
 
         use crate::rosy_lib::RosyBaseType;
         let serialization = if operand_type.base_type == RosyBaseType::RE && operand_type.dimensions == 0 {
-            format!("&mut (-(*{}))", operand_ser)
+            format!("(-{})", operand_output.as_value())
         } else {
-            format!("&mut RosySub::rosy_sub(&*&mut 0.0f64, &*{})?", operand_ser)
+            format!("RosySub::rosy_sub(&0.0f64, {})?", operand_output.as_ref())
         };
 
         if errors.is_empty() {
             Ok(TranspilationOutput {
                 serialization,
                 requested_variables,
-                ..Default::default()
+                value_kind: ValueKind::Owned,
             })
         } else {
             Err(errors)

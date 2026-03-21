@@ -37,7 +37,7 @@ use std::collections::HashSet;
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::TranspileableExpr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, ValueKind};
 use anyhow::{Result, Context, Error, anyhow};
 use crate::rosy_lib::RosyType;
 use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
@@ -106,52 +106,51 @@ impl Transpile for ConcatExpr {
 
         let mut requested_variables = BTreeSet::new();
         let mut errors = Vec::new();
-        let serialization = {
-            // Serialize the first term as a base
-            let first_term = self.terms.get(0)
-                .ok_or(vec!(anyhow!("Concatenation expression must have at least one term!")))?;
-            let mut serialization = match first_term.transpile(context) {
+
+        // Serialize the first term as a base accumulator
+        let first_term = self.terms.get(0)
+            .ok_or(vec!(anyhow!("Concatenation expression must have at least one term!")))?;
+        let mut accumulator = match first_term.transpile(context) {
+            Ok(output) => {
+                requested_variables.extend(output.requested_variables.iter().cloned());
+                output
+            },
+            Err(mut e) => {
+                for err in e.drain(..) {
+                    errors.push(err.context("...while transpiling first term of concatenation"));
+                }
+                TranspilationOutput::default()
+            }
+        };
+
+        // Then, for each subsequent term, serialize and concatenate
+        for (i, term) in self.terms.iter().skip(1).enumerate() {
+            let term_output = match term.transpile(context) {
                 Ok(output) => {
-                    requested_variables.extend(output.requested_variables);
-                    output.serialization
+                    requested_variables.extend(output.requested_variables.iter().cloned());
+                    output
                 },
-                Err(mut e) => {
-                    for err in e.drain(..) {
-                        errors.push(err.context("...while transpiling first term of concatenation"));
+                Err(mut vec_err) => {
+                    for err in vec_err.drain(..) {
+                        errors.push(err.context(format!(
+                            "...while transpiling term {} of concatenation", i+2
+                        )));
                     }
-                    String::new() // dummy value to collect more errors
+                    TranspilationOutput::default()
                 }
             };
+            accumulator = TranspilationOutput {
+                serialization: format!("RosyConcat::rosy_concat({}, {})?", accumulator.as_ref(), term_output.as_ref()),
+                requested_variables: BTreeSet::new(),
+                value_kind: ValueKind::Owned,
+            };
+        }
 
-            // Then, for each subsequent term, serialize and concatenate
-            for (i, term) in self.terms.iter().skip(1).enumerate() {
-                serialization = format!(
-                    "&mut RosyConcat::rosy_concat(&*{}, &*{})?",
-                    serialization,
-                    match term.transpile(context) {
-                        Ok(output) => {
-                            requested_variables.extend(output.requested_variables);
-                            output.serialization
-                        },
-                        Err(vec_err) => {
-                            for err in vec_err {
-                                errors.push(err.context(format!(
-                                    "...while transpiling term {} of concatenation", i+2
-                                )));
-                            }
-                            String::new() // dummy value to collect more errors
-                        }
-                    }
-                );
-            }
-            
-            serialization
-        };
         if errors.is_empty() {
             Ok(TranspilationOutput {
-                serialization,
+                serialization: accumulator.serialization,
                 requested_variables,
-                ..Default::default()
+                value_kind: ValueKind::Owned,
             })
         } else {
             Err(errors)

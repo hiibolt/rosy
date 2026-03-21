@@ -88,19 +88,19 @@ impl Transpile for VelsetStatement {
 
         let component_output = self.component_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling component expression in VELSET".to_string()))?;
-        requested_variables.extend(component_output.requested_variables);
+        requested_variables.extend(component_output.requested_variables.iter().cloned());
 
         let value_output = self.value_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling value expression in VELSET".to_string()))?;
-        requested_variables.extend(value_output.requested_variables);
+        requested_variables.extend(value_output.requested_variables.iter().cloned());
 
         // COSY uses 1-indexed components; convert to 0-indexed for Rust.
         // vec_name is a plain variable name so it can be used as a mutable l-value directly.
         let serialization = format!(
-            "{{ let __velset_idx = (*{} as usize).checked_sub(1).expect(\"VELSET component index must be >= 1\"); {}[__velset_idx] = (*{}).to_owned(); }}",
-            component_output.serialization,
+            "{{ let __velset_idx = ({} as usize).checked_sub(1).expect(\"VELSET component index must be >= 1\"); {}[__velset_idx] = {}; }}",
+            component_output.as_value(),
             vec_name,
-            value_output.serialization,
+            value_output.as_value(),
         );
 
         Ok(TranspilationOutput {

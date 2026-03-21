@@ -26,11 +26,10 @@
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr};
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind};
 use crate::rosy_lib::RosyType;
 use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 use anyhow::{Result, Error, Context as AnyhowContext};
-use std::collections::BTreeSet;
 use std::collections::HashSet;
 
 /// AST node for the `EXP(expr)` intrinsic function (exponential e^x).
@@ -58,21 +57,14 @@ impl Transpile for ExpExpr {
     ) -> Result<TranspilationOutput, Vec<Error>> {
         // Transpile the inner expression
         let inner_output = self.expr.transpile(context)?;
-        
-        // Combine requested variables
-        let mut requested_variables = BTreeSet::new();
-        requested_variables.extend(inner_output.requested_variables);
 
         // Generate the transpiled code
-        let serialization = format!(
-            "&mut RosyEXP::rosy_exp(&*{})?",
-            inner_output.serialization
-        );
+        let serialization = format!("RosyEXP::rosy_exp({})?", inner_output.as_ref());
 
         Ok(TranspilationOutput {
             serialization,
-            requested_variables,
-            ..Default::default()
+            requested_variables: inner_output.requested_variables,
+            value_kind: ValueKind::Owned,
         })
     }
 }

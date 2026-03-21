@@ -20,10 +20,10 @@
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr};
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind};
 use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
-use std::collections::{BTreeSet, HashSet};
+use std::collections::HashSet;
 use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 
 /// LST(n) — String memory size estimator (COSY compatibility).
@@ -52,19 +52,13 @@ impl Transpile for LstExpr {
         context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>> {
         let inner_output = self.expr.transpile(context)?;
-        
-        let mut requested_variables = BTreeSet::new();
-        requested_variables.extend(inner_output.requested_variables);
 
-        let serialization = format!(
-            "&mut RosyLST::rosy_lst(&*{})",
-            inner_output.serialization
-        );
+        let serialization = format!("RosyLST::rosy_lst({})", inner_output.as_ref());
 
         Ok(TranspilationOutput {
             serialization,
-            requested_variables,
-            ..Default::default()
+            requested_variables: inner_output.requested_variables,
+            value_kind: ValueKind::Owned,
         })
     }
 }

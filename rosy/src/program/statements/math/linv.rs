@@ -19,7 +19,7 @@ use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
     ast::*, program::expressions::Expr,
-    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement, add_context_to_all}
+    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement, add_context_to_all, ValueKind}
 };
 
 /// AST node for `LINV matrix inverse n alloc_dim error_flag;`.
@@ -87,7 +87,7 @@ impl Transpile for LinvStatement {
 
         let matrix_output = self.matrix_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling matrix in LINV".to_string()))?;
-        requested_variables.extend(matrix_output.requested_variables);
+        requested_variables.extend(matrix_output.requested_variables.iter().cloned());
 
         let inverse_output = self.inverse_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling inverse in LINV".to_string()))?;
@@ -95,37 +95,37 @@ impl Transpile for LinvStatement {
 
         let n_output = self.n_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling n in LINV".to_string()))?;
-        requested_variables.extend(n_output.requested_variables);
+        requested_variables.extend(n_output.requested_variables.iter().cloned());
 
         let alloc_dim_output = self.alloc_dim_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling alloc_dim in LINV".to_string()))?;
-        requested_variables.extend(alloc_dim_output.requested_variables);
+        requested_variables.extend(alloc_dim_output.requested_variables.iter().cloned());
 
         let error_flag_output = self.error_flag_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling error_flag in LINV".to_string()))?;
         requested_variables.extend(error_flag_output.requested_variables.clone());
 
-        // The inverse and error_flag are output (write) targets.
-        // VarExpr::transpile for a local variable produces `&name`; for higher/arg scopes it
-        // produces just `name`.
-        // - Local: strip leading `&` → bare name, assign directly: `name = value`
-        // - Higher/Arg: no leading `&` → bare name already, assign via deref: `*name = value`
-        fn make_lvalue_assign(serialization: &str, value: &str) -> String {
-            if let Some(bare) = serialization.strip_prefix('&') {
-                format!("{bare} = {value}")
+        // Determine l-value assignment:
+        // - Owned (Copy local): name is plain var → assign directly
+        // - Ref with & prefix (non-Copy local): strip & → assign to bare name
+        // - Ref without & (arg/higher): deref → *name = value
+        fn make_lvalue(ser: &str, value_kind: ValueKind, rhs: &str) -> String {
+            if value_kind == ValueKind::Owned {
+                format!("{ser} = {rhs}")
+            } else if let Some(bare) = ser.strip_prefix('&') {
+                format!("{bare} = {rhs}")
             } else {
-                format!("*{serialization} = {value}")
+                format!("*{ser} = {rhs}")
             }
         }
-
-        let inverse_assign = make_lvalue_assign(&inverse_output.serialization, "rosy_linv_inv");
-        let error_assign = make_lvalue_assign(&error_flag_output.serialization, "rosy_linv_err");
+        let inverse_assign = make_lvalue(&inverse_output.serialization, inverse_output.value_kind, "rosy_linv_inv");
+        let error_assign = make_lvalue(&error_flag_output.serialization, error_flag_output.value_kind, "rosy_linv_err");
 
         let serialization = format!(
-            "{{ let (rosy_linv_inv, rosy_linv_err) = rosy_lib::core::linv::rosy_linv(&*{matrix}, ({n}).to_owned() as usize, ({alloc_dim}).to_owned() as usize)?; {inverse_assign}; {error_assign}; }}",
-            matrix = matrix_output.serialization,
-            n = n_output.serialization,
-            alloc_dim = alloc_dim_output.serialization,
+            "{{ let (rosy_linv_inv, rosy_linv_err) = rosy_lib::core::linv::rosy_linv({matrix}, {n} as usize, {alloc_dim} as usize)?; {inverse_assign}; {error_assign}; }}",
+            matrix = matrix_output.as_ref(),
+            n = n_output.as_value(),
+            alloc_dim = alloc_dim_output.as_value(),
             inverse_assign = inverse_assign,
             error_assign = error_assign,
         );

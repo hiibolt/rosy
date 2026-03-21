@@ -75,23 +75,23 @@ impl Transpile for PolvalStatement {
 
         let l_out  = self.l_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling L in POLVAL".to_string()))?;
-        requested_variables.extend(l_out.requested_variables);
+        requested_variables.extend(l_out.requested_variables.iter().cloned());
 
         let p_out  = self.p_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling P in POLVAL".to_string()))?;
-        requested_variables.extend(p_out.requested_variables);
+        requested_variables.extend(p_out.requested_variables.iter().cloned());
 
         let np_out = self.np_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling NP in POLVAL".to_string()))?;
-        requested_variables.extend(np_out.requested_variables);
+        requested_variables.extend(np_out.requested_variables.iter().cloned());
 
         let a_out  = self.a_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling A in POLVAL".to_string()))?;
-        requested_variables.extend(a_out.requested_variables);
+        requested_variables.extend(a_out.requested_variables.iter().cloned());
 
         let na_out = self.na_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling NA in POLVAL".to_string()))?;
-        requested_variables.extend(na_out.requested_variables);
+        requested_variables.extend(na_out.requested_variables.iter().cloned());
 
         // R is the output variable — needs a mutable borrow
         let r_out  = self.r_expr.transpile(context)
@@ -100,20 +100,22 @@ impl Transpile for PolvalStatement {
 
         let nr_out = self.nr_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling NR in POLVAL".to_string()))?;
-        requested_variables.extend(nr_out.requested_variables);
+        requested_variables.extend(nr_out.requested_variables.iter().cloned());
 
-        // Build a mutable reference to the result variable
-        let r_mut = r_out.serialization.replacen("&*", "&mut *", 1);
+        // Build a mutable reference to the result variable.
+        // as_ref() gives either `&expr` (Owned) or the Ref serialization which
+        // already starts with `&`. Replace the leading `&` with `&mut `.
+        let r_mut = r_out.as_ref().replacen('&', "&mut ", 1);
 
         let serialization = format!(
-            "rosy_lib::core::polval::rosy_polval_re(({}).to_owned(), &*{}, ({}).to_owned() as usize, &*{}, ({}).to_owned() as usize, {}, ({}).to_owned() as usize)?;",
-            l_out.serialization,
-            p_out.serialization,
-            np_out.serialization,
-            a_out.serialization,
-            na_out.serialization,
+            "rosy_lib::core::polval::rosy_polval_re({}, {}, {} as usize, {}, {} as usize, {}, {} as usize)?;",
+            l_out.as_value(),
+            p_out.as_ref(),
+            np_out.as_value(),
+            a_out.as_ref(),
+            na_out.as_value(),
             r_mut,
-            nr_out.serialization,
+            nr_out.as_value(),
         );
 
         Ok(TranspilationOutput {

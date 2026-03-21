@@ -98,36 +98,36 @@ impl Transpile for DatrnStatement {
 
         let input_output = self.input_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling input in DATRN".to_string()))?;
-        requested_variables.extend(input_output.requested_variables);
+        requested_variables.extend(input_output.requested_variables.iter().cloned());
 
         let scales_output = self.scales_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling scales in DATRN".to_string()))?;
-        requested_variables.extend(scales_output.requested_variables);
+        requested_variables.extend(scales_output.requested_variables.iter().cloned());
 
         let shifts_output = self.shifts_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling shifts in DATRN".to_string()))?;
-        requested_variables.extend(shifts_output.requested_variables);
+        requested_variables.extend(shifts_output.requested_variables.iter().cloned());
 
         let m1_output = self.m1_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling m1 in DATRN".to_string()))?;
-        requested_variables.extend(m1_output.requested_variables);
+        requested_variables.extend(m1_output.requested_variables.iter().cloned());
 
         let m2_output = self.m2_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling m2 in DATRN".to_string()))?;
-        requested_variables.extend(m2_output.requested_variables);
+        requested_variables.extend(m2_output.requested_variables.iter().cloned());
 
         let out_output = self.output_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling output in DATRN".to_string()))?;
         requested_variables.extend(out_output.requested_variables.clone());
 
         let serialization = format!(
-            "rosy_lib::core::daprv::rosy_datrn(&*{}, &*{}, &*{}, ({}).to_owned() as usize, ({}).to_owned() as usize, {})?;",
-            input_output.serialization,
-            scales_output.serialization,
-            shifts_output.serialization,
-            m1_output.serialization,
-            m2_output.serialization,
-            out_output.serialization.replace("&mut ", "").replace("&", "&mut "),
+            "rosy_lib::core::daprv::rosy_datrn({}, {}, {}, {} as usize, {} as usize, {})?;",
+            input_output.as_ref(),
+            scales_output.as_ref(),
+            shifts_output.as_ref(),
+            m1_output.as_value(),
+            m2_output.as_value(),
+            out_output.as_ref().replace("&mut ", "").replace("&", "&mut "),
         );
 
         Ok(TranspilationOutput {

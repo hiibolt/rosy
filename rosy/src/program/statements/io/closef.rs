@@ -51,11 +51,11 @@ impl Transpile for ClosefStatement {
 
         let unit_output = self.unit_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling unit expression in CLOSEF".to_string()))?;
-        requested_variables.extend(unit_output.requested_variables);
+        requested_variables.extend(unit_output.requested_variables.iter().cloned());
 
         let serialization = format!(
-            "rosy_lib::core::file_io::rosy_closef(({}).to_owned())?;",
-            unit_output.serialization,
+            "rosy_lib::core::file_io::rosy_closef({})?;",
+            unit_output.as_value(),
         );
 
         Ok(TranspilationOutput {

@@ -178,7 +178,7 @@ impl Transpile for LoopStatement {
             match stmt.transpile(&mut inner_context) {
                 Ok(output) => {
                     serialized_statements.push(output.serialization);
-                    requested_variables.extend(output.requested_variables);
+                    requested_variables.extend(output.requested_variables.iter().cloned());
                 },
                 Err(stmt_errors) => {
                     for e in stmt_errors {
@@ -189,11 +189,8 @@ impl Transpile for LoopStatement {
         }
 
         // Serialize the start, end, and step expressions
-        let start_serialization = match self.start.transpile(context) {
-            Ok(output) => {
-                requested_variables.extend(output.requested_variables);
-                output.serialization
-            },
+        let start_output = match self.start.transpile(context) {
+            Ok(output) => output,
             Err(vec_err) => {
                 for e in vec_err {
                     errors.push(e.context(format!(
@@ -204,11 +201,9 @@ impl Transpile for LoopStatement {
                 return Err(errors);
             }
         };
-        let end_serialization = match self.end.transpile(context) {
-            Ok(output) => {
-                requested_variables.extend(output.requested_variables);
-                output.serialization
-            },
+        requested_variables.extend(start_output.requested_variables.iter().cloned());
+        let end_output = match self.end.transpile(context) {
+            Ok(output) => output,
             Err(vec_err) => {
                 for e in vec_err {
                     errors.push(e.context(format!(
@@ -219,11 +214,12 @@ impl Transpile for LoopStatement {
                 return Err(errors);
             }
         };
+        requested_variables.extend(end_output.requested_variables.iter().cloned());
         let step_serialization = if let Some(step_expr) = &self.step {
             match step_expr.transpile(context) {
                 Ok(output) => {
-                    requested_variables.extend(output.requested_variables);
-                    format!(".step_by(({}).to_owned() as usize)", output.serialization)
+                    requested_variables.extend(output.requested_variables.iter().cloned());
+                    format!(".step_by({} as usize)", output.as_value())
                 },
                 Err(vec_err) => {
                     for e in vec_err {
@@ -240,10 +236,10 @@ impl Transpile for LoopStatement {
         };
 
         let serialization = format!(
-            "for {} in ((({}).to_owned() as usize)..=(({}).to_owned() as usize)){} {{\n\tlet mut {} = {} as RE;\n{}\n}}",
+            "for {} in (({} as usize)..=({} as usize)){} {{\n\tlet mut {} = {} as RE;\n{}\n}}",
             self.iterator,
-            start_serialization,
-            end_serialization,
+            start_output.as_value(),
+            end_output.as_value(),
             step_serialization,
             self.iterator,
             self.iterator,

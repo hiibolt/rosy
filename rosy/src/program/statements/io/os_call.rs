@@ -50,11 +50,11 @@ impl Transpile for OsCallStatement {
 
         let cmd_output = self.cmd_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling command expression in OS".to_string()))?;
-        requested_variables.extend(cmd_output.requested_variables);
+        requested_variables.extend(cmd_output.requested_variables.iter().cloned());
 
         let serialization = format!(
             "{{\n    let __os_cmd: String = ({}).to_string();\n    std::process::Command::new(\"sh\").arg(\"-c\").arg(&__os_cmd).status().ok();\n}}",
-            cmd_output.serialization,
+            cmd_output.as_ref(),
         );
 
         Ok(TranspilationOutput {

@@ -55,12 +55,12 @@ impl Transpile for ScrlenStatement {
 
         let size_output = self.size_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling size expression in SCRLEN".to_string()))?;
-        requested_variables.extend(size_output.requested_variables);
+        requested_variables.extend(size_output.requested_variables.iter().cloned());
 
         // SCRLEN is a no-op in Rosy: scratch space is managed automatically by Rust.
         let serialization = format!(
             "{{ let _ = {}; /* SCRLEN: no-op in Rosy (scratch space managed automatically) */ }}",
-            size_output.serialization,
+            size_output.as_value(),
         );
 
         Ok(TranspilationOutput {

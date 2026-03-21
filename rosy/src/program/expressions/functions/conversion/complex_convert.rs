@@ -21,7 +21,7 @@
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::TranspileableExpr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, ValueKind};
 use anyhow::{Result, Error, Context};
 use std::collections::HashSet;
 use crate::rosy_lib::RosyType;
@@ -69,21 +69,17 @@ impl Transpile for ComplexConvertExpr {
             .map_err(|e| vec!(e.context("...while verifying types of complex conversion expression")))?;
 
         // Then, transpile the expression
-        let TranspilationOutput {
-            serialization: expr_serialization,
-            requested_variables,
-            ..
-        } = self.expr.transpile(context)
+        let inner_output = self.expr.transpile(context)
             .map_err(|e| e.into_iter().map(|err| {
                 err.context("...while transpiling expression for CM conversion")
             }).collect::<Vec<Error>>())?;
 
         // Finally, serialize the conversion
-        let serialization = format!("&mut RosyCM::rosy_cm(&*{}).context(\"...while trying to convert to (CM)\")?", expr_serialization);
+        let serialization = format!("RosyCM::rosy_cm({}).context(\"...while trying to convert to (CM)\")?", inner_output.as_ref());
         Ok(TranspilationOutput {
             serialization,
-            requested_variables,
-            ..Default::default()
+            requested_variables: inner_output.requested_variables,
+            value_kind: ValueKind::Owned,
         })
     }
 }

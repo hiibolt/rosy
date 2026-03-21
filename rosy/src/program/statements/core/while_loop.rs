@@ -115,11 +115,8 @@ impl Transpile for WhileStatement {
         }
 
         // Serialize the condition expression
-        let condition_serialization = match self.condition.transpile(context) {
-            Ok(output) => {
-                requested_variables.extend(output.requested_variables);
-                output.serialization
-            },
+        let cond_output = match self.condition.transpile(context) {
+            Ok(output) => output,
             Err(vec_err) => {
                 for e in vec_err {
                     errors.push(e.context("...while transpiling condition for WHILE loop"));
@@ -127,12 +124,13 @@ impl Transpile for WhileStatement {
                 return Err(errors);
             }
         };
+        requested_variables.extend(cond_output.requested_variables.iter().cloned());
 
         // Generate Rust while loop
-        // Use .to_owned() to convert &mut bool to bool for the condition
+        // LO (bool) is Copy, so as_value() gives the plain bool or (*&X)
         let serialization = format!(
-            "while ({}).to_owned() {{\n{}\n}}",
-            condition_serialization,
+            "while {} {{\n{}\n}}",
+            cond_output.as_value(),
             indent(serialized_statements.join("\n"))
         );
 

@@ -58,8 +58,8 @@ impl Transpile for DaepsStatement {
             })?;
 
         let serialization = format!(
-            "taylor::set_epsilon(({}).to_owned() as f64)?;",
-            epsilon_output.serialization
+            "taylor::set_epsilon({} as f64)?;",
+            epsilon_output.as_value()
         );
 
         Ok(TranspilationOutput {

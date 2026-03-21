@@ -19,7 +19,7 @@
 use crate::{
     ast::{FromRule, Rule},
     program::expressions::Expr,
-    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr}
+    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind}
 };
 use anyhow::{Error, Context};
 use std::collections::HashSet;
@@ -67,14 +67,14 @@ impl Transpile for CDExpr {
 
         // Use CD::variable(usize) to create a CD differential variable
         let serialization = format!(
-            "(&mut CD::variable(({}).clone() as usize)?)",
-            index_output.serialization
+            "CD::variable({} as usize)?",
+            index_output.as_value()
         );
 
         Ok(TranspilationOutput {
             serialization,
             requested_variables: index_output.requested_variables,
-            ..Default::default()
+            value_kind: ValueKind::Owned,
         })
     }
 }

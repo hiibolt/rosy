@@ -73,31 +73,31 @@ impl Transpile for DaprvStatement {
 
         let array_output = self.array_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling array in DAPRV".to_string()))?;
-        requested_variables.extend(array_output.requested_variables);
+        requested_variables.extend(array_output.requested_variables.iter().cloned());
 
         let num_comp_output = self.num_components_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling num_components in DAPRV".to_string()))?;
-        requested_variables.extend(num_comp_output.requested_variables);
+        requested_variables.extend(num_comp_output.requested_variables.iter().cloned());
 
         let max_vars_output = self.max_vars_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling max_vars in DAPRV".to_string()))?;
-        requested_variables.extend(max_vars_output.requested_variables);
+        requested_variables.extend(max_vars_output.requested_variables.iter().cloned());
 
         let current_vars_output = self.current_vars_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling current_vars in DAPRV".to_string()))?;
-        requested_variables.extend(current_vars_output.requested_variables);
+        requested_variables.extend(current_vars_output.requested_variables.iter().cloned());
 
         let unit_output = self.unit_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling unit in DAPRV".to_string()))?;
-        requested_variables.extend(unit_output.requested_variables);
+        requested_variables.extend(unit_output.requested_variables.iter().cloned());
 
         let serialization = format!(
-            "rosy_lib::core::daprv::rosy_daprv(&*{}, ({}).to_owned() as usize, ({}).to_owned() as usize, ({}).to_owned() as usize, ({}).to_owned() as u64)?;",
-            array_output.serialization,
-            num_comp_output.serialization,
-            max_vars_output.serialization,
-            current_vars_output.serialization,
-            unit_output.serialization,
+            "rosy_lib::core::daprv::rosy_daprv({}, {} as usize, {} as usize, {} as usize, {} as u64)?;",
+            array_output.as_ref(),
+            num_comp_output.as_value(),
+            max_vars_output.as_value(),
+            current_vars_output.as_value(),
+            unit_output.as_value(),
         );
 
         Ok(TranspilationOutput {

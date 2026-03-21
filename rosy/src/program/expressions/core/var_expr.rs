@@ -38,7 +38,7 @@
 use crate::ast::{FromRule, Rule};
 use super::variable_identifier::VariableIdentifier;
 use crate::transpile::TranspileableExpr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, VariableScope, };
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, VariableScope, ValueKind};
 use anyhow::{Result, Context, Error, anyhow};
 use crate::rosy_lib::RosyType;
 use crate::program::expressions::Expr;
@@ -200,29 +200,32 @@ impl Transpile for VarExpr {
                 )
             }
             VarExprKind::Variable => {
-                let TranspilationOutput {
-                    serialization: serialized_identifier,
-                    requested_variables,
-                    ..
-                } = self.identifier.transpile(context)
+                let ident_output = self.identifier.transpile(context)
                     .map_err(|e| e.into_iter().map(|err| {
                         err.context(format!(
                             "...while transpiling variable identifier '{}'", self.identifier.name
                         ))
                     }).collect::<Vec<Error>>())?;
-                
-                let reference = match context.variables.get(&self.identifier.name)
-                    .ok_or(vec!(anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.identifier.name)))? 
-                    .scope
-                {
-                    VariableScope::Local => "&",
-                    VariableScope::Arg => "",
-                    VariableScope::Higher => ""
+
+                let var_data = context.variables.get(&self.identifier.name)
+                    .ok_or(vec!(anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.identifier.name)))?;
+                let var_type = var_data.data.r#type.clone();
+
+                let (reference, value_kind) = match var_data.scope {
+                    VariableScope::Local => {
+                        if var_type.is_copy() {
+                            ("", ValueKind::Owned)   // Copy local: just `X`, value is copied
+                        } else {
+                            ("&", ValueKind::Ref)    // non-Copy local: `&X`, reference
+                        }
+                    },
+                    VariableScope::Arg => ("", ValueKind::Ref),    // already a reference
+                    VariableScope::Higher => ("", ValueKind::Ref),  // already a reference
                 };
                 Ok(TranspilationOutput {
-                    serialization: format!("{}{}", reference, serialized_identifier),
-                    requested_variables,
-                    ..Default::default()
+                    serialization: format!("{}{}", reference, ident_output.serialization),
+                    requested_variables: ident_output.requested_variables,
+                    value_kind,
                 })
             }
         }
@@ -289,7 +292,8 @@ pub fn function_call_transpile_helper (
                     ));
                 } else {
                     // If the type is correct, add the serialization
-                    serialized_args.push(arg_output.serialization);
+                    // Functions take &T args, so use as_ref()
+                    serialized_args.push(arg_output.as_ref());
                     requested_variables.extend(arg_output.requested_variables);
                 }
             },
@@ -308,14 +312,14 @@ pub fn function_call_transpile_helper (
     // (the prefix avoids shadowing by the implicit return variable).
     let rust_fn_name = format!("__fn_{}", name);
     let serialization = format!(
-        "&mut ({}({})? as {})",
+        "({}({})? as {})",
         rust_fn_name, serialized_args.join(", "), func_context.return_type.as_rust_type()
     );
     if errors.is_empty() {
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
-            ..Default::default()
+            value_kind: ValueKind::Owned,
         })
     } else {
         Err(errors)

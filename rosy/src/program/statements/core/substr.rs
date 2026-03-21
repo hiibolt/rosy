@@ -84,19 +84,19 @@ impl Transpile for SubstrStatement {
 
         let source_output = self.source_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling source expression in SUBSTR".to_string()))?;
-        requested_variables.extend(source_output.requested_variables);
+        requested_variables.extend(source_output.requested_variables.iter().cloned());
 
         let first_output = self.first_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling first-position expression in SUBSTR".to_string()))?;
-        requested_variables.extend(first_output.requested_variables);
+        requested_variables.extend(first_output.requested_variables.iter().cloned());
 
         let last_output = self.last_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling last-position expression in SUBSTR".to_string()))?;
-        requested_variables.extend(last_output.requested_variables);
+        requested_variables.extend(last_output.requested_variables.iter().cloned());
 
         let dest_output = self.dest.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling destination variable in SUBSTR".to_string()))?;
-        requested_variables.extend(dest_output.requested_variables);
+        requested_variables.extend(dest_output.requested_variables.iter().cloned());
 
         // Determine if we need to dereference the destination (Arg or Higher scope)
         let dereference = match context.variables.get(&self.dest.name)
@@ -113,16 +113,16 @@ impl Transpile for SubstrStatement {
 
         let serialization = format!(
             r#"{{
-    let __substr_src = ({}).to_owned();
-    let __substr_first = ({}).to_owned() as usize;
-    let __substr_last = ({}).to_owned() as usize;
+    let __substr_src = ({}).to_string();
+    let __substr_first = {} as usize;
+    let __substr_last = {} as usize;
     {}{} = __substr_src.get((__substr_first - 1)..__substr_last)
         .unwrap_or("")
         .to_string();
 }}"#,
-            source_output.serialization,
-            first_output.serialization,
-            last_output.serialization,
+            source_output.as_ref(),
+            first_output.as_value(),
+            last_output.as_value(),
             dereference,
             dest_output.serialization,
         );

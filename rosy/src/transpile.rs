@@ -153,7 +153,7 @@ impl TranspilationOutput {
     /// Get this expression as an owned value for assignment or value context.
     /// - Owned → expr (move/copy)
     /// - Ref + Copy → *expr (deref copy)
-    /// - Ref + non-Copy → expr.clone()
+    /// - Ref + non-Copy → (*expr).clone() (deref then clone the value, not the reference)
     pub fn as_owned(&self, ty: &RosyType) -> String {
         match self.value_kind {
             ValueKind::Owned => self.serialization.clone(),
@@ -161,7 +161,7 @@ impl TranspilationOutput {
                 if ty.is_copy() {
                     format!("(*{})", self.serialization)
                 } else {
-                    format!("({}).clone()", self.serialization)
+                    format!("(*{}).clone()", self.serialization)
                 }
             }
         }
@@ -169,11 +169,11 @@ impl TranspilationOutput {
 
     /// Get this expression as a shared reference for trait method arguments.
     /// - Owned → &expr (borrow temporary)
-    /// - Ref → expr (already a reference)
+    /// - Ref → &*expr (deref + reborrow to get &T from &T or &mut T)
     pub fn as_ref(&self) -> String {
         match self.value_kind {
             ValueKind::Owned => format!("&{}", self.serialization),
-            ValueKind::Ref => self.serialization.clone(),
+            ValueKind::Ref => format!("&*{}", self.serialization),
         }
     }
 

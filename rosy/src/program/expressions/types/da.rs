@@ -26,7 +26,7 @@
 use crate::{
     ast::{FromRule, Rule},
     program::expressions::Expr,
-    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr}
+    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind}
 };
 use anyhow::{Error, Context};
 use std::collections::HashSet;
@@ -73,16 +73,15 @@ impl Transpile for DAExpr {
             })?;
 
         // Use DA::variable(usize) to create a DA differential variable
-        // Clone the index (which is &mut T) to get an owned value for casting
         let serialization = format!(
-            "(&mut DA::variable(({}).clone() as usize)?)",
-            index_output.serialization
+            "DA::variable({} as usize)?",
+            index_output.as_value()
         );
 
         Ok(TranspilationOutput {
             serialization,
             requested_variables: index_output.requested_variables,
-            ..Default::default()
+            value_kind: ValueKind::Owned,
         })
     }
 }

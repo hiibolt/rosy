@@ -21,7 +21,7 @@
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::TranspileableExpr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, ValueKind};
 use anyhow::{Result, Error, Context};
 use std::collections::HashSet;
 use crate::rosy_lib::RosyType;
@@ -71,23 +71,19 @@ impl Transpile for ReConvertExpr {
         let _ = self.type_of(context)
             .map_err(|e| vec![e.context("...while verifying types of RE conversion expression")])?;
 
-        let TranspilationOutput {
-            serialization: expr_serialization,
-            requested_variables,
-            ..
-        } = self.expr.transpile(context)
+        let inner_output = self.expr.transpile(context)
             .map_err(|e| e.into_iter().map(|err| {
                 err.context("...while transpiling expression for RE conversion")
             }).collect::<Vec<Error>>())?;
 
         let serialization = format!(
-            "&mut RosyREConvert::rosy_re_convert(&*{}).context(\"...while trying to convert to (RE)\")?",
-            expr_serialization
+            "RosyREConvert::rosy_re_convert({}).context(\"...while trying to convert to (RE)\")?",
+            inner_output.as_ref()
         );
         Ok(TranspilationOutput {
             serialization,
-            requested_variables,
-            ..Default::default()
+            requested_variables: inner_output.requested_variables,
+            value_kind: ValueKind::Owned,
         })
     }
 }

@@ -22,7 +22,7 @@ use crate::{
     program::expressions::Expr,
     transpile::{
         TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableStatement, add_context_to_all,
+        TranspileableStatement, add_context_to_all, ValueKind,
     },
 };
 
@@ -85,30 +85,34 @@ impl Transpile for LdetStatement {
 
         let matrix_output = self.matrix_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling matrix in LDET".to_string()))?;
-        requested_variables.extend(matrix_output.requested_variables);
+        requested_variables.extend(matrix_output.requested_variables.iter().cloned());
 
         let n_output = self.n_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling n in LDET".to_string()))?;
-        requested_variables.extend(n_output.requested_variables);
+        requested_variables.extend(n_output.requested_variables.iter().cloned());
 
         let alloc_dim_output = self.alloc_dim_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling alloc_dim in LDET".to_string()))?;
-        requested_variables.extend(alloc_dim_output.requested_variables);
+        requested_variables.extend(alloc_dim_output.requested_variables.iter().cloned());
 
         let result_output = self.result_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling result in LDET".to_string()))?;
         requested_variables.extend(result_output.requested_variables.clone());
 
-        // The result variable serializes as `&VARNAME` (local scope) or `VARNAME`
-        // (arg/higher scope). Use strip_prefix to determine the correct lvalue form:
-        // - Local: strip `&` → bare name, assign directly: `name = value`
-        // - Higher/Arg: no leading `&` → assign via deref: `*name = value`
-        let result_assign = if let Some(bare) = result_output.serialization.strip_prefix('&') {
-            format!("{bare} = rosy_lib::core::ldet::rosy_ldet(&*{matrix}, ({n}).to_owned() as usize, ({alloc}).to_owned() as usize)?",
-                matrix = matrix_output.serialization, n = n_output.serialization, alloc = alloc_dim_output.serialization)
+        // Determine l-value assignment:
+        // - Owned (Copy local): assign directly
+        // - Ref with & prefix (non-Copy local): strip & → bare name
+        // - Ref without & (arg/higher): deref → *name = value
+        let matrix_ref = matrix_output.as_ref();
+        let n_val = n_output.as_value();
+        let alloc_val = alloc_dim_output.as_value();
+        let rhs = format!("rosy_lib::core::ldet::rosy_ldet({matrix_ref}, {n_val} as usize, {alloc_val} as usize)?");
+        let result_assign = if result_output.value_kind == ValueKind::Owned {
+            format!("{} = {rhs}", result_output.serialization)
+        } else if let Some(bare) = result_output.serialization.strip_prefix('&') {
+            format!("{bare} = {rhs}")
         } else {
-            format!("*{ser} = rosy_lib::core::ldet::rosy_ldet(&*{matrix}, ({n}).to_owned() as usize, ({alloc}).to_owned() as usize)?",
-                ser = result_output.serialization, matrix = matrix_output.serialization, n = n_output.serialization, alloc = alloc_dim_output.serialization)
+            format!("*{} = {rhs}", result_output.serialization)
         };
 
         let serialization = format!("{result_assign};");

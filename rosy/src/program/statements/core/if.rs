@@ -199,18 +199,16 @@ impl Transpile for ElseIfClause {
         let mut errors = Vec::new();
 
         // Transpile the condition
-        let condition_serialization = match self.condition.transpile(context) {
-            Ok(output) => {
-                requested_variables.extend(output.requested_variables);
-                output.serialization
-            },
+        let cond_output = match self.condition.transpile(context) {
+            Ok(output) => output,
             Err(err_vec) => {
                 for err in err_vec {
                     errors.push(err.context("...while transpiling ELSEIF condition expression"));
                 }
-                String::new() // dummy value so we can gather all errors
+                TranspilationOutput::default()
             }
         };
+        requested_variables.extend(cond_output.requested_variables.iter().cloned());
 
         // Transpile the body
         let serialized_statements: Vec<String> = {
@@ -235,8 +233,8 @@ impl Transpile for ElseIfClause {
         };
 
         let serialization = format!(
-            "else if ({}).to_owned() {{\n{}\n}}",
-            condition_serialization,
+            "else if {} {{\n{}\n}}",
+            cond_output.as_value(),
             indent(serialized_statements.join("\n"))
         );
         if errors.is_empty() {
@@ -265,18 +263,16 @@ impl Transpile for IfStatement {
         let mut errors = Vec::new();
 
         // Transpile the condition
-        let condition_serialization = match self.condition.transpile(context) {
-            Ok(output) => {
-                requested_variables.extend(output.requested_variables);
-                output.serialization
-            },
+        let cond_output = match self.condition.transpile(context) {
+            Ok(output) => output,
             Err(err_vec) => {
                 for err in err_vec {
                     errors.push(err.context("...while transpiling IF condition expression"));
                 }
-                String::new() // dummy value so we can gather all errors
+                TranspilationOutput::default()
             }
         };
+        requested_variables.extend(cond_output.requested_variables.iter().cloned());
 
         // Transpile the primary if clause body
         let serialized_if_statements: Vec<String> = {
@@ -345,8 +341,8 @@ impl Transpile for IfStatement {
         };
 
         let serialization = format!(
-            "if ({}).to_owned() {{\n{}\n}}{}{}",
-            condition_serialization,
+            "if {} {{\n{}\n}}{}{}",
+            cond_output.as_value(),
             indent(serialized_if_statements.join("\n")),
             if serialized_elseif_clauses.is_empty() { 
                 String::new() 

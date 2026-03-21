@@ -76,13 +76,13 @@ impl Transpile for WritebStatement {
                     ))
                 })?;
 
-            requested_variables.extend(output.requested_variables);
+            requested_variables.extend(output.requested_variables.iter().cloned());
 
             // Use RosyToBinary trait to convert to bytes, then write
             serialized_stmts.push(format!(
-                "rosy_lib::core::file_io::rosy_writeb_to_unit({}, &rosy_lib::core::file_io::RosyToBinary::to_binary(&*{}))?;",
+                "rosy_lib::core::file_io::rosy_writeb_to_unit({}, &rosy_lib::core::file_io::RosyToBinary::to_binary({}))?;",
                 self.unit,
-                output.serialization
+                output.as_ref()
             ));
         }
 

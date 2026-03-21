@@ -22,12 +22,12 @@
 //! x := 2 ^ 10;          { 1024 }
 //! ```
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::HashSet;
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::TranspileableExpr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, ValueKind};
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
 use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe, BinaryOpKind};
@@ -76,14 +76,15 @@ impl Transpile for PowExpr {
         }
 
         // Then, transpile both sides and combine
-        let mut serialization = String::from("&mut RosyPow::rosy_pow(&*");
         let mut errors = Vec::new();
-        let mut requested_variables = BTreeSet::new();
+        let mut requested_variables = std::collections::BTreeSet::new();
+        let mut left_ref = String::new();
+        let mut right_ref = String::new();
 
         // Transpile left
         match self.left.transpile(context) {
             Ok(output) => {
-                serialization.push_str(&output.serialization);
+                left_ref = output.as_ref();
                 requested_variables.extend(output.requested_variables);
             },
             Err(mut e) => {
@@ -94,10 +95,9 @@ impl Transpile for PowExpr {
         }
 
         // Transpile right
-        serialization.push_str(", &*");
         match self.right.transpile(context) {
             Ok(output) => {
-                serialization.push_str(&output.serialization);
+                right_ref = output.as_ref();
                 requested_variables.extend(output.requested_variables);
             },
             Err(mut e) => {
@@ -106,13 +106,14 @@ impl Transpile for PowExpr {
                 }
             }
         }
-        serialization.push_str(")?");
+
+        let serialization = format!("RosyPow::rosy_pow({}, {})?", left_ref, right_ref);
 
         if errors.is_empty() {
             Ok(TranspilationOutput {
                 serialization,
                 requested_variables,
-                ..Default::default()
+                value_kind: ValueKind::Owned,
             })
         } else {
             Err(errors)

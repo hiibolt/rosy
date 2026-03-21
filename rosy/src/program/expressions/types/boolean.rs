@@ -16,7 +16,7 @@ use anyhow::{Result, Error, bail};
 use crate::{
     ast::{FromRule, Rule},
     rosy_lib::RosyType,
-    transpile::{Transpile, TranspileableExpr, TranspilationInputContext, TranspilationOutput}
+    transpile::{Transpile, TranspileableExpr, TranspilationInputContext, TranspilationOutput, ValueKind}
 };
 
 impl FromRule for bool {
@@ -41,9 +41,9 @@ impl TranspileableExpr for bool {
 impl Transpile for bool {
     fn transpile(&self, _context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         Ok(TranspilationOutput {
-            serialization: format!("&mut {}", self),
+            serialization: format!("{}", self),
             requested_variables: BTreeSet::new(),
-            ..Default::default()
+            value_kind: ValueKind::Owned,
         })
     }
 }

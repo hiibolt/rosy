@@ -19,7 +19,7 @@ use anyhow::{Result, Error};
 use crate::{
     ast::{FromRule, Rule},
     rosy_lib::RosyType,
-    transpile::{Transpile, TranspileableExpr, TranspilationInputContext, TranspilationOutput}
+    transpile::{Transpile, TranspileableExpr, TranspilationInputContext, TranspilationOutput, ValueKind}
 };
 
 impl FromRule for String {
@@ -47,9 +47,9 @@ impl TranspileableExpr for String {
 impl Transpile for String {
     fn transpile(&self, _context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         Ok(TranspilationOutput {
-            serialization: format!("&mut String::from(\"{}\")", self),
+            serialization: format!("String::from(\"{}\")", self),
             requested_variables: BTreeSet::new(),
-            ..Default::default()
+            value_kind: ValueKind::Owned,
         })
     }
 }

@@ -46,7 +46,7 @@ use std::collections::{BTreeSet, HashSet};
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::TranspileableExpr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, ValueKind};
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
 use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe, BinaryOpKind};
@@ -103,48 +103,44 @@ impl Transpile for MultExpr {
         let mut requested_variables = BTreeSet::new();
 
         // Transpile left
-        let left_ser = match self.left.transpile(context) {
-            Ok(output) => {
-                requested_variables.extend(output.requested_variables);
-                output.serialization
-            },
+        let left_output = match self.left.transpile(context) {
+            Ok(output) => output,
             Err(mut e) => {
                 for err in e.drain(..) {
                     errors.push(err.context("...while transpiling left-hand side of multiplication"));
                 }
-                String::new()
+                TranspilationOutput::default()
             }
         };
+        requested_variables.extend(left_output.requested_variables.iter().cloned());
 
         // Transpile right
-        let right_ser = match self.right.transpile(context) {
-            Ok(output) => {
-                requested_variables.extend(output.requested_variables);
-                output.serialization
-            },
+        let right_output = match self.right.transpile(context) {
+            Ok(output) => output,
             Err(mut e) => {
                 for err in e.drain(..) {
                     errors.push(err.context("...while transpiling right-hand side of multiplication"));
                 }
-                String::new()
+                TranspilationOutput::default()
             }
         };
+        requested_variables.extend(right_output.requested_variables.iter().cloned());
 
         // Direct emission for infallible scalar types
         use crate::rosy_lib::RosyBaseType;
         let serialization = match (&left_type.base_type, &right_type.base_type) {
             (RosyBaseType::RE, RosyBaseType::RE) if left_type.dimensions == 0 && right_type.dimensions == 0
-                => format!("&mut ((*{}) * (*{}))", left_ser, right_ser),
+                => format!("({} * {})", left_output.as_value(), right_output.as_value()),
             (RosyBaseType::LO, RosyBaseType::LO) if left_type.dimensions == 0 && right_type.dimensions == 0
-                => format!("&mut ((*{}) && (*{}))", left_ser, right_ser),
-            _ => format!("&mut RosyMult::rosy_mult(&*{}, &*{})?", left_ser, right_ser),
+                => format!("({} && {})", left_output.as_value(), right_output.as_value()),
+            _ => format!("RosyMult::rosy_mult({}, {})?", left_output.as_ref(), right_output.as_ref()),
         };
 
         if errors.is_empty() {
             Ok(TranspilationOutput {
                 serialization,
                 requested_variables,
-                ..Default::default()
+                value_kind: ValueKind::Owned,
             })
         } else {
             Err(errors)

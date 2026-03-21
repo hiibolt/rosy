@@ -288,49 +288,45 @@ impl Transpile for AssignStatement {
         let mut errors = Vec::new();
         
         // Serialize the identifier
-        let serialized_identifier = match self.identifier.transpile(context) {
-            Ok(output) => {
-                requested_variables.extend(output.requested_variables);
-                output.serialization
-            },
+        let ident_output = match self.identifier.transpile(context) {
+            Ok(output) => output,
             Err(vec_err) => {
                 for err in vec_err {
                     errors.push(err.context(format!(
                         "...while transpiling identifier expression for assigment to '{}'", self.identifier.name
                     )));
                 }
-                String::new() // dummy value to collect more errors
+                TranspilationOutput::default()
             }
         };
+        requested_variables.extend(ident_output.requested_variables.iter().cloned());
+        let serialized_identifier = ident_output.serialization;
 
         // Serialize the value
-        let serialized_value = match self.value.transpile(context) {
-            Ok(output) => {
-                requested_variables.extend(output.requested_variables);
-                output.serialization
-            },
+        let value_output = match self.value.transpile(context) {
+            Ok(output) => output,
             Err(value_errors) => {
                 for err in value_errors {
                     errors.push(err.context(format!(
                         "...while transpiling value expression for assignment to '{}'", self.identifier.name
                     )));
                 }
-                String::new() // dummy value to collect more errors
+                TranspilationOutput::default()
             }
         };
+        requested_variables.extend(value_output.requested_variables.iter().cloned());
 
         // If RE→VE coercion is needed, wrap the value in vec![...]
-        // We dereference with (*...).to_owned() since the RE expression
-        // may be a reference (e.g. &mut 1f64 or &TEMP).
+        // RE is Copy, so as_value() gives the plain f64 value.
         let serialized_value = if needs_re_to_ve_coercion {
-            format!("vec![(*{}).to_owned()]", serialized_value)
+            format!("vec![{}]", value_output.as_value())
         } else {
-            serialized_value
+            value_output.as_owned(&variable_type)
         };
 
         // Serialize the entire function
         let dereference = match context.variables.get(&self.identifier.name)
-            .ok_or(vec!(anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.identifier.name)))? 
+            .ok_or(vec!(anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.identifier.name)))?
             .scope
         {
             VariableScope::Local => "",
@@ -342,7 +338,7 @@ impl Transpile for AssignStatement {
             }
         };
         let serialization = format!(
-            "{}{} = ({}).to_owned();",
+            "{}{} = {};",
             dereference, serialized_identifier, serialized_value
         );
         if errors.is_empty() {

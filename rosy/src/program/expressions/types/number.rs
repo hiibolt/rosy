@@ -21,7 +21,7 @@ use anyhow::{Result, Error};
 use crate::{
     ast::{FromRule, Rule},
     rosy_lib::RosyType,
-    transpile::{Transpile, TranspileableExpr, TranspilationInputContext, TranspilationOutput}
+    transpile::{Transpile, TranspileableExpr, TranspilationInputContext, TranspilationOutput, ValueKind}
 };
 
 impl FromRule for f64 {
@@ -42,9 +42,9 @@ impl TranspileableExpr for f64 {
 impl Transpile for f64 {
     fn transpile(&self, _context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
         Ok(TranspilationOutput {
-            serialization: format!("&mut {}f64", self),
+            serialization: format!("{}f64", self),
             requested_variables: BTreeSet::new(),
-            ..Default::default()
+            value_kind: ValueKind::Owned,
         })
     }
 }

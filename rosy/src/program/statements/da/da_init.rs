@@ -108,9 +108,9 @@ impl Transpile for DAInitStatement {
             })?;
         
         let serialization = format!(
-            "taylor::cleanup_taylor();\n\t\ttaylor::init_taylor(({}).to_owned() as u32, ({}).to_owned() as usize)?;", 
-            order_output.serialization, 
-            num_vars_output.serialization
+            "taylor::cleanup_taylor();\n\t\ttaylor::init_taylor({} as u32, {} as usize)?;",
+            order_output.as_value(),
+            num_vars_output.as_value()
         );
         
         let mut requested_variables = order_output.requested_variables;

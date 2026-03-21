@@ -70,21 +70,21 @@ impl Transpile for OpenfbStatement {
 
         let unit_output = self.unit_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling unit expression in OPENFB".to_string()))?;
-        requested_variables.extend(unit_output.requested_variables);
+        requested_variables.extend(unit_output.requested_variables.iter().cloned());
 
         let filename_output = self.filename_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling filename expression in OPENFB".to_string()))?;
-        requested_variables.extend(filename_output.requested_variables);
+        requested_variables.extend(filename_output.requested_variables.iter().cloned());
 
         let status_output = self.status_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling status expression in OPENFB".to_string()))?;
-        requested_variables.extend(status_output.requested_variables);
+        requested_variables.extend(status_output.requested_variables.iter().cloned());
 
         let serialization = format!(
-            "rosy_lib::core::file_io::rosy_openfb(({}).to_owned(), &({}).to_owned(), &({}).to_owned())?;",
-            unit_output.serialization,
-            filename_output.serialization,
-            status_output.serialization,
+            "rosy_lib::core::file_io::rosy_openfb({}, {}, {})?;",
+            unit_output.as_value(),
+            filename_output.as_ref(),
+            status_output.as_ref(),
         );
 
         Ok(TranspilationOutput {

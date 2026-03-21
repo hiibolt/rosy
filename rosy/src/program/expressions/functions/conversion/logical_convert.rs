@@ -18,7 +18,7 @@
 use crate::ast::{FromRule, Rule};
 use crate::transpile::TranspileableExpr;
 use crate::program::expressions::Expr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, ValueKind};
 use anyhow::{Result, Error, anyhow, Context};
 use std::collections::HashSet;
 use crate::rosy_lib::RosyType;
@@ -63,21 +63,17 @@ impl Transpile for LogicalConvertExpr {
             )))?;
 
         // Then, transpile the expression
-        let TranspilationOutput {
-            serialization: expr_serialization,
-            requested_variables,
-            ..
-        } = self.expr.transpile(context)
+        let inner_output = self.expr.transpile(context)
             .map_err(|e| e.into_iter().map(|err| {
                 err.context("...while transpiling expression for LO conversion")
             }).collect::<Vec<Error>>())?;
 
         // Finally, serialize the conversion
-        let serialization = format!("&mut RosyLO::rosy_to_logical(&*{})", expr_serialization);
+        let serialization = format!("RosyLO::rosy_to_logical({})", inner_output.as_ref());
         Ok(TranspilationOutput {
             serialization,
-            requested_variables,
-            ..Default::default()
+            requested_variables: inner_output.requested_variables,
+            value_kind: ValueKind::Owned,
         })
     }
 }

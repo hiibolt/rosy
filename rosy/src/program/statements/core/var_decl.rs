@@ -84,7 +84,7 @@ impl Transpile for VariableDeclarationData {
                 // transpile each dimension expression
                 match dim.transpile(context) {
                     Ok(output) => {
-                        result = format!("vec![{}; ({}).to_owned() as usize]", result, output.serialization);
+                        result = format!("vec![{}; {} as usize]", result, output.as_value());
                         requested_variables.extend(output.requested_variables);
                     },
                     Err(dim_errors) => {
@@ -254,11 +254,9 @@ impl Transpile for VarDeclStatement {
             return Err(vec!(anyhow!("Variable '{}' is already defined in this scope!", self.data.name)));
         }
 
-        let TranspilationOutput { 
-            serialization: data_default_serialization,
-            requested_variables ,
-            ..
-        } = self.data.transpile(context)?;
+        let data_output = self.data.transpile(context)?;
+        let data_default_serialization = data_output.serialization;
+        let requested_variables = data_output.requested_variables;
 
         let serialization = format!(
             "let mut {}: {} = {};",

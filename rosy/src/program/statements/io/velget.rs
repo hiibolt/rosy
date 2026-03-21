@@ -74,11 +74,11 @@ impl Transpile for VelgetStatement {
 
         let vec_output = self.vec_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling vector expression in VELGET".to_string()))?;
-        requested_variables.extend(vec_output.requested_variables);
+        requested_variables.extend(vec_output.requested_variables.iter().cloned());
 
         let component_output = self.component_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling component expression in VELGET".to_string()))?;
-        requested_variables.extend(component_output.requested_variables);
+        requested_variables.extend(component_output.requested_variables.iter().cloned());
 
         let output_id_output = self.output_var.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling output variable in VELGET".to_string()))?;
@@ -99,13 +99,13 @@ impl Transpile for VelgetStatement {
 
         let serialization = format!(
             "{{\n    \
-                let __rosy_velget_idx = ({component}).to_owned() as usize - 1usize;\n    \
-                {deref}{dest} = ({vec}).to_owned()[__rosy_velget_idx];\n\
+                let __rosy_velget_idx = {component} as usize - 1usize;\n    \
+                {deref}{dest} = {vec}[__rosy_velget_idx];\n\
             }}",
-            component = component_output.serialization,
+            component = component_output.as_value(),
             deref = dereference,
             dest = output_id_output.serialization,
-            vec = vec_output.serialization,
+            vec = vec_output.as_value(),
         );
 
         Ok(TranspilationOutput {

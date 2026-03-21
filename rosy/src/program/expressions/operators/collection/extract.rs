@@ -36,7 +36,7 @@ use std::collections::{BTreeSet, HashSet};
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::TranspileableExpr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, ValueKind};
 use anyhow::{Result, Error};
 use crate::rosy_lib::RosyType;
 use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe, BinaryOpKind};
@@ -87,43 +87,48 @@ impl Transpile for ExtractExpr {
             .map_err(|e| vec!(e.context("...while verifying types of extraction expression")))?;
 
         // Then, transpile both sides and combine
-        let mut serialization = String::from("&mut RosyExtract::rosy_extract(&*");
         let mut errors = Vec::new();
         let mut requested_variables = BTreeSet::new();
 
         // Transpile object
-        match self.object.transpile(context) {
+        let object_output = match self.object.transpile(context) {
             Ok(output) => {
-                serialization.push_str(&output.serialization);
-                requested_variables.extend(output.requested_variables);
+                requested_variables.extend(output.requested_variables.iter().cloned());
+                output
             },
             Err(mut e) => {
                 for err in e.drain(..) {
                     errors.push(err.context("...while transpiling object of extraction"));
                 }
+                TranspilationOutput::default()
             }
-        }
+        };
 
         // Transpile index
-        serialization.push_str(", &*");
-        match self.index.transpile(context) {
+        let index_output = match self.index.transpile(context) {
             Ok(output) => {
-                serialization.push_str(&output.serialization);
-                requested_variables.extend(output.requested_variables);
+                requested_variables.extend(output.requested_variables.iter().cloned());
+                output
             },
             Err(mut e) => {
                 for err in e.drain(..) {
                     errors.push(err.context("...while transpiling index of extraction"));
                 }
+                TranspilationOutput::default()
             }
-        }
-        serialization.push_str(").context(\"...while trying to extract an element\")?");
+        };
+
+        let serialization = format!(
+            "RosyExtract::rosy_extract({}, {}).context(\"...while trying to extract an element\")?",
+            object_output.as_ref(),
+            index_output.as_ref()
+        );
 
         if errors.is_empty() {
             Ok(TranspilationOutput {
                 serialization,
                 requested_variables,
-                ..Default::default()
+                value_kind: ValueKind::Owned,
             })
         } else {
             Err(errors)

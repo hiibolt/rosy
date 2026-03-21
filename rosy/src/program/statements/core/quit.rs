@@ -56,18 +56,18 @@ impl Transpile for QuitStatement {
 
         let code_output = self.code_expr.transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling code expression in QUIT".to_string()))?;
-        requested_variables.extend(code_output.requested_variables);
+        requested_variables.extend(code_output.requested_variables.iter().cloned());
 
         let serialization = format!(
             r#"{{
-    let __quit_code = *({}) as i32;
+    let __quit_code = {} as i32;
     if __quit_code == 1 {{
         panic!("QUIT with traceback requested");
     }} else {{
         std::process::exit(__quit_code);
     }}
 }}"#,
-            code_output.serialization,
+            code_output.as_value(),
         );
 
         Ok(TranspilationOutput {

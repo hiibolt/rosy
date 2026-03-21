@@ -26,7 +26,7 @@
 //! ```
 
 use crate::program::expressions::Expr;
-use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr};
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind};
 use crate::rosy_lib::RosyType;
 use anyhow::{Result, Error, Context as AnyhowContext};
 use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe, BinaryOpKind};
@@ -49,21 +49,21 @@ impl Transpile for DeriveExpr {
         let index_output = self.index.transpile(context)?;
 
         let mut requested_variables = BTreeSet::new();
-        requested_variables.extend(object_output.requested_variables);
-        requested_variables.extend(index_output.requested_variables);
+        requested_variables.extend(object_output.requested_variables.iter().cloned());
+        requested_variables.extend(index_output.requested_variables.iter().cloned());
 
         // Generate code that checks the sign of the index at runtime:
         // positive => derivative, negative => antiderivative
         let serialization = format!(
-            "&mut RosyDerive::rosy_derive(&*{}, ({}).clone() as i64)?",
-            object_output.serialization,
-            index_output.serialization
+            "RosyDerive::rosy_derive({}, ({}).clone() as i64)?",
+            object_output.as_ref(),
+            index_output.as_value()
         );
 
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
-            ..Default::default()
+            value_kind: ValueKind::Owned,
         })
     }
 }

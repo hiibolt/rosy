@@ -201,11 +201,8 @@ impl Transpile for PLoopStatement {
         }
 
         // Serialize the start and end expressions
-        let _start_serialization = match self.start.transpile(context) {
-            Ok(output) => {
-                requested_variables.extend(output.requested_variables);
-                output.serialization
-            },
+        let _start_output = match self.start.transpile(context) {
+            Ok(output) => output,
             Err(vec_err) => {
                 for e in vec_err {
                     errors.push(e.context(format!(
@@ -216,11 +213,9 @@ impl Transpile for PLoopStatement {
                 return Err(errors);
             }
         };
-        let end_serialization = match self.end.transpile(context) {
-            Ok(output) => {
-                requested_variables.extend(output.requested_variables);
-                output.serialization
-            },
+        requested_variables.extend(_start_output.requested_variables.iter().cloned());
+        let end_output = match self.end.transpile(context) {
+            Ok(output) => output,
             Err(vec_err) => {
                 for e in vec_err {
                     errors.push(e.context(format!(
@@ -231,6 +226,7 @@ impl Transpile for PLoopStatement {
                 return Err(errors);
             }
         };
+        requested_variables.extend(end_output.requested_variables.iter().cloned());
 
         // Check the type of the output array
         let output_type = self.output.type_of(context)
@@ -262,8 +258,8 @@ impl Transpile for PLoopStatement {
         let iterator_declaration_serialization = {
             requested_variables.insert("rosy_mpi_context".to_string());
             format!(
-                "let mut __ploop_end: f64 = *(&{} as &f64);\n\tlet mut {} = rosy_mpi_context.get_group_num(&mut __ploop_end)? + 1.0f64;",
-                end_serialization,
+                "let mut __ploop_end: f64 = {};\n\tlet mut {} = rosy_mpi_context.get_group_num(&mut __ploop_end)? + 1.0f64;",
+                end_output.as_value(),
                 self.iterator,
             )
         };

@@ -58,8 +58,8 @@ impl Transpile for DanotStatement {
             })?;
 
         let serialization = format!(
-            "taylor::set_truncation_order(({}).to_owned() as u32)?;",
-            order_output.serialization
+            "taylor::set_truncation_order({} as u32)?;",
+            order_output.as_value()
         );
 
         Ok(TranspilationOutput {

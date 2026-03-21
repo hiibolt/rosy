@@ -242,10 +242,10 @@ impl Transpile for FitStatement {
         }
 
         // Transpile eps, max, algorithm expressions
-        let eps_ser = match self.eps.transpile(context) {
+        let eps_output = match self.eps.transpile(context) {
             Ok(output) => {
-                requested_variables.extend(output.requested_variables);
-                output.serialization
+                requested_variables.extend(output.requested_variables.clone());
+                output
             },
             Err(vec_err) => {
                 for e in vec_err {
@@ -254,10 +254,10 @@ impl Transpile for FitStatement {
                 return Err(errors);
             }
         };
-        let max_ser = match self.max_iter.transpile(context) {
+        let max_output = match self.max_iter.transpile(context) {
             Ok(output) => {
-                requested_variables.extend(output.requested_variables);
-                output.serialization
+                requested_variables.extend(output.requested_variables.clone());
+                output
             },
             Err(vec_err) => {
                 for e in vec_err {
@@ -266,10 +266,10 @@ impl Transpile for FitStatement {
                 return Err(errors);
             }
         };
-        let algo_ser = match self.algorithm.transpile(context) {
+        let algo_output = match self.algorithm.transpile(context) {
             Ok(output) => {
-                requested_variables.extend(output.requested_variables);
-                output.serialization
+                requested_variables.extend(output.requested_variables.clone());
+                output
             },
             Err(vec_err) => {
                 for e in vec_err {
@@ -286,8 +286,9 @@ impl Transpile for FitStatement {
         let num_objs = self.objectives.len();
 
         // Build: let mut fit_vars = vec![var1, var2, ...];
+        // FIT variables are always RE (Copy), so we can use them directly.
         let vars_init = self.fit_variables.iter()
-            .map(|v| format!("({}).to_owned()", v))
+            .map(|v| v.clone())
             .collect::<Vec<_>>()
             .join(", ");
 
@@ -299,8 +300,9 @@ impl Transpile for FitStatement {
             .join("\n");
 
         // Build inside closure: collect objectives into vec
+        // Objective variables are always RE (Copy), so we can use them directly.
         let objs_collect = self.objectives.iter()
-            .map(|o| format!("({}).to_owned()", o))
+            .map(|o| o.clone())
             .collect::<Vec<_>>()
             .join(", ");
 
@@ -318,9 +320,9 @@ impl Transpile for FitStatement {
             \tlet mut __rosy_fit_vars: Vec<f64> = vec![{vars_init}];\n\
             \trosy_lib::optimizer::run_fit(\n\
             \t\t&mut __rosy_fit_vars,\n\
-            \t\t({eps_ser}).to_owned(),\n\
-            \t\t({max_ser}).to_owned() as usize,\n\
-            \t\t({algo_ser}).to_owned() as usize,\n\
+            \t\t{eps_val},\n\
+            \t\t{max_val} as usize,\n\
+            \t\t{algo_val} as usize,\n\
             \t\t{num_objs},\n\
             \t\t|__rosy_fit_vars: &mut [f64]| -> anyhow::Result<Vec<f64>> {{\n\
             {assign}\n\
@@ -331,9 +333,9 @@ impl Transpile for FitStatement {
             {writeback}\n\
             }}",
             vars_init = vars_init,
-            eps_ser = eps_ser,
-            max_ser = max_ser,
-            algo_ser = algo_ser,
+            eps_val = eps_output.as_value(),
+            max_val = max_output.as_value(),
+            algo_val = algo_output.as_value(),
             num_objs = num_objs,
             assign = indent(indent(indent(vars_assign))),
             body = indent(indent(indent(body_code))),

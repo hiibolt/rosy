@@ -30,7 +30,7 @@ use std::collections::HashSet;
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::transpile::TranspileableExpr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
+use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, ValueKind};
 use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
 use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
@@ -70,28 +70,27 @@ impl Transpile for NotExpr {
             )));
         }
 
-        let mut serialization = String::from("&mut RosyNot::rosy_not(&*");
         let mut errors = Vec::new();
         let mut requested_variables = BTreeSet::new();
 
-        match self.operand.transpile(context) {
-            Ok(output) => {
-                serialization.push_str(&output.serialization);
-                requested_variables.extend(output.requested_variables);
-            },
+        let operand_output = match self.operand.transpile(context) {
+            Ok(output) => output,
             Err(mut e) => {
                 for err in e.drain(..) {
                     errors.push(err.context("...while transpiling operand of NOT"));
                 }
+                TranspilationOutput::default()
             }
-        }
-        serialization.push_str(")?");
+        };
+        requested_variables.extend(operand_output.requested_variables.iter().cloned());
+
+        let serialization = format!("RosyNot::rosy_not({})?", operand_output.as_ref());
 
         if errors.is_empty() {
             Ok(TranspilationOutput {
                 serialization,
                 requested_variables,
-                ..Default::default()
+                value_kind: ValueKind::Owned,
             })
         } else {
             Err(errors)
