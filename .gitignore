@@ -10,3 +10,5 @@ rosy_output
 *.lis
 *.ssv
 *.fuse_*
+**/foxyinp.dat
+**/*_output.txt

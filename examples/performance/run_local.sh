@@ -125,7 +125,7 @@ for dir in "$SCRIPT_DIR"/non_mpi/*/; do
         printf "  [%d] %s %s...\r" "$NUM_TESTS" "$name" "$tier_label" >&2
 
         # ── Build Rosy ────────────────────────────────────────────────
-        if ! "$ROSY_BIN" build "$rosy_file" --release -d "$BUILD_DIR" -o "$dir/bench_rosy_t${tier}" 2>/dev/null; then
+        if ! "$ROSY_BIN" build "$rosy_file" --release --optimized -d "$BUILD_DIR" -o "$dir/bench_rosy_t${tier}" 2>/dev/null; then
             printf "\r%80s\r" "" >&2
             printf "%-28s %-4s %11s\n" "$name" "$tier_label" "BUILD FAIL"
             continue
@@ -155,12 +155,19 @@ for dir in "$SCRIPT_DIR"/non_mpi/*/; do
             fi
             cosy_end=$(date +%s%N)
             cosy_ms=$(awk "BEGIN { printf \"%.2f\", ($cosy_end - $cosy_start) / 1000000 }")
-            TOTAL_COSY_MS=$(awk "BEGIN { printf \"%.2f\", $TOTAL_COSY_MS + $cosy_ms }")
 
-            speedup=$(awk "BEGIN { if ($rosy_ms > 0.01) printf \"%.1f\", $cosy_ms / $rosy_ms; else print \"INF\" }")
+            # Check if COSY reported errors (compilation or runtime)
+            if grep -qE "### ERROR|ERROR OCCURED" "$dir/cosy_t${tier}_output.txt" 2>/dev/null; then
+                printf "\r%80s\r" "" >&2
+                printf "%-28s %-4s %11.2f %11s %10s\n" "$name" "$tier_label" "$rosy_ms" "COSY ERR" "N/A"
+            else
+                TOTAL_COSY_MS=$(awk "BEGIN { printf \"%.2f\", $TOTAL_COSY_MS + $cosy_ms }")
 
-            printf "\r%80s\r" "" >&2
-            printf "%-28s %-4s %11.2f %11.2f %9sx\n" "$name" "$tier_label" "$rosy_ms" "$cosy_ms" "$speedup"
+                speedup=$(awk "BEGIN { if ($rosy_ms > 0.01) printf \"%.1f\", $cosy_ms / $rosy_ms; else print \"INF\" }")
+
+                printf "\r%80s\r" "" >&2
+                printf "%-28s %-4s %11.2f %11.2f %9sx\n" "$name" "$tier_label" "$rosy_ms" "$cosy_ms" "$speedup"
+            fi
         else
             printf "\r%80s\r" "" >&2
             printf "%-28s %-4s %11.2f\n" "$name" "$tier_label" "$rosy_ms"

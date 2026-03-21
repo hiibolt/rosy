@@ -25,7 +25,7 @@ LOOP ITER 1 20000 ;
     { Fill matrix with a diagonally dominant matrix }
     LOOP I 1 15 ;
         LOOP J 1 15 ;
-            IF I = J ;
+            IF (I = J) ;
                 A(I,J) := 15.0 + I * 0.1 ;
             ELSEIF LO(1) ;
                 A(I,J) := SIN(I * 0.3) * COS(J * 0.7) ;

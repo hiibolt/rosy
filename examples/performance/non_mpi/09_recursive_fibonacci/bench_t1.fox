@@ -9,7 +9,7 @@ VARIABLE RESULT 1 ;
 VARIABLE DT 1 ;
 
 FUNCTION FIB N ;
-    IF N <= 1 ;
+    IF (N < 2) ;
         FIB := N ;
     ELSEIF LO(1) ;
         FIB := FIB(N - 1) + FIB(N - 2) ;
