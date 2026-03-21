@@ -1,6 +1,6 @@
 [package]
 name = "rosy"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2024"
 
 [dependencies]
@@ -19,6 +19,7 @@ serde = { version = "1", features = ["derive"] }
 
 # Dependencies that were in rosy_lib
 num-complex.workspace = true
+rustc-hash.workspace = true
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("mpi"))'] }

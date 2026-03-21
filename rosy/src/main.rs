@@ -162,6 +162,10 @@ enum Commands {
         #[arg(short, long)]
         release: bool,
 
+        /// Aggressive optimizations: LTO, single codegen unit, panic=abort (slower builds, faster binaries)
+        #[arg(long)]
+        optimized: bool,
+
         /// Enforce COSY INFINITY syntax: memory sizes are required in VARIABLE declarations
         #[arg(long)]
         cosy_syntax: bool,
@@ -184,21 +188,31 @@ enum Commands {
         #[arg(short, long)]
         release: bool,
 
+        /// Aggressive optimizations: LTO, single codegen unit, panic=abort (slower builds, faster binaries)
+        #[arg(long)]
+        optimized: bool,
+
         /// Enforce COSY INFINITY syntax: memory sizes are required in VARIABLE declarations
         #[arg(long)]
         cosy_syntax: bool,
     },
 }
 
-fn rosy(script_path: &PathBuf, output_dir: Option<PathBuf>, release: bool) -> Result<PathBuf> {
+fn rosy(script_path: &PathBuf, output_dir: Option<PathBuf>, release: bool, optimized: bool) -> Result<PathBuf> {
     let total_start = Instant::now();
     let filename = script_path
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_else(|| "unknown".into());
+    let profile_label = if optimized {
+        "optimized"
+    } else if release {
+        "release"
+    } else {
+        "debug"
+    };
     eprintln!(
-        "{BOLD}  Transpiling{RESET} {filename} ({})",
-        if release { "release" } else { "debug" }
+        "{BOLD}  Transpiling{RESET} {filename} ({profile_label})"
     );
 
     // --- Step 1: Parse ---
@@ -266,7 +280,7 @@ fn rosy(script_path: &PathBuf, output_dir: Option<PathBuf>, release: bool) -> Re
     let rosy_output_path = output_dir.unwrap_or_else(|| PathBuf::from(".rosy_output"));
 
     // Create the output project structure from embedded templates
-    embedded::create_output_project(&rosy_output_path, uses_mpi)
+    embedded::create_output_project(&rosy_output_path, uses_mpi, optimized)
         .context("Failed to create output project structure")?;
 
     // Inject the transpiled code into main.rs
@@ -324,23 +338,23 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Extract common fields and transpile
-    let (source, output_dir, release, cosy_syntax, output_name) = match &cli.command {
-        Commands::Run { source, output_dir, release, cosy_syntax } => {
-            (source.clone(), output_dir.clone(), *release, *cosy_syntax, None)
+    let (source, output_dir, release, optimized, cosy_syntax, output_name) = match &cli.command {
+        Commands::Run { source, output_dir, release, optimized, cosy_syntax } => {
+            (source.clone(), output_dir.clone(), *release || *optimized, *optimized, *cosy_syntax, None)
         }
-        Commands::Build { source, output, output_dir, release, cosy_syntax } => {
+        Commands::Build { source, output, output_dir, release, optimized, cosy_syntax } => {
             let name = output.clone().unwrap_or_else(|| {
                 source.file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("rosy_output")
                     .to_string()
             });
-            (source.clone(), output_dir.clone(), *release, *cosy_syntax, Some(name))
+            (source.clone(), output_dir.clone(), *release || *optimized, *optimized, *cosy_syntax, Some(name))
         }
     };
 
     syntax_config::set_cosy_syntax(cosy_syntax);
-    let binary_path = rosy(&source, output_dir, release)?;
+    let binary_path = rosy(&source, output_dir, release, optimized)?;
 
     // Show update notice after transpilation (network has had time)
     update_handle.finish();

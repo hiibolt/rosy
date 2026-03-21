@@ -1,6 +1,6 @@
 //! DA (Differential Algebra) - Generic Taylor series implementation.
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use std::f32::consts::E;
 use std::ops::{Add, Neg, Sub, Mul, Div, AddAssign};
 use std::fmt;
@@ -83,7 +83,7 @@ impl<T: DACoefficient> DA<T> {
     /// Create a new zero DA object.
     pub fn zero() -> Self {
         Self {
-            coeffs: HashMap::new(),
+            coeffs: HashMap::default(),
         }
     }
 
@@ -92,7 +92,7 @@ impl<T: DACoefficient> DA<T> {
     /// # Arguments
     /// * `value` - The constant coefficient value
     pub fn from_coeff(value: T) -> Self {
-        let mut coeffs = HashMap::new();
+        let mut coeffs = HashMap::default();
         let epsilon = get_config().ok().map(|c| c.epsilon).unwrap_or(1e-15);
         if value.abs() > epsilon {
             coeffs.insert(Monomial::constant(), value);
@@ -124,7 +124,7 @@ impl<T: DACoefficient> DA<T> {
             );
         }
 
-        let mut coeffs = HashMap::new();
+        let mut coeffs = HashMap::default();
         coeffs.insert(Monomial::variable(var_index - 1), T::one());
         Ok(Self { coeffs })
     }
@@ -198,7 +198,7 @@ impl<T: DACoefficient> Add<&DA<T>> for &DA<T> {
 
     fn add(self, rhs: &DA<T>) -> Self::Output {
         let config = get_config()?;
-        let mut result = HashMap::new();
+        let mut result = HashMap::default();
 
         // Add coefficients from self
         for (monomial, &coeff) in &self.coeffs {
@@ -373,7 +373,7 @@ impl<T: DACoefficient> Mul<&DA<T>> for &DA<T> {
 
     fn mul(self, rhs: &DA<T>) -> Self::Output {
         let config = get_config()?;
-        let mut result = HashMap::new();
+        let mut result = HashMap::default();
 
         // Multiply each term in self by each term in rhs
         for (m1, &c1) in &self.coeffs {
@@ -735,7 +735,7 @@ impl DA<num_complex::Complex64> {
         use num_complex::Complex64;
         
         // Get all monomials from both real and imaginary parts
-        let mut coeffs = HashMap::new();
+        let mut coeffs = HashMap::default();
         
         // Add real part coefficients
         for (monomial, &re_coeff) in real.coeffs_iter() {

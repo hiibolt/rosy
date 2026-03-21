@@ -1,6 +1,6 @@
 use crate::rosy_lib::{DA, CD};
 use crate::rosy_lib::taylor::{Monomial, get_config, MAX_VARS, DACoefficient};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 
 /// Trait for derivation/anti-derivation of DA types.
 /// Positive index = partial derivative, negative index = anti-derivative (integral).
@@ -12,7 +12,7 @@ pub trait RosyDerive {
 /// Generic derivative implementation for `DA<T>`.
 fn da_derivative<T: DACoefficient>(da: &crate::rosy_lib::taylor::da::DA<T>, var_idx: usize) -> anyhow::Result<crate::rosy_lib::taylor::da::DA<T>> {
     let config = get_config()?;
-    let mut result_coeffs: HashMap<Monomial, T> = HashMap::new();
+    let mut result_coeffs: HashMap<Monomial, T> = HashMap::default();
     
     // For each term c * x1^a1 * x2^a2 * ... * xn^an,
     // d/dx_i = a_i * c * x1^a1 * ... * x_i^(a_i - 1) * ... * xn^an
@@ -57,7 +57,7 @@ fn da_derivative<T: DACoefficient>(da: &crate::rosy_lib::taylor::da::DA<T>, var_
 /// Generic anti-derivative (integral) implementation for `DA<T>`.
 fn da_antiderivative<T: DACoefficient>(da: &crate::rosy_lib::taylor::da::DA<T>, var_idx: usize) -> anyhow::Result<crate::rosy_lib::taylor::da::DA<T>> {
     let config = get_config()?;
-    let mut result_coeffs: HashMap<Monomial, T> = HashMap::new();
+    let mut result_coeffs: HashMap<Monomial, T> = HashMap::default();
     
     // For each term c * x1^a1 * x2^a2 * ... * xn^an,
     // integral w.r.t. x_i = c/(a_i + 1) * x1^a1 * ... * x_i^(a_i + 1) * ... * xn^an

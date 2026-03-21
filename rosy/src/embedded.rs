@@ -65,6 +65,7 @@ mpi = { version = "0.8", optional = true }
 bincode = { version = "2.0", optional = true }
 serial_test = "3.2"
 num-complex = "0.4"
+rustc-hash = "2"
 "#;
 
     std::fs::write(lib_dir.join("Cargo.toml"), lib_cargo_toml)
@@ -74,34 +75,26 @@ num-complex = "0.4"
 }
 
 /// Generates a Cargo.toml for the output project
-fn generate_cargo_toml(uses_mpi: bool) -> String {
-    if uses_mpi {
-        r#"[package]
-name = "rosy_output"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-anyhow = "1.0"
-rosy_lib = { path = "./vendored/rosy_lib", features = ["mpi"] }
-num-complex = "0.4"
-"#.to_string()
+fn generate_cargo_toml(uses_mpi: bool, optimized: bool) -> String {
+    let mpi_dep = if uses_mpi {
+        "rosy_lib = { path = \"./vendored/rosy_lib\", features = [\"mpi\"] }"
     } else {
-        r#"[package]
-name = "rosy_output"
-version = "0.1.0"
-edition = "2024"
+        "rosy_lib = { path = \"./vendored/rosy_lib\" }"
+    };
 
-[dependencies]
-anyhow = "1.0"
-rosy_lib = { path = "./vendored/rosy_lib" }
-num-complex = "0.4"
-"#.to_string()
-    }
+    let profile_section = if optimized {
+        "\n[profile.release]\nopt-level = 3\nlto = \"fat\"\ncodegen-units = 1\npanic = \"abort\"\n"
+    } else {
+        ""
+    };
+
+    format!(
+        "[package]\nname = \"rosy_output\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[dependencies]\nanyhow = \"1.0\"\n{mpi_dep}\nnum-complex = \"0.4\"\n{profile_section}"
+    )
 }
 
 /// Creates the output project structure in the specified directory
-pub fn create_output_project(output_dir: &Path, uses_mpi: bool) -> Result<()> {
+pub fn create_output_project(output_dir: &Path, uses_mpi: bool, optimized: bool) -> Result<()> {
     // Create the directory structure
     std::fs::create_dir_all(output_dir.join("src"))
         .context("Failed to create output directory structure")?;
@@ -111,7 +104,7 @@ pub fn create_output_project(output_dir: &Path, uses_mpi: bool) -> Result<()> {
         .context("Failed to write vendored rosy_lib")?;
 
     // Write Cargo.toml
-    std::fs::write(output_dir.join("Cargo.toml"), generate_cargo_toml(uses_mpi))
+    std::fs::write(output_dir.join("Cargo.toml"), generate_cargo_toml(uses_mpi, optimized))
         .context("Failed to write Cargo.toml template")?;
 
     // Write main.rs template
