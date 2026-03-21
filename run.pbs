@@ -14,16 +14,15 @@ echo "[ Loading Modules ]"
 module purge
 module load openmpi/openmpi-5.0.7-gcc-14.2.0-cuda-12.8
 
-# Build - and set the path to - your compiled Rust binary
+# Build the ROSY program into a standalone binary
 echo ""
 echo "[ Building ROSY Program ]"
-cargo run --bin rosy_transpiler examples/ploop.rosy && \
-RUST_BIN=./target/release/rosy_output && \
+rosy build examples/ploop.rosy --optimized -o rosy_output && \
 
-# Run with 2 processes (1 per node)
+# Run with MPI
 echo "" && \
 echo "[ Starting ROSY Program ]" && \
-time mpirun -np 10 -hostfile $PBS_NODEFILE $RUST_BIN
+time mpirun -np 10 -hostfile $PBS_NODEFILE ./rosy_output
 
 # Test with regular COSY
 echo ""
