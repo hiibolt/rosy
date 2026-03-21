@@ -4,6 +4,10 @@ A modern transpiler for the ROSY scientific programming language, designed for b
 
 Rosy transpiles ROSY source code into self-contained, native Rust executables — optimized native code with zero runtime dependencies.
 
+## Language Documentation
+
+The complete ROSY language reference — every operator, function, statement, and type — is in the **[Rustdoc documentation]([https://hiibolt.github.io/cosy-rs/rosy/index.html](https://hiibolt.github.io/rosy/))**.
+
 ## Example
 
 ```
@@ -121,17 +125,7 @@ Use `--optimized` for any real computation. It produces significantly faster bin
 - **`panic = abort`** — eliminates unwinding overhead
 
 > **Recommendation:** Always use `--optimized` for actual physics runs. The extra ~3s of compile time is negligible compared to the runtime savings on any non-trivial computation. Reserve `--release` for rapid edit-run cycles during development.
-
-## Language Documentation
-
-The complete ROSY language reference — every operator, function, statement, and type — is in the **[Rustdoc documentation](https://hiibolt.github.io/cosy-rs/rosy/index.html)**.
-
-To build locally:
-
-```bash
-cargo doc --document-private-items --no-deps -p rosy --open
-```
-
+> 
 ## MPI Support (`PLOOP`)
 
 Programs using `PLOOP` require an MPI implementation and LLVM/Clang at compile time (the transpiler itself does not):
