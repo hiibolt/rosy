@@ -10,7 +10,7 @@
 # ============================================================================
 
 cd $PBS_O_WORKDIR
-COSY_BIN="$PBS_O_WORKDIR/../cosy"
+COSY_BIN="$PBS_O_WORKDIR/../../cosy"
 BUILD_DIR=$(mktemp -d /tmp/rosy_local_XXXXXX)
 trap "rm -rf $BUILD_DIR" EXIT
 T4_TIMEOUT=30
