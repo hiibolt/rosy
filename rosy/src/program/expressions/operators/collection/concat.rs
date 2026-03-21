@@ -39,7 +39,7 @@ use crate::program::expressions::Expr;
 use crate::transpile::TranspileableExpr;
 use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, ValueKind};
 use anyhow::{Result, Context, Error, anyhow};
-use crate::rosy_lib::RosyType;
+use crate::rosy_lib::{RosyType, RosyBaseType};
 use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 
 /// AST node for the concatenation operator (`&`).
@@ -98,16 +98,83 @@ impl TranspileableExpr for ConcatExpr {
 }
 impl Transpile for ConcatExpr {
     fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
-        // First, do a type check 
-        //
-        // Sneaky way to check that all terms are compatible :3
+        // First, do a type check
         let _ = self.type_of(context)
             .map_err(|e| vec!(e.context("...while verifying types of concatenation expression")))?;
 
+        // Check if all terms are the same scalar type for direct emission
+        let term_types: Vec<_> = self.terms.iter()
+            .map(|t| t.type_of(context))
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|e| vec![e])?;
+
+        let all_re_scalar = term_types.iter().all(|t| t.base_type == RosyBaseType::RE && t.dimensions == 0);
+        let all_st_scalar = term_types.iter().all(|t| t.base_type == RosyBaseType::ST && t.dimensions == 0);
+
+        // Direct vec![...] emission for all-RE terms (avoids N-1 intermediate allocations)
+        if all_re_scalar {
+            let mut parts = Vec::new();
+            let mut requested_variables = BTreeSet::new();
+            let mut errors = Vec::new();
+            for (i, term) in self.terms.iter().enumerate() {
+                match term.transpile(context) {
+                    Ok(output) => {
+                        requested_variables.extend(output.requested_variables.iter().cloned());
+                        parts.push(output.as_value());
+                    },
+                    Err(mut e) => {
+                        for err in e.drain(..) {
+                            errors.push(err.context(format!("...while transpiling term {} of concatenation", i+1)));
+                        }
+                    }
+                }
+            }
+            return if errors.is_empty() {
+                Ok(TranspilationOutput {
+                    serialization: format!("vec![{}]", parts.join(", ")),
+                    requested_variables,
+                    value_kind: ValueKind::Owned,
+                })
+            } else {
+                Err(errors)
+            };
+        }
+
+        // Direct format!(...) emission for all-ST terms (single allocation)
+        if all_st_scalar {
+            let mut parts = Vec::new();
+            let mut requested_variables = BTreeSet::new();
+            let mut errors = Vec::new();
+            for (i, term) in self.terms.iter().enumerate() {
+                match term.transpile(context) {
+                    Ok(output) => {
+                        requested_variables.extend(output.requested_variables.iter().cloned());
+                        parts.push(output.as_ref());
+                    },
+                    Err(mut e) => {
+                        for err in e.drain(..) {
+                            errors.push(err.context(format!("...while transpiling term {} of concatenation", i+1)));
+                        }
+                    }
+                }
+            }
+            return if errors.is_empty() {
+                Ok(TranspilationOutput {
+                    serialization: format!("format!(\"{}\"{})",
+                        "{}".repeat(parts.len()),
+                        parts.iter().map(|p| format!(", {p}")).collect::<String>()),
+                    requested_variables,
+                    value_kind: ValueKind::Owned,
+                })
+            } else {
+                Err(errors)
+            };
+        }
+
+        // General case: accumulator-based chaining via RosyConcat trait
         let mut requested_variables = BTreeSet::new();
         let mut errors = Vec::new();
 
-        // Serialize the first term as a base accumulator
         let first_term = self.terms.get(0)
             .ok_or(vec!(anyhow!("Concatenation expression must have at least one term!")))?;
         let mut accumulator = match first_term.transpile(context) {
@@ -123,7 +190,6 @@ impl Transpile for ConcatExpr {
             }
         };
 
-        // Then, for each subsequent term, serialize and concatenate
         for (i, term) in self.terms.iter().skip(1).enumerate() {
             let term_output = match term.transpile(context) {
                 Ok(output) => {

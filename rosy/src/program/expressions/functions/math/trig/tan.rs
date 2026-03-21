@@ -54,11 +54,17 @@ impl Transpile for TanExpr {
         &self,
         context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>> {
+        let inner_type = self.expr.type_of(context).map_err(|e| vec![e])?;
+
         // Transpile the inner expression
         let inner_output = self.expr.transpile(context)?;
 
         // Generate the transpiled code
-        let serialization = format!("RosyTAN::rosy_tan({})?", inner_output.as_ref());
+        let serialization = if inner_type == RosyType::RE() {
+            format!("{}.tan()", inner_output.as_value())
+        } else {
+            format!("RosyTAN::rosy_tan({})?", inner_output.as_ref())
+        };
 
         Ok(TranspilationOutput {
             serialization,

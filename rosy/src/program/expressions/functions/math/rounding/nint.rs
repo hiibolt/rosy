@@ -46,9 +46,15 @@ impl Transpile for NintExpr {
         &self,
         context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>> {
+        let inner_type = self.expr.type_of(context).map_err(|e| vec![e])?;
+
         let inner_output = self.expr.transpile(context)?;
 
-        let serialization = format!("RosyNINT::rosy_nint({})?", inner_output.as_ref());
+        let serialization = if inner_type == RosyType::RE() {
+            format!("{}.round()", inner_output.as_value())
+        } else {
+            format!("RosyNINT::rosy_nint({})?", inner_output.as_ref())
+        };
 
         Ok(TranspilationOutput {
             serialization,
