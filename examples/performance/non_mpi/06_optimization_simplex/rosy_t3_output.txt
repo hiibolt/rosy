@@ -1,4 +1,0 @@
-Optimization Simplex Benchmark: 4-var Rosenbrock, 500 starting points
-Final: A= 1.000000262084519     B= 1.000000991997407     C= 1.000002212460129     D= 1.000004578434601    
-Final OBJ=0.3541016879420112E-10
-CPUSEC:  0.000000000000000    

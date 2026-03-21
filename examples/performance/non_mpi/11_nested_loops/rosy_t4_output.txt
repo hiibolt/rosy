@@ -1,3 +1,0 @@
-Nested Loops Benchmark T4: 500^3 = 125,000,000 iterations
-Accumulated result:  31621969.44784490    
-CPUSEC:  0.000000000000000    

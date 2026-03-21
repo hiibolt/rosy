@@ -1,3 +1,0 @@
-DA Trig Benchmark: order 5, 2 vars, 5000 iterations
-Result constant part:  2.000615823268434    
-CPUSEC: 0.0000000000000000E-07

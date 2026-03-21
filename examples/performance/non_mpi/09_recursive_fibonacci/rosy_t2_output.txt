@@ -1,3 +1,0 @@
-Recursive Fibonacci Benchmark: Fib(20)
-Fib(20) =  6765.000000000000    
-CPUSEC: -.0000000000000000E-07

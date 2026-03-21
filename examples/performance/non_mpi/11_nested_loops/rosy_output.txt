@@ -1,3 +1,0 @@
-Nested Loops Benchmark: 300^3 = 27M iterations
-Accumulated result:  4360267.692158075    
-CPUSEC:  0.000000000000000    

@@ -1,5 +1,0 @@
-String Operations Benchmark T1: 10 iterations
-Last string: Value= 31.41590000000000     Index= 10.00000000000000    
-Last substr: Value=
-Last length:  57.00000000000000    
-CPUSEC:  0.000000000000000    

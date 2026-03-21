@@ -1,3 +1,0 @@
-Nested Loops Benchmark T1: 3^3 = 27 iterations
-Accumulated result: 0.5993972233443108E-01
-CPUSEC:  0.000000000000000    

@@ -1,3 +1,0 @@
-Math Functions Benchmark: 20M iterations of SIN+COS+EXP+LOG+SQRT
-Accumulated result:  84207174.78140610    
-CPUSEC:  0.000000000000000    
