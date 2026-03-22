@@ -6,7 +6,7 @@ Rosy transpiles ROSY source code into self-contained, native Rust executables �
 
 ## Language Documentation
 
-The complete ROSY language reference — every operator, function, statement, and type — is in the **[Rustdoc documentation]([https://hiibolt.github.io/cosy-rs/rosy/index.html](https://hiibolt.github.io/rosy/))**.
+The complete ROSY language reference — every operator, function, statement, and type — is in the **[Rustdoc documentation](https://hiibolt.github.io/rosy/)**.
 
 ## Example
 
