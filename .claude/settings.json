@@ -54,23 +54,13 @@
             "mcp__github-projects__add_item",
             "mcp__github-projects__edit_item",
             "mcp__github-projects__archive_item",
-            "mcp__github-projects__create_draft_item",
-            "mcp__rust-analyzer__rust_analyzer_diagnostics",
-            "mcp__rust-analyzer__rust_analyzer_workspace_diagnostics",
-            "mcp__rust-analyzer__rust_analyzer_hover",
-            "mcp__rust-analyzer__rust_analyzer_definition",
-            "mcp__rust-analyzer__rust_analyzer_references",
-            "mcp__rust-analyzer__rust_analyzer_completion",
-            "mcp__rust-analyzer__rust_analyzer_code_actions",
-            "mcp__rust-analyzer__rust_analyzer_format",
-            "mcp__rust-analyzer__rust_analyzer_symbols",
-            "mcp__rust-analyzer__rust_analyzer_set_workspace"
+            "mcp__github-projects__create_draft_item"
         ]
     },
-    "enabledMcpjsonServers": ["rust-analyzer", "github-projects", "github"],
+    "enabledMcpjsonServers": ["github-projects", "github"],
     "enabledPlugins": {
         "skill-creator@claude-plugins-official": true,
-        "commit-commands@claude-plugins-official": true
+        "rust-analyzer-lsp@claude-plugins-official": true
     },
     "outputStyle": "Explanatory"
 }

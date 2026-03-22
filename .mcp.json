@@ -1,8 +1,5 @@
 {
     "mcpServers": {
-        "rust-analyzer": {
-            "command": "rust-analyzer-mcp"
-        },
         "github": {
             "command": "bunx",
             "args": ["-y", "@modelcontextprotocol/server-github"],
