@@ -11,3 +11,6 @@ pub mod fit;
 pub mod ldet;
 pub mod linv;
 pub mod polval;
+pub mod vedot;
+pub mod veunit;
+pub mod vezero;
