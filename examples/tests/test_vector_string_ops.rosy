@@ -1,0 +1,73 @@
+{ Test VEDOT, VEUNIT, VEZERO, STCRE, RECST, RERAN }
+
+BEGIN ;
+
+{ === VEDOT === }
+VARIABLE (VE) A ;
+VARIABLE (VE) B ;
+VARIABLE (RE) DOT_RESULT ;
+
+A := 1.0 & 2.0 & 3.0 ;
+B := 4.0 & 5.0 & 6.0 ;
+
+VEDOT A B DOT_RESULT ;
+WRITE 6 'VEDOT(1,2,3 . 4,5,6) =' DOT_RESULT ;
+{ Expected: 1*4 + 2*5 + 3*6 = 32.0 }
+
+{ === VEUNIT === }
+VARIABLE (VE) UNIT_RESULT ;
+
+VEUNIT A UNIT_RESULT ;
+WRITE 6 'VEUNIT(1,2,3) =' ST(UNIT_RESULT) ;
+{ Expected: (1/sqrt(14), 2/sqrt(14), 3/sqrt(14)) }
+
+{ Verify it's a unit vector by dotting with itself }
+VARIABLE (RE) NORM_CHECK ;
+VEDOT UNIT_RESULT UNIT_RESULT NORM_CHECK ;
+WRITE 6 'VEUNIT norm check (should be 1.0) =' NORM_CHECK ;
+
+{ === STCRE === }
+VARIABLE (ST) NUM_STR ;
+VARIABLE (RE) PARSED ;
+
+NUM_STR := '3.14159' ;
+STCRE NUM_STR PARSED ;
+WRITE 6 'STCRE(3.14159) =' PARSED ;
+
+{ === RECST === }
+VARIABLE (RE) PIE ;
+VARIABLE (ST) RESULT_STR ;
+
+PIE := 3.14159265 ;
+RECST PIE '(F10.4)' RESULT_STR ;
+WRITE 6 'RECST(pi, F10.4) =' RESULT_STR ;
+
+RECST PIE '(E12.4)' RESULT_STR ;
+WRITE 6 'RECST(pi, E12.4) =' RESULT_STR ;
+
+{ === RERAN === }
+VARIABLE (RE) R1 ;
+VARIABLE (RE) R2 ;
+VARIABLE (RE) R3 ;
+
+RERAN R1 ;
+RERAN R2 ;
+RERAN R3 ;
+
+WRITE 6 'RERAN values (should be in [-1,1]):' ;
+WRITE 6 '  R1 =' R1 ;
+WRITE 6 '  R2 =' R2 ;
+WRITE 6 '  R3 =' R3 ;
+
+{ Verify they're in range }
+IF (R1 >= -1.0) * (R1 <= 1.0) ;
+  WRITE 6 'R1 in range: TRUE' ;
+ENDIF ;
+IF (R2 >= -1.0) * (R2 <= 1.0) ;
+  WRITE 6 'R2 in range: TRUE' ;
+ENDIF ;
+IF (R3 >= -1.0) * (R3 <= 1.0) ;
+  WRITE 6 'R3 in range: TRUE' ;
+ENDIF ;
+
+END ;

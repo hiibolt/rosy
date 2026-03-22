@@ -67,6 +67,7 @@ bincode = { version = "2.0", optional = true }
 serial_test = "3.2"
 num-complex = "0.4"
 rustc-hash = "2"
+rand = "0.9"
 "#;
 
     std::fs::write(lib_dir.join("Cargo.toml"), lib_cargo_toml)

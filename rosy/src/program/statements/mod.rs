@@ -66,6 +66,14 @@ pub use io::cpusec::CpusecStatement;
 pub use io::os_call::OsCallStatement;
 pub use io::velget::VelgetStatement;
 
+pub use math::vedot::VedotStatement;
+pub use math::veunit::VeunitStatement;
+pub use math::vezero::VezeroStatement;
+
+pub use core::stcre::StcreStatement;
+pub use core::recst::RecstStatement;
+pub use core::reran::ReranStatement;
+
 pub use da::daeps::DaepsStatement;
 pub use da::danot::DanotStatement;
 pub use da::datrn::DatrnStatement;
@@ -147,6 +155,12 @@ pub enum StatementEnum {
     Substr,
     Velget,
     Velset,
+    Vedot,
+    Veunit,
+    Vezero,
+    Stcre,
+    Recst,
+    Reran,
 }
 impl TranspileableStatement for Statement {}
 impl FromRule for Statement {
@@ -399,6 +413,48 @@ impl FromRule for Statement {
                 .context("...while building POLVAL statement!")
                 .map(|opt| opt.map(|stmt| Statement {
                     enum_variant: StatementEnum::Polval,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::vedot => VedotStatement::from_rule(pair)
+                .context("...while building VEDOT statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Vedot,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::veunit => VeunitStatement::from_rule(pair)
+                .context("...while building VEUNIT statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Veunit,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::vezero => VezeroStatement::from_rule(pair)
+                .context("...while building VEZERO statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Vezero,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::stcre => StcreStatement::from_rule(pair)
+                .context("...while building STCRE statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Stcre,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::recst => RecstStatement::from_rule(pair)
+                .context("...while building RECST statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Recst,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::reran => ReranStatement::from_rule(pair)
+                .context("...while building RERAN statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Reran,
                     inner: Box::new(stmt),
                     source_location: loc.clone(),
                 })),

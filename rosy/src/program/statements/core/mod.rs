@@ -36,3 +36,6 @@ pub mod substr;
 pub mod var_decl;
 pub mod velset;
 pub mod while_loop;
+pub mod stcre;
+pub mod recst;
+pub mod reran;

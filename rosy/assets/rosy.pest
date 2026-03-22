@@ -39,7 +39,13 @@ statement   = _{
   | substr
   | velset
   | velget
-  | polval }
+  | polval
+  | vedot
+  | veunit
+  | vezero
+  | stcre
+  | recst
+  | reran }
 
 /// BREAK
 break_statement = { ^"BREAK" ~ semicolon }
@@ -68,7 +74,7 @@ memory_size = { expr }
 
 /// Keywords - define all reserved words (must be followed by a non-identifier character)
 keyword = @{ keyword_raw ~ !(ASCII_ALPHANUMERIC | "_") }
-keyword_raw = { ^"ENDPROCEDURE" | ^"ENDFUNCTION" | ^"ENDWHILE" | ^"ENDLOOP" | ^"ENDPLOOP" | ^"ENDFIT" | ^"ENDIF" | ^"ELSEIF" | ^"ELSE" | ^"BEGIN" | ^"END" | ^"WRITEB" | ^"WRITE" | ^"READB" | ^"READ" | ^"VARIABLE" | ^"PROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"WHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"DANOT" | ^"DAEPS" | ^"DATRN" | ^"LENGTH" | ^"SINH" | ^"SIN" | ^"COSH" | ^"COS" | ^"ASIN" | ^"ACOS" | ^"ATAN" | ^"TANH" | ^"SQRT" | ^"SQR" | ^"VMAX" | ^"VMIN" | ^"ABS" | ^"NORM" | ^"CONS" | ^"INT" | ^"NINT" | ^"TYPE" | ^"REAL" | ^"IMAG" | ^"TRIM" | ^"LTRIM" | ^"ISRT3" | ^"ISRT" | ^"CMPLX" | ^"CONJ" | ^"LST" | ^"LCM" | ^"LCD" | ^"LOG" | ^"BREAK" | ^"QUIT" | ^"SCRLEN" | ^"CPUSEC" | ^"OS" | ^"LINV" | ^"LDET" | ^"SUBSTR" | ^"VELSET" | ^"VELGET" | ^"POLVAL" | ^"FIT" | ^"OPENFB" | ^"OPENF" | ^"CLOSEF" | ^"FUNCTION" | ^"LOOP" | ^"PLOOP" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
+keyword_raw = { ^"ENDPROCEDURE" | ^"ENDFUNCTION" | ^"ENDWHILE" | ^"ENDLOOP" | ^"ENDPLOOP" | ^"ENDFIT" | ^"ENDIF" | ^"ELSEIF" | ^"ELSE" | ^"BEGIN" | ^"END" | ^"WRITEB" | ^"WRITE" | ^"READB" | ^"READ" | ^"VARIABLE" | ^"PROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"WHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"DANOT" | ^"DAEPS" | ^"DATRN" | ^"LENGTH" | ^"SINH" | ^"SIN" | ^"COSH" | ^"COS" | ^"ASIN" | ^"ACOS" | ^"ATAN" | ^"TANH" | ^"SQRT" | ^"SQR" | ^"VMAX" | ^"VMIN" | ^"ABS" | ^"NORM" | ^"CONS" | ^"INT" | ^"NINT" | ^"TYPE" | ^"REAL" | ^"IMAG" | ^"TRIM" | ^"LTRIM" | ^"ISRT3" | ^"ISRT" | ^"CMPLX" | ^"CONJ" | ^"LST" | ^"LCM" | ^"LCD" | ^"LOG" | ^"BREAK" | ^"QUIT" | ^"SCRLEN" | ^"CPUSEC" | ^"OS" | ^"LINV" | ^"LDET" | ^"SUBSTR" | ^"VELSET" | ^"VELGET" | ^"POLVAL" | ^"VEDOT" | ^"VEUNIT" | ^"VEZERO" | ^"STCRE" | ^"RECST" | ^"RERAN" | ^"FIT" | ^"OPENFB" | ^"OPENF" | ^"CLOSEF" | ^"FUNCTION" | ^"LOOP" | ^"PLOOP" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
 
 /// [ IF / ELSEIF / ELSE / ENDIF ]
 if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
@@ -225,6 +231,15 @@ endif = { ^"ENDIF" ~ semicolon }
   cpusec = { ^"CPUSEC" ~ variable_identifier ~ semicolon }
   /// [ VECTOR ACCESS ]
   velget = { ^"VELGET" ~ expr ~ expr ~ variable_identifier ~ semicolon }
+  /// [ VECTOR MATH ]
+  vedot = { ^"VEDOT" ~ expr ~ expr ~ variable_identifier ~ semicolon }
+  veunit = { ^"VEUNIT" ~ expr ~ variable_identifier ~ semicolon }
+  vezero = { ^"VEZERO" ~ variable_identifier ~ expr ~ expr ~ semicolon }
+  /// [ TYPE CONVERSION ]
+  stcre = { ^"STCRE" ~ expr ~ variable_identifier ~ semicolon }
+  recst = { ^"RECST" ~ expr ~ expr ~ variable_identifier ~ semicolon }
+  /// [ RANDOM ]
+  reran = { ^"RERAN" ~ variable_identifier ~ semicolon }
   /// [ MATH ]
   linv = { ^"LINV" ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   ldet = { ^"LDET" ~ expr ~ expr ~ expr ~ expr ~ semicolon }

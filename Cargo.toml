@@ -16,4 +16,5 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
 serial_test = "3.2"
 num-complex = "0.4"
+rand = "0.9"
 rustc-hash = "2"
