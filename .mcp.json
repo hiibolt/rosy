@@ -1,0 +1,21 @@
+{
+    "mcpServers": {
+        "rust-analyzer": {
+            "command": "rust-analyzer-mcp"
+        },
+        "github": {
+            "command": "bunx",
+            "args": ["-y", "@modelcontextprotocol/server-github"],
+            "env": {
+                "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+            }
+        },
+        "github-projects": {
+            "command": "bun",
+            "args": ["run", ".claude/tools/github-projects-mcp/index.ts"],
+            "env": {
+                "GH_OWNER": "${GH_OWNER}"
+            }
+        }
+    }
+}
