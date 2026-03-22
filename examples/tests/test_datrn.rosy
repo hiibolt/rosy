@@ -5,8 +5,8 @@ BEGIN;
 DAINI 3 2 0 0;
 
 { Declare DA vector arrays (1 element each) }
-VARIABLE (DA) input 1;
-VARIABLE (DA) output 1;
+VARIABLE (DA 1) input;
+VARIABLE (DA 1) output;
 
 { Declare scale and shift vectors }
 VARIABLE (VE) scales;

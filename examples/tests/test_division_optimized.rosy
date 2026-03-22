@@ -1,15 +1,16 @@
 BEGIN;
+DAINI 3 2;
 PROCEDURE MAIN;
     VARIABLE (DA) X;
     VARIABLE (DA) Y;
     VARIABLE (DA) Z;
     VARIABLE (DA) W;
     
-    { Test 1: Simple division }
+    { Test 1: Simple division by DA with nonzero constant part }
     X := DA(1);
-    Y := DA(2);
+    Y := 1 + DA(2);
     Z := X / Y;
-    WRITE 6 'Test 1 - DA(1) / DA(2):';
+    WRITE 6 'Test 1 - DA(1) / (1+DA(2)):';
     WRITE 6 Z;
     
     { Test 2: Division creating higher order terms }

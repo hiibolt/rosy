@@ -30,6 +30,7 @@ pub trait DACoefficient:
 {
     fn zero() -> Self;
     fn one() -> Self;
+    fn from_usize(n: usize) -> Self;
     fn abs(&self) -> f64;
 
     /// Get a zeroed Vec from the thread-local free list, or allocate fresh.
@@ -47,6 +48,7 @@ thread_local! {
 impl DACoefficient for f64 {
     #[inline(always)] fn zero() -> Self { 0.0 }
     #[inline(always)] fn one() -> Self { 1.0 }
+    #[inline(always)] fn from_usize(n: usize) -> Self { n as f64 }
     #[inline(always)] fn abs(&self) -> f64 { f64::abs(*self) }
 
     fn pool_alloc(n: usize) -> Vec<Self> {
@@ -77,6 +79,7 @@ thread_local! {
 impl DACoefficient for Complex64 {
     #[inline(always)] fn zero() -> Self { Complex64::new(0.0, 0.0) }
     #[inline(always)] fn one() -> Self { Complex64::new(1.0, 0.0) }
+    #[inline(always)] fn from_usize(n: usize) -> Self { Complex64::new(n as f64, 0.0) }
     #[inline(always)] fn abs(&self) -> f64 { self.norm() }
 
     fn pool_alloc(n: usize) -> Vec<Self> {

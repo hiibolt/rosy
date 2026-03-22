@@ -9,14 +9,14 @@
 *                                                                             *
 ******************************************************************************}
 BEGIN ;
-VARIABLE NO 1 ; VARIABLE NV 1 ; VARIABLE LX 1 ;
+VARIABLE NO ; VARIABLE NV ; VARIABLE LX ;
 
 PROCEDURE RUN ;
-   VARIABLE NM 1 ;
-   VARIABLE A 1 ; VARIABLE B 1 ;
+   VARIABLE NM ;
+   VARIABLE A ; VARIABLE B ;
 
    PROCEDURE COSYST ; WRITE 6 ' ' '** COSY STrings **' ' ' ;
-      VARIABLE (ST) X1 1 ; VARIABLE (ST) X2 1 ;
+      VARIABLE (ST) X1 ; VARIABLE (ST) X2 ;
       X1 := 'Hello World!' ;
       {Extraction and concatenation}
       X2 := X1|(7&8) ; X2 := X2&(X1|7)&(X1|LENGTH(X1)) ;
@@ -26,7 +26,7 @@ PROCEDURE RUN ;
       ENDPROCEDURE ;
 
    PROCEDURE COSYLO ; WRITE 6 ' ' '** COSY LOgicals **' ' ' ;
-      VARIABLE (LO) X1 1 ; VARIABLE (LO) X2 1 ;
+      VARIABLE (LO) X1 ; VARIABLE (LO) X2 ;
       X1 := LO(1) ;
       X2 := LO(0) ;
       WRITE 6 '('&ST(X1)&')*('&ST(X2)&') is '&ST(X1*X2) ;
@@ -34,7 +34,7 @@ PROCEDURE RUN ;
       ENDPROCEDURE ;
 
    PROCEDURE COSYCM ; WRITE 6 ' ' '** COSY CoMplex numbers **' ' ' ;
-      VARIABLE (CM) IM 1 ; VARIABLE (CM) X1 1 ;
+      VARIABLE (CM) IM ; VARIABLE (CM) X1 ;
       IM := CM(0&1) ;
       X1 := CM(A&B) ;
       WRITE 6 'IM := CM(0&1) is '&ST(IM)&'  : imaginary unit' ;
@@ -45,7 +45,7 @@ PROCEDURE RUN ;
       ENDPROCEDURE ;
 
    PROCEDURE COSYVE ; WRITE 6 ' ' '** COSY VEctors **' ' ' ;
-      VARIABLE (VE) X1 1 ; VARIABLE (VE) X2 1 ;
+      VARIABLE (VE) X1 ; VARIABLE (VE) X2 ;
       X1 := A&B ;
       X2 := X1&X1 ;
       WRITE 6 'X1 := A&B is' X1 ;
@@ -56,7 +56,7 @@ PROCEDURE RUN ;
       ENDPROCEDURE ;
 
    PROCEDURE COSYDA ; WRITE 6 ' ' '** COSY DA''s **' ' ' ;
-      VARIABLE (DA) X1 1 ; VARIABLE (DA) X2 1 ; VARIABLE (DA) X3 1 ;
+      VARIABLE (DA) X1 ; VARIABLE (DA) X2 ; VARIABLE (DA) X3 ;
       WRITE 6 'DA(1), the 1-st identity, is' DA(1) ;
       X1 := A+DA(1) ; X2 := B+DA(2) ; X3 := X1-2*SQR(X2) ;
       WRITE 6 'X3 := X1-2*SQR(X2) where X1=A+DA(1), X2=B+DA(2)' X3 ;
