@@ -5,7 +5,6 @@
 .rosy_output
 .rosy_test_cache
 .rosy_output_bench
-.dacelib_comp
 rosy_output
 /cosy_examples
 *.out
