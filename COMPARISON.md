@@ -148,8 +148,8 @@ As workloads scale up, Rosy's advantage grows because compilation overhead is am
 
 | | Details |
 |---|---|
-| Cluster | NIU Metis, Rocky Linux 8, PBS Pro |
-| CPU | Intel Xeon (compute nodes) |
+| Cluster | NIU Metis, Red Hat Enterprise Linux 8.6, PBS Pro |
+| CPU | 2x AMD EPYC 7713s (per compute node) |
 | Rosy | v0.8.4, `rustc` nightly 1.96.0 |
 | COSY | 9.1, `gfortran 14.2.0 -Ofast -mcmodel=large` |
 | MPI | OpenMPI 5.0.7, 20 nodes x 1 rank |
