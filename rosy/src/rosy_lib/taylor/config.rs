@@ -232,6 +232,7 @@ pub fn cleanup_taylor() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     #[test]
     fn test_config_creation() {
@@ -248,6 +249,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_global_init() {
         cleanup_taylor();
 
@@ -281,6 +283,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_mult_table_correctness() {
         cleanup_taylor();
         init_taylor(3, 2).unwrap();
@@ -308,6 +311,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_danot_cannot_exceed_init_order() {
         cleanup_taylor();
         init_taylor(5, 2).unwrap();
