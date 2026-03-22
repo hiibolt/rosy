@@ -54,14 +54,14 @@ impl FromRule for DAInitStatement {
             .ok_or_else(|| anyhow::anyhow!("Expected expression for number of variables in DAINI statement"))?;
         
         // Parse optional 3rd and 4th arguments (COSY compatibility - ignored)
-        if let Some(third_pair) = inner.next() {
+        if let Some(third_pair) = inner.next().filter(|p| p.as_rule() == Rule::expr) {
             let _third_expr = Expr::from_rule(third_pair)
                 .context("Failed to build 3rd expression in DAINI statement!")?;
             if !syntax_config::is_cosy_syntax() {
                 eprintln!("[rosy] Note: DAINI 3rd argument (output unit) ignored — Rosy handles this automatically~");
             }
             
-            if let Some(fourth_pair) = inner.next() {
+            if let Some(fourth_pair) = inner.next().filter(|p| p.as_rule() == Rule::expr) {
                 let _fourth_expr = Expr::from_rule(fourth_pair)
                     .context("Failed to build 4th expression in DAINI statement!")?;
                 if !syntax_config::is_cosy_syntax() {

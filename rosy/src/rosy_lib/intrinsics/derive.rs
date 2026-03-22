@@ -26,22 +26,8 @@ fn da_derivative<T: DACoefficient>(da: &crate::rosy_lib::taylor::da::DA<T>, var_
         new_exponents[var_idx] -= 1;
         let new_monomial = Monomial::new(new_exponents);
 
-        // Multiply coefficient by the exponent
-        let mut factor = T::zero();
-        for _ in 0..exp_i {
-            factor += coeff;
-        }
-        // Actually: factor = coeff * exp_i (as T)
-        // We need a cleaner way: build T from u8
-        let scale = {
-            let mut s = T::zero();
-            let one = T::one();
-            for _ in 0..exp_i {
-                s += one;
-            }
-            s
-        };
-        let new_coeff = coeff * scale;
+        // Multiply coefficient by the exponent (direct multiply, matching DACE)
+        let new_coeff = coeff * T::from_usize(exp_i as usize);
         
         if new_coeff.abs() > config.epsilon {
             *result_coeffs.entry(new_monomial).or_insert(T::zero()) += new_coeff;
@@ -74,16 +60,8 @@ fn da_antiderivative<T: DACoefficient>(da: &crate::rosy_lib::taylor::da::DA<T>, 
             continue;
         }
         
-        // Divide coefficient by (exp_i + 1)
-        let divisor = {
-            let mut d = T::zero();
-            let one = T::one();
-            for _ in 0..new_exp {
-                d += one;
-            }
-            d
-        };
-        let new_coeff = coeff / divisor;
+        // Divide coefficient by (exp_i + 1) (direct divide, matching DACE)
+        let new_coeff = coeff / T::from_usize(new_exp as usize);
         
         if new_coeff.abs() > config.epsilon {
             *result_coeffs.entry(new_monomial).or_insert(T::zero()) += new_coeff;
