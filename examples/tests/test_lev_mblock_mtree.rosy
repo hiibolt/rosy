@@ -1,0 +1,134 @@
+BEGIN ;
+
+{ ====== Test LEV: eigenvalues of a 2x2 matrix ====== }
+{ Matrix: [[2, 1], [1, 2]] has eigenvalues 3 and 1 }
+VARIABLE (RE 10 10) A ;
+VARIABLE (RE 10) eigr ;
+VARIABLE (RE 10) eigi ;
+VARIABLE (RE 10 10) V ;
+
+{ Set matrix elements }
+A(1)(1) := 2 ;
+A(1)(2) := 1 ;
+A(2)(1) := 1 ;
+A(2)(2) := 2 ;
+
+LEV A eigr eigi V 2 10 ;
+
+{ Eigenvalues should be 3 and 1 (or 1 and 3, order may vary) }
+VARIABLE (RE) sum_eig ;
+sum_eig := eigr(1) + eigr(2) ;
+IF ABS(sum_eig - 4) < 0.0001 ;
+  WRITE 6 'LEV ok: eigenvalue sum = 4' ;
+ENDIF ;
+
+VARIABLE (RE) prod_eig ;
+prod_eig := eigr(1) * eigr(2) ;
+IF ABS(prod_eig - 3) < 0.0001 ;
+  WRITE 6 'LEV ok: eigenvalue product = 3' ;
+ENDIF ;
+
+{ Imaginary parts should be zero (real symmetric matrix) }
+IF ABS(eigi(1)) < 0.0001 ;
+  IF ABS(eigi(2)) < 0.0001 ;
+    WRITE 6 'LEV ok: imaginary parts are zero' ;
+  ENDIF ;
+ENDIF ;
+
+{ ====== Test LEV: complex eigenvalues ====== }
+{ Matrix: [[0, -1], [1, 0]] has eigenvalues +i and -i }
+VARIABLE (RE 10 10) B ;
+VARIABLE (RE 10) eigr2 ;
+VARIABLE (RE 10) eigi2 ;
+VARIABLE (RE 10 10) V2 ;
+
+B(1)(1) := 0 ;
+B(1)(2) := -1 ;
+B(2)(1) := 1 ;
+B(2)(2) := 0 ;
+
+LEV B eigr2 eigi2 V2 2 10 ;
+
+{ Real parts should be zero, imaginary parts should be +/-1 }
+IF ABS(eigr2(1)) < 0.0001 ;
+  IF ABS(eigr2(2)) < 0.0001 ;
+    WRITE 6 'LEV ok: complex eigenvalues have zero real parts' ;
+  ENDIF ;
+ENDIF ;
+
+VARIABLE (RE) abs_imag_sum ;
+abs_imag_sum := ABS(eigi2(1)) + ABS(eigi2(2)) ;
+IF ABS(abs_imag_sum - 2) < 0.0001 ;
+  WRITE 6 'LEV ok: |imag1| + |imag2| = 2' ;
+ENDIF ;
+
+{ ====== Test MBLOCK ====== }
+{ Same symmetric matrix: block-diag should produce Q, Q^-1 }
+VARIABLE (RE 10 10) T_mat ;
+VARIABLE (RE 10 10) T_inv ;
+
+MBLOCK A T_mat T_inv 10 2 ;
+
+{ T_inv should be transpose of T_mat (orthogonal) }
+{ Check: T_inv * T_mat should be near identity }
+VARIABLE (RE) diag_sum ;
+diag_sum := 0 ;
+VARIABLE (RE) offdiag_max ;
+offdiag_max := 0 ;
+VARIABLE (RE) temp ;
+
+LOOP I 1 2 ;
+  LOOP J 1 2 ;
+    temp := 0 ;
+    LOOP K 1 2 ;
+      temp := temp + T_inv(I)(K) * T_mat(K)(J) ;
+    ENDLOOP ;
+    IF I = J ;
+      diag_sum := diag_sum + temp ;
+    ENDIF ;
+    IF I # J ;
+      IF ABS(temp) > offdiag_max ;
+        offdiag_max := ABS(temp) ;
+      ENDIF ;
+    ENDIF ;
+  ENDLOOP ;
+ENDLOOP ;
+
+IF ABS(diag_sum - 2) < 0.01 ;
+  WRITE 6 'MBLOCK ok: T_inv * T_mat diagonal sum = 2' ;
+ENDIF ;
+
+IF offdiag_max < 0.01 ;
+  WRITE 6 'MBLOCK ok: T_inv * T_mat off-diagonal near zero' ;
+ENDIF ;
+
+{ ====== Test MTREE ====== }
+{ Create a simple DA and compute its tree representation }
+VARIABLE (DA) D1 ;
+VARIABLE (DA 2) DA_ARR ;
+VARIABLE (RE 100) COEFS ;
+VARIABLE (RE 100) S1 ;
+VARIABLE (RE 100) S2 ;
+VARIABLE (RE) NELEMS ;
+VARIABLE (RE) TLEN ;
+
+VARIABLE (RE) da_order ;
+VARIABLE (RE) da_nvars ;
+da_order := 3 ;
+da_nvars := 2 ;
+DAINI da_order da_nvars ;
+D1 := DA(1) + 2 * DA(2) + 3 ;
+DA_ARR(1) := D1 ;
+
+MTREE DA_ARR 1 COEFS S1 S2 NELEMS TLEN ;
+
+{ Tree length should be positive (the DA has non-zero terms) }
+IF TLEN > 0 ;
+  WRITE 6 'MTREE ok: tree length > 0' ;
+ENDIF ;
+
+IF NELEMS > 0 ;
+  WRITE 6 'MTREE ok: num elements > 0' ;
+ENDIF ;
+
+END ;

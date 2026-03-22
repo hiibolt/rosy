@@ -9,7 +9,9 @@
 
 pub mod fit;
 pub mod ldet;
+pub mod lev;
 pub mod linv;
+pub mod mblock;
 pub mod polval;
 pub mod vedot;
 pub mod veunit;

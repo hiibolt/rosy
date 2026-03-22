@@ -54,7 +54,9 @@ pub use io::closef::ClosefStatement;
 
 pub use math::fit::FitStatement;
 pub use math::ldet::LdetStatement;
+pub use math::lev::LevStatement;
 pub use math::linv::LinvStatement;
+pub use math::mblock::MblockStatement;
 pub use math::polval::PolvalStatement;
 
 pub use core::quit::QuitStatement;
@@ -80,6 +82,7 @@ pub use core::imunit::ImunitStatement;
 pub use da::daeps::DaepsStatement;
 pub use da::danot::DanotStatement;
 pub use da::datrn::DatrnStatement;
+pub use da::mtree::MtreeStatement;
 
 use crate::{ast::{FromRule, Rule}, transpile::*};
 use anyhow::{Context, Error, Result, bail};
@@ -167,6 +170,9 @@ pub enum StatementEnum {
     Pwtime,
     Pnpro,
     Imunit,
+    Lev,
+    Mblock,
+    Mtree,
 }
 impl TranspileableStatement for Statement {}
 impl FromRule for Statement {
@@ -482,6 +488,27 @@ impl FromRule for Statement {
                 .context("...while building IMUNIT statement!")
                 .map(|opt| opt.map(|stmt| Statement {
                     enum_variant: StatementEnum::Imunit,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::lev => LevStatement::from_rule(pair)
+                .context("...while building LEV statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Lev,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::mblock => MblockStatement::from_rule(pair)
+                .context("...while building MBLOCK statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Mblock,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::mtree => MtreeStatement::from_rule(pair)
+                .context("...while building MTREE statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Mtree,
                     inner: Box::new(stmt),
                     source_location: loc.clone(),
                 })),
