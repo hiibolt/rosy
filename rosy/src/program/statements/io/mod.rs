@@ -22,5 +22,6 @@ pub mod os_call;
 pub mod read;
 pub mod readb;
 pub mod velget;
+pub mod pwtime;
 pub mod write;
 pub mod writeb;

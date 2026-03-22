@@ -65,6 +65,7 @@ pub use core::velset::VelsetStatement;
 pub use io::cpusec::CpusecStatement;
 pub use io::os_call::OsCallStatement;
 pub use io::velget::VelgetStatement;
+pub use io::pwtime::PwtimeStatement;
 
 pub use math::vedot::VedotStatement;
 pub use math::veunit::VeunitStatement;
@@ -73,6 +74,8 @@ pub use math::vezero::VezeroStatement;
 pub use core::stcre::StcreStatement;
 pub use core::recst::RecstStatement;
 pub use core::reran::ReranStatement;
+pub use core::pnpro::PnproStatement;
+pub use core::imunit::ImunitStatement;
 
 pub use da::daeps::DaepsStatement;
 pub use da::danot::DanotStatement;
@@ -161,6 +164,9 @@ pub enum StatementEnum {
     Stcre,
     Recst,
     Reran,
+    Pwtime,
+    Pnpro,
+    Imunit,
 }
 impl TranspileableStatement for Statement {}
 impl FromRule for Statement {
@@ -455,6 +461,27 @@ impl FromRule for Statement {
                 .context("...while building RERAN statement!")
                 .map(|opt| opt.map(|stmt| Statement {
                     enum_variant: StatementEnum::Reran,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::pwtime => PwtimeStatement::from_rule(pair)
+                .context("...while building PWTIME statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Pwtime,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::pnpro => PnproStatement::from_rule(pair)
+                .context("...while building PNPRO statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Pnpro,
+                    inner: Box::new(stmt),
+                    source_location: loc.clone(),
+                })),
+            Rule::imunit => ImunitStatement::from_rule(pair)
+                .context("...while building IMUNIT statement!")
+                .map(|opt| opt.map(|stmt| Statement {
+                    enum_variant: StatementEnum::Imunit,
                     inner: Box::new(stmt),
                     source_location: loc.clone(),
                 })),

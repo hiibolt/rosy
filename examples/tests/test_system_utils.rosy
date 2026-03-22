@@ -1,0 +1,44 @@
+BEGIN ;
+
+{ Test PWTIME: wall-clock elapsed time }
+VARIABLE (RE) t1 ;
+PWTIME t1 ;
+IF t1 >= 0 ;
+  WRITE 6 'PWTIME ok: t1 is non-negative' ;
+ENDIF ;
+
+VARIABLE (RE) t2 ;
+PWTIME t2 ;
+IF t2 >= t1 ;
+  WRITE 6 'PWTIME ok: t2 >= t1 (monotonic)' ;
+ENDIF ;
+
+{ Test PNPRO: should return 1 in serial mode }
+VARIABLE (RE) np ;
+PNPRO np ;
+IF np = 1 ;
+  WRITE 6 'PNPRO ok: np = 1 (serial mode)' ;
+ENDIF ;
+
+{ Test IMUNIT: should return imaginary unit i }
+VARIABLE (CM) z ;
+IMUNIT z ;
+VARIABLE (RE) re_part ;
+VARIABLE (RE) im_part ;
+re_part := REAL(z) ;
+im_part := IMAG(z) ;
+IF re_part = 0 ;
+  WRITE 6 'IMUNIT ok: real part is 0' ;
+ENDIF ;
+IF im_part = 1 ;
+  WRITE 6 'IMUNIT ok: imaginary part is 1' ;
+ENDIF ;
+
+{ Use IMUNIT in arithmetic: z*z should equal -1 }
+VARIABLE (CM) z2 ;
+z2 := z * z ;
+IF REAL(z2) = -1 ;
+  WRITE 6 'IMUNIT ok: i*i = -1' ;
+ENDIF ;
+
+END ;
