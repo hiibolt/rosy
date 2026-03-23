@@ -22,10 +22,6 @@
 //! | Print DA values | **[`da::daprv`]**, **[`da::darev`]** |
 //! | Use `FIT` (optimization) | **[`math::fit`]** |
 //! | Use `BREAK` or `QUIT` | **[`core::break_statement`]**, **[`core::quit`]** |
-//!
-//! ## Auto-generated Test Documentation
-//!
-#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/statements_docs.md"))]
 
 pub mod core;
 pub mod da;
@@ -42,7 +38,7 @@ pub use core::function_call::FunctionCallStatement;
 pub use core::procedure_call::ProcedureCallStatement;
 pub use core::function::FunctionStatement;
 pub use core::procedure::ProcedureStatement;
-pub use core::break_statement::BreakStatement;
+pub use core::r#break::BreakStatement;
 
 pub use da::da_init::DAInitStatement;
 pub use da::daprv::DaprvStatement;

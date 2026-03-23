@@ -8,22 +8,16 @@ fn main() {
     // Re-run if source changes
     println!("cargo:rerun-if-changed=src/program");
 
-    // Auto-discover and codegen from rosy_test_raw annotations in all source dirs
-    let stmt_tests = codegen::discover_and_codegen_annotated(
+    // Auto-discover construct test directories
+    let stmt_tests = codegen::discover_construct_tests(
         Path::new("src/program/statements"),
-        "statements",
     );
-    let expr_tests = codegen::discover_and_codegen_annotated(
+    let expr_tests = codegen::discover_construct_tests(
         Path::new("src/program/expressions"),
-        "expressions",
     );
 
-    // Generate combined docs for rustdoc inclusion
-    codegen::generate_combined_docs("statements", &stmt_tests);
-    codegen::generate_combined_docs("expressions", &expr_tests);
-
-    // Generate the annotated test runner (include!'d in test module)
-    codegen::generate_annotated_test_runner(&[
+    // Generate the test runner (include!'d in test module)
+    codegen::generate_test_runner(&[
         ("statements", &stmt_tests),
         ("expressions", &expr_tests),
     ]);

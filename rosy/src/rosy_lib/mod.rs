@@ -54,28 +54,30 @@ mod annotated_tests {
     use std::path::PathBuf;
     use std::fs;
 
-    fn test_annotated_rosy_output(category: &str, name: &str) {
+    /// Run a construct test: execute ROSY and COSY, write outputs, compare.
+    fn run_construct_test(category: &str, name: &str, construct_dir: &str) {
         let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .expect("Failed to get workspace root")
             .to_path_buf();
 
-        let rosy_script = workspace_root.join(format!(
-            "rosy/assets/{}/{}/{}.rosy", category, name, name
-        ));
-        let expected_path = workspace_root.join(format!(
-            "rosy/assets/{}/{}/{}.expected", category, name, name
-        ));
+        // Construct dir is relative to crate root; make it absolute
+        let construct_path = workspace_root.join("rosy").join(construct_dir);
+        let rosy_script = construct_path.join("test.rosy");
+        let fox_script = construct_path.join("test.fox");
+        let rosy_output_path = construct_path.join("rosy_output.txt");
+        let cosy_output_path = construct_path.join("cosy_output.txt");
 
         assert!(rosy_script.exists(), "ROSY script not found: {:?}", rosy_script);
+        assert!(fox_script.exists(), "COSY script not found: {:?}", fox_script);
 
+        // --- Run ROSY ---
         let test_build_dir = workspace_root.join(format!(
             ".rosy_test_cache/{}_{}", category, name
         ));
         fs::create_dir_all(&test_build_dir).ok();
 
-        // Transpile and run using test_build_dir as cwd so temp files are isolated
-        let output = Command::new("cargo")
+        let rosy_result = Command::new("cargo")
             .arg("run").arg("--release")
             .arg("--manifest-path").arg(workspace_root.join("Cargo.toml"))
             .arg("-p").arg("rosy")
@@ -85,30 +87,75 @@ mod annotated_tests {
             .expect("Failed to run rosy");
 
         assert!(
-            output.status.success(),
+            rosy_result.status.success(),
             "ROSY transpiler failed for {}/{}:\nstdout: {}\nstderr: {}",
             category, name,
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
+            String::from_utf8_lossy(&rosy_result.stdout),
+            String::from_utf8_lossy(&rosy_result.stderr)
         );
 
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let rosy_stdout = String::from_utf8_lossy(&rosy_result.stdout).to_string();
+        fs::write(&rosy_output_path, &rosy_stdout)
+            .unwrap_or_else(|e| panic!("Failed to write rosy_output.txt for {}/{}: {}", category, name, e));
 
-        // Compare against expected output if it exists, otherwise create it
-        if expected_path.exists() {
-            let expected = fs::read_to_string(&expected_path).unwrap();
+        // --- Run COSY ---
+        let cosy_bin = workspace_root.join("cosy");
+        if cosy_bin.exists() && cosy_bin.is_file() {
+            // COSY reads filename (without .fox extension) from stdin.
+            // It requires the .fox file to be in the working directory.
+            let mut child = Command::new(&cosy_bin)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .current_dir(&construct_path)
+                .spawn()
+                .expect("Failed to spawn COSY");
+
+            // Write filename to stdin and drop to close it
+            {
+                use std::io::Write;
+                let mut stdin = child.stdin.take().expect("Failed to open COSY stdin");
+                stdin.write_all(b"test\n").expect("Failed to write to COSY stdin");
+            }
+            // stdin is dropped here, signaling EOF
+
+            let cosy_result = child.wait_with_output()
+                .expect("Failed to wait for COSY");
+
+            let cosy_stdout = String::from_utf8_lossy(&cosy_result.stdout).to_string();
+
+            // Extract output after "BEGINNING EXECUTION" line
+            let cosy_output = extract_cosy_output(&cosy_stdout);
+            fs::write(&cosy_output_path, &cosy_output)
+                .unwrap_or_else(|e| panic!("Failed to write cosy_output.txt for {}/{}: {}", category, name, e));
+
+            // Compare ROSY and COSY outputs
             assert_eq!(
-                stdout.trim(), expected.trim(),
-                "Output mismatch for {}/{}.\nExpected:\n{}\nGot:\n{}",
-                category, name, expected.trim(), stdout.trim()
+                rosy_stdout.trim(), cosy_output.trim(),
+                "Output mismatch for {}/{}.\nROSY output:\n{}\nCOSY output:\n{}",
+                category, name, rosy_stdout.trim(), cosy_output.trim()
             );
         } else {
-            fs::write(&expected_path, &stdout)
-                .unwrap_or_else(|e| panic!(
-                    "Failed to write expected output for {}/{}: {}", category, name, e
-                ));
-            println!("Created expected output file for {}/{}: {:?}", category, name, expected_path);
+            // No COSY binary available - just verify ROSY runs
+            eprintln!("COSY binary not found at {:?}, skipping COSY comparison for {}/{}", cosy_bin, category, name);
         }
+    }
+
+    /// Extract the meaningful output from COSY's stdout.
+    /// COSY prints a banner, then "BEGINNING EXECUTION", then the actual output.
+    fn extract_cosy_output(raw: &str) -> String {
+        let mut after_exec = false;
+        let mut lines = Vec::new();
+
+        for line in raw.lines() {
+            if after_exec {
+                lines.push(line);
+            } else if line.contains("BEGINNING EXECUTION") {
+                after_exec = true;
+            }
+        }
+
+        lines.join("\n")
     }
 
     include!(concat!(env!("OUT_DIR"), "/annotated_tests.rs"));

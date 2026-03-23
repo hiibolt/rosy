@@ -22,7 +22,7 @@
 //! - **[`procedure`]** / **[`procedure_call`]** — define and call procedures
 
 pub mod assign;
-pub mod break_statement;
+pub mod r#break;
 pub mod function_call;
 pub mod function;
 pub mod r#if;
