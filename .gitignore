@@ -11,6 +11,7 @@ rosy_output
 *.lis
 *.ssv
 *.fuse_*
-**/foxyinp.dat
 bench_t4
 settings.local.json
+*.bins
+*.dat

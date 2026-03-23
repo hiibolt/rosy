@@ -1,9 +1,9 @@
 BEGIN;
 PROCEDURE RUN;
     VARIABLE B 1;
-    B := NOT TRUE;
+    B := NOT(LO(1));
     WRITE 6 B;
-    B := NOT FALSE;
+    B := NOT(LO(0));
     WRITE 6 B;
 ENDPROCEDURE;
 RUN;

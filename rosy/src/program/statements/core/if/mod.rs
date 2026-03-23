@@ -16,6 +16,9 @@
 //!
 //! The condition must evaluate to a `LO` (logical/boolean) type.
 //!
+//! > **COSY note:** COSY INFINITY does not have an `ELSE` keyword.
+//! > The idiomatic equivalent is `ELSEIF LO(1);` (always-true guard).
+//!
 //! ## Rosy Example
 #![doc = include_str!("test.rosy")]
 //! **Output**:

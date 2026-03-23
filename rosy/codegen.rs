@@ -42,12 +42,13 @@ fn walk_for_construct_tests(
         let path = entry.path();
         if path.is_dir() {
             let has_test_rosy = path.join("test.rosy").is_file();
-            let has_test_fox = path.join("test.fox").is_file();
 
-            if has_test_rosy && has_test_fox {
+            if has_test_rosy {
                 let name = path.file_name().unwrap().to_string_lossy().to_string();
                 println!("cargo:rerun-if-changed={}", path.join("test.rosy").display());
-                println!("cargo:rerun-if-changed={}", path.join("test.fox").display());
+                if path.join("test.fox").is_file() {
+                    println!("cargo:rerun-if-changed={}", path.join("test.fox").display());
+                }
                 results.push(ConstructTest {
                     name,
                     dir: path.clone(),
