@@ -120,13 +120,3 @@ fn da_asin(da: &DA) -> anyhow::Result<DA> {
     DA::horner_eval(&da_prime, &taylor_coeffs)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::rosy_lib::intrinsics::test_utils::test_intrinsic_output_match;
-
-    #[test]
-    fn test_rosy_cosy_asin_match() {
-        test_intrinsic_output_match("asin");
-    }
-}

@@ -12,6 +12,32 @@
 //!   1 = Nelder-Mead Simplex
 //!   3 = Simulated Annealing (not yet implemented)
 //!   4 = LMDIF (Levenberg-Marquardt least squares)
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) X;
+//!     VARIABLE (RE) OBJ;
+//!     X := 0;
+//!     FIT X;
+//!         OBJ := (X - 3) * (X - 3);
+//!     ENDFIT 0.0000000001 1000 1 OBJ;
+//!     WRITE 6 X;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE X 1;
+//!     VARIABLE OBJ 1;
+//!     X := 0;
+//!     FIT X;
+//!         OBJ := (X - 3) * (X - 3);
+//!     ENDFIT 0.0000000001 1000 1 OBJ;
+//!     WRITE 6 X;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};

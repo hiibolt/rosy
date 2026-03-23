@@ -16,6 +16,24 @@
 //! ```text
 //! WRITE 6 'x = ' x ' y = ' y;
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) X;
+//!     X := 42;
+//!     WRITE 6 'Value: ' X;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE X 1;
+//!     X := 42;
+//!     WRITE 6 'Value: ' X;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

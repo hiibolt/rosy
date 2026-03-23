@@ -23,6 +23,24 @@
 //! VARIABLE (RE) x;
 //! x := SIN(3.14159 / 2);   { ≈ 1.0 }
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) X;
+//!     X := SIN(1.0);
+//!     WRITE 6 X;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE X 1;
+//!     X := SIN(1.0);
+//!     WRITE 6 X;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;

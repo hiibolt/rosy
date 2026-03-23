@@ -13,6 +13,34 @@
 //! 2. `n`         — number of actual rows/columns (RE, used as usize)
 //! 3. `alloc_dim` — allocation dimension (RE, used as usize)
 //! 4. `result`    — variable to receive the determinant (RE, must be a variable identifier)
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE 10 10) M;
+//!     VARIABLE (RE) D;
+//!     M(1)(1) := 1;
+//!     M(1)(2) := 2;
+//!     M(2)(1) := 3;
+//!     M(2)(2) := 4;
+//!     LDET M 2 10 D;
+//!     WRITE 6 D;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE M 100;
+//!     VARIABLE D 1;
+//!     M(1)(1) := 1;
+//!     M(1)(2) := 2;
+//!     M(2)(1) := 3;
+//!     M(2)(2) := 4;
+//!     LDET M 2 10 D;
+//!     WRITE 6 D;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

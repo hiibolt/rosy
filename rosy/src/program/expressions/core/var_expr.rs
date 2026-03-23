@@ -34,6 +34,24 @@
 //! MYFUNC(a, b)   { Function call (multiple args) }
 //! X[I,J]         { Variable with bracket indexing }
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) X;
+//!     X := 99;
+//!     WRITE 6 X;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE X 1;
+//!     X := 99;
+//!     WRITE 6 X;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use crate::ast::{FromRule, Rule};
 use super::variable_identifier::VariableIdentifier;

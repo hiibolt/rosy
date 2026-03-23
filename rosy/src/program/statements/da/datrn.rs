@@ -16,6 +16,39 @@
 //! 4. `m1`     (RE, read)         - start variable index (1-based)
 //! 5. `m2`     (RE, read)         - end variable index (1-based, inclusive)
 //! 6. `output` (DA vector, write) - result DA array
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     DAINI 3 2 0 0;
+//!     VARIABLE (DA 1) INPUT;
+//!     VARIABLE (DA 1) OUTPUT;
+//!     VARIABLE (VE) SCALES;
+//!     VARIABLE (VE) SHIFTS;
+//!     INPUT(1) := DA(1);
+//!     SCALES := 2.0 & 1.0;
+//!     SHIFTS := 1.0 & 0.0;
+//!     DATRN INPUT SCALES SHIFTS 1 1 OUTPUT;
+//!     DAPRV OUTPUT 1 2 2 6;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE NM 1;
+//!     VARIABLE INPUT 2000;
+//!     VARIABLE OUTPUT 2000;
+//!     VARIABLE SCALES 100;
+//!     VARIABLE SHIFTS 100;
+//!     OV 3 2 0 NM;
+//!     INPUT(1) := DA(1);
+//!     SCALES := 2.0 & 1.0;
+//!     SHIFTS := 1.0 & 0.0;
+//!     DATRN INPUT SCALES SHIFTS 1 1 OUTPUT;
+//!     DAPRV OUTPUT 1 2 2 6;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

@@ -16,6 +16,25 @@
 //! VARIABLE (DA) f;
 //! f := DA(1) + DA(2);
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     DAINI 5 2 0 0;
+//!     DANOT 3;
+//!     WRITE 6 'danot ok';
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE NM 1;
+//!     OV 5 2 0 NM;
+//!     DANOT 3;
+//!     WRITE 6 'danot ok';
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use anyhow::{Result, Context, Error, ensure};
 

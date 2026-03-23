@@ -19,6 +19,28 @@
 //! | LO    |  5   |
 //! | VE    |  6   |
 //! | DA    |  8   |
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) X;
+//!     VARIABLE (RE) T;
+//!     X := 42;
+//!     T := TYPE(X);
+//!     WRITE 6 T;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE X 1;
+//!     VARIABLE T 1;
+//!     X := 42;
+//!     T := TYPE(X);
+//!     WRITE 6 T;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;

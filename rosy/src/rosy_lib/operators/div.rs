@@ -234,23 +234,3 @@ impl RosyDiv<&CD> for &CD {
         self / other
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::super::test_utils::test_operator_output_match;
-
-    #[test]
-    fn test_rosy_cosy_output_match() {
-        // Division has subtle floating-point differences from COSY due to different
-        // rounding strategies in the iterative algorithm. The mathematical result is
-        // correct, but exact bit-for-bit matching is not guaranteed.
-        // 
-        // Set INACCURATE_TESTS=1 to enable strict output comparison during development.
-        if std::env::var("INACCURATE_TESTS").is_ok() {
-            test_operator_output_match("div");
-        } else {
-            println!("⚠️  Division test skipped (set INACCURATE_TESTS=1 to enable)");
-            println!("   Division is correct but has floating-point precision differences from COSY.");
-        }
-    }
-}

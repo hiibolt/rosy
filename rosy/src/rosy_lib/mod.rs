@@ -48,6 +48,72 @@ pub type LO = bool;
 pub type CM = num_complex::Complex64;
 pub type VE = Vec<f64>;
 
+#[cfg(test)]
+mod annotated_tests {
+    use std::process::Command;
+    use std::path::PathBuf;
+    use std::fs;
+
+    fn test_annotated_rosy_output(category: &str, name: &str) {
+        let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("Failed to get workspace root")
+            .to_path_buf();
+
+        let rosy_script = workspace_root.join(format!(
+            "rosy/assets/{}/{}/{}.rosy", category, name, name
+        ));
+        let expected_path = workspace_root.join(format!(
+            "rosy/assets/{}/{}/{}.expected", category, name, name
+        ));
+
+        assert!(rosy_script.exists(), "ROSY script not found: {:?}", rosy_script);
+
+        let test_build_dir = workspace_root.join(format!(
+            ".rosy_test_cache/{}_{}", category, name
+        ));
+        fs::create_dir_all(&test_build_dir).ok();
+
+        // Transpile and run using test_build_dir as cwd so temp files are isolated
+        let output = Command::new("cargo")
+            .arg("run").arg("--release")
+            .arg("--manifest-path").arg(workspace_root.join("Cargo.toml"))
+            .arg("-p").arg("rosy")
+            .arg("--").arg("run").arg(&rosy_script).arg("-d").arg(&test_build_dir)
+            .current_dir(&test_build_dir)
+            .output()
+            .expect("Failed to run rosy");
+
+        assert!(
+            output.status.success(),
+            "ROSY transpiler failed for {}/{}:\nstdout: {}\nstderr: {}",
+            category, name,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+
+        // Compare against expected output if it exists, otherwise create it
+        if expected_path.exists() {
+            let expected = fs::read_to_string(&expected_path).unwrap();
+            assert_eq!(
+                stdout.trim(), expected.trim(),
+                "Output mismatch for {}/{}.\nExpected:\n{}\nGot:\n{}",
+                category, name, expected.trim(), stdout.trim()
+            );
+        } else {
+            fs::write(&expected_path, &stdout)
+                .unwrap_or_else(|e| panic!(
+                    "Failed to write expected output for {}/{}: {}", category, name, e
+                ));
+            println!("Created expected output file for {}/{}: {:?}", category, name, expected_path);
+        }
+    }
+
+    include!(concat!(env!("OUT_DIR"), "/annotated_tests.rs"));
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RosyType {
     pub base_type: RosyBaseType,

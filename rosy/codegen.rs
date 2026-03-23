@@ -1,417 +1,232 @@
-//! Build-time code generation for operator tests.
+//! Build-time code generation from `rosy_test_raw` doc-comment annotations.
 //!
-//! This module parses the operator registries defined in `src/rosy_lib/operators/*/mod.rs`
-//! and generates:
-//! - Documentation tables (*.md)
-//! - ROSY test scripts (*.rosy)
-//! - COSY test scripts (*.fox)
-//! - Expected output files (*.expected)
+//! Walks source directories for `rosy_test_raw` blocks and generates:
+//! - ROSY test scripts (`*.rosy`)
+//! - COSY test scripts (`*.fox`)
+//! - Per-construct documentation (`*_doc.md`) with code + expected output
+//! - Combined category docs (`*_docs.md`) included in rustdoc
+//! - Test runner (`annotated_tests.rs`) with per-construct `#[test]` functions
 
 use std::fs;
 use std::path::Path;
-use regex::Regex;
 
-/// Represents a parsed type rule from the source code.
+/// Parsed `rosy_test_raw` annotation from module doc comments.
 #[derive(Debug, Clone)]
-pub struct TypeRule {
-    pub lhs: String,
-    pub rhs: String,
-    pub result: String,
-    pub lhs_test_val: String,
-    pub rhs_test_val: String,
-    pub comment: String,
+pub struct RosyTestAnnotation {
+    pub rosy_code: String,
+    pub fox_code: String,
 }
 
-/// Parse ADD_REGISTRY from add/mod.rs source code.
+/// Parse a `rosy_test_raw` annotation from a source file's doc comments.
 ///
-/// This uses simple regex parsing to extract TypeRule::new() calls.
-pub fn parse_registry_from_source(source_path: &Path) -> Vec<TypeRule> {
-    let content = fs::read_to_string(source_path)
-        .expect("Failed to read operator source file");
+/// Looks for blocks of the form:
+/// ```text
+/// //! ```rosy_test_raw
+/// //! --- rosy ---
+/// //! <rosy code>
+/// //! --- fox ---
+/// //! <fox code>
+/// //! ```
+/// ```
+pub fn parse_rosy_test_annotation(source_path: &Path) -> Option<RosyTestAnnotation> {
+    let content = fs::read_to_string(source_path).ok()?;
 
-    let mut rules = Vec::new();
+    let mut in_block = false;
+    let mut in_rosy = false;
+    let mut in_fox = false;
+    let mut rosy_lines: Vec<String> = Vec::new();
+    let mut fox_lines: Vec<String> = Vec::new();
 
-    // Simple parser: look for TypeRule::new("X", "Y", "Z") patterns
     for line in content.lines() {
-        if line.trim_start().starts_with("TypeRule::new(") {
-            if let Some(rule) = parse_typefrom_rule_new(line) {
-                rules.push(rule);
+        let trimmed = line.trim();
+
+        // Accept both //! (module-level) and /// (item-level) doc comments
+        let doc_content = if let Some(rest) = trimmed.strip_prefix("//!") {
+            rest.strip_prefix(' ').unwrap_or(rest)
+        } else if let Some(rest) = trimmed.strip_prefix("///") {
+            rest.strip_prefix(' ').unwrap_or(rest)
+        } else {
+            continue;
+        };
+
+        if !in_block && doc_content.trim() == "```rosy_test_raw" {
+            in_block = true;
+            in_rosy = false;
+            in_fox = false;
+            continue;
+        }
+
+        if in_block && doc_content.trim() == "```" {
+            break; // End of annotation block
+        }
+
+        if in_block {
+            if doc_content.trim() == "--- rosy ---" {
+                in_rosy = true;
+                in_fox = false;
+                continue;
             }
-        } else if line.trim_start().starts_with("TypeRule::with_comment(") {
-            if let Some(rule) = parse_typefrom_rule_with_comment(line) {
-                rules.push(rule);
-            } else {
-                println!("cargo:warning=Failed to parse line with comment: {}", line);
+            if doc_content.trim() == "--- fox ---" {
+                in_fox = true;
+                in_rosy = false;
+                continue;
+            }
+
+            if in_rosy {
+                rosy_lines.push(doc_content.to_string());
+            } else if in_fox {
+                fox_lines.push(doc_content.to_string());
             }
         }
     }
 
-    rules
-}
+    if rosy_lines.is_empty() || fox_lines.is_empty() {
+        return None;
+    }
 
-fn parse_typefrom_rule_new(line: &str) -> Option<TypeRule> {
-    // Parse: TypeRule::new("RE", "CM", "VE", "1", "2"),
-    // Using regex to properly handle comments with parentheses, commas, etc.
-    let re = Regex::new(
-        r#"TypeRule::new\s*\(\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*\)"#
-    ).ok()?;
-
-    let captures = re.captures(line)?;
-
-    Some(TypeRule {
-        lhs: captures.get(1)?.as_str().to_string(),
-        rhs: captures.get(2)?.as_str().to_string(),
-        result: captures.get(3)?.as_str().to_string(),
-        lhs_test_val: captures.get(4)?.as_str().to_string(),
-        rhs_test_val: captures.get(5)?.as_str().to_string(),
-        comment: String::new()
+    Some(RosyTestAnnotation {
+        rosy_code: rosy_lines.join("\n"),
+        fox_code: fox_lines.join("\n"),
     })
 }
 
-fn parse_typefrom_rule_with_comment(line: &str) -> Option<TypeRule> {
-    // Parse: TypeRule::with_comment("RE", "VE", "VE", "Add Real componentwise"),
-    // Using regex to properly handle comments with parentheses, commas, etc.
-    let re = Regex::new(
-        r#"TypeRule::with_comment\s*\(\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*\)"#
-    ).ok()?;
-
-    let captures = re.captures(line)?;
-
-    Some(TypeRule {
-        lhs: captures.get(1)?.as_str().to_string(),
-        rhs: captures.get(2)?.as_str().to_string(),
-        result: captures.get(3)?.as_str().to_string(),
-        lhs_test_val: captures.get(4)?.as_str().to_string(),
-        rhs_test_val: captures.get(5)?.as_str().to_string(),
-        comment: captures.get(6)?.as_str().to_string(),
-    })
-}
-
-/// Generate markdown documentation table from registry.
-pub fn generate_doc_table(rules: &[TypeRule]) -> String {
-    let mut table = String::from(
-        "| Left | Right | Result | Comment |\n\
-         |---|---|---|---|\n"
-    );
-
-    for rule in rules {
-        table.push_str(&format!(
-            "| {} | {} | {} | {} |\n",
-            rule.lhs,
-            rule.rhs,
-            rule.result,
-            rule.comment
-        ));
-    }
-
-    table
-}
-
-/// Get the operator symbol for a given operator name.
-fn get_operator_symbol(operator_name: &str) -> &'static str {
-    match operator_name {
-        "add" => "+",
-        "sub" => "-",
-        "mult" => "*",
-        "div" => "/",
-        "concat" => "&",
-        "extract" => "|",
-        "eq" => "=",
-        "neq" => "#",
-        "lt" => "<",
-        "gt" => ">",
-        "lte" => "<=",
-        "gte" => ">=",
-        "pow" => "^",
-        _ => panic!("Unknown operator name: {}", operator_name),
-    }
-}
-
-/// Generate ROSY test script.
+/// Walk a directory tree, find .rs files with `rosy_test_raw` annotations,
+/// and generate test files for each discovered annotation.
 ///
-/// For each type combination, creates variables and performs the operation.
-/// Uses language-appropriate test values for each type.
-pub fn generate_rosy_script(operator_name: &str, rules: &[TypeRule]) -> String {
-    let op_symbol = get_operator_symbol(operator_name);
-    let mut script = String::from("BEGIN;\n");
+/// Returns list of `(name, annotation)` pairs for test manifest generation.
+pub fn discover_and_codegen_annotated(
+    base_dir: &Path,
+    category: &str,
+) -> Vec<(String, RosyTestAnnotation)> {
+    let mut results = Vec::new();
+    walk_for_annotations(base_dir, &mut results);
+    results.sort_by(|a, b| a.0.cmp(&b.0));
 
-    for (idx, rule) in rules.iter().enumerate() {
-        script.push_str(&format!("    VARIABLE ({}) LHS_{};\n", rule.lhs, idx));
-        script.push_str(&format!("    VARIABLE ({}) RHS_{};\n", rule.rhs, idx));
-        script.push_str(&format!("    VARIABLE ({}) RESULT_{};\n\n", rule.result, idx));
-
-        // Initialize with type-appropriate test values
-        script.push_str(&format!("    LHS_{} := {};\n", idx, rule.lhs_test_val));
-        script.push_str(&format!("    RHS_{} := {};\n", idx, rule.rhs_test_val));
-
-        // Perform operation
-        script.push_str(&format!("    RESULT_{} := LHS_{} {} RHS_{};\n", idx, idx, op_symbol, idx));
-
-        // Write the result (just output the result value for now)
-        // Can't write literal strings in ROSY without ST() conversion
-        script.push_str(&format!("    WRITE 6 ST(RESULT_{});\n\n", idx));
+    for (name, annotation) in &results {
+        codegen_annotated(category, name, annotation);
     }
 
-    script.push_str("END;\n");
-    script
+    results
 }
 
-/// Generate COSY INFINITY test script.
-pub fn generate_cosy_script(operator_name: &str, rules: &[TypeRule]) -> String {
-    let op_symbol = get_operator_symbol(operator_name);
-    let mut script = String::from("BEGIN;\n\nPROCEDURE RUN;\n");
+fn walk_for_annotations(
+    dir: &Path,
+    results: &mut Vec<(String, RosyTestAnnotation)>,
+) {
+    let mut entries: Vec<_> = fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .collect();
+    entries.sort_by_key(|e| e.path());
 
-    // FOX/COSY requires ALL variable declarations at procedure start
-    script.push_str("    { All variable declarations must come first in FOX/COSY }\n");
-    script.push_str("    VARIABLE NM 1;\n");
+    for entry in entries {
+        let path = entry.path();
+        if path.is_dir() {
+            walk_for_annotations(&path, results);
+        } else if path.extension().map_or(false, |e| e == "rs") {
+            let stem = path.file_stem().unwrap().to_string_lossy().to_string();
+            if stem == "mod" { continue; }
 
-    // First pass: declare all variables
-    for (idx, rule) in rules.iter().enumerate() {
-        script.push_str(&format!("    VARIABLE LHS_{} {};\n", idx, get_cosy_var_size(&rule.lhs)));
-        script.push_str(&format!("    VARIABLE RHS_{} {};\n", idx, get_cosy_var_size(&rule.rhs)));
-        script.push_str(&format!("    VARIABLE RESULT_{} {};\n", idx, get_cosy_var_size(&rule.result)));
-    }
-
-    // Initialize DA system (needed for DA/CD types)
-    script.push_str("\n    { Initialize DA system for tests that use DA/CD types }\n");
-    script.push_str("    { DAINI: order 10, number_of_variables 6, mode 0 (see COSY manual) }\n");
-    script.push_str("    DAINI 10 6 0 NM;\n\n");
-
-    // Second pass: assignments and operations
-    for (idx, rule) in rules.iter().enumerate() {
-        script.push_str(&format!("    {{ Test {}: {} {} {} => {} }}\n", idx, rule.lhs, op_symbol, rule.rhs, rule.result));
-        script.push_str(&format!("    LHS_{} := {};\n", idx, rule.lhs_test_val));
-        script.push_str(&format!("    RHS_{} := {};\n", idx, rule.rhs_test_val));
-        script.push_str(&format!("    RESULT_{} := LHS_{} {} RHS_{};\n", idx, idx, op_symbol, idx));
-        script.push_str(&format!("    WRITE 6 RESULT_{};\n\n", idx));
-    }
-
-    script.push_str("ENDPROCEDURE;\n\nRUN;\nEND;\n");
-    script
-}
-
-/// Get COSY variable size (for VARIABLE X <size>).
-fn get_cosy_var_size(type_name: &str) -> &'static str {
-    match type_name {
-        "CM" => "2",     // Complex needs 2 slots (real + imaginary)
-        "VE" => "6",     // Vector of size 3
-        "DA" => "2000",  // DA needs space for coefficients at order 10
-        "CD" => "4000",  // Complex DA needs 2x DA space for real+imaginary parts
-        "RE" => "1",     // Real number
-        "LO" => "1",     // Logical (boolean)
-        "ST" => "6",     // String (arbitrary size, use 6 for short strings)
-        _ => panic!("Unknown type for COSY variable size: {}", type_name),
-    }
-}
-
-/// Run all code generation for an operator.
-pub fn codegen_operator(operator_name: &str) {
-    let src_path = Path::new("src/rosy_lib/operators")
-        .join(format!("{}.rs", operator_name));
-
-    let operator_dir = Path::new("assets/operators").join(operator_name);
-
-    // Create the assets directory if it doesn't exist
-    fs::create_dir_all(&operator_dir)
-        .expect("Failed to create assets directory");
-
-    println!("cargo:rerun-if-changed={}", src_path.display());
-
-    // Parse registry from source
-    let rules = parse_registry_from_source(&src_path);
-
-    if rules.is_empty() {
-        println!("cargo:warning=No registry found in {}", src_path.display());
-        return;
-    }
-
-    println!("cargo:warning=Generating {} tests for operator '{}'", rules.len(), operator_name);
-
-    // Generate documentation table
-    let doc_table = generate_doc_table(&rules);
-    fs::write(operator_dir.join(format!("{}_table.md", operator_name)), doc_table)
-        .expect("Failed to write doc table");
-
-    // Generate ROSY script
-    let rosy_script = generate_rosy_script(operator_name, &rules);
-    fs::write(operator_dir.join(format!("{}.rosy", operator_name)), rosy_script)
-        .expect("Failed to write ROSY script");
-
-    // Generate COSY script
-    let cosy_script = generate_cosy_script(operator_name, &rules);
-    fs::write(operator_dir.join(format!("{}.fox", operator_name)), cosy_script)
-        .expect("Failed to write COSY script");
-
-    println!("cargo:warning=Generated test files for operator '{}'", operator_name);
-}
-
-/// Represents a parsed intrinsic type rule from the source code.
-#[derive(Debug, Clone)]
-pub struct IntrinsicTypeRule {
-    pub input: String,
-    pub result: String,
-    pub test_val: String,
-}
-
-/// Parse intrinsic function registry from source code.
-pub fn parse_intrinsic_registry_from_source(source_path: &Path) -> Vec<IntrinsicTypeRule> {
-    let content = fs::read_to_string(source_path)
-        .expect("Failed to read intrinsic source file");
-
-    let mut rules = Vec::new();
-
-    // Look for IntrinsicTypeRule::new() patterns
-    for line in content.lines() {
-        if line.trim_start().starts_with("IntrinsicTypeRule::new(") {
-            if let Some(rule) = parse_intrinsic_typefrom_rule_new(line) {
-                rules.push(rule);
+            if let Some(annotation) = parse_rosy_test_annotation(&path) {
+                println!("cargo:rerun-if-changed={}", path.display());
+                results.push((stem, annotation));
             }
         }
     }
-
-    rules
 }
 
-fn parse_intrinsic_typefrom_rule_new(line: &str) -> Option<IntrinsicTypeRule> {
-    // Parse: IntrinsicTypeRule::new("RE", "RE", "1.5"),
-    let re = Regex::new(
-        r#"IntrinsicTypeRule::new\s*\(\s*"(.+)"\s*,\s*"(.+)"\s*,\s*"(.+)"\s*\)"#
-    ).ok()?;
-
-    let captures = re.captures(line)?;
-
-    Some(IntrinsicTypeRule {
-        input: captures.get(1)?.as_str().to_string(),
-        result: captures.get(2)?.as_str().to_string(),
-        test_val: captures.get(3)?.as_str().to_string().replace("\\\"", "\""),
-    })
-}
-
-/// Generate ROSY test script for intrinsic function.
-pub fn generate_intrinsic_rosy_script(intrinsic_name: &str, rules: &[IntrinsicTypeRule]) -> String {
-    let mut script = String::from("BEGIN;\n");
-
-    for (idx, rule) in rules.iter().enumerate() {
-        script.push_str(&format!("    VARIABLE ({}) INPUT_{};\n", rule.input, idx));
-        script.push_str(&format!("    VARIABLE ({}) RESULT_{};\n\n", rule.result, idx));
-
-        // Initialize with type-appropriate test values
-        script.push_str(&format!("    INPUT_{} := {};\n", idx, rule.test_val));
-
-        // Call intrinsic function
-        script.push_str(&format!("    RESULT_{} := {}(INPUT_{});\n", idx, intrinsic_name.to_uppercase(), idx));
-
-        // Write the result
-        script.push_str(&format!("    WRITE 6 ST(RESULT_{});\n\n", idx));
-    }
-
-    script.push_str("END;\n");
-    script
-}
-
-/// Generate COSY INFINITY test script for intrinsic function.
-pub fn generate_intrinsic_cosy_script(intrinsic_name: &str, rules: &[IntrinsicTypeRule]) -> String {
-    let mut script = String::from("BEGIN;\n\nPROCEDURE RUN;\n");
-
-    // FOX/COSY requires ALL variable declarations at procedure start
-    script.push_str("    { All variable declarations must come first in FOX/COSY }\n");
-    script.push_str("    VARIABLE NM 1;\n");
-
-    // First pass: declare all variables
-    for (idx, rule) in rules.iter().enumerate() {
-        script.push_str(&format!("    VARIABLE INPUT_{} {};\n", idx, get_cosy_var_size(&rule.input)));
-        script.push_str(&format!("    VARIABLE RESULT_{} {};\n", idx, get_cosy_var_size(&rule.result)));
-    }
-
-    // Initialize DA system (needed for DA/CD types)
-    script.push_str("\n    { Initialize DA system for tests that use DA/CD types }\n");
-    script.push_str("    { DAINI: order 10, number_of_variables 6, mode 0 (see COSY manual) }\n");
-    script.push_str("    DAINI 10 6 0 NM;\n\n");
-
-    // Second pass: assignments and function calls
-    for (idx, rule) in rules.iter().enumerate() {
-        script.push_str(&format!("    {{ Test {}: {}({}) => {} }}\n", idx, intrinsic_name.to_uppercase(), rule.input, rule.result));
-        script.push_str(&format!("    INPUT_{} := {};\n", idx, rule.test_val));
-        script.push_str(&format!("    RESULT_{} := {}(INPUT_{});\n", idx, intrinsic_name.to_uppercase(), idx));
-        script.push_str(&format!("    WRITE 6 RESULT_{};\n\n", idx));
-    }
-
-    script.push_str("ENDPROCEDURE;\n\nRUN;\nEND;\n");
-    script
-}
-
-/// Get the COSY/ROSY function name for an intrinsic module name.
+/// Generate test files (`.rosy`, `.fox`, `_doc.md`) from an annotation.
 ///
-/// Module naming conventions:
-/// - `int_fn`, `type_fn`, `real_fn`, `imag_fn` strip the `_fn` suffix
-/// - `re_convert` maps to `RE` (the RE() conversion function)
-/// - `ve_convert` maps to `VE` (the VE() conversion function)
-fn get_intrinsic_cosy_name(intrinsic_name: &str) -> String {
-    // Handle special _convert suffix: re_convert -> RE, ve_convert -> VE
-    if let Some(base) = intrinsic_name.strip_suffix("_convert") {
-        return base.to_uppercase();
-    }
-    // Handle _fn suffix: int_fn -> INT, type_fn -> TYPE, etc.
-    let base = intrinsic_name.strip_suffix("_fn").unwrap_or(intrinsic_name);
-    base.to_uppercase()
-}
+/// If a `.expected` file already exists (version-tracked), includes it in the
+/// generated documentation.
+pub fn codegen_annotated(category: &str, name: &str, annotation: &RosyTestAnnotation) {
+    let dir = Path::new("assets").join(category).join(name);
+    fs::create_dir_all(&dir).expect("Failed to create assets directory");
 
-/// Generate documentation table for intrinsic function.
-pub fn generate_intrinsic_doc_table(rules: &[IntrinsicTypeRule]) -> String {
-    let mut table = String::from(
-        "| Input | Result |\n\
-         |---|---|\n"
-    );
-
-    for rule in rules {
-        table.push_str(&format!(
-            "| {} | {} |\n",
-            rule.input,
-            rule.result
-        ));
-    }
-
-    table
-}
-
-/// Run all code generation for an intrinsic function.
-pub fn codegen_intrinsic(intrinsic_name: &str) {
-    let src_path = Path::new("src/rosy_lib/intrinsics")
-        .join(format!("{}.rs", intrinsic_name));
-
-    let intrinsic_dir = Path::new("assets/intrinsics").join(intrinsic_name);
-
-    // Create the assets directory if it doesn't exist
-    fs::create_dir_all(&intrinsic_dir)
-        .expect("Failed to create assets directory");
-
-    println!("cargo:rerun-if-changed={}", src_path.display());
-
-    // Parse registry from source
-    let rules = parse_intrinsic_registry_from_source(&src_path);
-
-    if rules.is_empty() {
-        println!("cargo:warning=No registry found in {}", src_path.display());
-        return;
-    }
-
-    println!("cargo:warning=Generating {} tests for intrinsic '{}'", rules.len(), intrinsic_name);
-
-    // Generate documentation table
-    let doc_table = generate_intrinsic_doc_table(&rules);
-    fs::write(intrinsic_dir.join(format!("{}_table.md", intrinsic_name)), doc_table)
-        .expect("Failed to write doc table");
-
-    // Generate ROSY script
-    let cosy_name = get_intrinsic_cosy_name(intrinsic_name);
-    let rosy_script = generate_intrinsic_rosy_script(&cosy_name, &rules);
-    fs::write(intrinsic_dir.join(format!("{}.rosy", intrinsic_name)), rosy_script)
+    // Write .rosy file
+    fs::write(dir.join(format!("{}.rosy", name)), &annotation.rosy_code)
         .expect("Failed to write ROSY script");
 
-    // Generate COSY script
-    let cosy_script = generate_intrinsic_cosy_script(&cosy_name, &rules);
-    fs::write(intrinsic_dir.join(format!("{}.fox", intrinsic_name)), cosy_script)
+    // Write .fox file
+    fs::write(dir.join(format!("{}.fox", name)), &annotation.fox_code)
         .expect("Failed to write COSY script");
 
-    println!("cargo:warning=Generated test files for intrinsic '{}'", intrinsic_name);
+    // Generate documentation with code and any existing expected output
+    let mut md = format!("# {}\n\n", name.to_uppercase().replace('_', " "));
+    md.push_str("## ROSY Test\n\n```rosy\n");
+    md.push_str(&annotation.rosy_code);
+    md.push_str("\n```\n\n");
+
+    let expected_path = dir.join(format!("{}.expected", name));
+    if expected_path.exists() {
+        if let Ok(expected) = fs::read_to_string(&expected_path) {
+            md.push_str("## Expected Output\n\n```\n");
+            md.push_str(&expected);
+            if !expected.ends_with('\n') { md.push('\n'); }
+            md.push_str("```\n\n");
+        }
+    }
+
+    md.push_str("## COSY Equivalent\n\n```cosy\n");
+    md.push_str(&annotation.fox_code);
+    md.push_str("\n```\n");
+
+    fs::write(dir.join(format!("{}_doc.md", name)), md)
+        .expect("Failed to write doc file");
+
+    println!("cargo:warning=Generated annotated test files for '{}/{}'", category, name);
+}
+
+/// Generate the auto-test runner file that will be `include!`-d in
+/// the annotated test module.
+///
+/// Each discovered annotation gets its own `#[test]` function that
+/// transpiles, compiles, and runs the `.rosy` script, then writes or
+/// compares against a `.expected` file.
+pub fn generate_annotated_test_runner(
+    all_tests: &[(&str, &[(String, RosyTestAnnotation)])],
+) {
+    let out_dir = std::env::var("OUT_DIR").unwrap();
+    let dest = Path::new(&out_dir).join("annotated_tests.rs");
+
+    use std::io::Write;
+    let mut f = fs::File::create(&dest).unwrap();
+
+    writeln!(f, "// Auto-generated by build.rs - do not edit manually!").unwrap();
+    writeln!(f).unwrap();
+
+    let mut total = 0;
+    for &(category, ref tests) in all_tests {
+        for (name, _) in tests.iter() {
+            writeln!(f, "#[test]").unwrap();
+            writeln!(f, "fn test_{}_{}() {{", category, name).unwrap();
+            writeln!(f, "    test_annotated_rosy_output(\"{}\", \"{}\");", category, name).unwrap();
+            writeln!(f, "}}").unwrap();
+            writeln!(f).unwrap();
+            total += 1;
+        }
+    }
+
+    println!("cargo:warning=Generated {} annotated test functions", total);
+}
+
+/// Generate a combined documentation file for a category.
+///
+/// Concatenates all per-construct `_doc.md` files into one `{category}_docs.md`
+/// that can be `include_str!`-d in module-level rustdoc.
+pub fn generate_combined_docs(category: &str, tests: &[(String, RosyTestAnnotation)]) {
+    let assets = Path::new("assets");
+
+    let mut combined = String::new();
+    for (name, _) in tests {
+        let doc_path = assets.join(category).join(name).join(format!("{}_doc.md", name));
+        if let Ok(content) = fs::read_to_string(&doc_path) {
+            combined.push_str(&content);
+            combined.push_str("\n---\n\n");
+        }
+    }
+
+    fs::write(assets.join(format!("{}_docs.md", category)), combined)
+        .expect("Failed to write combined docs");
 }

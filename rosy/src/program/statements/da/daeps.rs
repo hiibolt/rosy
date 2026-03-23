@@ -15,6 +15,25 @@
 //! OV 3 2;
 //! DAEPS 1e-10;   { set cutoff to 1e-10 }
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     DAINI 3 2 0 0;
+//!     DAEPS 0.0000000001;
+//!     WRITE 6 'daeps ok';
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE NM 1;
+//!     OV 3 2 0 NM;
+//!     DAEPS 0.0000000001;
+//!     WRITE 6 'daeps ok';
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use anyhow::{Result, Context, Error, ensure};
 

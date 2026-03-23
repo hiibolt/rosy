@@ -32,6 +32,10 @@
 //! ST(42)              { type conversion }
 //! DA(1)               { DA variable constructor }
 //! ```
+//!
+//! ## Auto-generated Test Documentation
+//!
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/expressions_docs.md"))]
 
 pub mod core;
 pub mod functions;

@@ -13,6 +13,26 @@
 //! ```text
 //! CLOSEF 10;
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     OPENF 20 'test_closef_tmp.dat' 'UNKNOWN';
+//!     WRITE 20 'data';
+//!     CLOSEF 20;
+//!     WRITE 6 'closef ok';
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     OPENF 20 'test_closef_tmp.dat' 'UNKNOWN';
+//!     WRITE 20 'data';
+//!     CLOSEF 20;
+//!     WRITE 6 'closef ok';
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

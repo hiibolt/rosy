@@ -49,13 +49,3 @@ impl RosyPow<&RE> for &VE {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::rosy_lib::operators::test_utils::test_operator_output_match;
-
-    #[test]
-    fn test_rosy_cosy_pow_match() {
-        test_operator_output_match("pow");
-    }
-}

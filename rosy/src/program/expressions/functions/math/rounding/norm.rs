@@ -15,6 +15,28 @@
 //! | VE    | VE     |
 //! | DA    | RE     |
 //! | CD    | RE     |
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (VE) V;
+//!     VARIABLE (VE) N;
+//!     V := 1.5 & -2.5 & 3.5;
+//!     N := NORM(V);
+//!     WRITE 6 ST(N);
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE V 100;
+//!     VARIABLE N 100;
+//!     V := 1.5 & -2.5 & 3.5;
+//!     N := NORM(V);
+//!     WRITE 6 N;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;

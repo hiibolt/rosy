@@ -39,8 +39,24 @@
 //! ```text
 //! VARIABLE (RE) x;
 //! x := 3 * 4;           { RE * RE → RE }
+//! ```//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) X;
+//!     X := 6 * 7;
+//!     WRITE 6 X;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE X 1;
+//!     X := 6 * 7;
+//!     WRITE 6 X;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
 //! ```
-
 use std::collections::{BTreeSet, HashSet};
 
 use crate::ast::{FromRule, Rule};

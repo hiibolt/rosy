@@ -1,0 +1,5 @@
+BEGIN;
+    VARIABLE (ST) S;
+    S := TRIM('hello   ');
+    WRITE 6 S;
+END;

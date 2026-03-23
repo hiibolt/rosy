@@ -5,6 +5,30 @@
 //! The condition is evaluated before each iteration. If it evaluates to TRUE,
 //! the body is executed and then the condition is checked again. When the
 //! condition evaluates to FALSE, execution continues after ENDWHILE.
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) I;
+//!     I := 0;
+//!     WHILE I < 5;
+//!         I := I + 1;
+//!     ENDWHILE;
+//!     WRITE 6 I;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE I 1;
+//!     I := 0;
+//!     WHILE I < 5;
+//!         I := I + 1;
+//!     ENDWHILE;
+//!     WRITE 6 I;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};

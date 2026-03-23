@@ -13,6 +13,24 @@
 //! | Input | Result |
 //! |-------|--------|
 //! | ST | ST |
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (ST) S;
+//!     S := TRIM('hello   ');
+//!     WRITE 6 S;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE S 80;
+//!     S := TRIM('hello   ');
+//!     WRITE 6 S;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;

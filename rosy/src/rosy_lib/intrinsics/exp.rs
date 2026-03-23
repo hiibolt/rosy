@@ -142,13 +142,3 @@ fn cd_exp(cd: &CD) -> anyhow::Result<CD> {
     Ok(result)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::rosy_lib::intrinsics::test_utils::test_intrinsic_output_match;
-
-    #[test]
-    fn test_rosy_cosy_exp_match() {
-        test_intrinsic_output_match("exp");
-    }
-}

@@ -9,6 +9,32 @@
 //! ```
 //!
 //! - `result_var` — variable that receives the RE random value
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) R;
+//!     RERAN R;
+//!     IF R >= 0;
+//!         IF R < 1;
+//!             WRITE 6 'reran ok';
+//!         ENDIF;
+//!     ENDIF;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE R 1;
+//!     RERAN R;
+//!     IF R >= 0;
+//!         IF R < 1;
+//!             WRITE 6 'reran ok';
+//!         ENDIF;
+//!     ENDIF;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

@@ -21,6 +21,26 @@
 //! VARIABLE (RE) x;
 //! x := 42;
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) X;
+//!     X := 42;
+//!     X := X + 8;
+//!     WRITE 6 X;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE X 1;
+//!     X := 42;
+//!     X := X + 8;
+//!     WRITE 6 X;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::{BTreeSet, HashSet};
 

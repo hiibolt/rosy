@@ -22,6 +22,28 @@
 //! SUBSTR s 1 5 sub;
 //! WRITE 6 sub;   { prints: Hello }
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (ST) S;
+//!     VARIABLE (ST) SUB;
+//!     S := 'hello world';
+//!     SUBSTR S 1 5 SUB;
+//!     WRITE 6 SUB;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE S 80;
+//!     VARIABLE SUB 80;
+//!     S := 'hello world';
+//!     SUBSTR S 1 5 SUB;
+//!     WRITE 6 SUB;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

@@ -11,6 +11,32 @@
 //! - `vec1`   — VE expression (first vector)
 //! - `vec2`   — VE expression (second vector)
 //! - `result` — variable that receives the RE dot product
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (VE) A;
+//!     VARIABLE (VE) B;
+//!     VARIABLE (RE) D;
+//!     A := 1&2&3;
+//!     B := 4&5&6;
+//!     VEDOT A B D;
+//!     WRITE 6 D;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE A 100;
+//!     VARIABLE B 100;
+//!     VARIABLE D 1;
+//!     A := 1&2&3;
+//!     B := 4&5&6;
+//!     VEDOT A B D;
+//!     WRITE 6 D;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

@@ -5,57 +5,35 @@ use std::io::Write;
 mod codegen;
 
 fn main() {
-    // Re-run if rosy_lib changes
-    println!("cargo:rerun-if-changed=src/rosy_lib");
+    // Re-run if source changes
+    println!("cargo:rerun-if-changed=src/program");
 
-    // Generate operator test files
-    codegen::codegen_operator("add");
-    codegen::codegen_operator("sub");
-    codegen::codegen_operator("mult");
-    codegen::codegen_operator("div");
-    codegen::codegen_operator("concat");
-    codegen::codegen_operator("extract");
-    codegen::codegen_operator("eq");
-    codegen::codegen_operator("neq");
-    codegen::codegen_operator("lt");
-    codegen::codegen_operator("gt");
-    codegen::codegen_operator("lte");
-    codegen::codegen_operator("gte");
-    codegen::codegen_operator("pow");
-    // Note: NOT is a unary operator and doesn't use the standard codegen
+    // Auto-discover and codegen from rosy_test_raw annotations in all source dirs
+    let stmt_tests = codegen::discover_and_codegen_annotated(
+        Path::new("src/program/statements"),
+        "statements",
+    );
+    let expr_tests = codegen::discover_and_codegen_annotated(
+        Path::new("src/program/expressions"),
+        "expressions",
+    );
 
-    // Generate intrinsic function test files
-    codegen::codegen_intrinsic("length");
-    codegen::codegen_intrinsic("sin");
-    codegen::codegen_intrinsic("cos");
-    codegen::codegen_intrinsic("asin");
-    codegen::codegen_intrinsic("acos");
-    codegen::codegen_intrinsic("atan");
-    codegen::codegen_intrinsic("sinh");
-    codegen::codegen_intrinsic("cosh");
-    codegen::codegen_intrinsic("tanh");
-    codegen::codegen_intrinsic("sqr");
-    codegen::codegen_intrinsic("sqrt");
-    codegen::codegen_intrinsic("exp");
-    codegen::codegen_intrinsic("log");
-    codegen::codegen_intrinsic("tan");
-    codegen::codegen_intrinsic("vmin");
-    codegen::codegen_intrinsic("abs");
-    codegen::codegen_intrinsic("norm");
-    codegen::codegen_intrinsic("cons");
-    codegen::codegen_intrinsic("int_fn");
-    codegen::codegen_intrinsic("nint");
-    codegen::codegen_intrinsic("type_fn");
-    codegen::codegen_intrinsic("trim");
-    codegen::codegen_intrinsic("ltrim");
-    codegen::codegen_intrinsic("isrt");
-    codegen::codegen_intrinsic("isrt3");
-    codegen::codegen_intrinsic("cmplx");
-    codegen::codegen_intrinsic("conj");
-    codegen::codegen_intrinsic("real_fn");
-    codegen::codegen_intrinsic("imag_fn");
-    codegen::codegen_intrinsic("re_convert");
-    codegen::codegen_intrinsic("ve_convert");
+    // Generate combined docs for rustdoc inclusion
+    codegen::generate_combined_docs("statements", &stmt_tests);
+    codegen::generate_combined_docs("expressions", &expr_tests);
+
+    // Generate the annotated test runner (include!'d in test module)
+    codegen::generate_annotated_test_runner(&[
+        ("statements", &stmt_tests),
+        ("expressions", &expr_tests),
+    ]);
+
+    println!(
+        "cargo:warning=Codegen complete: {} statements + {} expressions = {} total",
+        stmt_tests.len(),
+        expr_tests.len(),
+        stmt_tests.len() + expr_tests.len()
+    );
 
     // Generate the embedded files at compile time
     let out_dir = std::env::var("OUT_DIR").unwrap();

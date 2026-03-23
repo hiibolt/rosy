@@ -106,13 +106,3 @@ fn da_isrt3(da: &DA) -> anyhow::Result<DA> {
     Ok(result)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::rosy_lib::intrinsics::test_utils::test_intrinsic_output_match;
-
-    #[test]
-    fn test_rosy_cosy_isrt3_match() {
-        test_intrinsic_output_match("isrt3");
-    }
-}

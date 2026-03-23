@@ -15,6 +15,28 @@
 //! CPUSEC t;
 //! WRITE 6 t;
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) T;
+//!     CPUSEC T;
+//!     IF T >= 0;
+//!         WRITE 6 'cpusec ok';
+//!     ENDIF;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE T 1;
+//!     CPUSEC T;
+//!     IF T >= 0;
+//!         WRITE 6 'cpusec ok';
+//!     ENDIF;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

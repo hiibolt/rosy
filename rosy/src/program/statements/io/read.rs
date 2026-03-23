@@ -14,6 +14,34 @@
 //! VARIABLE (RE) x;
 //! READ 5 x;              { read from unit 5 }
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) X;
+//!     OPENF 20 'test_read_tmp.dat' 'UNKNOWN';
+//!     WRITE 20 42;
+//!     CLOSEF 20;
+//!     OPENF 20 'test_read_tmp.dat' 'OLD';
+//!     READ 20 X;
+//!     CLOSEF 20;
+//!     WRITE 6 X;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE X 1;
+//!     OPENF 20 'test_read_tmp.dat' 'UNKNOWN';
+//!     WRITE 20 42;
+//!     CLOSEF 20;
+//!     OPENF 20 'test_read_tmp.dat' 'OLD';
+//!     READ 20 X;
+//!     CLOSEF 20;
+//!     WRITE 6 X;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};

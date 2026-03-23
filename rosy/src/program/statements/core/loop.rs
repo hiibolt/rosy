@@ -24,6 +24,30 @@
 //!     WRITE 6 J;
 //! ENDLOOP;
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) SUM;
+//!     SUM := 0;
+//!     LOOP I 1 5;
+//!         SUM := SUM + I;
+//!     ENDLOOP;
+//!     WRITE 6 SUM;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE SUM 1;
+//!     SUM := 0;
+//!     LOOP I 1 5;
+//!         SUM := SUM + I;
+//!     ENDLOOP;
+//!     WRITE 6 SUM;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};

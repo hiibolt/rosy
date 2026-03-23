@@ -17,6 +17,24 @@
 //! v := 3 & 4;
 //! z := CM(v);            { 3 + 4i }
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (CM) Z;
+//!     Z := CM(3&4);
+//!     WRITE 6 ST(Z);
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE Z 2;
+//!     Z := CM(3&4);
+//!     WRITE 6 Z;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;

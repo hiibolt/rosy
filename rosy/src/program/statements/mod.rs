@@ -22,6 +22,10 @@
 //! | Print DA values | **[`da::daprv`]**, **[`da::darev`]** |
 //! | Use `FIT` (optimization) | **[`math::fit`]** |
 //! | Use `BREAK` or `QUIT` | **[`core::break_statement`]**, **[`core::quit`]** |
+//!
+//! ## Auto-generated Test Documentation
+//!
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/statements_docs.md"))]
 
 pub mod core;
 pub mod da;

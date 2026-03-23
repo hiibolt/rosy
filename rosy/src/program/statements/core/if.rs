@@ -27,6 +27,42 @@
 //!     WRITE 6 'negative';
 //! ENDIF;
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) X;
+//!     X := 5;
+//!     IF X > 3;
+//!         WRITE 6 'X is greater than 3';
+//!     ENDIF;
+//!     IF X < 3;
+//!         WRITE 6 'should not print';
+//!     ELSEIF X = 5;
+//!         WRITE 6 'X equals 5';
+//!     ELSE;
+//!         WRITE 6 'should not print either';
+//!     ENDIF;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE X 1;
+//!     X := 5;
+//!     IF X > 3;
+//!         WRITE 6 'X is greater than 3';
+//!     ENDIF;
+//!     IF X < 3;
+//!         WRITE 6 'should not print';
+//!     ELSEIF X = 5;
+//!         WRITE 6 'X equals 5';
+//!     ELSE;
+//!         WRITE 6 'should not print either';
+//!     ENDIF;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure, bail};

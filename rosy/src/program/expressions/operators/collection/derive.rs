@@ -24,6 +24,31 @@
 //! f := DA(1) * DA(1) + DA(2);  { f = x² + y }
 //! df := f % 1;                  { df/dx = 2x }
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     DAINI 3 2 0 0;
+//!     VARIABLE (DA) F;
+//!     VARIABLE (DA) DF;
+//!     F := DA(1) * DA(1);
+//!     DF := F % 1;
+//!     WRITE 6 ST(CONS(DF));
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE NM 1;
+//!     VARIABLE F 2000;
+//!     VARIABLE DF 2000;
+//!     OV 3 2 0 NM;
+//!     F := DA(1) * DA(1);
+//!     DF := F % 1;
+//!     WRITE 6 CONS(DF);
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind};

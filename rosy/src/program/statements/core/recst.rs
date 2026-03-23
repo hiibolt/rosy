@@ -11,6 +11,24 @@
 //! - `value`      — RE or CM expression to convert
 //! - `format`     — ST expression (Fortran format string, e.g. `'(F10.3)'`)
 //! - `result_var` — variable that receives the ST result
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (ST) S;
+//!     RECST 3.14 '(F10.4)' S;
+//!     WRITE 6 S;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE S 80;
+//!     RECST 3.14 '(F10.4)' S;
+//!     WRITE 6 S;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

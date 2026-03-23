@@ -15,6 +15,41 @@
 //! - `steer2`      — variable for steering array 2 (RE ** 1)
 //! - `elements2`   — variable for number of tree elements (RE)
 //! - `tree_length` — variable for total tree length (RE)
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     DAINI 3 2 0 0;
+//!     VARIABLE (DA 2) MAP;
+//!     MAP(1) := DA(1) + 0.1 * DA(2);
+//!     MAP(2) := DA(2) + 0.1 * DA(1);
+//!     VARIABLE (RE 100) COEFF;
+//!     VARIABLE (RE 100) STEER1;
+//!     VARIABLE (RE 100) STEER2;
+//!     VARIABLE (RE) ELEM2;
+//!     VARIABLE (RE) TLEN;
+//!     MTREE MAP 2 COEFF STEER1 STEER2 ELEM2 TLEN;
+//!     WRITE 6 'mtree ok';
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE NM 1;
+//!     VARIABLE MAP 4000;
+//!     VARIABLE COEFF 100;
+//!     VARIABLE STEER1 100;
+//!     VARIABLE STEER2 100;
+//!     VARIABLE ELEM2 1;
+//!     VARIABLE TLEN 1;
+//!     OV 3 2 0 NM;
+//!     MAP(1) := DA(1) + 0.1 * DA(2);
+//!     MAP(2) := DA(2) + 0.1 * DA(1);
+//!     MTREE MAP 2 COEFF STEER1 STEER2 ELEM2 TLEN;
+//!     WRITE 6 'mtree ok';
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

@@ -14,6 +14,24 @@
 //! |-------|--------|
 //! | CM    | VE     |
 //! | VE    | VE     |
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (VE) V;
+//!     V := VE(CM(3&4));
+//!     WRITE 6 ST(V);
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE V 100;
+//!     V := VE(CM(3&4));
+//!     WRITE 6 V;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;

@@ -1,3 +1,0 @@
-| Input | Result |
-|---|---|
-| VE | RE |

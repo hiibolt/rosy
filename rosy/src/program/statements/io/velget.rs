@@ -21,6 +21,28 @@
 //! VELGET v 2 x;     { x = v[1] = 20.0 }
 //! WRITE 6 x;
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (VE) V;
+//!     VARIABLE (RE) X;
+//!     V := 10&20&30;
+//!     VELGET V 2 X;
+//!     WRITE 6 X;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE V 100;
+//!     VARIABLE X 1;
+//!     V := 10&20&30;
+//!     VELGET V 2 X;
+//!     WRITE 6 X;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

@@ -68,13 +68,3 @@ impl RosyCONJ for CD {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::rosy_lib::intrinsics::test_utils::test_intrinsic_output_match;
-
-    #[test]
-    fn test_rosy_cosy_conj_match() {
-        test_intrinsic_output_match("conj");
-    }
-}

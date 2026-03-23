@@ -14,6 +14,28 @@
 //! VARIABLE (LO) flag;
 //! flag := LO(1);         { TRUE (nonzero = true) }
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (LO) B;
+//!     B := LO(1);
+//!     WRITE 6 B;
+//!     B := LO(0);
+//!     WRITE 6 B;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE B 1;
+//!     B := LO(1);
+//!     WRITE 6 B;
+//!     B := LO(0);
+//!     WRITE 6 B;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use crate::ast::{FromRule, Rule};
 use crate::transpile::TranspileableExpr;
