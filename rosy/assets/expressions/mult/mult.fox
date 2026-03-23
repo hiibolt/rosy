@@ -1,0 +1,8 @@
+BEGIN;
+PROCEDURE RUN;
+    VARIABLE X 1;
+    X := 6 * 7;
+    WRITE 6 X;
+ENDPROCEDURE;
+RUN;
+END;

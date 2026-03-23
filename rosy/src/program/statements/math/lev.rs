@@ -14,6 +14,42 @@
 //! - `eigvecs`   — variable for eigenvector matrix (RE ** 2)
 //! - `n`         — number of actual entries (RE, used as usize)
 //! - `alloc_dim` — allocation dimension (RE, used as usize)
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE 10 10) M;
+//!     VARIABLE (RE 10) ER;
+//!     VARIABLE (RE 10) EI;
+//!     VARIABLE (RE 10 10) V;
+//!     M(1)(1) := 2;
+//!     M(1)(2) := 1;
+//!     M(2)(1) := 1;
+//!     M(2)(2) := 2;
+//!     LEV M ER EI V 2 10;
+//!     VARIABLE (RE) S;
+//!     S := ER(1) + ER(2);
+//!     WRITE 6 S;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE M 100;
+//!     VARIABLE ER 10;
+//!     VARIABLE EI 10;
+//!     VARIABLE V 100;
+//!     VARIABLE S 1;
+//!     M(1)(1) := 2;
+//!     M(1)(2) := 1;
+//!     M(2)(1) := 1;
+//!     M(2)(2) := 2;
+//!     LEV M ER EI V 2 10;
+//!     S := ER(1) + ER(2);
+//!     WRITE 6 S;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

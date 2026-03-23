@@ -8,6 +8,41 @@
 //! ```text
 //! DAREV array num_components max_vars current_vars unit;
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     DAINI 3 2 0 0;
+//!     VARIABLE (DA 1) A;
+//!     VARIABLE (DA 1) B;
+//!     A(1) := DA(1) + 3;
+//!     OPENF 20 'test_darev_tmp.dat' 'UNKNOWN';
+//!     DAPRV A 1 2 2 20;
+//!     CLOSEF 20;
+//!     OPENF 20 'test_darev_tmp.dat' 'OLD';
+//!     DAREV B 1 2 2 20;
+//!     CLOSEF 20;
+//!     WRITE 6 'darev ok';
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE NM 1;
+//!     VARIABLE A 2000;
+//!     VARIABLE B 2000;
+//!     OV 3 2 0 NM;
+//!     A(1) := DA(1) + 3;
+//!     OPENF 20 'test_darev_tmp.dat' 'UNKNOWN';
+//!     DAPRV A 1 2 2 20;
+//!     CLOSEF 20;
+//!     OPENF 20 'test_darev_tmp.dat' 'OLD';
+//!     DAREV B 1 2 2 20;
+//!     CLOSEF 20;
+//!     WRITE 6 'darev ok';
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

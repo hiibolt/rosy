@@ -16,6 +16,24 @@
 //! | CM | CM |
 //! | DA | CD |
 //! | CD | CD |
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (CM) Z;
+//!     Z := CMPLX(3.0);
+//!     WRITE 6 ST(Z);
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE Z 2;
+//!     Z := CMPLX(3.0);
+//!     WRITE 6 Z;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;

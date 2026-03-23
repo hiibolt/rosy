@@ -72,13 +72,3 @@ impl RosyTAN for DA {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::rosy_lib::intrinsics::test_utils::test_intrinsic_output_match;
-
-    #[test]
-    fn test_rosy_cosy_tan_match() {
-        test_intrinsic_output_match("tan");
-    }
-}

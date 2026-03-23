@@ -21,6 +21,26 @@
 //!
 //! GREET 'World';
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     PROCEDURE GREET NAME;
+//!         WRITE 6 'Hello ' NAME;
+//!     ENDPROCEDURE;
+//!     GREET 'World';
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     PROCEDURE GREET NAME;
+//!         WRITE 6 'Hello ' NAME;
+//!     ENDPROCEDURE;
+//!     GREET 'World';
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};

@@ -1,0 +1,9 @@
+BEGIN;
+PROCEDURE RUN;
+    VARIABLE NM 1;
+    OV 5 2 0 NM;
+    DANOT 3;
+    WRITE 6 'danot ok';
+ENDPROCEDURE;
+RUN;
+END;

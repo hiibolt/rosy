@@ -1,0 +1,7 @@
+BEGIN;
+PROCEDURE RUN;
+    SCRLEN 100;
+    WRITE 6 'scrlen ok';
+ENDPROCEDURE;
+RUN;
+END;

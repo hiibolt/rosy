@@ -23,6 +23,24 @@
 //!     WRITE 6 'x is zero';
 //! ENDIF;
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (LO) R;
+//!     R := 5 = 5;
+//!     WRITE 6 R;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE R 1;
+//!     R := 5 = 5;
+//!     WRITE 6 R;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use std::collections::HashSet;

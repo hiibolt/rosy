@@ -11,6 +11,24 @@
 //! ```
 //!
 //! All string literals produce the `ST` type.
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (ST) S;
+//!     S := 'hello';
+//!     WRITE 6 S;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE S 80;
+//!     S := 'hello';
+//!     WRITE 6 S;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::{BTreeSet, HashSet};
 use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};

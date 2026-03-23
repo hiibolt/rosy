@@ -20,6 +20,36 @@
 //! VARIABLE (RE) x y z;
 //! VARIABLE (VE ** 2) matrix;    { 2D array of vectors }
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) X;
+//!     VARIABLE (ST) S;
+//!     VARIABLE (LO) B;
+//!     X := 42;
+//!     S := 'hello';
+//!     B := TRUE;
+//!     WRITE 6 X;
+//!     WRITE 6 S;
+//!     WRITE 6 B;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE X 1;
+//!     VARIABLE S 80;
+//!     VARIABLE B 1;
+//!     X := 42;
+//!     S := 'hello';
+//!     B := TRUE;
+//!     WRITE 6 X;
+//!     WRITE 6 S;
+//!     WRITE 6 B;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 

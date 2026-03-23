@@ -1,9 +1,0 @@
-BEGIN;
-    VARIABLE (VE) INPUT_0;
-    VARIABLE (RE) RESULT_0;
-
-    INPUT_0 := 1.5&2.5&3.5;
-    RESULT_0 := VMIN(INPUT_0);
-    WRITE 6 ST(RESULT_0);
-
-END;

@@ -1,6 +1,6 @@
 [package]
 name = "rosy"
-version = "0.12.0"
+version = "0.13.0"
 edition = "2024"
 
 [features]
@@ -29,4 +29,3 @@ rustc-hash.workspace = true
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("mpi", "nightly-simd"))'] }
 
 [build-dependencies]
-regex = "1"

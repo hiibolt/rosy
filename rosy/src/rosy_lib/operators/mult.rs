@@ -242,12 +242,3 @@ impl RosyMult<&CD> for &CD {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::super::test_utils::test_operator_output_match;
-
-    #[test]
-    fn test_rosy_cosy_output_match() {
-        test_operator_output_match("mult");
-    }
-}

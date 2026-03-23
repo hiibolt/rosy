@@ -29,6 +29,28 @@
 //! v := 1 & 2 & 3;
 //! n := LENGTH(v);        { 3.0 }
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (ST) S;
+//!     VARIABLE (RE) L;
+//!     S := 'hello';
+//!     L := LENGTH(S);
+//!     WRITE 6 L;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE S 80;
+//!     VARIABLE L 1;
+//!     S := 'hello';
+//!     L := LENGTH(S);
+//!     WRITE 6 L;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;

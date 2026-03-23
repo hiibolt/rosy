@@ -13,6 +13,24 @@
 //! ```
 //!
 //! All numeric literals produce the `RE` type.
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) X;
+//!     X := 42;
+//!     WRITE 6 X;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE X 1;
+//!     X := 42;
+//!     WRITE 6 X;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::{BTreeSet, HashSet};
 use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};

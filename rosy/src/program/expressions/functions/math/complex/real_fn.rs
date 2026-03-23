@@ -16,6 +16,28 @@
 //! | CM    | RE     |
 //! | DA    | DA     |
 //! | CD    | DA     |
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (CM) Z;
+//!     VARIABLE (RE) R;
+//!     Z := CM(3&4);
+//!     R := REAL(Z);
+//!     WRITE 6 R;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE Z 2;
+//!     VARIABLE R 1;
+//!     Z := CM(3&4);
+//!     R := REAL(Z);
+//!     WRITE 6 R;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;

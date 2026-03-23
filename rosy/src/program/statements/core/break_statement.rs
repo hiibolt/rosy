@@ -6,6 +6,36 @@
 //! Only valid inside WHILE or LOOP contexts - not valid inside PLOOP,
 //! and PROCEDURE/FUNCTION definitions create scope boundaries that
 //! reset loop context.
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) I;
+//!     I := 0;
+//!     WHILE I < 100;
+//!         I := I + 1;
+//!         IF I = 5;
+//!             BREAK;
+//!         ENDIF;
+//!     ENDWHILE;
+//!     WRITE 6 I;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE I 1;
+//!     I := 0;
+//!     WHILE I < 100;
+//!         I := I + 1;
+//!         IF I = 5;
+//!             BREAK;
+//!         ENDIF;
+//!     ENDWHILE;
+//!     WRITE 6 I;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Error, anyhow, ensure};

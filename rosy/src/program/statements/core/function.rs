@@ -19,6 +19,30 @@
 //!     result := X * X;
 //! ENDFUNCTION SQUARE result;
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     FUNCTION SQUARE X;
+//!         SQUARE := X * X;
+//!     ENDFUNCTION;
+//!     VARIABLE (RE) R;
+//!     R := SQUARE(5);
+//!     WRITE 6 R;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE R 1;
+//!     FUNCTION SQUARE X;
+//!         SQUARE := X * X;
+//!     ENDFUNCTION;
+//!     R := SQUARE(5);
+//!     WRITE 6 R;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};

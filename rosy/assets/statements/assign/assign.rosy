@@ -1,0 +1,6 @@
+BEGIN;
+    VARIABLE (RE) X;
+    X := 42;
+    X := X + 8;
+    WRITE 6 X;
+END;

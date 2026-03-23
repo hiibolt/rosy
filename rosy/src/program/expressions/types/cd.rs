@@ -15,6 +15,27 @@
 //! VARIABLE (CD) g;
 //! g := CD(1) + CD(2);    { g = x + y (complex Taylor) }
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     DAINI 3 2 0 0;
+//!     VARIABLE (CD) Z;
+//!     Z := CD(1);
+//!     WRITE 6 ST(CONS(REAL(Z)));
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE NM 1;
+//!     VARIABLE Z 4000;
+//!     OV 3 2 0 NM;
+//!     Z := CD(1);
+//!     WRITE 6 CONS(REAL(Z));
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use crate::{
     ast::{FromRule, Rule},

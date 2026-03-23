@@ -7,6 +7,27 @@
 //! ```text
 //! DAPRV array num_components max_vars current_vars unit;
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     DAINI 3 2 0 0;
+//!     VARIABLE (DA 1) A;
+//!     A(1) := DA(1) + 2;
+//!     DAPRV A 1 2 2 6;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE NM 1;
+//!     VARIABLE A 2000;
+//!     OV 3 2 0 NM;
+//!     A(1) := DA(1) + 2;
+//!     DAPRV A 1 2 2 6;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

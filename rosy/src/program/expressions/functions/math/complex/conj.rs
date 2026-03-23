@@ -15,6 +15,28 @@
 //! | RE | RE |
 //! | CM | CM |
 //! | CD | CD |
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (CM) Z;
+//!     VARIABLE (CM) C;
+//!     Z := CM(3&4);
+//!     C := CONJ(Z);
+//!     WRITE 6 ST(C);
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE Z 2;
+//!     VARIABLE C 2;
+//!     Z := CM(3&4);
+//!     C := CONJ(Z);
+//!     WRITE 6 C;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;

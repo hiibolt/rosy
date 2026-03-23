@@ -1,0 +1,30 @@
+# SIN
+
+## ROSY Test
+
+```rosy
+BEGIN;
+    VARIABLE (RE) X;
+    X := SIN(1.0);
+    WRITE 6 X;
+END;
+```
+
+## Expected Output
+
+```
+0.8414709848078965    
+```
+
+## COSY Equivalent
+
+```cosy
+BEGIN;
+PROCEDURE RUN;
+    VARIABLE X 1;
+    X := SIN(1.0);
+    WRITE 6 X;
+ENDPROCEDURE;
+RUN;
+END;
+```

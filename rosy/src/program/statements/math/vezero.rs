@@ -13,6 +13,26 @@
 //! - `array`        — variable identifier for the array of VE vectors to check (modified in-place)
 //! - `num_elements` — RE expression for number of VE array elements to check
 //! - `threshold`    — RE expression for the threshold value
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (VE) V;
+//!     V := 0.001 & 5 & 0.0001;
+//!     VEZERO V 3 0.01;
+//!     WRITE 6 ST(V);
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE V 100;
+//!     V := 0.001 & 5 & 0.0001;
+//!     VEZERO V 3 0.01;
+//!     WRITE 6 V;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
@@ -89,11 +109,9 @@ impl Transpile for VezeroStatement {
             "{{\n    \
                 let __rosy_vezero_n = {num} as usize;\n    \
                 let __rosy_vezero_thresh = ({thresh} as f64).abs();\n    \
-                for __rosy_vezero_vec in {arr}[..__rosy_vezero_n].iter_mut() {{\n        \
-                    for __rosy_vezero_comp in __rosy_vezero_vec.iter_mut() {{\n            \
-                        if __rosy_vezero_comp.abs() > __rosy_vezero_thresh {{\n                \
-                            *__rosy_vezero_comp = 0.0;\n            \
-                        }}\n        \
+                for __rosy_vezero_comp in {arr}[..__rosy_vezero_n].iter_mut() {{\n        \
+                    if __rosy_vezero_comp.abs() > __rosy_vezero_thresh {{\n            \
+                        *__rosy_vezero_comp = 0.0;\n        \
                     }}\n    \
                 }}\n\
             }}",

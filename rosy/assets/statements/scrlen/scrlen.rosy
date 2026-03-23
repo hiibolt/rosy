@@ -1,0 +1,4 @@
+BEGIN;
+    SCRLEN 100;
+    WRITE 6 'scrlen ok';
+END;

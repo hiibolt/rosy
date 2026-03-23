@@ -15,6 +15,24 @@
 //! IMUNIT z;
 //! WRITE 6 z;   { prints (0, 1) }
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (CM) Z;
+//!     IMUNIT Z;
+//!     WRITE 6 ST(Z);
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE Z 2;
+//!     IMUNIT Z;
+//!     WRITE 6 Z;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

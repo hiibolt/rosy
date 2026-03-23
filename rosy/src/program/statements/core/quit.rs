@@ -19,6 +19,24 @@
 //! ```text
 //! QUIT 0;
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     WRITE 6 'before quit';
+//!     QUIT 0;
+//!     WRITE 6 'after quit';
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     WRITE 6 'before quit';
+//!     QUIT 0;
+//!     WRITE 6 'after quit';
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

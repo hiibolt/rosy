@@ -15,6 +15,30 @@
 //! WRITEB 11 myVector;
 //! CLOSEF 11;
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (VE) V;
+//!     V := 1&2&3;
+//!     OPENFB 22 'test_writeb_tmp.bin' 'UNKNOWN';
+//!     WRITEB 22 V;
+//!     CLOSEF 22;
+//!     WRITE 6 'writeb ok';
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE V 100;
+//!     V := 1&2&3;
+//!     OPENFB 22 'test_writeb_tmp.bin' 'UNKNOWN';
+//!     WRITEB 22 V;
+//!     CLOSEF 22;
+//!     WRITE 6 'writeb ok';
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

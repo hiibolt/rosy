@@ -1,0 +1,30 @@
+# LOG
+
+## ROSY Test
+
+```rosy
+BEGIN;
+    VARIABLE (RE) X;
+    X := LOG(2.718281828);
+    WRITE 6 X;
+END;
+```
+
+## Expected Output
+
+```
+0.9999999998311266    
+```
+
+## COSY Equivalent
+
+```cosy
+BEGIN;
+PROCEDURE RUN;
+    VARIABLE X 1;
+    X := LOG(2.718281828);
+    WRITE 6 X;
+ENDPROCEDURE;
+RUN;
+END;
+```

@@ -8,6 +8,30 @@
 //! ```text
 //! FNAME arg1 [arg2 ...];
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     FUNCTION DOUBLE X;
+//!         DOUBLE := X + X;
+//!     ENDFUNCTION;
+//!     VARIABLE (RE) R;
+//!     R := DOUBLE(21);
+//!     WRITE 6 R;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE R 1;
+//!     FUNCTION DOUBLE X;
+//!         DOUBLE := X + X;
+//!     ENDFUNCTION;
+//!     R := DOUBLE(21);
+//!     WRITE 6 R;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use anyhow::{Result, Context, Error, ensure};
 

@@ -15,6 +15,24 @@
 //! PNPRO n;
 //! WRITE 6 n;
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     VARIABLE (RE) NP;
+//!     PNPRO NP;
+//!     WRITE 6 NP;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     VARIABLE NP 1;
+//!     PNPRO NP;
+//!     WRITE 6 NP;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

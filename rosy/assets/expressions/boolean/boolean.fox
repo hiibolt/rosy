@@ -1,0 +1,10 @@
+BEGIN;
+PROCEDURE RUN;
+    VARIABLE B 1;
+    B := TRUE;
+    WRITE 6 B;
+    B := FALSE;
+    WRITE 6 B;
+ENDPROCEDURE;
+RUN;
+END;

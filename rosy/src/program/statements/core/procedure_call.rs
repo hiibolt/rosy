@@ -12,6 +12,26 @@
 //!
 //! Arguments are passed by mutable reference. The procedure may modify
 //! the caller's variables.
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     PROCEDURE SHOW X;
+//!         WRITE 6 X;
+//!     ENDPROCEDURE;
+//!     SHOW 99;
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     PROCEDURE SHOW X;
+//!         WRITE 6 X;
+//!     ENDPROCEDURE;
+//!     SHOW 99;
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, anyhow, ensure};

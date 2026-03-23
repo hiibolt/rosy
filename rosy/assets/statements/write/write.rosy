@@ -1,0 +1,5 @@
+BEGIN;
+    VARIABLE (RE) X;
+    X := 42;
+    WRITE 6 'Value: ' X;
+END;

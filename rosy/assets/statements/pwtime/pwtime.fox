@@ -1,0 +1,10 @@
+BEGIN;
+PROCEDURE RUN;
+    VARIABLE T 1;
+    PWTIME T;
+    IF T >= 0;
+        WRITE 6 'pwtime ok';
+    ENDIF;
+ENDPROCEDURE;
+RUN;
+END;

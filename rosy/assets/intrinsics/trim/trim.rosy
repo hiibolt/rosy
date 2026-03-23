@@ -1,9 +1,0 @@
-BEGIN;
-    VARIABLE (ST) INPUT_0;
-    VARIABLE (ST) RESULT_0;
-
-    INPUT_0 := '  hello  ';
-    RESULT_0 := TRIM(INPUT_0);
-    WRITE 6 ST(RESULT_0);
-
-END;

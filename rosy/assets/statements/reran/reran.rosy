@@ -1,0 +1,9 @@
+BEGIN;
+    VARIABLE (RE) R;
+    RERAN R;
+    IF R >= 0;
+        IF R < 1;
+            WRITE 6 'reran ok';
+        ENDIF;
+    ENDIF;
+END;

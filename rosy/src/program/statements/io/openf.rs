@@ -19,6 +19,26 @@
 //! WRITE 10 'Hello, file!';
 //! CLOSEF 10;
 //! ```
+//!
+//! ```rosy_test_raw
+//! --- rosy ---
+//! BEGIN;
+//!     OPENF 20 'test_openf_tmp.dat' 'UNKNOWN';
+//!     WRITE 20 'hello from file';
+//!     CLOSEF 20;
+//!     WRITE 6 'openf ok';
+//! END;
+//! --- fox ---
+//! BEGIN;
+//! PROCEDURE RUN;
+//!     OPENF 20 'test_openf_tmp.dat' 'UNKNOWN';
+//!     WRITE 20 'hello from file';
+//!     CLOSEF 20;
+//!     WRITE 6 'openf ok';
+//! ENDPROCEDURE;
+//! RUN;
+//! END;
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};
