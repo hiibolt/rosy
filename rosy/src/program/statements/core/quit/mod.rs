@@ -15,13 +15,18 @@
 //! - `QUIT n;` — exits with code `n` cast to i32
 //!
 //! ## Rosy Example
+//! ```
 #![doc = include_str!("test.rosy")]
 //! **Output**:
+//! ```
 #![doc = include_str!("rosy_output.txt")]
 //! ## COSY Example
+//! ```
 #![doc = include_str!("test.fox")]
 //! **Output**:
+//! ```
 #![doc = include_str!("cosy_output.txt")]
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

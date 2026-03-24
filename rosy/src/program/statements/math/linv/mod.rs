@@ -15,9 +15,12 @@
 //! - `error_flag` — variable to receive error code (0: no error, 132: singular)
 //!
 //! ## Rosy Example
+//! ```
 #![doc = include_str!("test.rosy")]
 //! **Output**:
+//! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

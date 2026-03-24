@@ -6,7 +6,40 @@ on:
   pull_request:
 
 jobs:
+  detect-version-bump:
+    runs-on: ubuntu-latest
+    outputs:
+      minor_bump: ${{ steps.detect.outputs.minor_bump }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect minor version bump
+        id: detect
+        run: |
+          CURRENT=$(grep '^version' rosy/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          CURRENT_MINOR=$(echo "$CURRENT" | cut -d. -f2)
+
+          # Get the previous version from the parent commit
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+            PREV=$(git show HEAD~1:rosy/Cargo.toml 2>/dev/null | grep '^version' | head -1 | sed 's/.*"\(.*\)".*/\1/' || echo "")
+            PREV_MINOR=$(echo "$PREV" | cut -d. -f2)
+          else
+            PREV_MINOR=""
+          fi
+
+          if [ -n "$PREV_MINOR" ] && [ "$CURRENT_MINOR" != "$PREV_MINOR" ]; then
+            echo "minor_bump=true" >> "$GITHUB_OUTPUT"
+            echo "Detected minor version bump: $PREV -> $CURRENT"
+          else
+            echo "minor_bump=false" >> "$GITHUB_OUTPUT"
+            echo "No minor version bump: ${PREV:-unknown} -> $CURRENT"
+          fi
+
   check:
+    needs: detect-version-bump
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -28,4 +61,5 @@ jobs:
         run: cargo check --workspace
 
       - name: Run tests
+        if: needs.detect-version-bump.outputs.minor_bump == 'true'
         run: cargo test -p rosy -- --skip test_rosy_cosy

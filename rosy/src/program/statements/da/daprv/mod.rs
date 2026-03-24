@@ -9,9 +9,12 @@
 //! ```
 //!
 //! ## Rosy Example
+//! ```
 #![doc = include_str!("test.rosy")]
 //! **Output**:
+//! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 
 use std::collections::BTreeSet;
 use anyhow::{Result, Context, Error, ensure};

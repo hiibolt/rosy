@@ -17,13 +17,18 @@
 //! | CD | CD |
 //!
 //! ## Rosy Example
+//! ```
 #![doc = include_str!("test.rosy")]
 //! **Output**:
+//! ```
 #![doc = include_str!("rosy_output.txt")]
 //! ## COSY Example
+//! ```
 #![doc = include_str!("test.fox")]
 //! **Output**:
+//! ```
 #![doc = include_str!("cosy_output.txt")]
+//! ```
 
 use crate::program::expressions::Expr;
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind};
