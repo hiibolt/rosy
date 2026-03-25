@@ -17,12 +17,15 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
@@ -30,10 +33,18 @@
 
 use std::collections::BTreeSet;
 
-use anyhow::{Result, Context, Error, anyhow, ensure};
+use anyhow::{Context, Error, Result, anyhow, ensure};
 
 use crate::{
-    ast::*, program::{expressions::Expr, statements::SourceLocation}, resolve::{ScopeContext, TypeResolver, TypeSlot}, rosy_lib::{RosyBaseType, RosyType}, syntax_config, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, VariableData, VariableScope}
+    ast::*,
+    program::{expressions::Expr, statements::SourceLocation},
+    resolve::{ScopeContext, TypeResolver, TypeSlot},
+    rosy_lib::{RosyBaseType, RosyType},
+    syntax_config,
+    transpile::{
+        ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableExpr, TranspileableStatement, VariableData, VariableScope,
+    },
 };
 
 #[derive(Debug)]
@@ -45,18 +56,21 @@ pub struct VariableDeclarationData {
 impl VariableDeclarationData {
     /// Helper to unwrap the type or return a descriptive error.
     pub fn require_type(&self) -> Result<RosyType, Error> {
-        self.r#type.ok_or_else(|| anyhow!(
-            "Type inference is not yet supported - please specify the type for '{}'", self.name
-        ))
+        self.r#type.ok_or_else(|| {
+            anyhow!(
+                "Type inference is not yet supported - please specify the type for '{}'",
+                self.name
+            )
+        })
     }
 }
 impl Transpile for VariableDeclarationData {
     // note that this transpiles as the default value for the type
-    fn transpile (
-        &self, context: &mut TranspilationInputContext
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>> {
-        let resolved_type = self.require_type()
-            .map_err(|e| vec![e])?;
+        let resolved_type = self.require_type().map_err(|e| vec![e])?;
 
         let base_value = match resolved_type.base_type {
             RosyBaseType::RE => "0.0",
@@ -65,8 +79,9 @@ impl Transpile for VariableDeclarationData {
             RosyBaseType::CM => "Complex64::new(0.0, 0.0)",
             RosyBaseType::VE => "vec![]",
             RosyBaseType::DA => "DA::zero()",
-            RosyBaseType::CD => "CD::zero()"
-        }.to_string();
+            RosyBaseType::CD => "CD::zero()",
+        }
+        .to_string();
 
         let mut requested_variables = BTreeSet::new();
         let mut errors = Vec::new();
@@ -81,7 +96,9 @@ impl Transpile for VariableDeclarationData {
                     if t == expected_type {
                         Ok(())
                     } else {
-                        Err(anyhow::anyhow!("Array dimension expression must be of type {expected_type}, found {t}"))
+                        Err(anyhow::anyhow!(
+                            "Array dimension expression must be of type {expected_type}, found {t}"
+                        ))
                     }
                 }) {
                     errors.push(e.context("...while checking array dimension expression type"));
@@ -93,10 +110,12 @@ impl Transpile for VariableDeclarationData {
                     Ok(output) => {
                         result = format!("vec![{}; {} as usize]", result, output.as_value());
                         requested_variables.extend(output.requested_variables);
-                    },
+                    }
                     Err(dim_errors) => {
                         for e in dim_errors {
-                            errors.push(e.context("...while transpiling array dimension expression!"));
+                            errors.push(
+                                e.context("...while transpiling array dimension expression!"),
+                            );
                         }
                     }
                 }
@@ -118,27 +137,33 @@ impl Transpile for VariableDeclarationData {
 
 #[derive(Debug)]
 pub struct VarDeclStatement {
-    pub data: VariableDeclarationData
+    pub data: VariableDeclarationData,
 }
 
 impl FromRule for VarDeclStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::var_decl, 
-            "Expected `var_decl` rule when building variable declaration, found: {:?}", pair.as_rule());
-        
+        ensure!(
+            pair.as_rule() == Rule::var_decl,
+            "Expected `var_decl` rule when building variable declaration, found: {:?}",
+            pair.as_rule()
+        );
+
         let mut inner = pair.into_inner();
 
         // Peek at the next token to see if it's a type or a variable name
-        let first = inner.next()
+        let first = inner
+            .next()
             .context("Missing tokens in variable declaration!")?;
 
         let (r#type, mut dimension_exprs, name) = if first.as_rule() == Rule::r#type {
             // Type is present: parse type, then name
             let (r#type, dimension_exprs) = build_type(first)
                 .context("...while building variable type in variable declaration!")?;
-            let name = inner.next()
+            let name = inner
+                .next()
                 .context("Missing variable name after type in variable declaration!")?
-                .as_str().to_string();
+                .as_str()
+                .to_string();
             (Some(r#type), dimension_exprs, name)
         } else {
             // No type: first token is the variable name
@@ -150,7 +175,9 @@ impl FromRule for VarDeclStatement {
         let mut memory_sizes: Vec<Expr> = Vec::new();
         for mem_pair in inner {
             if mem_pair.as_rule() == Rule::memory_size {
-                let mem_inner = mem_pair.into_inner().next()
+                let mem_inner = mem_pair
+                    .into_inner()
+                    .next()
                     .context("Missing expression in memory_size")?;
                 let expr = Expr::from_rule(mem_inner)
                     .context("...while building memory size expression in variable declaration!")?;
@@ -210,14 +237,15 @@ impl TranspileableStatement for VarDeclStatement {
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
-        source_location: SourceLocation
+        source_location: SourceLocation,
     ) -> Option<Result<()>> {
-        let slot = TypeSlot::Variable(
-            ctx.scope_path.clone(),
-            self.data.name.clone(),
+        let slot = TypeSlot::Variable(ctx.scope_path.clone(), self.data.name.clone());
+
+        resolver.insert_slot(
+            slot.clone(),
+            self.data.r#type.as_ref(),
+            Some(source_location),
         );
-        
-        resolver.insert_slot(slot.clone(), self.data.r#type.as_ref(), Some(source_location));
         ctx.variables.insert(self.data.name.clone(), slot);
 
         Some(Ok(()))
@@ -228,10 +256,7 @@ impl TranspileableStatement for VarDeclStatement {
         current_scope: &[String],
     ) -> Option<Result<()>> {
         if self.data.r#type.is_none() {
-            let slot = TypeSlot::Variable(
-                current_scope.to_vec(),
-                self.data.name.clone(),
-            );
+            let slot = TypeSlot::Variable(current_scope.to_vec(), self.data.name.clone());
             if let Some(node) = resolver.nodes.get(&slot) {
                 if let Some(t) = &node.resolved {
                     let mut resolved = t.clone();
@@ -244,11 +269,7 @@ impl TranspileableStatement for VarDeclStatement {
         }
         Some(Ok(()))
     }
-    fn set_implicit_return_type(
-        &mut self,
-        name: &str,
-        return_type: &RosyType,
-    ) -> bool {
+    fn set_implicit_return_type(&mut self, name: &str, return_type: &RosyType) -> bool {
         if self.data.name == name && self.data.r#type.is_none() {
             self.data.r#type = Some(return_type.clone());
             true
@@ -258,19 +279,35 @@ impl TranspileableStatement for VarDeclStatement {
     }
 }
 impl Transpile for VarDeclStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
-        let resolved_type = self.data.require_type()
-            .map_err(|e| vec![e.context(format!("...while transpiling variable declaration for '{}'", self.data.name))])?;
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
+        let resolved_type = self.data.require_type().map_err(|e| {
+            vec![e.context(format!(
+                "...while transpiling variable declaration for '{}'",
+                self.data.name
+            ))]
+        })?;
 
         // Insert the declaration, but check it doesn't already exist
-        if matches!(context.variables.insert(self.data.name.clone(), ScopedVariableData { 
-            scope: VariableScope::Local,
-            data: VariableData { 
-                name: self.data.name.clone(),
-                r#type: resolved_type.clone()
-            }
-        }), Some(_)) {
-            return Err(vec!(anyhow!("Variable '{}' is already defined in this scope!", self.data.name)));
+        if matches!(
+            context.variables.insert(
+                self.data.name.clone(),
+                ScopedVariableData {
+                    scope: VariableScope::Local,
+                    data: VariableData {
+                        name: self.data.name.clone(),
+                        r#type: resolved_type.clone()
+                    }
+                }
+            ),
+            Some(_)
+        ) {
+            return Err(vec![anyhow!(
+                "Variable '{}' is already defined in this scope!",
+                self.data.name
+            )]);
         }
 
         let data_output = self.data.transpile(context)?;

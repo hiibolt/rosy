@@ -15,26 +15,29 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
     ast::*,
     program::expressions::{Expr, core::variable_identifier::VariableIdentifier},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableStatement, VariableScope, add_context_to_all,
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        VariableScope, add_context_to_all,
     },
 };
 
@@ -55,48 +58,69 @@ impl FromRule for VedotStatement {
 
         let mut inner = pair.into_inner();
 
-        let vec1_pair = inner.next()
+        let vec1_pair = inner
+            .next()
             .context("Missing first vector expression in VEDOT!")?;
         let vec1_expr = Expr::from_rule(vec1_pair)
             .context("Failed to build first vector expression in VEDOT")?
             .ok_or_else(|| anyhow::anyhow!("Expected first vector expression in VEDOT"))?;
 
-        let vec2_pair = inner.next()
+        let vec2_pair = inner
+            .next()
             .context("Missing second vector expression in VEDOT!")?;
         let vec2_expr = Expr::from_rule(vec2_pair)
             .context("Failed to build second vector expression in VEDOT")?
             .ok_or_else(|| anyhow::anyhow!("Expected second vector expression in VEDOT"))?;
 
-        let output_pair = inner.next()
-            .context("Missing output variable in VEDOT!")?;
+        let output_pair = inner.next().context("Missing output variable in VEDOT!")?;
         let output_var = VariableIdentifier::from_rule(output_pair)
             .context("Failed to build output variable identifier in VEDOT")?
             .ok_or_else(|| anyhow::anyhow!("Expected output variable identifier in VEDOT"))?;
 
-        Ok(Some(VedotStatement { vec1_expr, vec2_expr, output_var }))
+        Ok(Some(VedotStatement {
+            vec1_expr,
+            vec2_expr,
+            output_var,
+        }))
     }
 }
 
 impl TranspileableStatement for VedotStatement {}
 
 impl Transpile for VedotStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
 
-        let vec1_output = self.vec1_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling first vector in VEDOT".to_string()))?;
+        let vec1_output = self.vec1_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling first vector in VEDOT".to_string())
+        })?;
         requested_variables.extend(vec1_output.requested_variables.iter().cloned());
 
-        let vec2_output = self.vec2_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling second vector in VEDOT".to_string()))?;
+        let vec2_output = self.vec2_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling second vector in VEDOT".to_string())
+        })?;
         requested_variables.extend(vec2_output.requested_variables.iter().cloned());
 
-        let output_id_output = self.output_var.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling output variable in VEDOT".to_string()))?;
+        let output_id_output = self.output_var.transpile(context).map_err(|e| {
+            add_context_to_all(
+                e,
+                "...while transpiling output variable in VEDOT".to_string(),
+            )
+        })?;
         requested_variables.extend(output_id_output.requested_variables.clone());
 
-        let dereference = match context.variables.get(&self.output_var.name)
-            .ok_or_else(|| vec![anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.output_var.name)])?
+        let dereference = match context
+            .variables
+            .get(&self.output_var.name)
+            .ok_or_else(|| {
+                vec![anyhow::anyhow!(
+                    "Variable '{}' is not defined in this scope!",
+                    self.output_var.name
+                )]
+            })?
             .scope
         {
             VariableScope::Local => "",

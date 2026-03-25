@@ -15,35 +15,46 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, anyhow, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, anyhow, ensure};
 
-use crate::{ast::*, program::statements::*, resolve::{ScopeContext, TypeResolver, TypeSlot}, transpile::*};
+use crate::{
+    ast::*,
+    program::statements::*,
+    resolve::{ScopeContext, TypeResolver, TypeSlot},
+    transpile::*,
+};
 
 /// AST node for a user-defined procedure declaration.
 #[derive(Debug)]
 pub struct ProcedureStatement {
     pub name: String,
     pub args: Vec<VariableDeclarationData>,
-    pub body: Vec<Statement>
+    pub body: Vec<Statement>,
 }
 
 impl FromRule for ProcedureStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::procedure, 
-            "Expected `procedure` rule when building procedure statement, found: {:?}", pair.as_rule());
-        
+        ensure!(
+            pair.as_rule() == Rule::procedure,
+            "Expected `procedure` rule when building procedure statement, found: {:?}",
+            pair.as_rule()
+        );
+
         let mut inner = pair.into_inner();
         let (name, args) = {
             let mut start_procedure_inner = inner
@@ -51,21 +62,27 @@ impl FromRule for ProcedureStatement {
                 .context("Missing first token `start_procedure`!")?
                 .into_inner();
 
-            let name = start_procedure_inner.next()
+            let name = start_procedure_inner
+                .next()
                 .context("Missing procedure name!")?
-                .as_str().to_string();
-            
+                .as_str()
+                .to_string();
+
             let mut args = Vec::new();
             // Collect all remaining argument names and types
             while let Some(arg_pair) = start_procedure_inner.next() {
                 if arg_pair.as_rule() == Rule::semicolon {
                     break;
                 }
-                ensure!(arg_pair.as_rule() == Rule::procedure_argument_name_and_type, 
-                    "Expected procedure argument name and type, found: {:?}", arg_pair.as_rule());
-                
+                ensure!(
+                    arg_pair.as_rule() == Rule::procedure_argument_name_and_type,
+                    "Expected procedure argument name and type, found: {:?}",
+                    arg_pair.as_rule()
+                );
+
                 let mut arg_inner = arg_pair.into_inner();
-                let name = arg_inner.next()
+                let name = arg_inner
+                    .next()
                     .context("Missing procedure argument name!")?
                     .as_str();
 
@@ -88,7 +105,7 @@ impl FromRule for ProcedureStatement {
 
             (name, args)
         };
-        
+
         let body = {
             let mut statements = Vec::new();
 
@@ -98,10 +115,11 @@ impl FromRule for ProcedureStatement {
                 if element.as_rule() == Rule::end_procedure {
                     break;
                 }
-                
+
                 let pair_input = element.as_str();
                 if let Some(stmt) = Statement::from_rule(element)
-                    .with_context(|| format!("Failed to build statement from:\n{}", pair_input))? {
+                    .with_context(|| format!("Failed to build statement from:\n{}", pair_input))?
+                {
                     statements.push(stmt);
                 }
             }
@@ -117,16 +135,17 @@ impl TranspileableStatement for ProcedureStatement {
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
-        source_location: SourceLocation
+        source_location: SourceLocation,
     ) -> Option<Result<()>> {
         let mut arg_slots = Vec::new();
         for arg in &self.args {
-            let arg_slot = TypeSlot::Argument(
-                ctx.scope_path.clone(),
-                self.name.clone(),
-                arg.name.clone(),
+            let arg_slot =
+                TypeSlot::Argument(ctx.scope_path.clone(), self.name.clone(), arg.name.clone());
+            resolver.insert_slot(
+                arg_slot.clone(),
+                arg.r#type.as_ref(),
+                Some(source_location.clone()),
             );
-            resolver.insert_slot(arg_slot.clone(), arg.r#type.as_ref(), Some(source_location.clone()));
             arg_slots.push((arg.name.clone(), arg_slot));
         }
 
@@ -144,11 +163,8 @@ impl TranspileableStatement for ProcedureStatement {
         };
 
         for arg in &self.args {
-            let arg_slot = TypeSlot::Argument(
-                ctx.scope_path.clone(),
-                self.name.clone(),
-                arg.name.clone(),
-            );
+            let arg_slot =
+                TypeSlot::Argument(ctx.scope_path.clone(), self.name.clone(), arg.name.clone());
             inner_ctx.variables.insert(arg.name.clone(), arg_slot);
         }
 
@@ -165,11 +181,8 @@ impl TranspileableStatement for ProcedureStatement {
     ) -> Option<Result<()>> {
         for arg in &mut self.args {
             if arg.r#type.is_none() {
-                let slot = TypeSlot::Argument(
-                    current_scope.to_vec(),
-                    self.name.clone(),
-                    arg.name.clone(),
-                );
+                let slot =
+                    TypeSlot::Argument(current_scope.to_vec(), self.name.clone(), arg.name.clone());
                 if let Some(node) = resolver.nodes.get(&slot) {
                     if let Some(t) = &node.resolved {
                         arg.r#type = Some(t.clone());
@@ -188,7 +201,10 @@ impl TranspileableStatement for ProcedureStatement {
     }
 }
 impl Transpile for ProcedureStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         // Resolve all argument types (required for transpilation)
         let resolved_arg_data: Vec<VariableData> = {
             let mut data = Vec::new();
@@ -200,7 +216,8 @@ impl Transpile for ProcedureStatement {
                         r#type: t,
                     }),
                     Err(e) => errors.push(e.context(format!(
-                        "...while resolving argument types for procedure '{}'", self.name
+                        "...while resolving argument types for procedure '{}'",
+                        self.name
                     ))),
                 }
             }
@@ -211,18 +228,23 @@ impl Transpile for ProcedureStatement {
         };
 
         // Insert the procedure signature, but check it doesn't already exist
-        if context.functions.contains_key(&self.name) || 
-            matches!(context.procedures.insert(
-                self.name.clone(),
-                TranspilationInputProcedureContext {
-                    args: resolved_arg_data.clone(),
-                    requested_variables: BTreeSet::new()
-                }
-            ), Some(_))
+        if context.functions.contains_key(&self.name)
+            || matches!(
+                context.procedures.insert(
+                    self.name.clone(),
+                    TranspilationInputProcedureContext {
+                        args: resolved_arg_data.clone(),
+                        requested_variables: BTreeSet::new()
+                    }
+                ),
+                Some(_)
+            )
         {
-            return Err(vec!(anyhow!("Procedure '{}' is already defined in this scope!", self.name)));
+            return Err(vec![anyhow!(
+                "Procedure '{}' is already defined in this scope!",
+                self.name
+            )]);
         }
-
 
         // Define and raise the level of any existing variables
         let mut inner_context: TranspilationInputContext = context.clone();
@@ -234,14 +256,20 @@ impl Transpile for ProcedureStatement {
             *scope = match *scope {
                 VariableScope::Local => VariableScope::Higher,
                 VariableScope::Arg => VariableScope::Higher,
-                VariableScope::Higher => VariableScope::Higher
+                VariableScope::Higher => VariableScope::Higher,
             }
         }
         for arg_data in &resolved_arg_data {
-            if matches!(inner_context.variables.insert(arg_data.name.clone(), ScopedVariableData {
-                scope: VariableScope::Arg,
-                data: arg_data.clone()
-            }), Some(_)) {
+            if matches!(
+                inner_context.variables.insert(
+                    arg_data.name.clone(),
+                    ScopedVariableData {
+                        scope: VariableScope::Arg,
+                        data: arg_data.clone()
+                    }
+                ),
+                Some(_)
+            ) {
                 errors.push(anyhow!("Argument '{}' is already defined!", arg_data.name));
             }
         }
@@ -252,11 +280,12 @@ impl Transpile for ProcedureStatement {
                 Ok(output) => {
                     serialized_statements.push(output.serialization);
                     requested_variables.extend(output.requested_variables);
-                },
+                }
                 Err(stmt_errors) => {
                     for e in stmt_errors {
                         errors.push(e.context(format!(
-                            "...while transpiling statement in procedure '{}'", self.name
+                            "...while transpiling statement in procedure '{}'",
+                            self.name
                         )));
                     }
                 }
@@ -265,7 +294,8 @@ impl Transpile for ProcedureStatement {
 
         // Update the procedure context with the requested variables,
         //  first removing those which are locally defined or args
-        requested_variables = requested_variables.into_iter()
+        requested_variables = requested_variables
+            .into_iter()
             .filter(|var| {
                 if let Some(var_data) = inner_context.variables.get(var) {
                     !matches!(var_data.scope, VariableScope::Local | VariableScope::Arg)
@@ -277,23 +307,27 @@ impl Transpile for ProcedureStatement {
         if let Some(proc_context) = context.procedures.get_mut(&self.name) {
             proc_context.requested_variables = requested_variables.clone();
         } else {
-            errors.push(anyhow!(
-                "Procedure '{}' was not found in context after being inserted!", self.name
-            ).context("...while updating procedure context"));
+            errors.push(
+                anyhow!(
+                    "Procedure '{}' was not found in context after being inserted!",
+                    self.name
+                )
+                .context("...while updating procedure context"),
+            );
         }
 
         // Serialize arguments
         let serialized_args: Vec<String> = {
             let mut serialized_args = Vec::new();
             for var_name in requested_variables.iter() {
-                let Some(var_data) = inner_context.variables
-                    .get(var_name) else 
-                {
-                    errors.push(anyhow!(
-                        "Variable '{}' was requested but not found in context!", var_name
-                    ).context(format!(
-                        "...while transpiling procedure '{}'", self.name
-                    )));
+                let Some(var_data) = inner_context.variables.get(var_name) else {
+                    errors.push(
+                        anyhow!(
+                            "Variable '{}' was requested but not found in context!",
+                            var_name
+                        )
+                        .context(format!("...while transpiling procedure '{}'", self.name)),
+                    );
                     continue;
                 };
 
@@ -315,7 +349,9 @@ impl Transpile for ProcedureStatement {
 
         let serialization = format!(
             "fn {} ( {} ) -> Result<()> {{\n{}\n\n\tOk(())\n}}",
-            self.name, serialized_args.join(", "), indent(serialized_statements.join("\n"))
+            self.name,
+            serialized_args.join(", "),
+            indent(serialized_statements.join("\n"))
         );
         if errors.is_empty() {
             Ok(TranspilationOutput {

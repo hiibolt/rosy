@@ -18,12 +18,15 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
@@ -32,14 +35,14 @@
 use std::collections::BTreeSet;
 use std::collections::HashSet;
 
-use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
+use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::TranspileableExpr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, ValueKind};
-use anyhow::{Result, Error, anyhow};
 use crate::rosy_lib::RosyType;
+use crate::transpile::TranspileableExpr;
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, ValueKind};
+use anyhow::{Error, Result, anyhow};
 
 /// AST node for the less-than operator (`<`).
 #[derive(Debug, PartialEq)]
@@ -54,30 +57,39 @@ impl FromRule for LtExpr {
     }
 }
 impl TranspileableExpr for LtExpr {
-    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
+    fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         crate::rosy_lib::operators::lt::get_return_type(
             &self.left.type_of(context)?,
-            &self.right.type_of(context)?
-        ).ok_or(anyhow::anyhow!(
+            &self.right.type_of(context)?,
+        )
+        .ok_or(anyhow::anyhow!(
             "Cannot compare types '{}' and '{}' with less-than!",
             self.left.type_of(context)?,
             self.right.type_of(context)?
         ))
     }
-    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+    fn build_expr_recipe(
+        &self,
+        _resolver: &TypeResolver,
+        _ctx: &ScopeContext,
+        _deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
         Some(ExprRecipe::Literal(RosyType::LO()))
     }
 }
 impl Transpile for LtExpr {
-    fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
-        let left_type = self.left.type_of(context)
-            .map_err(|e| vec!(e))?;
-        let right_type = self.right.type_of(context)
-            .map_err(|e| vec!(e))?;
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
+        let left_type = self.left.type_of(context).map_err(|e| vec![e])?;
+        let right_type = self.right.type_of(context).map_err(|e| vec![e])?;
         if crate::rosy_lib::operators::lt::get_return_type(&left_type, &right_type).is_none() {
-            return Err(vec!(anyhow!(
-                "Cannot compare types '{}' and '{}' with less-than!", left_type, right_type
-            )));
+            return Err(vec![anyhow!(
+                "Cannot compare types '{}' and '{}' with less-than!",
+                left_type,
+                right_type
+            )]);
         }
 
         let mut errors = Vec::new();
@@ -108,9 +120,15 @@ impl Transpile for LtExpr {
         use crate::rosy_lib::RosyBaseType;
         let serialization = match (&left_type.base_type, &right_type.base_type) {
             (RosyBaseType::RE, RosyBaseType::RE) | (RosyBaseType::ST, RosyBaseType::ST)
-                if left_type.dimensions == 0 && right_type.dimensions == 0
-                => format!("({} < {})", left_output.as_value(), right_output.as_value()),
-            _ => format!("RosyLt::rosy_lt({}, {})?", left_output.as_ref(), right_output.as_ref()),
+                if left_type.dimensions == 0 && right_type.dimensions == 0 =>
+            {
+                format!("({} < {})", left_output.as_value(), right_output.as_value())
+            }
+            _ => format!(
+                "RosyLt::rosy_lt({}, {})?",
+                left_output.as_ref(),
+                right_output.as_ref()
+            ),
         };
 
         if errors.is_empty() {

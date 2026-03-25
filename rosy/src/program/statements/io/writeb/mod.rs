@@ -11,22 +11,30 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
-    ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement, add_context_to_all}
+    ast::*,
+    program::expressions::Expr,
+    transpile::{
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        add_context_to_all,
+    },
 };
 
 /// AST node for `WRITEB unit expr+;`.
@@ -39,12 +47,16 @@ pub struct WritebStatement {
 
 impl FromRule for WritebStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::writeb, 
-            "Expected `writeb` rule when building WRITEB statement, found: {:?}", pair.as_rule());
-        
+        ensure!(
+            pair.as_rule() == Rule::writeb,
+            "Expected `writeb` rule when building WRITEB statement, found: {:?}",
+            pair.as_rule()
+        );
+
         let mut inner = pair.into_inner();
 
-        let unit = inner.next()
+        let unit = inner
+            .next()
             .context("Missing first token `unit`!")?
             .as_str()
             .parse::<u8>()
@@ -70,17 +82,23 @@ impl FromRule for WritebStatement {
 }
 impl TranspileableStatement for WritebStatement {}
 impl Transpile for WritebStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut serialized_stmts = Vec::new();
         let mut requested_variables = BTreeSet::new();
 
         for expr in &self.exprs {
-            let output = expr.transpile(context)
-                .map_err(|err_vec| {
-                    add_context_to_all(err_vec, format!(
-                        "...while transpiling expression '{:?}' for WRITEB statement", expr
-                    ))
-                })?;
+            let output = expr.transpile(context).map_err(|err_vec| {
+                add_context_to_all(
+                    err_vec,
+                    format!(
+                        "...while transpiling expression '{:?}' for WRITEB statement",
+                        expr
+                    ),
+                )
+            })?;
 
             requested_variables.extend(output.requested_variables.iter().cloned());
 

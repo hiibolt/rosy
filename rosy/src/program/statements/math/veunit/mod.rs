@@ -14,26 +14,29 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
     ast::*,
     program::expressions::{Expr, core::variable_identifier::VariableIdentifier},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableStatement, VariableScope, add_context_to_all,
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        VariableScope, add_context_to_all,
     },
 };
 
@@ -53,38 +56,56 @@ impl FromRule for VeunitStatement {
 
         let mut inner = pair.into_inner();
 
-        let vec_pair = inner.next()
+        let vec_pair = inner
+            .next()
             .context("Missing vector expression in VEUNIT!")?;
         let vec_expr = Expr::from_rule(vec_pair)
             .context("Failed to build vector expression in VEUNIT")?
             .ok_or_else(|| anyhow::anyhow!("Expected vector expression in VEUNIT"))?;
 
-        let output_pair = inner.next()
-            .context("Missing output variable in VEUNIT!")?;
+        let output_pair = inner.next().context("Missing output variable in VEUNIT!")?;
         let output_var = VariableIdentifier::from_rule(output_pair)
             .context("Failed to build output variable identifier in VEUNIT")?
             .ok_or_else(|| anyhow::anyhow!("Expected output variable identifier in VEUNIT"))?;
 
-        Ok(Some(VeunitStatement { vec_expr, output_var }))
+        Ok(Some(VeunitStatement {
+            vec_expr,
+            output_var,
+        }))
     }
 }
 
 impl TranspileableStatement for VeunitStatement {}
 
 impl Transpile for VeunitStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
 
-        let vec_output = self.vec_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling vector in VEUNIT".to_string()))?;
+        let vec_output = self.vec_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling vector in VEUNIT".to_string())
+        })?;
         requested_variables.extend(vec_output.requested_variables.iter().cloned());
 
-        let output_id_output = self.output_var.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling output variable in VEUNIT".to_string()))?;
+        let output_id_output = self.output_var.transpile(context).map_err(|e| {
+            add_context_to_all(
+                e,
+                "...while transpiling output variable in VEUNIT".to_string(),
+            )
+        })?;
         requested_variables.extend(output_id_output.requested_variables.clone());
 
-        let dereference = match context.variables.get(&self.output_var.name)
-            .ok_or_else(|| vec![anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.output_var.name)])?
+        let dereference = match context
+            .variables
+            .get(&self.output_var.name)
+            .ok_or_else(|| {
+                vec![anyhow::anyhow!(
+                    "Variable '{}' is not defined in this scope!",
+                    self.output_var.name
+                )]
+            })?
             .scope
         {
             VariableScope::Local => "",

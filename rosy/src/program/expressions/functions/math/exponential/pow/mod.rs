@@ -18,12 +18,15 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
@@ -33,11 +36,11 @@ use std::collections::HashSet;
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::TranspileableExpr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, ValueKind};
-use anyhow::{Result, Error, anyhow};
+use crate::resolve::{BinaryOpKind, ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe, BinaryOpKind};
+use crate::transpile::TranspileableExpr;
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, ValueKind};
+use anyhow::{Error, Result, anyhow};
 
 /// AST node for the power/exponentiation operator (`^`).
 #[derive(Debug, PartialEq)]
@@ -56,30 +59,43 @@ impl TranspileableExpr for PowExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         crate::rosy_lib::operators::pow::get_return_type(
             &self.left.type_of(context)?,
-            &self.right.type_of(context)?
-        ).ok_or(anyhow::anyhow!(
+            &self.right.type_of(context)?,
+        )
+        .ok_or(anyhow::anyhow!(
             "Cannot raise type '{}' to the power of type '{}'!",
             self.left.type_of(context)?,
             self.right.type_of(context)?
         ))
     }
-    fn build_expr_recipe(&self, resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+    fn build_expr_recipe(
+        &self,
+        resolver: &TypeResolver,
+        ctx: &ScopeContext,
+        deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
         let left = resolver.build_expr_recipe(&self.left, ctx, deps);
         let right = resolver.build_expr_recipe(&self.right, ctx, deps);
-        Some(ExprRecipe::BinaryOp { op: BinaryOpKind::Pow, left: Box::new(left), right: Box::new(right) })
+        Some(ExprRecipe::BinaryOp {
+            op: BinaryOpKind::Pow,
+            left: Box::new(left),
+            right: Box::new(right),
+        })
     }
 }
 impl Transpile for PowExpr {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         // First, ensure the types are compatible
-        let left_type = self.left.type_of(context)
-            .map_err(|e| vec!(e))?;
-        let right_type = self.right.type_of(context)
-            .map_err(|e| vec!(e))?;
+        let left_type = self.left.type_of(context).map_err(|e| vec![e])?;
+        let right_type = self.right.type_of(context).map_err(|e| vec![e])?;
         if crate::rosy_lib::operators::pow::get_return_type(&left_type, &right_type).is_none() {
-            return Err(vec!(anyhow!(
-                "Cannot raise type '{}' to the power of type '{}'!", left_type, right_type
-            )));
+            return Err(vec![anyhow!(
+                "Cannot raise type '{}' to the power of type '{}'!",
+                left_type,
+                right_type
+            )]);
         }
 
         // Then, transpile both sides and combine
@@ -93,7 +109,7 @@ impl Transpile for PowExpr {
             Ok(output) => {
                 left_ref = output.as_ref();
                 requested_variables.extend(output.requested_variables);
-            },
+            }
             Err(mut e) => {
                 for err in e.drain(..) {
                     errors.push(err.context("...while transpiling base of exponentiation"));
@@ -106,7 +122,7 @@ impl Transpile for PowExpr {
             Ok(output) => {
                 right_ref = output.as_ref();
                 requested_variables.extend(output.requested_variables);
-            },
+            }
             Err(mut e) => {
                 for err in e.drain(..) {
                     errors.push(err.context("...while transpiling exponent of exponentiation"));

@@ -19,22 +19,27 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
 use crate::program::expressions::Expr;
-use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind};
+use crate::resolve::{BinaryOpKind, ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use anyhow::{Result, Error, Context as AnyhowContext};
-use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe, BinaryOpKind};
+use crate::transpile::{
+    TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
+};
+use anyhow::{Context as AnyhowContext, Error, Result};
 use std::collections::{BTreeSet, HashSet};
 
 /// DA%n = partial derivative w.r.t. variable n (positive n)
@@ -74,9 +79,11 @@ impl Transpile for DeriveExpr {
 }
 impl TranspileableExpr for DeriveExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
-        let object_type = self.object.type_of(context)
+        let object_type = self
+            .object
+            .type_of(context)
             .context("Failed to determine type of object in % (derive) expression")?;
-        
+
         match object_type {
             t if t == RosyType::DA() => Ok(RosyType::DA()),
             t if t == RosyType::CD() => Ok(RosyType::CD()),
@@ -86,9 +93,18 @@ impl TranspileableExpr for DeriveExpr {
             ),
         }
     }
-    fn build_expr_recipe(&self, resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+    fn build_expr_recipe(
+        &self,
+        resolver: &TypeResolver,
+        ctx: &ScopeContext,
+        deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
         let left = resolver.build_expr_recipe(&self.object, ctx, deps);
         let right = resolver.build_expr_recipe(&self.index, ctx, deps);
-        Some(ExprRecipe::BinaryOp { op: BinaryOpKind::Derive, left: Box::new(left), right: Box::new(right) })
+        Some(ExprRecipe::BinaryOp {
+            op: BinaryOpKind::Derive,
+            left: Box::new(left),
+            right: Box::new(right),
+        })
     }
 }

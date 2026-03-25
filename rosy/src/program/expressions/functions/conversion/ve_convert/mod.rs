@@ -18,12 +18,15 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
@@ -31,12 +34,12 @@
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::TranspileableExpr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, ValueKind};
-use anyhow::{Result, Error, Context};
-use std::collections::HashSet;
+use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
+use crate::transpile::TranspileableExpr;
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, ValueKind};
+use anyhow::{Context, Error, Result};
+use std::collections::HashSet;
 
 /// AST node for the `VE(expr)` type conversion function.
 #[derive(Debug, PartialEq)]
@@ -46,46 +49,66 @@ pub struct VeConvertExpr {
 
 impl FromRule for VeConvertExpr {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        anyhow::ensure!(pair.as_rule() == Rule::ve_fn, "Expected ve_fn rule, got {:?}", pair.as_rule());
+        anyhow::ensure!(
+            pair.as_rule() == Rule::ve_fn,
+            "Expected ve_fn rule, got {:?}",
+            pair.as_rule()
+        );
         let mut inner = pair.into_inner();
-        let expr_pair = inner.next()
-            .context("Missing inner expression for `VE`!")?;
-        let expr = Box::new(Expr::from_rule(expr_pair)
-            .context("Failed to build expression for `VE`")?
-            .ok_or_else(|| anyhow::anyhow!("Expected expression for `VE`"))?);
+        let expr_pair = inner.next().context("Missing inner expression for `VE`!")?;
+        let expr = Box::new(
+            Expr::from_rule(expr_pair)
+                .context("Failed to build expression for `VE`")?
+                .ok_or_else(|| anyhow::anyhow!("Expected expression for `VE`"))?,
+        );
         Ok(Some(VeConvertExpr { expr }))
     }
 }
 
 impl TranspileableExpr for VeConvertExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
-        let expr_type = self.expr.type_of(context)
+        let expr_type = self
+            .expr
+            .type_of(context)
             .map_err(|e| e.context("...while determining type of expression for VE conversion"))?;
-        let result_type = crate::rosy_lib::intrinsics::ve_convert::get_return_type(&expr_type)
-            .ok_or(anyhow::anyhow!(
-                "Cannot convert type '{}' to 'VE'!",
-                expr_type
-            ))?;
+        let result_type =
+            crate::rosy_lib::intrinsics::ve_convert::get_return_type(&expr_type).ok_or(
+                anyhow::anyhow!("Cannot convert type '{}' to 'VE'!", expr_type),
+            )?;
         Ok(result_type)
     }
-    fn discover_expr_function_calls(&self, resolver: &mut TypeResolver, ctx: &ScopeContext) -> Option<Result<()>> {
+    fn discover_expr_function_calls(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &ScopeContext,
+    ) -> Option<Result<()>> {
         Some(resolver.discover_expr_function_calls(&self.expr, ctx))
     }
-    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+    fn build_expr_recipe(
+        &self,
+        _resolver: &TypeResolver,
+        _ctx: &ScopeContext,
+        _deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
         Some(ExprRecipe::Literal(RosyType::VE()))
     }
 }
 
 impl Transpile for VeConvertExpr {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         // Verify type compatibility
-        let _ = self.type_of(context)
+        let _ = self
+            .type_of(context)
             .map_err(|e| vec![e.context("...while verifying types of VE conversion expression")])?;
 
-        let inner_output = self.expr.transpile(context)
-            .map_err(|e| e.into_iter().map(|err| {
-                err.context("...while transpiling expression for VE conversion")
-            }).collect::<Vec<Error>>())?;
+        let inner_output = self.expr.transpile(context).map_err(|e| {
+            e.into_iter()
+                .map(|err| err.context("...while transpiling expression for VE conversion"))
+                .collect::<Vec<Error>>()
+        })?;
 
         let serialization = format!(
             "RosyVEConvert::rosy_ve_convert({}).context(\"...while trying to convert to (VE)\")?",

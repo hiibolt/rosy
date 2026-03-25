@@ -17,20 +17,21 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
     ast::*,
     program::expressions::Expr,
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableStatement, add_context_to_all, ValueKind,
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        ValueKind, add_context_to_all,
     },
 };
 
@@ -53,22 +54,30 @@ impl FromRule for MblockStatement {
 
         let mut inner = pair.into_inner();
 
-        let matrix_pair = inner.next().context("Missing matrix parameter in MBLOCK!")?;
+        let matrix_pair = inner
+            .next()
+            .context("Missing matrix parameter in MBLOCK!")?;
         let matrix_expr = Expr::from_rule(matrix_pair)
             .context("Failed to build matrix expression in MBLOCK")?
             .ok_or_else(|| anyhow::anyhow!("Expected matrix expression in MBLOCK"))?;
 
-        let transform_pair = inner.next().context("Missing transform parameter in MBLOCK!")?;
+        let transform_pair = inner
+            .next()
+            .context("Missing transform parameter in MBLOCK!")?;
         let transform_expr = Expr::from_rule(transform_pair)
             .context("Failed to build transform expression in MBLOCK")?
             .ok_or_else(|| anyhow::anyhow!("Expected transform expression in MBLOCK"))?;
 
-        let inverse_pair = inner.next().context("Missing inverse parameter in MBLOCK!")?;
+        let inverse_pair = inner
+            .next()
+            .context("Missing inverse parameter in MBLOCK!")?;
         let inverse_expr = Expr::from_rule(inverse_pair)
             .context("Failed to build inverse expression in MBLOCK")?
             .ok_or_else(|| anyhow::anyhow!("Expected inverse expression in MBLOCK"))?;
 
-        let alloc_dim_pair = inner.next().context("Missing alloc_dim parameter in MBLOCK!")?;
+        let alloc_dim_pair = inner
+            .next()
+            .context("Missing alloc_dim parameter in MBLOCK!")?;
         let alloc_dim_expr = Expr::from_rule(alloc_dim_pair)
             .context("Failed to build alloc_dim expression in MBLOCK")?
             .ok_or_else(|| anyhow::anyhow!("Expected alloc_dim expression in MBLOCK"))?;
@@ -91,26 +100,35 @@ impl FromRule for MblockStatement {
 impl TranspileableStatement for MblockStatement {}
 
 impl Transpile for MblockStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
 
-        let matrix_output = self.matrix_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling matrix in MBLOCK".to_string()))?;
+        let matrix_output = self.matrix_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling matrix in MBLOCK".to_string())
+        })?;
         requested_variables.extend(matrix_output.requested_variables.iter().cloned());
 
-        let transform_output = self.transform_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling transform in MBLOCK".to_string()))?;
+        let transform_output = self.transform_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling transform in MBLOCK".to_string())
+        })?;
         requested_variables.extend(transform_output.requested_variables.clone());
 
-        let inverse_output = self.inverse_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling inverse in MBLOCK".to_string()))?;
+        let inverse_output = self.inverse_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling inverse in MBLOCK".to_string())
+        })?;
         requested_variables.extend(inverse_output.requested_variables.clone());
 
-        let alloc_dim_output = self.alloc_dim_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling alloc_dim in MBLOCK".to_string()))?;
+        let alloc_dim_output = self.alloc_dim_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling alloc_dim in MBLOCK".to_string())
+        })?;
         requested_variables.extend(alloc_dim_output.requested_variables.iter().cloned());
 
-        let n_output = self.n_expr.transpile(context)
+        let n_output = self
+            .n_expr
+            .transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling n in MBLOCK".to_string()))?;
         requested_variables.extend(n_output.requested_variables.iter().cloned());
 
@@ -124,8 +142,16 @@ impl Transpile for MblockStatement {
             }
         }
 
-        let transform_assign = make_lvalue(&transform_output.serialization, transform_output.value_kind, "rosy_mblock_t");
-        let inverse_assign = make_lvalue(&inverse_output.serialization, inverse_output.value_kind, "rosy_mblock_ti");
+        let transform_assign = make_lvalue(
+            &transform_output.serialization,
+            transform_output.value_kind,
+            "rosy_mblock_t",
+        );
+        let inverse_assign = make_lvalue(
+            &inverse_output.serialization,
+            inverse_output.value_kind,
+            "rosy_mblock_ti",
+        );
 
         let serialization = format!(
             "{{ let (rosy_mblock_t, rosy_mblock_ti) = rosy_lib::core::mblock::rosy_mblock({matrix}, {n} as usize, {alloc_dim} as usize)?; {transform_assign}; {inverse_assign}; }}",

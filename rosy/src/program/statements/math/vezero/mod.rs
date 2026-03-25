@@ -17,26 +17,29 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
     ast::*,
     program::expressions::{Expr, core::variable_identifier::VariableIdentifier},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableStatement, add_context_to_all,
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        add_context_to_all,
     },
 };
 
@@ -57,44 +60,58 @@ impl FromRule for VezeroStatement {
 
         let mut inner = pair.into_inner();
 
-        let array_pair = inner.next()
-            .context("Missing array variable in VEZERO!")?;
+        let array_pair = inner.next().context("Missing array variable in VEZERO!")?;
         let array_ident = VariableIdentifier::from_rule(array_pair)
             .context("Failed to build array variable identifier in VEZERO")?
             .ok_or_else(|| anyhow::anyhow!("Expected array variable identifier in VEZERO"))?;
 
-        let num_pair = inner.next()
+        let num_pair = inner
+            .next()
             .context("Missing num_elements expression in VEZERO!")?;
         let num_elements_expr = Expr::from_rule(num_pair)
             .context("Failed to build num_elements expression in VEZERO")?
             .ok_or_else(|| anyhow::anyhow!("Expected num_elements expression in VEZERO"))?;
 
-        let threshold_pair = inner.next()
+        let threshold_pair = inner
+            .next()
             .context("Missing threshold expression in VEZERO!")?;
         let threshold_expr = Expr::from_rule(threshold_pair)
             .context("Failed to build threshold expression in VEZERO")?
             .ok_or_else(|| anyhow::anyhow!("Expected threshold expression in VEZERO"))?;
 
-        Ok(Some(VezeroStatement { array_ident, num_elements_expr, threshold_expr }))
+        Ok(Some(VezeroStatement {
+            array_ident,
+            num_elements_expr,
+            threshold_expr,
+        }))
     }
 }
 
 impl TranspileableStatement for VezeroStatement {}
 
 impl Transpile for VezeroStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
 
-        let array_output = self.array_ident.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling array variable in VEZERO".to_string()))?;
+        let array_output = self.array_ident.transpile(context).map_err(|e| {
+            add_context_to_all(
+                e,
+                "...while transpiling array variable in VEZERO".to_string(),
+            )
+        })?;
         requested_variables.extend(array_output.requested_variables.clone());
 
-        let num_output = self.num_elements_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling num_elements in VEZERO".to_string()))?;
+        let num_output = self.num_elements_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling num_elements in VEZERO".to_string())
+        })?;
         requested_variables.extend(num_output.requested_variables.iter().cloned());
 
-        let threshold_output = self.threshold_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling threshold in VEZERO".to_string()))?;
+        let threshold_output = self.threshold_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling threshold in VEZERO".to_string())
+        })?;
         requested_variables.extend(threshold_output.requested_variables.iter().cloned());
 
         let array_name = array_output.serialization;

@@ -37,12 +37,15 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
@@ -52,11 +55,11 @@ use std::collections::{BTreeSet, HashSet};
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::TranspileableExpr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, ValueKind};
-use anyhow::{Result, Error, anyhow};
+use crate::resolve::{BinaryOpKind, ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe, BinaryOpKind};
+use crate::transpile::TranspileableExpr;
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, ValueKind};
+use anyhow::{Error, Result, anyhow};
 
 /// AST node for the binary addition operator (`+`).
 ///
@@ -74,37 +77,57 @@ impl FromRule for AddExpr {
     }
 }
 impl TranspileableExpr for AddExpr {
-    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
+    fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         crate::rosy_lib::operators::add::get_return_type(
             &self.left.type_of(context)?,
-            &self.right.type_of(context)?
-        ).ok_or(anyhow::anyhow!(
+            &self.right.type_of(context)?,
+        )
+        .ok_or(anyhow::anyhow!(
             "Cannot add types '{}' and '{}' together!",
             self.left.type_of(context)?,
             self.right.type_of(context)?
         ))
     }
-    fn discover_expr_function_calls(&self, resolver: &mut TypeResolver, ctx: &ScopeContext) -> Option<Result<()>> {
-        Some(resolver.discover_expr_function_calls(&self.left, ctx)
-            .and_then(|_| resolver.discover_expr_function_calls(&self.right, ctx)))
+    fn discover_expr_function_calls(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &ScopeContext,
+    ) -> Option<Result<()>> {
+        Some(
+            resolver
+                .discover_expr_function_calls(&self.left, ctx)
+                .and_then(|_| resolver.discover_expr_function_calls(&self.right, ctx)),
+        )
     }
-    fn build_expr_recipe(&self, resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+    fn build_expr_recipe(
+        &self,
+        resolver: &TypeResolver,
+        ctx: &ScopeContext,
+        deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
         let left = resolver.build_expr_recipe(&self.left, ctx, deps);
         let right = resolver.build_expr_recipe(&self.right, ctx, deps);
-        Some(ExprRecipe::BinaryOp { op: BinaryOpKind::Add, left: Box::new(left), right: Box::new(right) })
+        Some(ExprRecipe::BinaryOp {
+            op: BinaryOpKind::Add,
+            left: Box::new(left),
+            right: Box::new(right),
+        })
     }
 }
 impl Transpile for AddExpr {
-    fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         // First, ensure the types are compatible
-        let left_type = self.left.type_of(context)
-            .map_err(|e| vec!(e))?;
-        let right_type = self.right.type_of(context)
-            .map_err(|e| vec!(e))?;
+        let left_type = self.left.type_of(context).map_err(|e| vec![e])?;
+        let right_type = self.right.type_of(context).map_err(|e| vec![e])?;
         if crate::rosy_lib::operators::add::get_return_type(&left_type, &right_type).is_none() {
-            return Err(vec!(anyhow!(
-                "Cannot add types '{}' and '{}' together!", left_type, right_type
-            )));
+            return Err(vec![anyhow!(
+                "Cannot add types '{}' and '{}' together!",
+                left_type,
+                right_type
+            )]);
         }
 
         // Then, transpile both sides and combine
@@ -138,11 +161,25 @@ impl Transpile for AddExpr {
         // Direct emission for infallible scalar types
         use crate::rosy_lib::RosyBaseType;
         let serialization = match (&left_type.base_type, &right_type.base_type) {
-            (RosyBaseType::RE, RosyBaseType::RE) if left_type.dimensions == 0 && right_type.dimensions == 0
-                => format!("({} + {})", left_output.as_value(), right_output.as_value()),
-            (RosyBaseType::LO, RosyBaseType::LO) if left_type.dimensions == 0 && right_type.dimensions == 0
-                => format!("({} || {})", left_output.as_value(), right_output.as_value()),
-            _ => format!("RosyAdd::rosy_add({}, {})?", left_output.as_ref(), right_output.as_ref()),
+            (RosyBaseType::RE, RosyBaseType::RE)
+                if left_type.dimensions == 0 && right_type.dimensions == 0 =>
+            {
+                format!("({} + {})", left_output.as_value(), right_output.as_value())
+            }
+            (RosyBaseType::LO, RosyBaseType::LO)
+                if left_type.dimensions == 0 && right_type.dimensions == 0 =>
+            {
+                format!(
+                    "({} || {})",
+                    left_output.as_value(),
+                    right_output.as_value()
+                )
+            }
+            _ => format!(
+                "RosyAdd::rosy_add({}, {})?",
+                left_output.as_ref(),
+                right_output.as_ref()
+            ),
         };
 
         if errors.is_empty() {

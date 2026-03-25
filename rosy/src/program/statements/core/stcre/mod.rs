@@ -14,26 +14,29 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
     ast::*,
     program::expressions::{Expr, core::variable_identifier::VariableIdentifier},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableStatement, VariableScope, add_context_to_all,
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        VariableScope, add_context_to_all,
     },
 };
 
@@ -53,38 +56,59 @@ impl FromRule for StcreStatement {
 
         let mut inner = pair.into_inner();
 
-        let string_pair = inner.next()
+        let string_pair = inner
+            .next()
             .context("Missing string expression in STCRE!")?;
         let string_expr = Expr::from_rule(string_pair)
             .context("Failed to build string expression in STCRE")?
             .ok_or_else(|| anyhow::anyhow!("Expected string expression in STCRE"))?;
 
-        let output_pair = inner.next()
-            .context("Missing output variable in STCRE!")?;
+        let output_pair = inner.next().context("Missing output variable in STCRE!")?;
         let output_var = VariableIdentifier::from_rule(output_pair)
             .context("Failed to build output variable identifier in STCRE")?
             .ok_or_else(|| anyhow::anyhow!("Expected output variable identifier in STCRE"))?;
 
-        Ok(Some(StcreStatement { string_expr, output_var }))
+        Ok(Some(StcreStatement {
+            string_expr,
+            output_var,
+        }))
     }
 }
 
 impl TranspileableStatement for StcreStatement {}
 
 impl Transpile for StcreStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
 
-        let string_output = self.string_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling string expression in STCRE".to_string()))?;
+        let string_output = self.string_expr.transpile(context).map_err(|e| {
+            add_context_to_all(
+                e,
+                "...while transpiling string expression in STCRE".to_string(),
+            )
+        })?;
         requested_variables.extend(string_output.requested_variables.iter().cloned());
 
-        let output_id_output = self.output_var.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling output variable in STCRE".to_string()))?;
+        let output_id_output = self.output_var.transpile(context).map_err(|e| {
+            add_context_to_all(
+                e,
+                "...while transpiling output variable in STCRE".to_string(),
+            )
+        })?;
         requested_variables.extend(output_id_output.requested_variables.clone());
 
-        let dereference = match context.variables.get(&self.output_var.name)
-            .ok_or_else(|| vec![anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.output_var.name)])?
+        let dereference = match context
+            .variables
+            .get(&self.output_var.name)
+            .ok_or_else(|| {
+                vec![anyhow::anyhow!(
+                    "Variable '{}' is not defined in this scope!",
+                    self.output_var.name
+                )]
+            })?
             .scope
         {
             VariableScope::Local => "",

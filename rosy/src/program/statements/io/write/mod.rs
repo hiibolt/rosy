@@ -14,22 +14,36 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
-    ast::*, program::{expressions::{Expr, functions::conversion::string_convert::string_convert_transpile_helper}, statements::SourceLocation}, resolve::{ScopeContext, TypeResolver}, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement, add_context_to_all}
+    ast::*,
+    program::{
+        expressions::{
+            Expr, functions::conversion::string_convert::string_convert_transpile_helper,
+        },
+        statements::SourceLocation,
+    },
+    resolve::{ScopeContext, TypeResolver},
+    transpile::{
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        add_context_to_all,
+    },
 };
 
 /// AST node for the `WRITE unit expr+;` statement.
@@ -41,12 +55,16 @@ pub struct WriteStatement {
 
 impl FromRule for WriteStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::write, 
-            "Expected `write` rule when building write statement, found: {:?}", pair.as_rule());
-        
+        ensure!(
+            pair.as_rule() == Rule::write,
+            "Expected `write` rule when building write statement, found: {:?}",
+            pair.as_rule()
+        );
+
         let mut inner = pair.into_inner();
 
-        let unit = inner.next()
+        let unit = inner
+            .next()
             .context("Missing first token `unit`!")?
             .as_str()
             .parse::<u8>()
@@ -75,12 +93,14 @@ impl TranspileableStatement for WriteStatement {
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
-        _source_location: SourceLocation
+        _source_location: SourceLocation,
     ) -> Option<Result<()>> {
         // Discover function call sites within all write expressions
         for expr in &self.exprs {
             if let Err(e) = resolver.discover_expr_function_calls(expr, ctx) {
-                return Some(Err(e.context("...while discovering function call dependencies in WRITE statement")));
+                return Some(Err(e.context(
+                    "...while discovering function call dependencies in WRITE statement",
+                )));
             }
         }
 
@@ -88,7 +108,10 @@ impl TranspileableStatement for WriteStatement {
     }
 }
 impl Transpile for WriteStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut serialized_exprs = Vec::new();
         let mut requested_variables = BTreeSet::new();
         for expr in &self.exprs {
@@ -96,12 +119,15 @@ impl Transpile for WriteStatement {
                 serialization: serialized_expr,
                 requested_variables: expr_requested_variables,
                 ..
-            } = string_convert_transpile_helper(expr, context)
-                .map_err(|err_vec| {
-                    add_context_to_all(err_vec, format!(
-                        "...while transpiling expression '{:?}' for WRITE statement", expr
-                    ))
-                })?;
+            } = string_convert_transpile_helper(expr, context).map_err(|err_vec| {
+                add_context_to_all(
+                    err_vec,
+                    format!(
+                        "...while transpiling expression '{:?}' for WRITE statement",
+                        expr
+                    ),
+                )
+            })?;
 
             serialized_exprs.push(serialized_expr);
             requested_variables.extend(expr_requested_variables);
@@ -113,7 +139,11 @@ impl Transpile for WriteStatement {
                 // Write to stdout
                 let serialization = format!(
                     "println!(\"{}\", {});",
-                    serialized_exprs.iter().map(|_| "{}").collect::<Vec<&str>>().join(""),
+                    serialized_exprs
+                        .iter()
+                        .map(|_| "{}")
+                        .collect::<Vec<&str>>()
+                        .join(""),
                     serialized_exprs.join(", ")
                 );
                 Ok(TranspilationOutput {
@@ -121,15 +151,14 @@ impl Transpile for WriteStatement {
                     requested_variables,
                     ..Default::default()
                 })
-            },
+            }
             unit => {
                 // Write to file unit
                 let mut stmts = Vec::new();
                 for expr_ser in &serialized_exprs {
                     stmts.push(format!(
                         "rosy_lib::core::file_io::rosy_write_to_unit({}, &format!(\"{{}}\", {}))?;",
-                        unit,
-                        expr_ser
+                        unit, expr_ser
                     ));
                 }
                 Ok(TranspilationOutput {
@@ -137,7 +166,7 @@ impl Transpile for WriteStatement {
                     requested_variables,
                     ..Default::default()
                 })
-            },
+            }
         }
     }
 }

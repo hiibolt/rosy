@@ -28,28 +28,33 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
-use crate::ast::{FromRule, Rule};
 use super::variable_identifier::VariableIdentifier;
-use crate::transpile::TranspileableExpr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, VariableScope, ValueKind};
-use anyhow::{Result, Context, Error, anyhow};
-use crate::rosy_lib::RosyType;
+use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
+use crate::rosy_lib::RosyType;
+use crate::transpile::TranspileableExpr;
+use crate::transpile::{
+    TranspilationInputContext, TranspilationOutput, Transpile, ValueKind, VariableScope,
+};
+use anyhow::{Context, Error, Result, anyhow};
 use std::collections::BTreeSet;
 use std::collections::HashSet;
 
-use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
+use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 
 /// What a `variable_identifier` AST node actually represents,
 /// determined at transpile time via the decision tree.
@@ -92,7 +97,8 @@ impl VarExpr {
                     // But must not also have bracket indices
                     if has_brackets {
                         return Err(vec![anyhow::anyhow!(
-                            "'{}': function call with bracket indexing is not valid", ident.name
+                            "'{}': function call with bracket indexing is not valid",
+                            ident.name
                         )]);
                     }
                     Ok(VarExprKind::FunctionCall)
@@ -106,7 +112,8 @@ impl VarExpr {
                         (false, true) => {
                             if has_brackets {
                                 return Err(vec![anyhow::anyhow!(
-                                    "'{}': function call with bracket indexing is not valid", ident.name
+                                    "'{}': function call with bracket indexing is not valid",
+                                    ident.name
                                 )]);
                             }
                             Ok(VarExprKind::FunctionCall)
@@ -124,17 +131,17 @@ impl VarExpr {
                                 // Variable is a scalar — can't index, must be a function call
                                 if has_brackets {
                                     return Err(vec![anyhow::anyhow!(
-                                        "'{}': function call with bracket indexing is not valid", ident.name
+                                        "'{}': function call with bracket indexing is not valid",
+                                        ident.name
                                     )]);
                                 }
                                 Ok(VarExprKind::FunctionCall)
                             }
                         }
-                        (false, false) => {
-                            Err(vec![anyhow::anyhow!(
-                                "'{}' is neither a defined variable nor a defined function in this scope!", ident.name
-                            )])
-                        }
+                        (false, false) => Err(vec![anyhow::anyhow!(
+                            "'{}' is neither a defined variable nor a defined function in this scope!",
+                            ident.name
+                        )]),
                     }
                 }
             }
@@ -145,7 +152,9 @@ impl VarExpr {
                     if group.len() != 1 {
                         return Err(vec![anyhow::anyhow!(
                             "'{}': paren group {} has {} args — multi-dimensional indexing requires exactly 1 arg per group",
-                            ident.name, i + 1, group.len()
+                            ident.name,
+                            i + 1,
+                            group.len()
                         )]);
                     }
                 }
@@ -157,7 +166,11 @@ impl VarExpr {
 
 impl FromRule for VarExpr {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        anyhow::ensure!(pair.as_rule() == Rule::variable_identifier, "Expected variable_identifier rule, got {:?}", pair.as_rule());
+        anyhow::ensure!(
+            pair.as_rule() == Rule::variable_identifier,
+            "Expected variable_identifier rule, got {:?}",
+            pair.as_rule()
+        );
         let identifier = VariableIdentifier::from_rule(pair)
             .context("Failed to build variable identifier!")?
             .ok_or_else(|| anyhow::anyhow!("Expected variable identifier"))?;
@@ -165,24 +178,33 @@ impl FromRule for VarExpr {
     }
 }
 impl TranspileableExpr for VarExpr {
-    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
+    fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         match self.classify(context).map_err(|errs| {
-            errs.into_iter().next().unwrap_or_else(|| anyhow::anyhow!("Unknown classification error"))
+            errs.into_iter()
+                .next()
+                .unwrap_or_else(|| anyhow::anyhow!("Unknown classification error"))
         })? {
             VarExprKind::FunctionCall => {
-                let func_ctx = context.functions.get(&self.identifier.name)
-                    .ok_or_else(|| anyhow::anyhow!("Function '{}' not found", self.identifier.name))?;
+                let func_ctx = context
+                    .functions
+                    .get(&self.identifier.name)
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Function '{}' not found", self.identifier.name)
+                    })?;
                 Ok(func_ctx.return_type.clone())
             }
-            VarExprKind::Variable => {
-                self.identifier.type_of(context)
-                    .context(format!(
-                        "...while determining type of variable identifier '{}'", self.identifier.name
-                    ))
-            }
+            VarExprKind::Variable => self.identifier.type_of(context).context(format!(
+                "...while determining type of variable identifier '{}'",
+                self.identifier.name
+            )),
         }
     }
-    fn build_expr_recipe(&self, _resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+    fn build_expr_recipe(
+        &self,
+        _resolver: &TypeResolver,
+        ctx: &ScopeContext,
+        deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
         let ident = &self.identifier;
         if let Some(slot) = ctx.variables.get(&ident.name) {
             deps.insert(slot.clone());
@@ -198,38 +220,51 @@ impl TranspileableExpr for VarExpr {
     }
 }
 impl Transpile for VarExpr {
-    fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         match self.classify(context)? {
             VarExprKind::FunctionCall => {
                 // Delegate to function call helper — args are the single paren group
                 function_call_transpile_helper(
                     &self.identifier.name,
                     &self.identifier.paren_groups[0],
-                    context
+                    context,
                 )
             }
             VarExprKind::Variable => {
-                let ident_output = self.identifier.transpile(context)
-                    .map_err(|e| e.into_iter().map(|err| {
-                        err.context(format!(
-                            "...while transpiling variable identifier '{}'", self.identifier.name
-                        ))
-                    }).collect::<Vec<Error>>())?;
+                let ident_output = self.identifier.transpile(context).map_err(|e| {
+                    e.into_iter()
+                        .map(|err| {
+                            err.context(format!(
+                                "...while transpiling variable identifier '{}'",
+                                self.identifier.name
+                            ))
+                        })
+                        .collect::<Vec<Error>>()
+                })?;
 
-                let var_data = context.variables.get(&self.identifier.name)
-                    .ok_or(vec!(anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.identifier.name)))?;
+                let var_data =
+                    context
+                        .variables
+                        .get(&self.identifier.name)
+                        .ok_or(vec![anyhow::anyhow!(
+                            "Variable '{}' is not defined in this scope!",
+                            self.identifier.name
+                        )])?;
                 let var_type = var_data.data.r#type.clone();
 
                 let (reference, value_kind) = match var_data.scope {
                     VariableScope::Local => {
                         if var_type.is_copy() {
-                            ("", ValueKind::Owned)   // Copy local: just `X`, value is copied
+                            ("", ValueKind::Owned) // Copy local: just `X`, value is copied
                         } else {
-                            ("&", ValueKind::Ref)    // non-Copy local: `&X`, reference
+                            ("&", ValueKind::Ref) // non-Copy local: `&X`, reference
                         }
-                    },
-                    VariableScope::Arg => ("", ValueKind::Ref),    // already a reference
-                    VariableScope::Higher => ("", ValueKind::Ref),  // already a reference
+                    }
+                    VariableScope::Arg => ("", ValueKind::Ref), // already a reference
+                    VariableScope::Higher => ("", ValueKind::Ref), // already a reference
                 };
                 Ok(TranspilationOutput {
                     serialization: format!("{}{}", reference, ident_output.serialization),
@@ -241,39 +276,47 @@ impl Transpile for VarExpr {
     }
 }
 
-pub fn function_call_transpile_helper (
+pub fn function_call_transpile_helper(
     name: &String,
     args: &Vec<Expr>,
-    context: &mut TranspilationInputContext
+    context: &mut TranspilationInputContext,
 ) -> Result<TranspilationOutput, Vec<Error>> {
     // Start by checking that the function exists
     let func_context = match context.functions.get(name) {
         Some(ctx) => ctx,
-        None => return Err(vec!(anyhow!("Function '{}' is not defined in this scope, can't transpile function call!", name)))
-    }.clone();
+        None => {
+            return Err(vec![anyhow!(
+                "Function '{}' is not defined in this scope, can't transpile function call!",
+                name
+            )]);
+        }
+    }
+    .clone();
 
     // Check that the number of arguments is correct
     if func_context.args.len() != args.len() {
-        return Err(vec!(anyhow!(
+        return Err(vec![anyhow!(
             "Function '{}' expects {} arguments, but {} were provided!",
-            name, func_context.args.len(), args.len()
-        )));
+            name,
+            func_context.args.len(),
+            args.len()
+        )]);
     }
     let mut errors = Vec::new();
     let mut requested_variables = BTreeSet::new();
     let mut serialized_args = Vec::new();
     // Serialize the requested variables from the function context
     for var in &func_context.requested_variables {
-        let var_data = context.variables.get(var)
-            .ok_or(vec!(anyhow!(
-                "Could not find variable '{}' requested by function '{}'",
-                var, name
-            )))?;
-        
+        let var_data = context.variables.get(var).ok_or(vec![anyhow!(
+            "Could not find variable '{}' requested by function '{}'",
+            var,
+            name
+        )])?;
+
         let serialized_arg = match var_data.scope {
             VariableScope::Higher => format!("{}", var),
             VariableScope::Arg => format!("{}", var),
-            VariableScope::Local => format!("&mut {}", var)
+            VariableScope::Local => format!("&mut {}", var),
         };
         serialized_args.push(serialized_arg);
     }
@@ -283,15 +326,16 @@ pub fn function_call_transpile_helper (
         match arg_expr.transpile(context) {
             Ok(arg_output) => {
                 // Check the type is correct
-                let provided_type = arg_expr.type_of(context)
-                    .map_err(|e| vec!(e))?;
+                let provided_type = arg_expr.type_of(context).map_err(|e| vec![e])?;
                 let expected_type = func_context
                     .args
                     .get(i)
-                    .ok_or(vec!(anyhow!(
+                    .ok_or(vec![anyhow!(
                         "Function '{}' expects {} arguments, but {} were provided!",
-                        name, func_context.args.len(), args.len()
-                    )))?
+                        name,
+                        func_context.args.len(),
+                        args.len()
+                    )])?
                     .r#type
                     .clone();
                 if provided_type != expected_type {
@@ -305,11 +349,13 @@ pub fn function_call_transpile_helper (
                     serialized_args.push(arg_output.as_ref());
                     requested_variables.extend(arg_output.requested_variables);
                 }
-            },
+            }
             Err(arg_errors) => {
                 for e in arg_errors {
                     errors.push(e.context(format!(
-                        "...while transpiling argument {} for function '{}'", i+1, name
+                        "...while transpiling argument {} for function '{}'",
+                        i + 1,
+                        name
                     )));
                 }
             }
@@ -322,7 +368,9 @@ pub fn function_call_transpile_helper (
     let rust_fn_name = format!("__fn_{}", name);
     let serialization = format!(
         "({}({})? as {})",
-        rust_fn_name, serialized_args.join(", "), func_context.return_type.as_rust_type()
+        rust_fn_name,
+        serialized_args.join(", "),
+        func_context.return_type.as_rust_type()
     );
     if errors.is_empty() {
         Ok(TranspilationOutput {

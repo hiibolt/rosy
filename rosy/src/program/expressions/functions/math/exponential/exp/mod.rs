@@ -20,12 +20,15 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
@@ -33,10 +36,12 @@
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind};
+use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
-use anyhow::{Result, Error, Context as AnyhowContext};
+use crate::transpile::{
+    TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
+};
+use anyhow::{Context as AnyhowContext, Error, Result};
 use std::collections::HashSet;
 
 /// AST node for the `EXP(expr)` intrinsic function (exponential e^x).
@@ -47,13 +52,20 @@ pub struct ExpExpr {
 
 impl FromRule for ExpExpr {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        anyhow::ensure!(pair.as_rule() == Rule::exp_fn, "Expected exp_fn rule, got {:?}", pair.as_rule());
+        anyhow::ensure!(
+            pair.as_rule() == Rule::exp_fn,
+            "Expected exp_fn rule, got {:?}",
+            pair.as_rule()
+        );
         let mut inner = pair.into_inner();
-        let expr_pair = inner.next()
+        let expr_pair = inner
+            .next()
             .context("Missing inner expression for `EXP`!")?;
-        let expr = Box::new(Expr::from_rule(expr_pair)
-            .context("Failed to build expression for `EXP`")?
-            .ok_or_else(|| anyhow::anyhow!("Expected expression for `EXP`"))?);
+        let expr = Box::new(
+            Expr::from_rule(expr_pair)
+                .context("Failed to build expression for `EXP`")?
+                .ok_or_else(|| anyhow::anyhow!("Expected expression for `EXP`"))?,
+        );
         Ok(Some(ExpExpr { expr }))
     }
 }
@@ -84,19 +96,21 @@ impl Transpile for ExpExpr {
 impl TranspileableExpr for ExpExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         use crate::rosy_lib::intrinsics::exp;
-        
-        let inner_type = self.expr.type_of(context)
+
+        let inner_type = self
+            .expr
+            .type_of(context)
             .context("Failed to determine type of inner expression in EXP")?;
-        
+
         exp::get_return_type(&inner_type)
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "EXP not supported for type: {:?}",
-                    inner_type
-                )
-            })
+            .ok_or_else(|| anyhow::anyhow!("EXP not supported for type: {:?}", inner_type))
     }
-    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+    fn build_expr_recipe(
+        &self,
+        _resolver: &TypeResolver,
+        _ctx: &ScopeContext,
+        _deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
         None
     }
 }

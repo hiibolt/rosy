@@ -14,21 +14,29 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
-use anyhow::{Result, Context, Error, ensure};
+use anyhow::{Context, Error, Result, ensure};
 
 use crate::{
-    ast::*, program::expressions::Expr, syntax_config, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement}
+    ast::*,
+    program::expressions::Expr,
+    syntax_config,
+    transpile::{
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+    },
 };
 
 /// AST node for the `OV order nvars;` DA initialization statement.
@@ -40,38 +48,49 @@ pub struct DAInitStatement {
 
 impl FromRule for DAInitStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::daini, 
-            "Expected `daini` rule when building DA init, found: {:?}", pair.as_rule());
-        
+        ensure!(
+            pair.as_rule() == Rule::daini,
+            "Expected `daini` rule when building DA init, found: {:?}",
+            pair.as_rule()
+        );
+
         let mut inner = pair.into_inner();
-        
+
         // Parse the first expression (order)
-        let order_pair = inner.next()
+        let order_pair = inner
+            .next()
             .context("Missing order parameter in DAINI statement!")?;
         let order_expr = Expr::from_rule(order_pair)
             .context("Failed to build order expression in DAINI statement!")?
             .ok_or_else(|| anyhow::anyhow!("Expected expression for order in DAINI statement"))?;
-        
+
         // Parse the second expression (number of variables)
-        let num_vars_pair = inner.next()
+        let num_vars_pair = inner
+            .next()
             .context("Missing number of variables parameter in DAINI statement!")?;
         let num_vars_expr = Expr::from_rule(num_vars_pair)
             .context("Failed to build number of variables expression in DAINI statement!")?
-            .ok_or_else(|| anyhow::anyhow!("Expected expression for number of variables in DAINI statement"))?;
-        
+            .ok_or_else(|| {
+                anyhow::anyhow!("Expected expression for number of variables in DAINI statement")
+            })?;
+
         // Parse optional 3rd and 4th arguments (COSY compatibility - ignored)
         if let Some(third_pair) = inner.next().filter(|p| p.as_rule() == Rule::expr) {
             let _third_expr = Expr::from_rule(third_pair)
                 .context("Failed to build 3rd expression in DAINI statement!")?;
             if !syntax_config::is_cosy_syntax() {
-                eprintln!("[rosy] Note: DAINI 3rd argument (output unit) ignored — Rosy handles this automatically~");
+                eprintln!(
+                    "[rosy] Note: DAINI 3rd argument (output unit) ignored — Rosy handles this automatically~"
+                );
             }
-            
+
             if let Some(fourth_pair) = inner.next().filter(|p| p.as_rule() == Rule::expr) {
                 let _fourth_expr = Expr::from_rule(fourth_pair)
                     .context("Failed to build 4th expression in DAINI statement!")?;
                 if !syntax_config::is_cosy_syntax() {
-                    eprintln!("[rosy] Note: DAINI 4th argument (num monomials out) ignored — Rosy handles this automatically~");
+                    eprintln!(
+                        "[rosy] Note: DAINI 4th argument (num monomials out) ignored — Rosy handles this automatically~"
+                    );
                 }
             } else if syntax_config::is_cosy_syntax() {
                 anyhow::bail!(
@@ -87,7 +106,7 @@ impl FromRule for DAInitStatement {
                  Hint: If you intended to use Rosy syntax, remove the `--cosy-syntax` flag."
             );
         }
-        
+
         Ok(Some(DAInitStatement {
             order: order_expr,
             number_of_variables: num_vars_expr,
@@ -96,32 +115,38 @@ impl FromRule for DAInitStatement {
 }
 impl TranspileableStatement for DAInitStatement {}
 impl Transpile for DAInitStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         // Transpile the order expression
-        let order_output = self.order.transpile(context)
-            .map_err(|errs| {
-                errs.into_iter()
-                    .map(|e| e.context("...while transpiling order expression in DAINI"))
-                    .collect::<Vec<_>>()
-            })?;
-        
+        let order_output = self.order.transpile(context).map_err(|errs| {
+            errs.into_iter()
+                .map(|e| e.context("...while transpiling order expression in DAINI"))
+                .collect::<Vec<_>>()
+        })?;
+
         // Transpile the number of variables expression
-        let num_vars_output = self.number_of_variables.transpile(context)
+        let num_vars_output = self
+            .number_of_variables
+            .transpile(context)
             .map_err(|errs| {
                 errs.into_iter()
-                    .map(|e| e.context("...while transpiling number of variables expression in DAINI"))
+                    .map(|e| {
+                        e.context("...while transpiling number of variables expression in DAINI")
+                    })
                     .collect::<Vec<_>>()
             })?;
-        
+
         let serialization = format!(
             "taylor::cleanup_taylor();\n\t\ttaylor::init_taylor({} as u32, {} as usize)?;",
             order_output.as_value(),
             num_vars_output.as_value()
         );
-        
+
         let mut requested_variables = order_output.requested_variables;
         requested_variables.extend(num_vars_output.requested_variables);
-        
+
         Ok(TranspilationOutput {
             serialization,
             requested_variables,

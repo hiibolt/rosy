@@ -20,17 +20,22 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
-    ast::*, program::expressions::Expr,
-    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement, add_context_to_all}
+    ast::*,
+    program::expressions::Expr,
+    transpile::{
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        add_context_to_all,
+    },
 };
 
 /// AST node for `DATRN input scales shifts m1 m2 output;`.
@@ -46,43 +51,40 @@ pub struct DatrnStatement {
 
 impl FromRule for DatrnStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::datrn,
-            "Expected `datrn` rule when building DATRN statement, found: {:?}", pair.as_rule());
+        ensure!(
+            pair.as_rule() == Rule::datrn,
+            "Expected `datrn` rule when building DATRN statement, found: {:?}",
+            pair.as_rule()
+        );
 
         let mut inner = pair.into_inner();
 
-        let input_pair = inner.next()
-            .context("Missing input parameter in DATRN!")?;
+        let input_pair = inner.next().context("Missing input parameter in DATRN!")?;
         let input_expr = Expr::from_rule(input_pair)
             .context("Failed to build input expression in DATRN")?
             .ok_or_else(|| anyhow::anyhow!("Expected input expression in DATRN"))?;
 
-        let scales_pair = inner.next()
-            .context("Missing scales parameter in DATRN!")?;
+        let scales_pair = inner.next().context("Missing scales parameter in DATRN!")?;
         let scales_expr = Expr::from_rule(scales_pair)
             .context("Failed to build scales expression in DATRN")?
             .ok_or_else(|| anyhow::anyhow!("Expected scales expression in DATRN"))?;
 
-        let shifts_pair = inner.next()
-            .context("Missing shifts parameter in DATRN!")?;
+        let shifts_pair = inner.next().context("Missing shifts parameter in DATRN!")?;
         let shifts_expr = Expr::from_rule(shifts_pair)
             .context("Failed to build shifts expression in DATRN")?
             .ok_or_else(|| anyhow::anyhow!("Expected shifts expression in DATRN"))?;
 
-        let m1_pair = inner.next()
-            .context("Missing m1 parameter in DATRN!")?;
+        let m1_pair = inner.next().context("Missing m1 parameter in DATRN!")?;
         let m1_expr = Expr::from_rule(m1_pair)
             .context("Failed to build m1 expression in DATRN")?
             .ok_or_else(|| anyhow::anyhow!("Expected m1 expression in DATRN"))?;
 
-        let m2_pair = inner.next()
-            .context("Missing m2 parameter in DATRN!")?;
+        let m2_pair = inner.next().context("Missing m2 parameter in DATRN!")?;
         let m2_expr = Expr::from_rule(m2_pair)
             .context("Failed to build m2 expression in DATRN")?
             .ok_or_else(|| anyhow::anyhow!("Expected m2 expression in DATRN"))?;
 
-        let output_pair = inner.next()
-            .context("Missing output parameter in DATRN!")?;
+        let output_pair = inner.next().context("Missing output parameter in DATRN!")?;
         let output_expr = Expr::from_rule(output_pair)
             .context("Failed to build output expression in DATRN")?
             .ok_or_else(|| anyhow::anyhow!("Expected output expression in DATRN"))?;
@@ -101,31 +103,42 @@ impl FromRule for DatrnStatement {
 impl TranspileableStatement for DatrnStatement {}
 
 impl Transpile for DatrnStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
 
-        let input_output = self.input_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling input in DATRN".to_string()))?;
+        let input_output = self.input_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling input in DATRN".to_string())
+        })?;
         requested_variables.extend(input_output.requested_variables.iter().cloned());
 
-        let scales_output = self.scales_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling scales in DATRN".to_string()))?;
+        let scales_output = self.scales_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling scales in DATRN".to_string())
+        })?;
         requested_variables.extend(scales_output.requested_variables.iter().cloned());
 
-        let shifts_output = self.shifts_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling shifts in DATRN".to_string()))?;
+        let shifts_output = self.shifts_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling shifts in DATRN".to_string())
+        })?;
         requested_variables.extend(shifts_output.requested_variables.iter().cloned());
 
-        let m1_output = self.m1_expr.transpile(context)
+        let m1_output = self
+            .m1_expr
+            .transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling m1 in DATRN".to_string()))?;
         requested_variables.extend(m1_output.requested_variables.iter().cloned());
 
-        let m2_output = self.m2_expr.transpile(context)
+        let m2_output = self
+            .m2_expr
+            .transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling m2 in DATRN".to_string()))?;
         requested_variables.extend(m2_output.requested_variables.iter().cloned());
 
-        let out_output = self.output_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling output in DATRN".to_string()))?;
+        let out_output = self.output_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling output in DATRN".to_string())
+        })?;
         requested_variables.extend(out_output.requested_variables.clone());
 
         let serialization = format!(
@@ -135,7 +148,10 @@ impl Transpile for DatrnStatement {
             shifts_output.as_ref(),
             m1_output.as_value(),
             m2_output.as_value(),
-            out_output.as_ref().replace("&mut ", "").replace("&", "&mut "),
+            out_output
+                .as_ref()
+                .replace("&mut ", "")
+                .replace("&", "&mut "),
         );
 
         Ok(TranspilationOutput {

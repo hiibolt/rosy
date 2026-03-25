@@ -20,12 +20,15 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
@@ -33,10 +36,12 @@
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind};
+use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
-use anyhow::{Result, Error, Context as AnyhowContext};
+use crate::transpile::{
+    TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
+};
+use anyhow::{Context as AnyhowContext, Error, Result};
 use std::collections::HashSet;
 
 /// AST node for the `SIN(expr)` intrinsic function.
@@ -47,13 +52,20 @@ pub struct SinExpr {
 
 impl FromRule for SinExpr {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        anyhow::ensure!(pair.as_rule() == Rule::sin, "Expected sin rule, got {:?}", pair.as_rule());
+        anyhow::ensure!(
+            pair.as_rule() == Rule::sin,
+            "Expected sin rule, got {:?}",
+            pair.as_rule()
+        );
         let mut inner = pair.into_inner();
-        let expr_pair = inner.next()
+        let expr_pair = inner
+            .next()
             .context("Missing inner expression for `SIN`!")?;
-        let expr = Box::new(Expr::from_rule(expr_pair)
-            .context("Failed to build expression for `SIN`")?
-            .ok_or_else(|| anyhow::anyhow!("Expected expression for `SIN`"))?);
+        let expr = Box::new(
+            Expr::from_rule(expr_pair)
+                .context("Failed to build expression for `SIN`")?
+                .ok_or_else(|| anyhow::anyhow!("Expected expression for `SIN`"))?,
+        );
         Ok(Some(SinExpr { expr }))
     }
 }
@@ -84,24 +96,30 @@ impl Transpile for SinExpr {
 impl TranspileableExpr for SinExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         use crate::rosy_lib::intrinsics::sin;
-        
+
         // Get the type of the inner expression
-        let inner_type = self.expr.type_of(context)
+        let inner_type = self
+            .expr
+            .type_of(context)
             .context("Failed to determine type of inner expression in SIN")?;
-        
+
         // Use the SIN registry to get the return type
         sin::get_return_type(&inner_type)
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "SIN not supported for type: {:?}",
-                    inner_type
-                )
-            })
+            .ok_or_else(|| anyhow::anyhow!("SIN not supported for type: {:?}", inner_type))
     }
-    fn discover_expr_function_calls(&self, resolver: &mut TypeResolver, ctx: &ScopeContext) -> Option<Result<()>> {
+    fn discover_expr_function_calls(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &ScopeContext,
+    ) -> Option<Result<()>> {
         Some(resolver.discover_expr_function_calls(&self.expr, ctx))
     }
-    fn build_expr_recipe(&self, resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+    fn build_expr_recipe(
+        &self,
+        resolver: &TypeResolver,
+        ctx: &ScopeContext,
+        deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
         let inner = resolver.build_expr_recipe(&self.expr, ctx, deps);
         Some(ExprRecipe::Sin(Box::new(inner)))
     }

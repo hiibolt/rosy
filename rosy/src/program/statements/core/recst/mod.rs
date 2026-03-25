@@ -15,26 +15,29 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
     ast::*,
     program::expressions::{Expr, core::variable_identifier::VariableIdentifier},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableStatement, VariableScope, add_context_to_all,
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        VariableScope, add_context_to_all,
     },
 };
 
@@ -55,48 +58,67 @@ impl FromRule for RecstStatement {
 
         let mut inner = pair.into_inner();
 
-        let value_pair = inner.next()
-            .context("Missing value expression in RECST!")?;
+        let value_pair = inner.next().context("Missing value expression in RECST!")?;
         let value_expr = Expr::from_rule(value_pair)
             .context("Failed to build value expression in RECST")?
             .ok_or_else(|| anyhow::anyhow!("Expected value expression in RECST"))?;
 
-        let format_pair = inner.next()
+        let format_pair = inner
+            .next()
             .context("Missing format expression in RECST!")?;
         let format_expr = Expr::from_rule(format_pair)
             .context("Failed to build format expression in RECST")?
             .ok_or_else(|| anyhow::anyhow!("Expected format expression in RECST"))?;
 
-        let output_pair = inner.next()
-            .context("Missing output variable in RECST!")?;
+        let output_pair = inner.next().context("Missing output variable in RECST!")?;
         let output_var = VariableIdentifier::from_rule(output_pair)
             .context("Failed to build output variable identifier in RECST")?
             .ok_or_else(|| anyhow::anyhow!("Expected output variable identifier in RECST"))?;
 
-        Ok(Some(RecstStatement { value_expr, format_expr, output_var }))
+        Ok(Some(RecstStatement {
+            value_expr,
+            format_expr,
+            output_var,
+        }))
     }
 }
 
 impl TranspileableStatement for RecstStatement {}
 
 impl Transpile for RecstStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
 
-        let value_output = self.value_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling value in RECST".to_string()))?;
+        let value_output = self.value_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling value in RECST".to_string())
+        })?;
         requested_variables.extend(value_output.requested_variables.iter().cloned());
 
-        let format_output = self.format_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling format in RECST".to_string()))?;
+        let format_output = self.format_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling format in RECST".to_string())
+        })?;
         requested_variables.extend(format_output.requested_variables.iter().cloned());
 
-        let output_id_output = self.output_var.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling output variable in RECST".to_string()))?;
+        let output_id_output = self.output_var.transpile(context).map_err(|e| {
+            add_context_to_all(
+                e,
+                "...while transpiling output variable in RECST".to_string(),
+            )
+        })?;
         requested_variables.extend(output_id_output.requested_variables.clone());
 
-        let dereference = match context.variables.get(&self.output_var.name)
-            .ok_or_else(|| vec![anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.output_var.name)])?
+        let dereference = match context
+            .variables
+            .get(&self.output_var.name)
+            .ok_or_else(|| {
+                vec![anyhow::anyhow!(
+                    "Variable '{}' is not defined in this scope!",
+                    self.output_var.name
+                )]
+            })?
             .scope
         {
             VariableScope::Local => "",

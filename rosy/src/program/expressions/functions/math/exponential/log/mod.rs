@@ -20,12 +20,15 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
@@ -33,10 +36,12 @@
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind};
+use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
-use anyhow::{Result, Error, Context as AnyhowContext};
+use crate::transpile::{
+    TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
+};
+use anyhow::{Context as AnyhowContext, Error, Result};
 use std::collections::HashSet;
 
 /// AST node for the `LOG(expr)` intrinsic function (natural logarithm ln(x)).
@@ -47,13 +52,20 @@ pub struct LogExpr {
 
 impl FromRule for LogExpr {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        anyhow::ensure!(pair.as_rule() == Rule::log_fn, "Expected log_fn rule, got {:?}", pair.as_rule());
+        anyhow::ensure!(
+            pair.as_rule() == Rule::log_fn,
+            "Expected log_fn rule, got {:?}",
+            pair.as_rule()
+        );
         let mut inner = pair.into_inner();
-        let expr_pair = inner.next()
+        let expr_pair = inner
+            .next()
             .context("Missing inner expression for `LOG`!")?;
-        let expr = Box::new(Expr::from_rule(expr_pair)
-            .context("Failed to build expression for `LOG`")?
-            .ok_or_else(|| anyhow::anyhow!("Expected expression for `LOG`"))?);
+        let expr = Box::new(
+            Expr::from_rule(expr_pair)
+                .context("Failed to build expression for `LOG`")?
+                .ok_or_else(|| anyhow::anyhow!("Expected expression for `LOG`"))?,
+        );
         Ok(Some(LogExpr { expr }))
     }
 }
@@ -85,18 +97,20 @@ impl TranspileableExpr for LogExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         use crate::rosy_lib::intrinsics::log;
 
-        let inner_type = self.expr.type_of(context)
+        let inner_type = self
+            .expr
+            .type_of(context)
             .context("Failed to determine type of inner expression in LOG")?;
 
         log::get_return_type(&inner_type)
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "LOG not supported for type: {:?}",
-                    inner_type
-                )
-            })
+            .ok_or_else(|| anyhow::anyhow!("LOG not supported for type: {:?}", inner_type))
     }
-    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+    fn build_expr_recipe(
+        &self,
+        _resolver: &TypeResolver,
+        _ctx: &ScopeContext,
+        _deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
         None
     }
 }

@@ -25,12 +25,15 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
@@ -40,11 +43,11 @@ use std::collections::{BTreeSet, HashSet};
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::TranspileableExpr;
-use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput, ValueKind};
-use anyhow::{Result, Error};
+use crate::resolve::{BinaryOpKind, ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe, BinaryOpKind};
+use crate::transpile::TranspileableExpr;
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, ValueKind};
+use anyhow::{Error, Result};
 
 /// AST node for the extraction operator (`|`).
 #[derive(Debug, PartialEq)]
@@ -61,35 +64,60 @@ impl FromRule for ExtractExpr {
 }
 
 impl TranspileableExpr for ExtractExpr {
-    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
-        let object_type = self.object.type_of(context)
-            .map_err(|e| e.context("...while determining type of object expression for extraction"))?;
-        let index_type = self.index.type_of(context)
-            .map_err(|e| e.context("...while determining type of index expression for extraction"))?;
+    fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
+        let object_type = self.object.type_of(context).map_err(|e| {
+            e.context("...while determining type of object expression for extraction")
+        })?;
+        let index_type = self.index.type_of(context).map_err(|e| {
+            e.context("...while determining type of index expression for extraction")
+        })?;
 
-        let result_type = crate::rosy_lib::operators::extract::get_return_type(&object_type, &index_type)
-            .ok_or(anyhow::anyhow!(
-                "Cannot extract from type '{}' using index of type '{}'!",
-                object_type, index_type
-            ))?;
+        let result_type =
+            crate::rosy_lib::operators::extract::get_return_type(&object_type, &index_type).ok_or(
+                anyhow::anyhow!(
+                    "Cannot extract from type '{}' using index of type '{}'!",
+                    object_type,
+                    index_type
+                ),
+            )?;
 
         Ok(result_type)
     }
-    fn discover_expr_function_calls(&self, resolver: &mut TypeResolver, ctx: &ScopeContext) -> Option<Result<()>> {
-        Some(resolver.discover_expr_function_calls(&self.object, ctx)
-            .and_then(|_| resolver.discover_expr_function_calls(&self.index, ctx)))
+    fn discover_expr_function_calls(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &ScopeContext,
+    ) -> Option<Result<()>> {
+        Some(
+            resolver
+                .discover_expr_function_calls(&self.object, ctx)
+                .and_then(|_| resolver.discover_expr_function_calls(&self.index, ctx)),
+        )
     }
-    fn build_expr_recipe(&self, resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+    fn build_expr_recipe(
+        &self,
+        resolver: &TypeResolver,
+        ctx: &ScopeContext,
+        deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
         let left = resolver.build_expr_recipe(&self.object, ctx, deps);
         let right = resolver.build_expr_recipe(&self.index, ctx, deps);
-        Some(ExprRecipe::BinaryOp { op: BinaryOpKind::Extract, left: Box::new(left), right: Box::new(right) })
+        Some(ExprRecipe::BinaryOp {
+            op: BinaryOpKind::Extract,
+            left: Box::new(left),
+            right: Box::new(right),
+        })
     }
 }
 impl Transpile for ExtractExpr {
-    fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         // First, ensure the types are compatible
-        let _ = self.type_of(context)
-            .map_err(|e| vec!(e.context("...while verifying types of extraction expression")))?;
+        let _ = self
+            .type_of(context)
+            .map_err(|e| vec![e.context("...while verifying types of extraction expression")])?;
 
         // Then, transpile both sides and combine
         let mut errors = Vec::new();
@@ -100,7 +128,7 @@ impl Transpile for ExtractExpr {
             Ok(output) => {
                 requested_variables.extend(output.requested_variables.iter().cloned());
                 output
-            },
+            }
             Err(mut e) => {
                 for err in e.drain(..) {
                     errors.push(err.context("...while transpiling object of extraction"));
@@ -114,7 +142,7 @@ impl Transpile for ExtractExpr {
             Ok(output) => {
                 requested_variables.extend(output.requested_variables.iter().cloned());
                 output
-            },
+            }
             Err(mut e) => {
                 for err in e.drain(..) {
                     errors.push(err.context("...while transpiling index of extraction"));

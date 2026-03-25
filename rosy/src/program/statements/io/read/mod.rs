@@ -11,48 +11,62 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, anyhow, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, anyhow, ensure};
 
 use crate::{
-    ast::*, program::expressions::core::variable_identifier::VariableIdentifier, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement}
+    ast::*,
+    program::expressions::core::variable_identifier::VariableIdentifier,
+    transpile::{
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr,
+        TranspileableStatement,
+    },
 };
 
 /// AST node for the `READ unit variable;` statement.
 #[derive(Debug)]
 pub struct ReadStatement {
     pub unit: u8,
-    pub identifier: VariableIdentifier
+    pub identifier: VariableIdentifier,
 }
 
 impl FromRule for ReadStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::read, 
-            "Expected `read` rule when building read statement, found: {:?}", pair.as_rule());
-        
+        ensure!(
+            pair.as_rule() == Rule::read,
+            "Expected `read` rule when building read statement, found: {:?}",
+            pair.as_rule()
+        );
+
         let mut inner = pair.into_inner();
 
-        let unit = inner.next()
+        let unit = inner
+            .next()
             .context("Missing first token `unit`!")?
             .as_str()
             .parse::<u8>()
             .context("Failed to parse `unit` as u8 in `read` statement!")?;
 
         let identifier = VariableIdentifier::from_rule(
-            inner.next()
-            .context("Missing second token `variable_identifier`!")?
-        ).context("...while building variable identifier for read statement")?
+            inner
+                .next()
+                .context("Missing second token `variable_identifier`!")?,
+        )
+        .context("...while building variable identifier for read statement")?
         .ok_or_else(|| anyhow::anyhow!("Expected variable identifier for read statement"))?;
 
         Ok(Some(ReadStatement { unit, identifier }))
@@ -60,20 +74,24 @@ impl FromRule for ReadStatement {
 }
 impl TranspileableStatement for ReadStatement {}
 impl Transpile for ReadStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
         let mut errors = Vec::new();
-        
+
         // Serialize the identifier
         let serialized_variable_identifier = match self.identifier.transpile(context) {
             Ok(output) => {
                 requested_variables.extend(output.requested_variables);
                 output.serialization
-            },
+            }
             Err(vec_err) => {
                 for err in vec_err {
                     errors.push(err.context(format!(
-                        "...while transpiling identifier expression for READ into '{}'", self.identifier.name
+                        "...while transpiling identifier expression for READ into '{}'",
+                        self.identifier.name
                     )));
                 }
                 String::new() // dummy value to collect more errors
@@ -85,14 +103,17 @@ impl Transpile for ReadStatement {
             Ok(var_type) => var_type,
             Err(e) => {
                 errors.push(e.context(format!(
-                    "...while determining type of variable identifier for READ into '{}'", self.identifier.name
+                    "...while determining type of variable identifier for READ into '{}'",
+                    self.identifier.name
                 )));
                 return Err(errors); // Cannot continue without the type
             }
         };
         if !crate::rosy_lib::intrinsics::from_st::can_be_obtained(&variable_type) {
             errors.push(anyhow!(
-                "Cannot READ into variable '{}' of type {}!", self.identifier.name, variable_type
+                "Cannot READ into variable '{}' of type {}!",
+                self.identifier.name,
+                variable_type
             ));
             return Err(errors); // Cannot continue if the type is incompatible
         }
@@ -108,7 +129,7 @@ impl Transpile for ReadStatement {
                     "{} = rosy_lib::intrinsics::from_st::from_stdin::<{}>().context(\"Failed to READ into {}\")?;",
                     serialized_variable_identifier, serialized_variable_type, self.identifier.name
                 )
-            },
+            }
             unit => {
                 // Read from file unit
                 format!(
@@ -122,7 +143,7 @@ impl Transpile for ReadStatement {
                     typ = serialized_variable_type,
                     name = self.identifier.name,
                 )
-            },
+            }
         };
         if errors.is_empty() {
             Ok(TranspilationOutput {

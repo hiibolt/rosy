@@ -12,26 +12,31 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
+use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
+use crate::rosy_lib::RosyType;
 use crate::{
     ast::{FromRule, Rule},
     program::expressions::Expr,
-    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind}
+    transpile::{
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
+    },
 };
-use anyhow::{Error, Context};
+use anyhow::{Context, Error};
 use std::collections::HashSet;
-use crate::rosy_lib::RosyType;
-use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 
 /// AST node for the `CD(n)` constructor expression.
 #[derive(Debug, PartialEq)]
@@ -41,13 +46,18 @@ pub struct CDExpr {
 
 impl FromRule for CDExpr {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> anyhow::Result<Option<Self>> {
-        anyhow::ensure!(pair.as_rule() == Rule::cd_intrinsic, "Expected cd_intrinsic rule, got {:?}", pair.as_rule());
+        anyhow::ensure!(
+            pair.as_rule() == Rule::cd_intrinsic,
+            "Expected cd_intrinsic rule, got {:?}",
+            pair.as_rule()
+        );
         let mut inner = pair.into_inner();
-        let expr_pair = inner.next()
-            .context("Missing inner expression for `CD`!")?;
-        let index = Box::new(Expr::from_rule(expr_pair)
-            .context("Failed to build expression for `CD`")?
-            .ok_or_else(|| anyhow::anyhow!("Expected expression for `CD`"))?);
+        let expr_pair = inner.next().context("Missing inner expression for `CD`!")?;
+        let index = Box::new(
+            Expr::from_rule(expr_pair)
+                .context("Failed to build expression for `CD`")?
+                .ok_or_else(|| anyhow::anyhow!("Expected expression for `CD`"))?,
+        );
         Ok(Some(CDExpr { index }))
     }
 }
@@ -55,7 +65,12 @@ impl TranspileableExpr for CDExpr {
     fn type_of(&self, _context: &TranspilationInputContext) -> anyhow::Result<RosyType> {
         Ok(RosyType::CD())
     }
-    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+    fn build_expr_recipe(
+        &self,
+        _resolver: &TypeResolver,
+        _ctx: &ScopeContext,
+        _deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
         Some(ExprRecipe::Literal(RosyType::CD()))
     }
 }
@@ -65,18 +80,14 @@ impl Transpile for CDExpr {
         context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>> {
         // Transpile the index expression
-        let index_output = self.index.transpile(context)
-            .map_err(|errs| {
-                errs.into_iter()
-                    .map(|e| e.context("...while transpiling CD index expression"))
-                    .collect::<Vec<_>>()
-            })?;
+        let index_output = self.index.transpile(context).map_err(|errs| {
+            errs.into_iter()
+                .map(|e| e.context("...while transpiling CD index expression"))
+                .collect::<Vec<_>>()
+        })?;
 
         // Use CD::variable(usize) to create a CD differential variable
-        let serialization = format!(
-            "CD::variable({} as usize)?",
-            index_output.as_value()
-        );
+        let serialization = format!("CD::variable({} as usize)?", index_output.as_value());
 
         Ok(TranspilationOutput {
             serialization,

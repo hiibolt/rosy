@@ -14,22 +14,30 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
-    ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement, add_context_to_all}
+    ast::*,
+    program::expressions::Expr,
+    transpile::{
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        add_context_to_all,
+    },
 };
 
 /// AST node for `OPENFB unit filename status;`.
@@ -43,47 +51,70 @@ pub struct OpenfbStatement {
 
 impl FromRule for OpenfbStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::openfb, 
-            "Expected `openfb` rule when building OPENFB statement, found: {:?}", pair.as_rule());
-        
+        ensure!(
+            pair.as_rule() == Rule::openfb,
+            "Expected `openfb` rule when building OPENFB statement, found: {:?}",
+            pair.as_rule()
+        );
+
         let mut inner = pair.into_inner();
 
-        let unit_pair = inner.next()
-            .context("Missing unit expression in OPENFB!")?;
+        let unit_pair = inner.next().context("Missing unit expression in OPENFB!")?;
         let unit_expr = Expr::from_rule(unit_pair)
             .context("Failed to build unit expression in OPENFB")?
             .ok_or_else(|| anyhow::anyhow!("Expected unit expression in OPENFB"))?;
 
-        let filename_pair = inner.next()
+        let filename_pair = inner
+            .next()
             .context("Missing filename expression in OPENFB!")?;
         let filename_expr = Expr::from_rule(filename_pair)
             .context("Failed to build filename expression in OPENFB")?
             .ok_or_else(|| anyhow::anyhow!("Expected filename expression in OPENFB"))?;
 
-        let status_pair = inner.next()
+        let status_pair = inner
+            .next()
             .context("Missing status expression in OPENFB!")?;
         let status_expr = Expr::from_rule(status_pair)
             .context("Failed to build status expression in OPENFB")?
             .ok_or_else(|| anyhow::anyhow!("Expected status expression in OPENFB"))?;
 
-        Ok(Some(OpenfbStatement { unit_expr, filename_expr, status_expr }))
+        Ok(Some(OpenfbStatement {
+            unit_expr,
+            filename_expr,
+            status_expr,
+        }))
     }
 }
 impl TranspileableStatement for OpenfbStatement {}
 impl Transpile for OpenfbStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
 
-        let unit_output = self.unit_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling unit expression in OPENFB".to_string()))?;
+        let unit_output = self.unit_expr.transpile(context).map_err(|e| {
+            add_context_to_all(
+                e,
+                "...while transpiling unit expression in OPENFB".to_string(),
+            )
+        })?;
         requested_variables.extend(unit_output.requested_variables.iter().cloned());
 
-        let filename_output = self.filename_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling filename expression in OPENFB".to_string()))?;
+        let filename_output = self.filename_expr.transpile(context).map_err(|e| {
+            add_context_to_all(
+                e,
+                "...while transpiling filename expression in OPENFB".to_string(),
+            )
+        })?;
         requested_variables.extend(filename_output.requested_variables.iter().cloned());
 
-        let status_output = self.status_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling status expression in OPENFB".to_string()))?;
+        let status_output = self.status_expr.transpile(context).map_err(|e| {
+            add_context_to_all(
+                e,
+                "...while transpiling status expression in OPENFB".to_string(),
+            )
+        })?;
         requested_variables.extend(status_output.requested_variables.iter().cloned());
 
         let serialization = format!(

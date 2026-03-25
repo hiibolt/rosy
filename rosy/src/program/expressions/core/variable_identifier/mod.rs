@@ -19,12 +19,15 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
@@ -33,10 +36,10 @@
 use std::collections::BTreeSet;
 
 use crate::ast::Rule;
-use crate::{ast::FromRule, transpile::*};
-use crate::rosy_lib::RosyType;
 use crate::program::expressions::Expr;
-use anyhow::{Result, Context, Error, ensure};
+use crate::rosy_lib::RosyType;
+use crate::{ast::FromRule, transpile::*};
+use anyhow::{Context, Error, Result, ensure};
 
 /// A parsed identifier with optional parenthesized arguments and bracket indices.
 #[derive(Debug, PartialEq)]
@@ -74,14 +77,19 @@ impl VariableIdentifier {
 
 impl FromRule for VariableIdentifier {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<VariableIdentifier>> {
-        ensure!(pair.as_rule() == Rule::variable_identifier, 
-            "Expected `variable_identifier` rule when building variable identifier, found: {:?}", pair.as_rule());
-            
+        ensure!(
+            pair.as_rule() == Rule::variable_identifier,
+            "Expected `variable_identifier` rule when building variable identifier, found: {:?}",
+            pair.as_rule()
+        );
+
         let mut inner = pair.into_inner();
-        let name = inner.next()
+        let name = inner
+            .next()
             .context("Missing variable name in variable identifier!")?
-            .as_str().to_string();
-        
+            .as_str()
+            .to_string();
+
         let mut paren_groups = Vec::new();
         let mut bracket_indices = Vec::new();
 
@@ -101,7 +109,9 @@ impl FromRule for VariableIdentifier {
                     for expr_pair in token.into_inner() {
                         let expr = Expr::from_rule(expr_pair)
                             .context("Failed to build expression in bracket index!")?
-                            .ok_or_else(|| anyhow::anyhow!("Expected expression in bracket index"))?;
+                            .ok_or_else(|| {
+                                anyhow::anyhow!("Expected expression in bracket index")
+                            })?;
                         bracket_indices.push(expr);
                     }
                 }
@@ -118,9 +128,11 @@ impl FromRule for VariableIdentifier {
 }
 
 impl TranspileableExpr for VariableIdentifier {
-    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
-        let var_data = context.variables.get(&self.name)
-            .ok_or(anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.name))?;
+    fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
+        let var_data = context.variables.get(&self.name).ok_or(anyhow::anyhow!(
+            "Variable '{}' is not defined in this scope!",
+            self.name
+        ))?;
 
         let num_indices = self.num_index_dimensions();
         let mut var_type = var_data.data.r#type.clone();
@@ -136,13 +148,18 @@ impl TranspileableExpr for VariableIdentifier {
 }
 
 impl Transpile for VariableIdentifier {
-    fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
-        // Check that the variable exists and that the 
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
+        // Check that the variable exists and that the
         //  dimensions are correct
-        let _ = self.type_of(context)
-            .map_err(|err| {
-                vec!(err.context(format!("...while checking the type of variable {}", self.name)))
-            })?;
+        let _ = self.type_of(context).map_err(|err| {
+            vec![err.context(format!(
+                "...while checking the type of variable {}",
+                self.name
+            ))]
+        })?;
 
         // Serialize the indices
         let mut serialized_indicies = String::new();
@@ -155,25 +172,30 @@ impl Transpile for VariableIdentifier {
             let name = &self.name;
 
             // Check that the type is RE
-            let index_expr_type = index_expr.type_of(context)
-                .map_err(|err| {
-                    vec!(err.context(format!("...while checking the type for index expression {i} of {name}")))
-                })?;
+            let index_expr_type = index_expr.type_of(context).map_err(|err| {
+                vec![err.context(format!(
+                    "...while checking the type for index expression {i} of {name}"
+                ))]
+            })?;
             let expected_type = RosyType::RE();
             if index_expr_type != expected_type {
-                return Err(vec!(anyhow::anyhow!("Indexing expression {i} when indexing {name} was {index_expr_type}, when it should be {expected_type}!")));
+                return Err(vec![anyhow::anyhow!(
+                    "Indexing expression {i} when indexing {name} was {index_expr_type}, when it should be {expected_type}!"
+                )]);
             }
 
             // Transpile it
             match index_expr.transpile(context) {
                 Ok(output) => {
-                    serialized_indicies.push_str(&format!("[({} - 1.0f64) as usize]", output.as_value()));
+                    serialized_indicies
+                        .push_str(&format!("[({} - 1.0f64) as usize]", output.as_value()));
                     requested_variables.extend(output.requested_variables);
-                },
+                }
                 Err(vec_err) => {
                     for err in vec_err {
                         errors.push(err.context(format!(
-                            "...while transpiling index expression to {}", self.name
+                            "...while transpiling index expression to {}",
+                            self.name
                         )));
                     }
                 }
@@ -181,17 +203,19 @@ impl Transpile for VariableIdentifier {
         }
 
         // Finally, serialize the entire variable
-        if VariableScope::Higher == context.variables.get(&self.name)
-            .ok_or(vec!(anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.name)))? 
-            .scope
+        if VariableScope::Higher
+            == context
+                .variables
+                .get(&self.name)
+                .ok_or(vec![anyhow::anyhow!(
+                    "Variable '{}' is not defined in this scope!",
+                    self.name
+                )])?
+                .scope
         {
             requested_variables.insert(self.name.clone());
         }
-        let serialization = format!(
-            "{}{}",
-            self.name,
-            serialized_indicies
-        );
+        let serialization = format!("{}{}", self.name, serialized_indicies);
         if errors.is_empty() {
             Ok(TranspilationOutput {
                 serialization,

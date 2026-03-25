@@ -11,23 +11,30 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
-    ast::*, program::expressions::core::variable_identifier::VariableIdentifier,
-    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement, VariableScope}
+    ast::*,
+    program::expressions::core::variable_identifier::VariableIdentifier,
+    transpile::{
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        VariableScope,
+    },
 };
 
 /// AST node for `CPUSEC v;`.
@@ -38,12 +45,16 @@ pub struct CpusecStatement {
 
 impl FromRule for CpusecStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::cpusec,
-            "Expected `cpusec` rule when building CPUSEC statement, found: {:?}", pair.as_rule());
+        ensure!(
+            pair.as_rule() == Rule::cpusec,
+            "Expected `cpusec` rule when building CPUSEC statement, found: {:?}",
+            pair.as_rule()
+        );
 
         let mut inner = pair.into_inner();
 
-        let expr_pair = inner.next()
+        let expr_pair = inner
+            .next()
             .context("Missing variable expression in CPUSEC!")?;
 
         // The argument must be a variable identifier (assignable l-value).
@@ -60,7 +71,10 @@ impl FromRule for CpusecStatement {
 impl TranspileableStatement for CpusecStatement {}
 
 impl Transpile for CpusecStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
         let mut errors = Vec::new();
 
@@ -69,7 +83,7 @@ impl Transpile for CpusecStatement {
             Ok(output) => {
                 requested_variables.extend(output.requested_variables.clone());
                 output.serialization
-            },
+            }
             Err(vec_err) => {
                 for err in vec_err {
                     errors.push(err.context(format!(
@@ -86,8 +100,15 @@ impl Transpile for CpusecStatement {
         }
 
         // Determine deref prefix based on variable scope
-        let dereference = match context.variables.get(&self.identifier.name)
-            .ok_or_else(|| vec![anyhow::anyhow!("Variable '{}' is not defined in this scope!", self.identifier.name)])?
+        let dereference = match context
+            .variables
+            .get(&self.identifier.name)
+            .ok_or_else(|| {
+                vec![anyhow::anyhow!(
+                    "Variable '{}' is not defined in this scope!",
+                    self.identifier.name
+                )]
+            })?
             .scope
         {
             VariableScope::Local => "",

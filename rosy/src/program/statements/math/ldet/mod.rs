@@ -17,30 +17,31 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
     ast::*,
     program::expressions::Expr,
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableStatement, add_context_to_all, ValueKind,
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        ValueKind, add_context_to_all,
     },
 };
 
 /// AST node for `LDET matrix n alloc_dim result ;`.
 #[derive(Debug)]
 pub struct LdetStatement {
-    pub matrix_expr:    Expr,
-    pub n_expr:         Expr,
+    pub matrix_expr: Expr,
+    pub n_expr: Expr,
     pub alloc_dim_expr: Expr,
-    pub result_expr:    Expr,
+    pub result_expr: Expr,
 }
 
 impl FromRule for LdetStatement {
@@ -63,7 +64,9 @@ impl FromRule for LdetStatement {
             .context("Failed to build n expression in LDET")?
             .ok_or_else(|| anyhow::anyhow!("Expected n expression in LDET"))?;
 
-        let alloc_dim_pair = inner.next().context("Missing alloc_dim parameter in LDET!")?;
+        let alloc_dim_pair = inner
+            .next()
+            .context("Missing alloc_dim parameter in LDET!")?;
         let alloc_dim_expr = Expr::from_rule(alloc_dim_pair)
             .context("Failed to build alloc_dim expression in LDET")?
             .ok_or_else(|| anyhow::anyhow!("Expected alloc_dim expression in LDET"))?;
@@ -91,20 +94,25 @@ impl Transpile for LdetStatement {
     ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
 
-        let matrix_output = self.matrix_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling matrix in LDET".to_string()))?;
+        let matrix_output = self.matrix_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling matrix in LDET".to_string())
+        })?;
         requested_variables.extend(matrix_output.requested_variables.iter().cloned());
 
-        let n_output = self.n_expr.transpile(context)
+        let n_output = self
+            .n_expr
+            .transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling n in LDET".to_string()))?;
         requested_variables.extend(n_output.requested_variables.iter().cloned());
 
-        let alloc_dim_output = self.alloc_dim_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling alloc_dim in LDET".to_string()))?;
+        let alloc_dim_output = self.alloc_dim_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling alloc_dim in LDET".to_string())
+        })?;
         requested_variables.extend(alloc_dim_output.requested_variables.iter().cloned());
 
-        let result_output = self.result_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling result in LDET".to_string()))?;
+        let result_output = self.result_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling result in LDET".to_string())
+        })?;
         requested_variables.extend(result_output.requested_variables.clone());
 
         // Determine l-value assignment:
@@ -114,7 +122,9 @@ impl Transpile for LdetStatement {
         let matrix_ref = matrix_output.as_ref();
         let n_val = n_output.as_value();
         let alloc_val = alloc_dim_output.as_value();
-        let rhs = format!("rosy_lib::core::ldet::rosy_ldet({matrix_ref}, {n_val} as usize, {alloc_val} as usize)?");
+        let rhs = format!(
+            "rosy_lib::core::ldet::rosy_ldet({matrix_ref}, {n_val} as usize, {alloc_val} as usize)?"
+        );
         let result_assign = if result_output.value_kind == ValueKind::Owned {
             format!("{} = {rhs}", result_output.serialization)
         } else if let Some(bare) = result_output.serialization.strip_prefix('&') {

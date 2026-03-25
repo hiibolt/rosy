@@ -12,12 +12,15 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
@@ -26,11 +29,11 @@
 use std::collections::HashSet;
 
 use crate::ast::{FromRule, Rule};
-use crate::transpile::*;
 use crate::program::expressions::Expr;
+use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
-use anyhow::{Result, Error, anyhow, Context};
+use crate::transpile::*;
+use anyhow::{Context, Error, Result, anyhow};
 
 /// AST node for the `ST(expr)` type conversion function.
 #[derive(Debug, PartialEq)]
@@ -40,53 +43,71 @@ pub struct StringConvertExpr {
 
 impl FromRule for StringConvertExpr {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        anyhow::ensure!(pair.as_rule() == Rule::st, "Expected st rule, got {:?}", pair.as_rule());
+        anyhow::ensure!(
+            pair.as_rule() == Rule::st,
+            "Expected st rule, got {:?}",
+            pair.as_rule()
+        );
         let mut inner = pair.into_inner();
-        let expr_pair = inner.next()
-            .context("Missing inner expression for `ST`!")?;
-        let expr = Box::new(Expr::from_rule(expr_pair)
-            .context("Failed to build expression for `ST`")?
-            .ok_or_else(|| anyhow::anyhow!("Expected expression for `ST`"))?);
+        let expr_pair = inner.next().context("Missing inner expression for `ST`!")?;
+        let expr = Box::new(
+            Expr::from_rule(expr_pair)
+                .context("Failed to build expression for `ST`")?
+                .ok_or_else(|| anyhow::anyhow!("Expected expression for `ST`"))?,
+        );
         Ok(Some(StringConvertExpr { expr }))
     }
 }
 
 impl TranspileableExpr for StringConvertExpr {
-    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType> {
+    fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         let expr_type = self.expr.type_of(context)?;
-        crate::rosy_lib::intrinsics::st::get_return_type(&expr_type)
-            .ok_or(anyhow::anyhow!("Cannot convert type '{expr_type}' to 'ST'!"))
+        crate::rosy_lib::intrinsics::st::get_return_type(&expr_type).ok_or(anyhow::anyhow!(
+            "Cannot convert type '{expr_type}' to 'ST'!"
+        ))
     }
-    fn discover_expr_function_calls(&self, resolver: &mut TypeResolver, ctx: &ScopeContext) -> Option<Result<()>> {
+    fn discover_expr_function_calls(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &ScopeContext,
+    ) -> Option<Result<()>> {
         Some(resolver.discover_expr_function_calls(&self.expr, ctx))
     }
-    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+    fn build_expr_recipe(
+        &self,
+        _resolver: &TypeResolver,
+        _ctx: &ScopeContext,
+        _deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
         Some(ExprRecipe::Literal(RosyType::ST()))
     }
 }
 impl Transpile for StringConvertExpr {
-    fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         string_convert_transpile_helper(&self.expr, context)
     }
 }
 
-pub fn string_convert_transpile_helper (
+pub fn string_convert_transpile_helper(
     expr: &Expr,
-    context: &mut TranspilationInputContext
+    context: &mut TranspilationInputContext,
 ) -> Result<TranspilationOutput, Vec<Error>> {
     // First, ensure the type is convertible to ST
-    let expr_type = expr.type_of(context)
-        .map_err(|e| vec!(e))?;
-    let _ = crate::rosy_lib::intrinsics::st::get_return_type(&expr_type)
-        .ok_or(vec!(anyhow!(
-            "Cannot convert type '{}' to 'ST'!", expr_type
-        )))?;
+    let expr_type = expr.type_of(context).map_err(|e| vec![e])?;
+    let _ = crate::rosy_lib::intrinsics::st::get_return_type(&expr_type).ok_or(vec![anyhow!(
+        "Cannot convert type '{}' to 'ST'!",
+        expr_type
+    )])?;
 
     // Then, transpile the expression
-    let inner_output = expr.transpile(context)
-        .map_err(|e| e.into_iter().map(|err| {
-            err.context("...while transpiling expression for STRING conversion")
-        }).collect::<Vec<Error>>())?;
+    let inner_output = expr.transpile(context).map_err(|e| {
+        e.into_iter()
+            .map(|err| err.context("...while transpiling expression for STRING conversion"))
+            .collect::<Vec<Error>>()
+    })?;
 
     // Finally, serialize the conversion
     let serialization = format!("RosyST::rosy_to_string({})", inner_output.as_ref());

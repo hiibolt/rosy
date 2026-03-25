@@ -17,22 +17,30 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
-    ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement, add_context_to_all}
+    ast::*,
+    program::expressions::Expr,
+    transpile::{
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        add_context_to_all,
+    },
 };
 
 /// AST node for `QUIT c;`.
@@ -43,13 +51,15 @@ pub struct QuitStatement {
 
 impl FromRule for QuitStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::quit,
-            "Expected `quit` rule when building QUIT statement, found: {:?}", pair.as_rule());
+        ensure!(
+            pair.as_rule() == Rule::quit,
+            "Expected `quit` rule when building QUIT statement, found: {:?}",
+            pair.as_rule()
+        );
 
         let mut inner = pair.into_inner();
 
-        let code_pair = inner.next()
-            .context("Missing code expression in QUIT!")?;
+        let code_pair = inner.next().context("Missing code expression in QUIT!")?;
         let code_expr = Expr::from_rule(code_pair)
             .context("Failed to build code expression in QUIT")?
             .ok_or_else(|| anyhow::anyhow!("Expected code expression in QUIT"))?;
@@ -59,11 +69,18 @@ impl FromRule for QuitStatement {
 }
 impl TranspileableStatement for QuitStatement {}
 impl Transpile for QuitStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
 
-        let code_output = self.code_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling code expression in QUIT".to_string()))?;
+        let code_output = self.code_expr.transpile(context).map_err(|e| {
+            add_context_to_all(
+                e,
+                "...while transpiling code expression in QUIT".to_string(),
+            )
+        })?;
         requested_variables.extend(code_output.requested_variables.iter().cloned());
 
         let serialization = format!(

@@ -21,12 +21,15 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
@@ -34,10 +37,12 @@
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind};
+use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
-use anyhow::{Result, Error, Context as AnyhowContext};
+use crate::transpile::{
+    TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
+};
+use anyhow::{Context as AnyhowContext, Error, Result};
 use std::collections::HashSet;
 
 /// AST node for the `TANH(expr)` intrinsic function.
@@ -48,13 +53,20 @@ pub struct TanhExpr {
 
 impl FromRule for TanhExpr {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        anyhow::ensure!(pair.as_rule() == Rule::tanh_fn, "Expected tanh_fn rule, got {:?}", pair.as_rule());
+        anyhow::ensure!(
+            pair.as_rule() == Rule::tanh_fn,
+            "Expected tanh_fn rule, got {:?}",
+            pair.as_rule()
+        );
         let mut inner = pair.into_inner();
-        let expr_pair = inner.next()
+        let expr_pair = inner
+            .next()
             .context("Missing inner expression for `TANH`!")?;
-        let expr = Box::new(Expr::from_rule(expr_pair)
-            .context("Failed to build expression for `TANH`")?
-            .ok_or_else(|| anyhow::anyhow!("Expected expression for `TANH`"))?);
+        let expr = Box::new(
+            Expr::from_rule(expr_pair)
+                .context("Failed to build expression for `TANH`")?
+                .ok_or_else(|| anyhow::anyhow!("Expected expression for `TANH`"))?,
+        );
         Ok(Some(TanhExpr { expr }))
     }
 }
@@ -84,21 +96,27 @@ impl TranspileableExpr for TanhExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         use crate::rosy_lib::intrinsics::tanh;
 
-        let inner_type = self.expr.type_of(context)
+        let inner_type = self
+            .expr
+            .type_of(context)
             .context("Failed to determine type of inner expression in TANH")?;
 
         tanh::get_return_type(&inner_type)
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "TANH not supported for type: {:?}",
-                    inner_type
-                )
-            })
+            .ok_or_else(|| anyhow::anyhow!("TANH not supported for type: {:?}", inner_type))
     }
-    fn discover_expr_function_calls(&self, resolver: &mut TypeResolver, ctx: &ScopeContext) -> Option<Result<()>> {
+    fn discover_expr_function_calls(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &ScopeContext,
+    ) -> Option<Result<()>> {
         Some(resolver.discover_expr_function_calls(&self.expr, ctx))
     }
-    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+    fn build_expr_recipe(
+        &self,
+        _resolver: &TypeResolver,
+        _ctx: &ScopeContext,
+        _deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
         None
     }
 }

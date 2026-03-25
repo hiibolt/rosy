@@ -15,12 +15,15 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
@@ -29,12 +32,14 @@
 use std::collections::BTreeSet;
 use std::collections::HashSet;
 
-use anyhow::{Result, Error, anyhow};
 use crate::ast::{FromRule, Rule};
-use crate::rosy_lib::RosyType;
-use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
-use crate::transpile::{Transpile, TranspileableExpr, TranspilationInputContext, TranspilationOutput, ValueKind};
 use crate::program::expressions::Expr;
+use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
+use crate::rosy_lib::RosyType;
+use crate::transpile::{
+    TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
+};
+use anyhow::{Error, Result, anyhow};
 
 /// Unary negation expression: `-expr`
 /// Transpiled as `0 - expr` using the existing subtraction operator.
@@ -56,22 +61,38 @@ impl TranspileableExpr for NegExpr {
         let operand_type = self.operand.type_of(context)?;
         // Use the sub registry to check: RE - operand_type should work
         let zero_type = RosyType::RE();
-        crate::rosy_lib::operators::sub::get_return_type(&zero_type, &operand_type)
-            .ok_or_else(|| anyhow!(
-                "Cannot negate type '{}' (no subtraction from RE defined)", operand_type
-            ))
+        crate::rosy_lib::operators::sub::get_return_type(&zero_type, &operand_type).ok_or_else(
+            || {
+                anyhow!(
+                    "Cannot negate type '{}' (no subtraction from RE defined)",
+                    operand_type
+                )
+            },
+        )
     }
-    fn discover_expr_function_calls(&self, resolver: &mut TypeResolver, ctx: &ScopeContext) -> Option<Result<()>> {
+    fn discover_expr_function_calls(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &ScopeContext,
+    ) -> Option<Result<()>> {
         Some(resolver.discover_expr_function_calls(&self.operand, ctx))
     }
-    fn build_expr_recipe(&self, resolver: &TypeResolver, ctx: &ScopeContext, deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+    fn build_expr_recipe(
+        &self,
+        resolver: &TypeResolver,
+        ctx: &ScopeContext,
+        deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
         Some(resolver.build_expr_recipe(&self.operand, ctx, deps))
     }
 }
 
 impl Transpile for NegExpr {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
-        let operand_type = self.operand.type_of(context).map_err(|e| vec!(e))?;
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
+        let operand_type = self.operand.type_of(context).map_err(|e| vec![e])?;
         let mut errors = Vec::new();
         let mut requested_variables = BTreeSet::new();
 
@@ -87,11 +108,12 @@ impl Transpile for NegExpr {
         requested_variables.extend(operand_output.requested_variables.iter().cloned());
 
         use crate::rosy_lib::RosyBaseType;
-        let serialization = if operand_type.base_type == RosyBaseType::RE && operand_type.dimensions == 0 {
-            format!("(-{})", operand_output.as_value())
-        } else {
-            format!("RosySub::rosy_sub(&0.0f64, {})?", operand_output.as_ref())
-        };
+        let serialization =
+            if operand_type.base_type == RosyBaseType::RE && operand_type.dimensions == 0 {
+                format!("(-{})", operand_output.as_value())
+            } else {
+                format!("RosySub::rosy_sub(&0.0f64, {})?", operand_output.as_ref())
+            };
 
         if errors.is_empty() {
             Ok(TranspilationOutput {
@@ -104,4 +126,3 @@ impl Transpile for NegExpr {
         }
     }
 }
-

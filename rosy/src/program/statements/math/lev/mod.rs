@@ -18,20 +18,21 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, ensure};
 
 use crate::{
     ast::*,
     program::expressions::Expr,
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableStatement, add_context_to_all, ValueKind,
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        ValueKind, add_context_to_all,
     },
 };
 
@@ -80,7 +81,9 @@ impl FromRule for LevStatement {
             .context("Failed to build n expression in LEV")?
             .ok_or_else(|| anyhow::anyhow!("Expected n expression in LEV"))?;
 
-        let alloc_dim_pair = inner.next().context("Missing alloc_dim parameter in LEV!")?;
+        let alloc_dim_pair = inner
+            .next()
+            .context("Missing alloc_dim parameter in LEV!")?;
         let alloc_dim_expr = Expr::from_rule(alloc_dim_pair)
             .context("Failed to build alloc_dim expression in LEV")?
             .ok_or_else(|| anyhow::anyhow!("Expected alloc_dim expression in LEV"))?;
@@ -99,31 +102,42 @@ impl FromRule for LevStatement {
 impl TranspileableStatement for LevStatement {}
 
 impl Transpile for LevStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
 
-        let matrix_output = self.matrix_expr.transpile(context)
+        let matrix_output = self
+            .matrix_expr
+            .transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling matrix in LEV".to_string()))?;
         requested_variables.extend(matrix_output.requested_variables.iter().cloned());
 
-        let eig_real_output = self.eig_real_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling eig_real in LEV".to_string()))?;
+        let eig_real_output = self.eig_real_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling eig_real in LEV".to_string())
+        })?;
         requested_variables.extend(eig_real_output.requested_variables.clone());
 
-        let eig_imag_output = self.eig_imag_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling eig_imag in LEV".to_string()))?;
+        let eig_imag_output = self.eig_imag_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling eig_imag in LEV".to_string())
+        })?;
         requested_variables.extend(eig_imag_output.requested_variables.clone());
 
-        let eigvecs_output = self.eigvecs_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling eigvecs in LEV".to_string()))?;
+        let eigvecs_output = self.eigvecs_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling eigvecs in LEV".to_string())
+        })?;
         requested_variables.extend(eigvecs_output.requested_variables.clone());
 
-        let n_output = self.n_expr.transpile(context)
+        let n_output = self
+            .n_expr
+            .transpile(context)
             .map_err(|e| add_context_to_all(e, "...while transpiling n in LEV".to_string()))?;
         requested_variables.extend(n_output.requested_variables.iter().cloned());
 
-        let alloc_dim_output = self.alloc_dim_expr.transpile(context)
-            .map_err(|e| add_context_to_all(e, "...while transpiling alloc_dim in LEV".to_string()))?;
+        let alloc_dim_output = self.alloc_dim_expr.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling alloc_dim in LEV".to_string())
+        })?;
         requested_variables.extend(alloc_dim_output.requested_variables.iter().cloned());
 
         fn make_lvalue(ser: &str, value_kind: ValueKind, rhs: &str) -> String {
@@ -136,9 +150,21 @@ impl Transpile for LevStatement {
             }
         }
 
-        let eig_real_assign = make_lvalue(&eig_real_output.serialization, eig_real_output.value_kind, "rosy_lev_er");
-        let eig_imag_assign = make_lvalue(&eig_imag_output.serialization, eig_imag_output.value_kind, "rosy_lev_ei");
-        let eigvecs_assign = make_lvalue(&eigvecs_output.serialization, eigvecs_output.value_kind, "rosy_lev_v");
+        let eig_real_assign = make_lvalue(
+            &eig_real_output.serialization,
+            eig_real_output.value_kind,
+            "rosy_lev_er",
+        );
+        let eig_imag_assign = make_lvalue(
+            &eig_imag_output.serialization,
+            eig_imag_output.value_kind,
+            "rosy_lev_ei",
+        );
+        let eigvecs_assign = make_lvalue(
+            &eigvecs_output.serialization,
+            eigvecs_output.value_kind,
+            "rosy_lev_v",
+        );
 
         let serialization = format!(
             "{{ let (rosy_lev_er, rosy_lev_ei, rosy_lev_v) = rosy_lib::core::lev::rosy_lev({matrix}, {n} as usize, {alloc_dim} as usize)?; {eig_real_assign}; {eig_imag_assign}; {eigvecs_assign}; }}",

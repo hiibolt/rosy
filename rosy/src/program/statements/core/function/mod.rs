@@ -14,22 +14,32 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, anyhow, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, anyhow, ensure};
 
 use crate::{
-    ast::*, program::statements::*, resolve::{ResolutionRule, ScopeContext, TypeResolver, TypeSlot}, rosy_lib::RosyType, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationInputFunctionContext, TranspilationOutput, Transpile, VariableData, VariableScope, indent}
+    ast::*,
+    program::statements::*,
+    resolve::{ResolutionRule, ScopeContext, TypeResolver, TypeSlot},
+    rosy_lib::RosyType,
+    transpile::{
+        ScopedVariableData, TranspilationInputContext, TranspilationInputFunctionContext,
+        TranspilationOutput, Transpile, VariableData, VariableScope, indent,
+    },
 };
 
 /// AST node for a user-defined function declaration.
@@ -38,14 +48,17 @@ pub struct FunctionStatement {
     pub name: String,
     pub args: Vec<VariableDeclarationData>,
     pub return_type: Option<RosyType>,
-    pub body: Vec<Statement>
+    pub body: Vec<Statement>,
 }
 
 impl FromRule for FunctionStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::function, 
-            "Expected `function` rule when building function statement, found: {:?}", pair.as_rule());
-        
+        ensure!(
+            pair.as_rule() == Rule::function,
+            "Expected `function` rule when building function statement, found: {:?}",
+            pair.as_rule()
+        );
+
         let mut inner = pair.into_inner();
         let (return_type, name, args) = {
             let mut start_function_inner = inner
@@ -54,17 +67,20 @@ impl FromRule for FunctionStatement {
                 .into_inner();
 
             // Return type is now optional - peek to see if the next token is a type or a name
-            let first = start_function_inner.next()
+            let first = start_function_inner
+                .next()
                 .context("Missing tokens in function declaration!")?;
 
             let (return_type, name) = if first.as_rule() == Rule::r#type {
                 // we choose to ignore the dimensions of the return type for now
                 //  since they can be changed dynamically
-                let (return_type, _) = build_type(first)
-                    .context("...while building function return type")?;
-                let name = start_function_inner.next()
+                let (return_type, _) =
+                    build_type(first).context("...while building function return type")?;
+                let name = start_function_inner
+                    .next()
                     .context("Missing function name!")?
-                    .as_str().to_string();
+                    .as_str()
+                    .to_string();
                 (Some(return_type), name)
             } else {
                 // No return type specified, first token is the function name
@@ -82,8 +98,11 @@ impl FromRule for FunctionStatement {
                     break;
                 }
 
-                ensure!(arg_pair.as_rule() == Rule::function_argument_name, 
-                    "Expected function argument name, found: {:?}", arg_pair.as_rule());
+                ensure!(
+                    arg_pair.as_rule() == Rule::function_argument_name,
+                    "Expected function argument name, found: {:?}",
+                    arg_pair.as_rule()
+                );
                 let arg_name = arg_pair.as_str();
 
                 // Peek at the next token to see if it's a type
@@ -94,8 +113,8 @@ impl FromRule for FunctionStatement {
                         let (t, d) = build_type(type_pair)
                             .context("...while building function argument type")?;
                         (Some(t), d)
-                    },
-                    _ => (None, Vec::new())
+                    }
+                    _ => (None, Vec::new()),
                 };
 
                 let argument_data = VariableDeclarationData {
@@ -110,23 +129,21 @@ impl FromRule for FunctionStatement {
         };
 
         let body = {
-            let mut statements = vec!(
-                Statement {
-                    enum_variant: StatementEnum::VarDecl,
-                    inner: Box::new(VarDeclStatement {
-                        data: VariableDeclarationData {
-                            name: name.clone(),
-                            r#type: return_type.clone(),
-                            dimension_exprs: Vec::new(),
-                        }
-                    }),
-                    source_location: SourceLocation {
-                        line: 0,
-                        col: 0,
-                        snippet: format!("(implicit return variable for FUNCTION {})", name),
+            let mut statements = vec![Statement {
+                enum_variant: StatementEnum::VarDecl,
+                inner: Box::new(VarDeclStatement {
+                    data: VariableDeclarationData {
+                        name: name.clone(),
+                        r#type: return_type.clone(),
+                        dimension_exprs: Vec::new(),
                     },
-                }
-            );
+                }),
+                source_location: SourceLocation {
+                    line: 0,
+                    col: 0,
+                    snippet: format!("(implicit return variable for FUNCTION {})", name),
+                },
+            }];
 
             // Process remaining elements (statements and end_function)
             while let Some(element) = inner.next() {
@@ -137,7 +154,8 @@ impl FromRule for FunctionStatement {
 
                 let pair_input = element.as_str();
                 if let Some(stmt) = Statement::from_rule(element)
-                    .with_context(|| format!("Failed to build statement from:\n{}", pair_input))? {
+                    .with_context(|| format!("Failed to build statement from:\n{}", pair_input))?
+                {
                     statements.push(stmt);
                 }
             }
@@ -145,7 +163,12 @@ impl FromRule for FunctionStatement {
             statements
         };
 
-        Ok(Some(FunctionStatement { name, args, return_type, body }))
+        Ok(Some(FunctionStatement {
+            name,
+            args,
+            return_type,
+            body,
+        }))
     }
 }
 impl TranspileableStatement for FunctionStatement {
@@ -153,31 +176,31 @@ impl TranspileableStatement for FunctionStatement {
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
-        source_location: SourceLocation
+        source_location: SourceLocation,
     ) -> Option<Result<()>> {
         // Return type slot
-        let ret_slot = TypeSlot::FunctionReturn(
-            ctx.scope_path.clone(),
-            self.name.clone(),
+        let ret_slot = TypeSlot::FunctionReturn(ctx.scope_path.clone(), self.name.clone());
+        resolver.insert_slot(
+            ret_slot.clone(),
+            self.return_type.as_ref(),
+            Some(source_location.clone()),
         );
-        resolver.insert_slot(ret_slot.clone(), self.return_type.as_ref(), Some(source_location.clone()));
 
         // Argument slots
         let mut arg_slots = Vec::new();
         for arg in &self.args {
-            let arg_slot = TypeSlot::Argument(
-                ctx.scope_path.clone(),
-                self.name.clone(),
-                arg.name.clone(),
+            let arg_slot =
+                TypeSlot::Argument(ctx.scope_path.clone(), self.name.clone(), arg.name.clone());
+            resolver.insert_slot(
+                arg_slot.clone(),
+                arg.r#type.as_ref(),
+                Some(source_location.clone()),
             );
-            resolver.insert_slot(arg_slot.clone(), arg.r#type.as_ref(), Some(source_location.clone()));
             arg_slots.push((arg.name.clone(), arg_slot));
         }
 
-        ctx.functions.insert(
-            self.name.clone(),
-            (ret_slot.clone(), arg_slots),
-        );
+        ctx.functions
+            .insert(self.name.clone(), (ret_slot.clone(), arg_slots));
 
         // Recurse into function body with inner scope
         let mut inner_ctx = ScopeContext {
@@ -194,22 +217,23 @@ impl TranspileableStatement for FunctionStatement {
 
         // Add args to inner scope as variable references
         for arg in &self.args {
-            let arg_slot = TypeSlot::Argument(
-                ctx.scope_path.clone(),
-                self.name.clone(),
-                arg.name.clone(),
-            );
+            let arg_slot =
+                TypeSlot::Argument(ctx.scope_path.clone(), self.name.clone(), arg.name.clone());
             inner_ctx.variables.insert(arg.name.clone(), arg_slot);
         }
 
         // The implicit return variable inside the function body
-        let inner_ret_var_slot = TypeSlot::Variable(
-            inner_ctx.scope_path.clone(),
-            self.name.clone(),
-        );
+        let inner_ret_var_slot =
+            TypeSlot::Variable(inner_ctx.scope_path.clone(), self.name.clone());
         // If the return type is known explicitly, the inner return var is also known
-        resolver.insert_slot(inner_ret_var_slot.clone(), self.return_type.as_ref(), Some(source_location.clone()));
-        inner_ctx.variables.insert(self.name.clone(), inner_ret_var_slot.clone());
+        resolver.insert_slot(
+            inner_ret_var_slot.clone(),
+            self.return_type.as_ref(),
+            Some(source_location.clone()),
+        );
+        inner_ctx
+            .variables
+            .insert(self.name.clone(), inner_ret_var_slot.clone());
 
         if let Err(e) = resolver.discover_slots(&self.body, &mut inner_ctx) {
             return Some(Err(e));
@@ -229,7 +253,7 @@ impl TranspileableStatement for FunctionStatement {
                 node.depends_on.insert(inner_ret_var_slot);
             }
         }
-        
+
         Some(Ok(()))
     }
     fn apply_resolved_types(
@@ -239,10 +263,7 @@ impl TranspileableStatement for FunctionStatement {
     ) -> Option<Result<()>> {
         // Return type
         if self.return_type.is_none() {
-            let slot = TypeSlot::FunctionReturn(
-                current_scope.to_vec(),
-                self.name.clone(),
-            );
+            let slot = TypeSlot::FunctionReturn(current_scope.to_vec(), self.name.clone());
             if let Some(node) = resolver.nodes.get(&slot) {
                 if let Some(t) = &node.resolved {
                     self.return_type = Some(t.clone());
@@ -253,11 +274,8 @@ impl TranspileableStatement for FunctionStatement {
         // Argument types
         for arg in &mut self.args {
             if arg.r#type.is_none() {
-                let slot = TypeSlot::Argument(
-                    current_scope.to_vec(),
-                    self.name.clone(),
-                    arg.name.clone(),
-                );
+                let slot =
+                    TypeSlot::Argument(current_scope.to_vec(), self.name.clone(), arg.name.clone());
                 if let Some(node) = resolver.nodes.get(&slot) {
                     if let Some(t) = &node.resolved {
                         arg.r#type = Some(t.clone());
@@ -269,7 +287,9 @@ impl TranspileableStatement for FunctionStatement {
         // Resolve the implicit return variable (first stmt in body)
         if let Some(first_stmt) = self.body.first_mut() {
             if let Some(return_type) = &self.return_type {
-                first_stmt.inner.set_implicit_return_type(&self.name, return_type);
+                first_stmt
+                    .inner
+                    .set_implicit_return_type(&self.name, return_type);
             }
         }
 
@@ -284,7 +304,10 @@ impl TranspileableStatement for FunctionStatement {
     }
 }
 impl Transpile for FunctionStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         // Resolve the return type (required for transpilation)
         let resolved_return_type = self.return_type
             .ok_or_else(|| anyhow!("Type inference is not yet supported - please specify the return type for function '{}'", self.name))
@@ -301,7 +324,8 @@ impl Transpile for FunctionStatement {
                         r#type: t,
                     }),
                     Err(e) => errors.push(e.context(format!(
-                        "...while resolving argument types for function '{}'", self.name
+                        "...while resolving argument types for function '{}'",
+                        self.name
                     ))),
                 }
             }
@@ -312,19 +336,24 @@ impl Transpile for FunctionStatement {
         };
 
         // Insert the function signature, but check it doesn't already exist
-        if context.functions.contains_key(&self.name) ||
-            matches!(context.functions.insert(
+        if context.functions.contains_key(&self.name)
+            || matches!(
+                context.functions.insert(
                     self.name.clone(),
                     TranspilationInputFunctionContext {
                         return_type: resolved_return_type.clone(),
                         args: resolved_arg_data.clone(),
                         requested_variables: BTreeSet::new()
                     }
-                ), Some(_))
+                ),
+                Some(_)
+            )
         {
-            return Err(vec!(anyhow!("Function '{}' is already defined in this scope!", self.name)));
+            return Err(vec![anyhow!(
+                "Function '{}' is already defined in this scope!",
+                self.name
+            )]);
         }
-
 
         // Define and raise the level of any existing variables
         let mut inner_context: TranspilationInputContext = context.clone();
@@ -336,14 +365,20 @@ impl Transpile for FunctionStatement {
             *scope = match *scope {
                 VariableScope::Local => VariableScope::Higher,
                 VariableScope::Arg => VariableScope::Higher,
-                VariableScope::Higher => VariableScope::Higher
+                VariableScope::Higher => VariableScope::Higher,
             }
         }
         for arg_data in &resolved_arg_data {
-                if matches!(inner_context.variables.insert(arg_data.name.clone(), ScopedVariableData {
-                scope: VariableScope::Arg,
-                data: arg_data.clone()
-            }), Some(_)) {
+            if matches!(
+                inner_context.variables.insert(
+                    arg_data.name.clone(),
+                    ScopedVariableData {
+                        scope: VariableScope::Arg,
+                        data: arg_data.clone()
+                    }
+                ),
+                Some(_)
+            ) {
                 errors.push(anyhow!("Argument '{}' is already defined!", arg_data.name));
             }
         }
@@ -354,11 +389,12 @@ impl Transpile for FunctionStatement {
                 Ok(output) => {
                     serialized_statements.push(output.serialization);
                     requested_variables.extend(output.requested_variables);
-                },
+                }
                 Err(stmt_errors) => {
                     for e in stmt_errors {
                         errors.push(e.context(format!(
-                            "...while transpiling statement in function '{}'", self.name
+                            "...while transpiling statement in function '{}'",
+                            self.name
                         )));
                     }
                 }
@@ -369,23 +405,27 @@ impl Transpile for FunctionStatement {
         if let Some(func_context) = context.functions.get_mut(&self.name) {
             func_context.requested_variables = requested_variables.clone();
         } else {
-            errors.push(anyhow!(
-                "Function '{}' was not found in context after being inserted!", self.name
-            ).context("...while updating function context"));
+            errors.push(
+                anyhow!(
+                    "Function '{}' was not found in context after being inserted!",
+                    self.name
+                )
+                .context("...while updating function context"),
+            );
         }
 
         // Serialize arguments
         let serialized_args: Vec<String> = {
             let mut serialized_args = Vec::new();
             for var_name in requested_variables.iter() {
-                let Some(var_data) = inner_context.variables
-                    .get(var_name) else 
-                {
-                    errors.push(anyhow!(
-                        "Variable '{}' was requested but not found in context!", var_name
-                    ).context(format!(
-                        "...while transpiling function '{}'", self.name
-                    )));
+                let Some(var_data) = inner_context.variables.get(var_name) else {
+                    errors.push(
+                        anyhow!(
+                            "Variable '{}' was requested but not found in context!",
+                            var_name
+                        )
+                        .context(format!("...while transpiling function '{}'", self.name)),
+                    );
                     continue;
                 };
 
@@ -416,7 +456,8 @@ impl Transpile for FunctionStatement {
         let rust_fn_name = format!("__fn_{}", self.name);
         let serialization = format!(
             "fn {} ( {} ) -> Result<{}> {{\n{}\n\tOk({})\n}}",
-            rust_fn_name, serialized_args.join(", "),
+            rust_fn_name,
+            serialized_args.join(", "),
             serialized_return_type,
             indent(serialized_statements.join("\n")),
             self.name

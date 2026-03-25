@@ -18,12 +18,15 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
@@ -31,11 +34,13 @@
 
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
-use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind};
+use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use anyhow::{Result, Error, Context as AnyhowContext};
+use crate::transpile::{
+    TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
+};
+use anyhow::{Context as AnyhowContext, Error, Result};
 use std::collections::HashSet;
-use crate::resolve::{TypeResolver, ScopeContext, TypeSlot, ExprRecipe};
 
 /// AST node for the `INT(expr)` intrinsic function (truncate toward zero).
 #[derive(Debug, PartialEq)]
@@ -45,13 +50,20 @@ pub struct IntExpr {
 
 impl FromRule for IntExpr {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        anyhow::ensure!(pair.as_rule() == Rule::int_fn, "Expected int_fn rule, got {:?}", pair.as_rule());
+        anyhow::ensure!(
+            pair.as_rule() == Rule::int_fn,
+            "Expected int_fn rule, got {:?}",
+            pair.as_rule()
+        );
         let mut inner = pair.into_inner();
-        let expr_pair = inner.next()
+        let expr_pair = inner
+            .next()
             .context("Missing inner expression for `INT`!")?;
-        let expr = Box::new(Expr::from_rule(expr_pair)
-            .context("Failed to build expression for `INT`")?
-            .ok_or_else(|| anyhow::anyhow!("Expected expression for `INT`"))?);
+        let expr = Box::new(
+            Expr::from_rule(expr_pair)
+                .context("Failed to build expression for `INT`")?
+                .ok_or_else(|| anyhow::anyhow!("Expected expression for `INT`"))?,
+        );
         Ok(Some(IntExpr { expr }))
     }
 }
@@ -81,21 +93,27 @@ impl TranspileableExpr for IntExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         use crate::rosy_lib::intrinsics::int_fn;
 
-        let inner_type = self.expr.type_of(context)
+        let inner_type = self
+            .expr
+            .type_of(context)
             .context("Failed to determine type of inner expression in INT")?;
 
         int_fn::get_return_type(&inner_type)
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "INT not supported for type: {:?}",
-                    inner_type
-                )
-            })
+            .ok_or_else(|| anyhow::anyhow!("INT not supported for type: {:?}", inner_type))
     }
-    fn discover_expr_function_calls(&self, resolver: &mut TypeResolver, ctx: &ScopeContext) -> Option<Result<()>> {
+    fn discover_expr_function_calls(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &ScopeContext,
+    ) -> Option<Result<()>> {
         Some(resolver.discover_expr_function_calls(&self.expr, ctx))
     }
-    fn build_expr_recipe(&self, _resolver: &TypeResolver, _ctx: &ScopeContext, _deps: &mut HashSet<TypeSlot>) -> Option<ExprRecipe> {
+    fn build_expr_recipe(
+        &self,
+        _resolver: &TypeResolver,
+        _ctx: &ScopeContext,
+        _deps: &mut HashSet<TypeSlot>,
+    ) -> Option<ExprRecipe> {
         None
     }
 }

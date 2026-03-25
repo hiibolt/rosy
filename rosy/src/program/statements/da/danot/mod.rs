@@ -11,21 +11,28 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
-use anyhow::{Result, Context, Error, ensure};
+use anyhow::{Context, Error, Result, ensure};
 
 use crate::{
-    ast::*, program::expressions::Expr, transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement}
+    ast::*,
+    program::expressions::Expr,
+    transpile::{
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+    },
 };
 
 /// AST node for the `DANOT c;` DA truncation order statement.
@@ -36,31 +43,35 @@ pub struct DanotStatement {
 
 impl FromRule for DanotStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::danot,
-            "Expected `danot` rule when building DANOT statement, found: {:?}", pair.as_rule());
+        ensure!(
+            pair.as_rule() == Rule::danot,
+            "Expected `danot` rule when building DANOT statement, found: {:?}",
+            pair.as_rule()
+        );
 
         let mut inner = pair.into_inner();
 
-        let order_pair = inner.next()
+        let order_pair = inner
+            .next()
             .context("Missing truncation order parameter in DANOT statement!")?;
         let order_expr = Expr::from_rule(order_pair)
             .context("Failed to build order expression in DANOT statement!")?
             .ok_or_else(|| anyhow::anyhow!("Expected expression for order in DANOT statement"))?;
 
-        Ok(Some(DanotStatement {
-            order: order_expr,
-        }))
+        Ok(Some(DanotStatement { order: order_expr }))
     }
 }
 impl TranspileableStatement for DanotStatement {}
 impl Transpile for DanotStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
-        let order_output = self.order.transpile(context)
-            .map_err(|errs| {
-                errs.into_iter()
-                    .map(|e| e.context("...while transpiling order expression in DANOT"))
-                    .collect::<Vec<_>>()
-            })?;
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
+        let order_output = self.order.transpile(context).map_err(|errs| {
+            errs.into_iter()
+                .map(|e| e.context("...while transpiling order expression in DANOT"))
+                .collect::<Vec<_>>()
+        })?;
 
         let serialization = format!(
             "taylor::set_truncation_order({} as u32)?;",

@@ -10,17 +10,20 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
 //! ```
 
+use anyhow::{Error, Result, anyhow, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Error, anyhow, ensure};
 
 use crate::{
     ast::*,
-    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement}
+    transpile::{
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+    },
 };
 
 #[derive(Debug)]
@@ -28,19 +31,25 @@ pub struct BreakStatement;
 
 impl FromRule for BreakStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::break_statement, 
-            "Expected `break_statement` rule when building break statement, found: {:?}", pair.as_rule());
+        ensure!(
+            pair.as_rule() == Rule::break_statement,
+            "Expected `break_statement` rule when building break statement, found: {:?}",
+            pair.as_rule()
+        );
 
         Ok(Some(BreakStatement))
     }
 }
 impl TranspileableStatement for BreakStatement {}
 impl Transpile for BreakStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         if !context.in_loop {
-            return Err(vec!(anyhow!(
+            return Err(vec![anyhow!(
                 "BREAK can only be used inside a WHILE or LOOP block"
-            )));
+            )]);
         }
 
         Ok(TranspilationOutput {

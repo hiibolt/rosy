@@ -19,26 +19,35 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
+use anyhow::{Context, Error, Result, anyhow, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, anyhow, ensure};
 
 use crate::{
     ast::*,
-    program::{expressions::Expr, statements::{Statement, SourceLocation}},
+    program::{
+        expressions::Expr,
+        statements::{SourceLocation, Statement},
+    },
     resolve::{ScopeContext, TypeResolver},
     rosy_lib::RosyType,
-    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, indent}
+    transpile::{
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr,
+        TranspileableStatement, indent,
+    },
 };
 
 #[derive(Debug)]
@@ -58,18 +67,22 @@ pub struct FitStatement {
 }
 impl FromRule for FitStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::fit_statement,
-            "Expected `fit_statement` rule when building FIT statement, found: {:?}", pair.as_rule());
+        ensure!(
+            pair.as_rule() == Rule::fit_statement,
+            "Expected `fit_statement` rule when building FIT statement, found: {:?}",
+            pair.as_rule()
+        );
 
         let mut inner = pair.into_inner();
 
         // Parse start_fit to get variable names
         let fit_variables = {
-            let start_fit = inner
-                .next()
-                .context("Missing first token `start_fit`!")?;
-            ensure!(start_fit.as_rule() == Rule::start_fit,
-                "Expected `start_fit`, found: {:?}", start_fit.as_rule());
+            let start_fit = inner.next().context("Missing first token `start_fit`!")?;
+            ensure!(
+                start_fit.as_rule() == Rule::start_fit,
+                "Expected `start_fit`, found: {:?}",
+                start_fit.as_rule()
+            );
 
             let start_fit_inner = start_fit.into_inner();
             let mut vars = Vec::new();
@@ -89,7 +102,8 @@ impl FromRule for FitStatement {
         // Parse body statements until we hit end_fit
         let mut body = Vec::new();
         let end_fit_pair = loop {
-            let element = inner.next()
+            let element = inner
+                .next()
                 .ok_or_else(|| anyhow::anyhow!("Expected `end_fit` at end of FIT block!"))?;
 
             if element.as_rule() == Rule::end_fit {
@@ -98,7 +112,8 @@ impl FromRule for FitStatement {
 
             let pair_input = element.as_str();
             if let Some(stmt) = Statement::from_rule(element)
-                .with_context(|| format!("Failed to build statement from:\n{}", pair_input))? {
+                .with_context(|| format!("Failed to build statement from:\n{}", pair_input))?
+            {
                 body.push(stmt);
             }
         };
@@ -107,19 +122,22 @@ impl FromRule for FitStatement {
         let (eps, max_iter, algorithm, objectives) = {
             let mut end_fit_inner = end_fit_pair.into_inner();
 
-            let eps_pair = end_fit_inner.next()
+            let eps_pair = end_fit_inner
+                .next()
                 .context("Missing `eps` expression in ENDFIT!")?;
             let eps = Expr::from_rule(eps_pair)
                 .context("Failed to build `eps` expression in ENDFIT!")?
                 .ok_or_else(|| anyhow::anyhow!("Expected expression for `eps` in ENDFIT"))?;
 
-            let max_pair = end_fit_inner.next()
+            let max_pair = end_fit_inner
+                .next()
                 .context("Missing `max` expression in ENDFIT!")?;
             let max_iter = Expr::from_rule(max_pair)
                 .context("Failed to build `max` expression in ENDFIT!")?
                 .ok_or_else(|| anyhow::anyhow!("Expected expression for `max` in ENDFIT"))?;
 
-            let algo_pair = end_fit_inner.next()
+            let algo_pair = end_fit_inner
+                .next()
                 .context("Missing `algorithm` expression in ENDFIT!")?;
             let algorithm = Expr::from_rule(algo_pair)
                 .context("Failed to build `algorithm` expression in ENDFIT!")?
@@ -154,7 +172,7 @@ impl TranspileableStatement for FitStatement {
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
-        _source_location: SourceLocation
+        _source_location: SourceLocation,
     ) -> Option<Result<()>> {
         Some(resolver.discover_slots(&self.body, &mut ctx.clone()))
     }
@@ -170,7 +188,10 @@ impl TranspileableStatement for FitStatement {
     }
 }
 impl Transpile for FitStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut errors = Vec::new();
         let mut requested_variables = BTreeSet::new();
 
@@ -181,13 +202,15 @@ impl Transpile for FitStatement {
                     if scoped_var.data.r#type != RosyType::RE() {
                         errors.push(anyhow!(
                             "FIT variable '{}' must be of type (RE), found '{}'",
-                            var_name, scoped_var.data.r#type
+                            var_name,
+                            scoped_var.data.r#type
                         ));
                     }
                 }
                 None => {
                     errors.push(anyhow!(
-                        "FIT variable '{}' is not declared in this scope!", var_name
+                        "FIT variable '{}' is not declared in this scope!",
+                        var_name
                     ));
                 }
             }
@@ -200,13 +223,15 @@ impl Transpile for FitStatement {
                     if scoped_var.data.r#type != RosyType::RE() {
                         errors.push(anyhow!(
                             "ENDFIT objective '{}' must be of type (RE), found '{}'",
-                            obj_name, scoped_var.data.r#type
+                            obj_name,
+                            scoped_var.data.r#type
                         ));
                     }
                 }
                 None => {
                     errors.push(anyhow!(
-                        "ENDFIT objective '{}' is not declared in this scope!", obj_name
+                        "ENDFIT objective '{}' is not declared in this scope!",
+                        obj_name
                     ));
                 }
             }
@@ -217,23 +242,26 @@ impl Transpile for FitStatement {
         }
 
         // Verify eps, max, and algorithm are RE type
-        let eps_type = self.eps.type_of(context).map_err(|e| vec!(e))?;
+        let eps_type = self.eps.type_of(context).map_err(|e| vec![e])?;
         if eps_type != RosyType::RE() {
-            return Err(vec!(anyhow!(
-                "ENDFIT `eps` must be of type (RE), found '{}'", eps_type
-            )));
+            return Err(vec![anyhow!(
+                "ENDFIT `eps` must be of type (RE), found '{}'",
+                eps_type
+            )]);
         }
-        let max_type = self.max_iter.type_of(context).map_err(|e| vec!(e))?;
+        let max_type = self.max_iter.type_of(context).map_err(|e| vec![e])?;
         if max_type != RosyType::RE() {
-            return Err(vec!(anyhow!(
-                "ENDFIT `max` must be of type (RE), found '{}'", max_type
-            )));
+            return Err(vec![anyhow!(
+                "ENDFIT `max` must be of type (RE), found '{}'",
+                max_type
+            )]);
         }
-        let algo_type = self.algorithm.type_of(context).map_err(|e| vec!(e))?;
+        let algo_type = self.algorithm.type_of(context).map_err(|e| vec![e])?;
         if algo_type != RosyType::RE() {
-            return Err(vec!(anyhow!(
-                "ENDFIT `algorithm` must be of type (RE), found '{}'", algo_type
-            )));
+            return Err(vec![anyhow!(
+                "ENDFIT `algorithm` must be of type (RE), found '{}'",
+                algo_type
+            )]);
         }
 
         // Transpile body statements
@@ -245,7 +273,7 @@ impl Transpile for FitStatement {
                 Ok(output) => {
                     serialized_statements.push(output.serialization);
                     requested_variables.extend(output.requested_variables);
-                },
+                }
                 Err(stmt_errors) => {
                     for e in stmt_errors {
                         errors.push(e.context("...while transpiling statement in FIT block"));
@@ -263,7 +291,7 @@ impl Transpile for FitStatement {
             Ok(output) => {
                 requested_variables.extend(output.requested_variables.clone());
                 output
-            },
+            }
             Err(vec_err) => {
                 for e in vec_err {
                     errors.push(e.context("...while transpiling `eps` in ENDFIT"));
@@ -275,7 +303,7 @@ impl Transpile for FitStatement {
             Ok(output) => {
                 requested_variables.extend(output.requested_variables.clone());
                 output
-            },
+            }
             Err(vec_err) => {
                 for e in vec_err {
                     errors.push(e.context("...while transpiling `max` in ENDFIT"));
@@ -287,7 +315,7 @@ impl Transpile for FitStatement {
             Ok(output) => {
                 requested_variables.extend(output.requested_variables.clone());
                 output
-            },
+            }
             Err(vec_err) => {
                 for e in vec_err {
                     errors.push(e.context("...while transpiling `algorithm` in ENDFIT"));
@@ -304,13 +332,17 @@ impl Transpile for FitStatement {
 
         // Build: let mut fit_vars = vec![var1, var2, ...];
         // FIT variables are always RE (Copy), so we can use them directly.
-        let vars_init = self.fit_variables.iter()
+        let vars_init = self
+            .fit_variables
+            .iter()
             .map(|v| v.clone())
             .collect::<Vec<_>>()
             .join(", ");
 
         // Build inside closure: assign from slice to variables
-        let vars_assign = self.fit_variables.iter()
+        let vars_assign = self
+            .fit_variables
+            .iter()
             .enumerate()
             .map(|(i, v)| format!("{} = __rosy_fit_vars[{}];", v, i))
             .collect::<Vec<_>>()
@@ -318,13 +350,17 @@ impl Transpile for FitStatement {
 
         // Build inside closure: collect objectives into vec
         // Objective variables are always RE (Copy), so we can use them directly.
-        let objs_collect = self.objectives.iter()
+        let objs_collect = self
+            .objectives
+            .iter()
             .map(|o| o.clone())
             .collect::<Vec<_>>()
             .join(", ");
 
         // Build after optimizer: assign back from optimized vec
-        let vars_writeback = self.fit_variables.iter()
+        let vars_writeback = self
+            .fit_variables
+            .iter()
             .enumerate()
             .map(|(i, v)| format!("{} = __rosy_fit_vars[{}];", v, i))
             .collect::<Vec<_>>()

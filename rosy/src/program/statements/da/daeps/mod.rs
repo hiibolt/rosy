@@ -12,22 +12,28 @@
 //! ## Rosy Example
 //! ```
 #![doc = include_str!("test.rosy")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("rosy_output.txt")]
+//! ```
 //! ## COSY Example
 //! ```
 #![doc = include_str!("test.fox")]
+//! ```
 //! **Output**:
 //! ```
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
-use anyhow::{Result, Context, Error, ensure};
+use anyhow::{Context, Error, Result, ensure};
 
 use crate::{
-    ast::*, program::expressions::Expr,
-    transpile::{TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement}
+    ast::*,
+    program::expressions::Expr,
+    transpile::{
+        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+    },
 };
 
 /// AST node for the `DAEPS c;` DA epsilon statement.
@@ -38,12 +44,16 @@ pub struct DaepsStatement {
 
 impl FromRule for DaepsStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::daeps,
-            "Expected `daeps` rule when building DAEPS statement, found: {:?}", pair.as_rule());
+        ensure!(
+            pair.as_rule() == Rule::daeps,
+            "Expected `daeps` rule when building DAEPS statement, found: {:?}",
+            pair.as_rule()
+        );
 
         let mut inner = pair.into_inner();
 
-        let epsilon_pair = inner.next()
+        let epsilon_pair = inner
+            .next()
             .context("Missing epsilon parameter in DAEPS statement!")?;
         let epsilon_expr = Expr::from_rule(epsilon_pair)
             .context("Failed to build epsilon expression in DAEPS statement!")?
@@ -56,13 +66,15 @@ impl FromRule for DaepsStatement {
 }
 impl TranspileableStatement for DaepsStatement {}
 impl Transpile for DaepsStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
-        let epsilon_output = self.epsilon.transpile(context)
-            .map_err(|errs| {
-                errs.into_iter()
-                    .map(|e| e.context("...while transpiling epsilon expression in DAEPS"))
-                    .collect::<Vec<_>>()
-            })?;
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
+        let epsilon_output = self.epsilon.transpile(context).map_err(|errs| {
+            errs.into_iter()
+                .map(|e| e.context("...while transpiling epsilon expression in DAEPS"))
+                .collect::<Vec<_>>()
+        })?;
 
         let serialization = format!(
             "taylor::set_epsilon({} as f64)?;",
