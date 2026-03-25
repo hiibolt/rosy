@@ -282,7 +282,7 @@ impl Transpile for LoopStatement {
         };
 
         let serialization = format!(
-            "for {} in (({} as usize)..=({} as usize)){} {{\n\tlet mut {} = {} as RE;\n{}\n}}",
+            "#[allow(unused_parens)]\nfor {} in (({} as usize)..=({} as usize)){} {{\n\tlet mut {} = {} as RE;\n{}\n}}",
             self.iterator,
             start_output.as_value(),
             end_output.as_value(),

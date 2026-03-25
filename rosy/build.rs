@@ -1,14 +1,25 @@
 use std::fs;
-use std::path::{Path, PathBuf};
 use std::io::Write;
+use std::path::{Path, PathBuf};
 
 mod codegen;
 
 fn main() {
+    // Check if CodeGraph is initialized
+    if !Path::new("../.codegraph").exists() {
+        println!("cargo:warning=CodeGraph is not initialized. For faster code exploration, run:");
+        println!("cargo:warning=  bunx @colbymchenry/codegraph");
+        println!("cargo:warning=  codegraph init");
+        println!("cargo:warning=  codegraph index");
+    }
+
     // Re-run if source changes
     println!("cargo:rerun-if-changed=src/program");
+    println!("cargo:rerun-if-changed=src/rosy_lib");
 
-    // Auto-discover construct test directories
+    // Auto-discover and generate construct test runner (include!'d in test module).
+    // Generation is fast — the output goes to OUT_DIR and is only compiled during
+    // `cargo test` via #[cfg(test)].
     let stmt_tests = codegen::discover_construct_tests(
         Path::new("src/program/statements"),
     );
@@ -16,18 +27,10 @@ fn main() {
         Path::new("src/program/expressions"),
     );
 
-    // Generate the test runner (include!'d in test module)
     codegen::generate_test_runner(&[
         ("statements", &stmt_tests),
         ("expressions", &expr_tests),
     ]);
-
-    println!(
-        "cargo:warning=Codegen complete: {} statements + {} expressions = {} total",
-        stmt_tests.len(),
-        expr_tests.len(),
-        stmt_tests.len() + expr_tests.len()
-    );
 
     // Generate the embedded files at compile time
     let out_dir = std::env::var("OUT_DIR").unwrap();
@@ -47,20 +50,25 @@ fn main() {
     let lib_path = PathBuf::from("src/rosy_lib");
     let files = collect_files(&lib_path, &lib_path);
 
-    let file_count = files.len();
+    let _file_count = files.len();
 
     for file in files {
         let full_path = lib_path.join(&file);
         writeln!(f, "    EmbeddedFile {{").unwrap();
         writeln!(f, "        path: r#\"{}\"#,", file.display()).unwrap();
-        writeln!(f, "        content: include_str!(r#\"{}\"#),",
-            full_path.canonicalize().unwrap().display()).unwrap();
+        writeln!(
+            f,
+            "        content: include_str!(r#\"{}\"#),",
+            full_path.canonicalize().unwrap().display()
+        )
+        .unwrap();
         writeln!(f, "    }},").unwrap();
     }
 
     writeln!(f, "];").unwrap();
 
-    println!("cargo:warning=Embedded {} rosy_lib files", file_count);
+    // Quiet — only print during verbose builds
+    // println!("cargo:warning=Embedded {} rosy_lib files", file_count);
 }
 
 fn collect_files(root: &Path, current: &Path) -> Vec<PathBuf> {

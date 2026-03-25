@@ -213,6 +213,10 @@ fn rosy(script_path: &PathBuf, output_dir: Option<PathBuf>, release: bool, optim
         "debug"
     };
     eprintln!(
+        "{BOLD}        Rosy{RESET} v{}",
+        env!("CARGO_PKG_VERSION")
+    );
+    eprintln!(
         "{BOLD}  Transpiling{RESET} {filename} ({profile_label})"
     );
 
