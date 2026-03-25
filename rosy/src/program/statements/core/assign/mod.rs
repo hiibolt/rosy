@@ -130,6 +130,34 @@ impl TranspileableStatement for AssignStatement {
                             .map(|loc| format!("\n│  📍 Declared at: {}", loc))
                             .unwrap_or_default();
                         let assign_hint = format!("\n│  📍 Assigned at: {}", source_location);
+                        // Mode-aware hint for common VE↔RE patterns
+                        let ve_hint = {
+                            let re = RosyType::RE();
+                            let ve = RosyType::VE();
+                            if (explicit_type == ve && new_type == re)
+                                || (explicit_type == re && new_type == ve)
+                            {
+                                if crate::syntax_config::is_cosy_syntax() {
+                                    format!(
+                                        "\n│\n\
+                                         │  📖 Common COSY vector patterns:\n\
+                                         │     • Build via concatenation:  {} := 0 & 1 & 2;\n\
+                                         │     • Pre-sized array:          VARIABLE {} <mem> <dim>;",
+                                        var_name, var_name
+                                    )
+                                } else {
+                                    format!(
+                                        "\n│\n\
+                                         │  📖 Common vector patterns:\n\
+                                         │     • Build via concatenation:  {} := 0 & 1 & 2;\n\
+                                         │     • Declare as array:         VARIABLE (RE <dim>) {};",
+                                        var_name, var_name
+                                    )
+                                }
+                            } else {
+                                String::new()
+                            }
+                        };
                         return Some(Err(anyhow!(
                             "\n╭─ Type Conflict ──────────────────────────────────────────\n\
                                 │\n\
@@ -139,7 +167,7 @@ impl TranspileableStatement for AssignStatement {
                                 │  💡 Either:\n\
                                 │     • Change the explicit type to match the assignment, or\n\
                                 │     • Split into separate variables: {}_{:?}  and  {}_{:?}\n\
-                                │\n\
+                                │{}\n\
                                 ╰──────────────────────────────────────────────────────────",
                             var_name,
                             scope_str,
@@ -151,6 +179,7 @@ impl TranspileableStatement for AssignStatement {
                             explicit_type.base_type,
                             var_name,
                             new_type.base_type,
+                            ve_hint,
                         )));
                     }
                 }

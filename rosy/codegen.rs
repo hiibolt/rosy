@@ -93,5 +93,5 @@ pub fn generate_test_runner(
         }
     }
 
-    println!("cargo:warning=Generated {} construct test functions", total);
+    let _ = total; // suppress unused warning; count available for debugging
 }
