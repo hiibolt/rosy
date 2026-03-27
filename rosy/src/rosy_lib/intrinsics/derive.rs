@@ -1,6 +1,6 @@
 use crate::rosy_lib::{DA, CD};
-use crate::rosy_lib::taylor::{Monomial, get_config, MAX_VARS, DACoefficient};
-use rustc_hash::FxHashMap as HashMap;
+use crate::rosy_lib::taylor::{get_runtime, DACoefficient};
+use crate::rosy_lib::taylor::config::DERIV_INVALID;
 
 /// Trait for derivation/anti-derivation of DA types.
 /// Positive index = partial derivative, negative index = anti-derivative (integral).
@@ -9,69 +9,89 @@ pub trait RosyDerive {
     fn rosy_derive(&self, var_index: i64) -> anyhow::Result<Self::Output>;
 }
 
-/// Generic derivative implementation for `DA<T>`.
+/// Generic derivative using precomputed index tables (issues #19 + #21).
+///
+/// Zero allocations beyond the pool-allocated output array. Single linear scan
+/// over nonzero entries with O(1) index lookups via `deriv_target`/`deriv_exponent`.
 fn da_derivative<T: DACoefficient>(da: &crate::rosy_lib::taylor::da::DA<T>, var_idx: usize) -> anyhow::Result<crate::rosy_lib::taylor::da::DA<T>> {
-    let config = get_config()?;
-    let mut result_coeffs: HashMap<Monomial, T> = HashMap::default();
-    
-    // For each term c * x1^a1 * x2^a2 * ... * xn^an,
-    // d/dx_i = a_i * c * x1^a1 * ... * x_i^(a_i - 1) * ... * xn^an
-    for (monomial, coeff) in da.coeffs_iter().into_iter() {
-        let exp_i = monomial.exponents[var_idx];
-        if exp_i == 0 {
-            continue; // This term vanishes under differentiation
-        }
+    let rt = get_runtime()?;
+    let n = rt.num_monomials;
+    let epsilon = rt.config.epsilon;
+    let base = var_idx * n;
 
-        let mut new_exponents = monomial.exponents;
-        new_exponents[var_idx] -= 1;
-        let new_monomial = Monomial::new(new_exponents);
+    let mut coeffs = T::pool_alloc(n);
+    let mut nonzero = Vec::new();
 
-        // Multiply coefficient by the exponent (direct multiply, matching DACE)
-        let new_coeff = coeff * T::from_usize(exp_i as usize);
-        
-        if new_coeff.abs() > config.epsilon {
-            *result_coeffs.entry(new_monomial).or_insert(T::zero()) += new_coeff;
+    for &idx in &da.nonzero {
+        let i = idx as usize;
+        let exp_v = rt.deriv_exponent[base + i];
+        if exp_v == 0 { continue; }
+
+        let target = rt.deriv_target[base + i];
+        if target == DERIV_INVALID { continue; }
+
+        let new_coeff = da.coeffs[i] * T::from_usize(exp_v as usize);
+        if new_coeff.abs() > epsilon {
+            let tu = target as usize;
+            coeffs[tu] = coeffs[tu] + new_coeff;
+            nonzero.push(target);
         }
     }
-    
-    // Remove small coefficients
-    result_coeffs.retain(|_, &mut coeff| coeff.abs() > config.epsilon);
-    
-    Ok(crate::rosy_lib::taylor::da::DA::from_coeffs(result_coeffs))
+
+    // Deduplicate nonzero list and filter small coefficients
+    nonzero.sort_unstable();
+    nonzero.dedup();
+    nonzero.retain(|&k| {
+        if coeffs[k as usize].abs() > epsilon {
+            true
+        } else {
+            coeffs[k as usize] = T::zero();
+            false
+        }
+    });
+
+    Ok(crate::rosy_lib::taylor::da::DA { coeffs, nonzero })
 }
 
-/// Generic anti-derivative (integral) implementation for `DA<T>`.
+/// Generic anti-derivative (integral) using precomputed index tables (issues #19 + #21).
 fn da_antiderivative<T: DACoefficient>(da: &crate::rosy_lib::taylor::da::DA<T>, var_idx: usize) -> anyhow::Result<crate::rosy_lib::taylor::da::DA<T>> {
-    let config = get_config()?;
-    let mut result_coeffs: HashMap<Monomial, T> = HashMap::default();
-    
-    // For each term c * x1^a1 * x2^a2 * ... * xn^an,
-    // integral w.r.t. x_i = c/(a_i + 1) * x1^a1 * ... * x_i^(a_i + 1) * ... * xn^an
-    for (monomial, coeff) in da.coeffs_iter().into_iter() {
-        let exp_i = monomial.exponents[var_idx];
-        let new_exp = exp_i + 1;
-        
-        let mut new_exponents = monomial.exponents;
-        new_exponents[var_idx] = new_exp;
-        let new_monomial = Monomial::new(new_exponents);
-        
-        // Skip if the new monomial exceeds the max order
-        if !new_monomial.within_order(config.max_order) {
-            continue;
-        }
-        
-        // Divide coefficient by (exp_i + 1) (direct divide, matching DACE)
-        let new_coeff = coeff / T::from_usize(new_exp as usize);
-        
-        if new_coeff.abs() > config.epsilon {
-            *result_coeffs.entry(new_monomial).or_insert(T::zero()) += new_coeff;
+    let rt = get_runtime()?;
+    let n = rt.num_monomials;
+    let epsilon = rt.config.epsilon;
+    let base = var_idx * n;
+
+    let mut coeffs = T::pool_alloc(n);
+    let mut nonzero = Vec::new();
+
+    for &idx in &da.nonzero {
+        let i = idx as usize;
+        let target = rt.integ_target[base + i];
+        if target == DERIV_INVALID { continue; }
+
+        let exp_v = rt.deriv_exponent[base + i];
+        let new_exp = exp_v as usize + 1;
+        let new_coeff = da.coeffs[i] / T::from_usize(new_exp);
+
+        if new_coeff.abs() > epsilon {
+            let tu = target as usize;
+            coeffs[tu] = coeffs[tu] + new_coeff;
+            nonzero.push(target);
         }
     }
-    
-    // Remove small coefficients
-    result_coeffs.retain(|_, &mut coeff| coeff.abs() > config.epsilon);
-    
-    Ok(crate::rosy_lib::taylor::da::DA::from_coeffs(result_coeffs))
+
+    // Deduplicate nonzero list and filter small coefficients
+    nonzero.sort_unstable();
+    nonzero.dedup();
+    nonzero.retain(|&k| {
+        if coeffs[k as usize].abs() > epsilon {
+            true
+        } else {
+            coeffs[k as usize] = T::zero();
+            false
+        }
+    });
+
+    Ok(crate::rosy_lib::taylor::da::DA { coeffs, nonzero })
 }
 
 impl RosyDerive for DA {

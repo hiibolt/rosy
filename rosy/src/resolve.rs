@@ -525,10 +525,22 @@ impl TypeResolver {
         }
 
         let rule = node.rule.clone();
+        let declared_at = node.declared_at.clone();
+        let assigned_at = node.assigned_at.clone();
         let resolved_type = match rule {
             ResolutionRule::Explicit(t) => t,
-            ResolutionRule::InferredFrom { recipe, .. } => {
-                self.evaluate_recipe(&recipe)?
+            ResolutionRule::InferredFrom { recipe, reason } => {
+                self.evaluate_recipe(&recipe).map_err(|e| {
+                    let mut ctx = format!("while resolving {}", slot);
+                    if let Some(loc) = &assigned_at {
+                        ctx.push_str(&format!("\n  📍 Assigned at: {}", loc));
+                    }
+                    if let Some(loc) = &declared_at {
+                        ctx.push_str(&format!("\n  📍 Declared at: {}", loc));
+                    }
+                    ctx.push_str(&format!("\n  ({})", reason));
+                    e.context(ctx)
+                })?
             }
             ResolutionRule::Mirror { source, .. } => {
                 self.nodes.get(&source)
@@ -539,13 +551,12 @@ impl TypeResolver {
                     ))?
             }
             ResolutionRule::Unresolved => {
-                // No rule was ever established — default to RE (COSY behavior:
-                // all untyped variables that are never assigned default to RE).
-                tracing::debug!(
-                    "Defaulting unresolved slot {} to RE (COSY default)",
-                    slot
-                );
-                RosyType::RE()
+                let mut msg = format!("No type could be determined for {}", slot);
+                if let Some(loc) = &node.declared_at {
+                    msg.push_str(&format!("\n  📍 Declared at: {}", loc));
+                }
+                msg.push_str("\n  💡 Add an explicit type annotation or assign a value with a known type.");
+                return Err(anyhow!("{}", msg));
             }
         };
 

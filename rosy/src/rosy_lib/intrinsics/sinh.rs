@@ -78,24 +78,20 @@ impl RosySINH for DA {
 ///
 /// c_n = [sinh_f0, cosh_f0][n%2] / n!
 fn da_sinh(da: &DA) -> anyhow::Result<DA> {
-    let config = crate::rosy_lib::taylor::get_config()?;
-    let max_order = config.max_order as usize;
+    let rt = crate::rosy_lib::taylor::get_runtime()?;
+    let nocut = rt.config.max_order as usize;
 
     let f0 = da.constant_part();
-    let sinh_f0 = f0.sinh();
-    let cosh_f0 = f0.cosh();
+    let da_prime = da.make_prime();
 
-    let mut da_prime = da.clone();
-    da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
-
-    let cycle = [sinh_f0, cosh_f0];
-    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
-    let mut factorial = 1.0;
-    for n in 0..=max_order {
-        if n > 0 { factorial *= n as f64; }
-        taylor_coeffs.push(cycle[n % 2] / factorial);
+    // Recurrence: xf[i] = xf[i-2] / (i*(i-1))  (no negation for sinh/cosh)
+    let mut xf = Vec::with_capacity(nocut + 1);
+    xf.push(f0.sinh());
+    if nocut >= 1 { xf.push(f0.cosh()); }
+    for i in 2..=nocut {
+        xf.push(xf[i - 2] / ((i * (i - 1)) as f64));
     }
 
-    DA::horner_eval(&da_prime, &taylor_coeffs)
+    DA::horner_eval_with_rt(&da_prime, &xf, &rt)
 }
 

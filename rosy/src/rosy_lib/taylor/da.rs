@@ -43,6 +43,30 @@ pub trait DACoefficient:
 
 thread_local! {
     static F64_POOL: RefCell<Vec<Vec<f64>>> = RefCell::new(Vec::new());
+    static BITSET_POOL: RefCell<Vec<Vec<u64>>> = RefCell::new(Vec::new());
+}
+
+/// Get a zeroed bitset from the thread-local pool, or allocate fresh.
+pub(crate) fn bitset_pool_alloc(words: usize) -> Vec<u64> {
+    BITSET_POOL.with(|pool| {
+        let mut pool = pool.borrow_mut();
+        while let Some(v) = pool.pop() {
+            if v.len() == words {
+                return v;
+            }
+        }
+        vec![0u64; words]
+    })
+}
+
+/// Return a bitset to the pool after clearing the set bits (O(popcount)).
+pub(crate) fn bitset_pool_return(mut v: Vec<u64>) {
+    if v.is_empty() { return; }
+    // Clear only the set words — most words are zero
+    for w in v.iter_mut() {
+        *w = 0;
+    }
+    BITSET_POOL.with(|pool| pool.borrow_mut().push(v));
 }
 
 impl DACoefficient for f64 {
@@ -318,6 +342,23 @@ impl<T: DACoefficient> DA<T> {
             self.coeffs[0] = T::zero();
         }
     }
+
+    /// Create the "prime" (non-constant) part of a DA for series evaluation.
+    ///
+    /// Clones the DA and zeroes its constant part in O(1). Unlike the old
+    /// pattern of `da.clone()` + `set_coeff(Monomial::constant(), 0.0)`,
+    /// this avoids the RwLock acquisition and HashMap lookup in `set_coeff`.
+    pub fn make_prime(&self) -> Self {
+        let mut prime = self.clone();
+        if prime.coeffs[0].abs() > 1e-15 {
+            prime.coeffs[0] = T::zero();
+            // Remove 0 from nonzero list
+            if let Some(pos) = prime.nonzero.iter().position(|&i| i == 0) {
+                prime.nonzero.swap_remove(pos);
+            }
+        }
+        prime
+    }
 }
 
 // ============================================================================
@@ -505,6 +546,89 @@ impl<T: DACoefficient> Sub<T> for &DA<T> {
 // Multiplication: O(K²) inner loop, pool-allocated result, bitset tracking
 // ============================================================================
 
+impl<T: DACoefficient> DA<T> {
+    /// Multiply two DAs with a custom truncation order (for progressive Horner).
+    ///
+    /// Uses inline order checking to skip pairs where `order_a + order_b > trunc_order`.
+    /// No auxiliary data structures are allocated — just one comparison per pair.
+    /// This enables progressive order truncation in Horner evaluation (issue #18).
+    pub fn multiply_truncated(&self, rhs: &DA<T>, trunc_order: u32) -> Result<DA<T>> {
+        let rt = get_runtime()?;
+        Self::multiply_truncated_with_rt(self, rhs, trunc_order, &rt)
+    }
+
+    /// Inner implementation that takes an already-acquired runtime reference.
+    /// Avoids redundant RwLock acquisition when called in a loop (e.g. Horner).
+    pub(crate) fn multiply_truncated_with_rt(lhs: &DA<T>, rhs: &DA<T>, trunc_order: u32, rt: &TaylorRuntime) -> Result<DA<T>> {
+        let n = rt.num_monomials;
+        let epsilon = rt.config.epsilon;
+        let orders = &rt.monomial_orders;
+        let trunc_order_u8 = trunc_order as u8;
+
+        let mut result = T::pool_alloc(n);
+        let words = (n + 63) / 64;
+        let mut written = bitset_pool_alloc(words);
+
+        if let Some(table) = &rt.mult_table {
+            for &i in &lhs.nonzero {
+                let ci = lhs.coeffs[i as usize];
+                let oi = orders[i as usize];
+                if oi > trunc_order_u8 { continue; }
+                let max_b_order = trunc_order_u8 - oi;
+                let row = i as usize * n;
+                for &j in &rhs.nonzero {
+                    if orders[j as usize] > max_b_order { continue; }
+                    let k = table[row + j as usize];
+                    if k != MULT_INVALID {
+                        let ku = k as usize;
+                        result[ku] = ci.mul_add(rhs.coeffs[j as usize], result[ku]);
+                        written[ku / 64] |= 1u64 << (ku % 64);
+                    }
+                }
+            }
+        } else {
+            for &i in &lhs.nonzero {
+                let ci = lhs.coeffs[i as usize];
+                let oi = orders[i as usize];
+                if oi > trunc_order_u8 { continue; }
+                let max_b_order = trunc_order_u8 - oi;
+                for &j in &rhs.nonzero {
+                    if orders[j as usize] > max_b_order { continue; }
+                    let product = rt.monomial_list[i as usize].multiply(&rt.monomial_list[j as usize]);
+                    if product.within_order(trunc_order) {
+                        if let Some(&k) = rt.monomial_index.get(&product) {
+                            let ku = k as usize;
+                            result[ku] = ci.mul_add(rhs.coeffs[j as usize], result[ku]);
+                            written[ku / 64] |= 1u64 << (ku % 64);
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut nonzero = Vec::new();
+        for word_idx in 0..words {
+            let mut word = written[word_idx];
+            while word != 0 {
+                let bit = word.trailing_zeros() as usize;
+                let idx = word_idx * 64 + bit;
+                if idx < n {
+                    if result[idx].abs() > epsilon {
+                        nonzero.push(idx as u32);
+                    } else {
+                        result[idx] = T::zero();
+                    }
+                }
+                word &= word - 1;
+            }
+        }
+
+        bitset_pool_return(written);
+
+        Ok(DA { coeffs: result, nonzero })
+    }
+}
+
 impl<T: DACoefficient> Mul<&DA<T>> for &DA<T> {
     type Output = Result<DA<T>>;
 
@@ -518,7 +642,7 @@ impl<T: DACoefficient> Mul<&DA<T>> for &DA<T> {
         let mut result = T::pool_alloc(n);
 
         let words = (n + 63) / 64;
-        let mut written = vec![0u64; words];
+        let mut written = bitset_pool_alloc(words);
 
         if let Some(table) = &rt.mult_table {
             for &i in &self.nonzero {
@@ -567,6 +691,8 @@ impl<T: DACoefficient> Mul<&DA<T>> for &DA<T> {
                 word &= word - 1;
             }
         }
+
+        bitset_pool_return(written);
 
         Ok(DA { coeffs: result, nonzero })
     }

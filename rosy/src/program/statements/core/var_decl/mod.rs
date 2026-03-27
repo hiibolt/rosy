@@ -206,21 +206,28 @@ impl FromRule for VarDeclStatement {
             }
         } else {
             // ── Rosy mode (default) ──
-            if r#type.is_some() && !memory_sizes.is_empty() {
-                // When an explicit type is provided, all dimensions must be
-                // inside the type parens — trailing expressions are not allowed.
-                let type_name = r#type.as_ref().unwrap().base_type;
-                anyhow::bail!(
-                    "In Rosy syntax, array dimensions must be declared inside the type annotation.\n\
-                     Found: VARIABLE ({type_name:?}) {name} <{n} trailing expr(s)> ;\n\
-                     Expected: VARIABLE ({type_name:?} <dims...>) {name} ;\n\
-                     Hint: Move the dimensions into the parentheses, e.g. VARIABLE (RE 3 5) MY_ARRAY ;",
-                    n = memory_sizes.len(),
-                );
+            // Nothing is allowed after the variable name — dimensions go
+            // inside the type parentheses, and memory sizes don't exist.
+            if !memory_sizes.is_empty() {
+                if r#type.is_some() {
+                    let type_name = r#type.as_ref().unwrap().base_type;
+                    anyhow::bail!(
+                        "In Rosy syntax, array dimensions must be declared inside the type annotation.\n\
+                         Found: VARIABLE ({type_name:?}) {name} <{n} trailing expr(s)> ;\n\
+                         Expected: VARIABLE ({type_name:?} <dims...>) {name} ;\n\
+                         Hint: Move the dimensions into the parentheses, e.g. VARIABLE (RE 3 5) MY_ARRAY ;",
+                        n = memory_sizes.len(),
+                    );
+                } else {
+                    anyhow::bail!(
+                        "In Rosy syntax, nothing is allowed after the variable name.\n\
+                         Found: VARIABLE {name} <{n} trailing expr(s)> ;\n\
+                         Expected: VARIABLE {name} ;  or  VARIABLE (TYPE) {name} ;\n\n\
+                         Hint: If you need an array, declare dimensions in the type:\n> VARIABLE (RE 3 5) {name} ;",
+                        n = memory_sizes.len(),
+                    );
+                }
             }
-            // For inferred-type variables (no explicit type), trailing
-            // expressions are the array dimensions (unchanged behavior).
-            dimension_exprs.extend(memory_sizes);
         }
 
         let data = VariableDeclarationData {

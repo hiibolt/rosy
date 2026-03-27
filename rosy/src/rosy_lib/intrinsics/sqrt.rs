@@ -87,34 +87,27 @@ impl RosySQRT for DA {
 fn da_sqrt(da: &DA) -> anyhow::Result<DA> {
     use crate::rosy_lib::taylor::DACoefficient;
 
-    let config = crate::rosy_lib::taylor::get_config()?;
-    let max_order = config.max_order as usize;
+    let rt = crate::rosy_lib::taylor::get_runtime()?;
+    let nocut = rt.config.max_order as usize;
 
     let f0 = da.constant_part();
     anyhow::ensure!(f0 > 0.0, "SQRT: constant part of DA must be positive, got {}", f0);
 
     let sqrt_f0 = f0.sqrt();
-
-    // Create delta = (f - f0) / f0
-    let mut da_prime = da.clone();
-    da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
+    let da_prime = da.make_prime();
     let da_delta = (&da_prime * DA::from_coeff(1.0 / f0))?;
 
-    // Precompute binomial coefficients C(1/2, n)
-    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
-    taylor_coeffs.push(1.0); // C(1/2, 0) = 1
+    // Binomial coefficients C(1/2, n) via recurrence
+    let mut xf = Vec::with_capacity(nocut + 1);
+    xf.push(1.0);
     let mut binom_coeff = 0.5_f64;
-    for n in 1..=max_order {
-        taylor_coeffs.push(binom_coeff);
+    for n in 1..=nocut {
+        xf.push(binom_coeff);
         binom_coeff *= (0.5 - n as f64) / (n as f64 + 1.0);
     }
 
-    // Horner's evaluation of (1 + u)^(1/2)
-    let mut result = DA::horner_eval(&da_delta, &taylor_coeffs)?;
-
-    // Multiply by sqrt(f0)
+    let mut result = DA::horner_eval_with_rt(&da_delta, &xf, &rt)?;
     result = (&result * DA::from_coeff(sqrt_f0))?;
-
     Ok(result)
 }
 

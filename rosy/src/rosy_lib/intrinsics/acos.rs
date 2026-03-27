@@ -75,47 +75,41 @@ impl RosyACOS for DA {
 fn da_acos(da: &DA) -> anyhow::Result<DA> {
     use crate::rosy_lib::taylor::DACoefficient;
 
-    let config = crate::rosy_lib::taylor::get_config()?;
-    let max_order = config.max_order as usize;
+    let rt = crate::rosy_lib::taylor::get_runtime()?;
+    let nocut = rt.config.max_order as usize;
 
     let f0 = da.constant_part();
+    let da_prime = da.make_prime();
 
-    // Create DA with constant part removed (δf = f - f₀)
-    let mut da_prime = da.clone();
-    da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
-
-    // Compute derivatives of acos at f0.
-    // acos'(x) = -1/sqrt(1-x^2), and higher derivatives use the same recurrence as asin
-    // but negated: since acos(x) = pi/2 - asin(x), d^n acos / dx^n = -d^n asin / dx^n for n >= 1.
-    let mut derivs = vec![0.0f64; max_order + 1];
+    // Compute derivatives of acos at f0 (same recurrence as asin, but derivs[1] = -1/sqrt(1-x^2))
+    let mut derivs = vec![0.0f64; nocut + 1];
     derivs[0] = f0.acos();
-    if max_order >= 1 {
+    if nocut >= 1 {
         let denom = (1.0 - f0 * f0).sqrt();
         if denom.abs() < 1e-15 {
             return Err(anyhow::anyhow!("ACOS is not differentiable at x = ±1"));
         }
         derivs[1] = -1.0 / denom;
     }
-    if max_order >= 2 {
+    if nocut >= 2 {
         let denom = 1.0 - f0 * f0;
         if denom.abs() < 1e-15 {
             return Err(anyhow::anyhow!("ACOS is not differentiable at x = ±1"));
         }
-        for n in 1..max_order {
-            // Same recurrence as asin but negated: acos satisfies (1-x²)*f'' + (2n-1)*x*f' + (n-1)^2 * f_{n-1} = 0
+        for n in 1..nocut {
             let n_f = n as f64;
             derivs[n + 1] = ((2.0 * n_f - 1.0) * f0 * derivs[n] + (n_f - 1.0).powi(2) * derivs[n - 1]) / (1.0 - f0 * f0);
         }
     }
 
-    // Precompute Taylor coefficients c_n = derivs[n] / n!
-    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
+    // Taylor coefficients c_n = derivs[n] / n!
+    let mut xf = Vec::with_capacity(nocut + 1);
     let mut factorial = 1.0;
-    for n in 0..=max_order {
+    for n in 0..=nocut {
         if n > 0 { factorial *= n as f64; }
-        taylor_coeffs.push(derivs[n] / factorial);
+        xf.push(derivs[n] / factorial);
     }
 
-    DA::horner_eval(&da_prime, &taylor_coeffs)
+    DA::horner_eval_with_rt(&da_prime, &xf, &rt)
 }
 

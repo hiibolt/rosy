@@ -1,3 +1,0 @@
-DA Bending Magnet Benchmark T2: order 5, 4 vars, 1000 iterations
-Result constant part:  1.109104408088299    
-CPUSEC: 0.1007590000000000E-01

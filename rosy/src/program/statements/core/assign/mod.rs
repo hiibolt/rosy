@@ -51,7 +51,8 @@ use anyhow::{Context, Error, Result, anyhow, ensure};
 #[derive(Debug)]
 pub struct AssignStatement {
     pub identifier: VariableIdentifier,
-    pub value: Expr,
+    /// `None` when RHS is `.` (clear/reset), `Some` for normal expressions.
+    pub value: Option<Expr>,
 }
 
 impl FromRule for AssignStatement {
@@ -72,14 +73,20 @@ impl FromRule for AssignStatement {
                 anyhow::anyhow!("Expected variable identifier for assignment statement")
             })?;
 
-        let expr_pair = inner.next().context("Missing second token `expr`!")?;
-        let expr = Expr::from_rule(expr_pair)
-            .context("Failed to build expression for assignment statement!")?
-            .ok_or_else(|| anyhow::anyhow!("Expected expression for assignment statement"))?;
+        let rhs_pair = inner.next().context("Missing second token in assignment!")?;
+        let value = if rhs_pair.as_rule() == crate::ast::Rule::empty_literal {
+            None
+        } else {
+            Some(
+                Expr::from_rule(rhs_pair)
+                    .context("Failed to build expression for assignment statement!")?
+                    .ok_or_else(|| anyhow::anyhow!("Expected expression for assignment statement"))?,
+            )
+        };
 
         Ok(Some(AssignStatement {
             identifier,
-            value: expr,
+            value,
         }))
     }
 }
@@ -90,8 +97,14 @@ impl TranspileableStatement for AssignStatement {
         ctx: &mut ScopeContext,
         source_location: SourceLocation,
     ) -> Option<Result<()>> {
+        // Clear assignments (`:= .`) don't affect type resolution
+        let value = match &self.value {
+            Some(v) => v,
+            None => return Some(Ok(())),
+        };
+
         // Discover function call sites within the RHS expression
-        if let Err(e) = resolver.discover_expr_function_calls(&self.value, ctx) {
+        if let Err(e) = resolver.discover_expr_function_calls(value, ctx) {
             return Some(Err(e.context(
                 "...while discovering function call dependencies in assignment statement",
             )));
@@ -105,7 +118,7 @@ impl TranspileableStatement for AssignStatement {
 
         // Build a recipe for the RHS expression and collect its dependencies
         let mut deps = HashSet::new();
-        let recipe = resolver.build_expr_recipe(&self.value, ctx, &mut deps);
+        let recipe = resolver.build_expr_recipe(value, ctx, &mut deps);
 
         if let Some(node) = resolver.nodes.get(&var_slot) {
             if node.resolved.is_some() {
@@ -118,7 +131,11 @@ impl TranspileableStatement for AssignStatement {
                 let num_indices = self.identifier.num_index_dimensions();
                 explicit_type.dimensions = explicit_type.dimensions.saturating_sub(num_indices);
                 if let Ok(new_type) = resolver.evaluate_recipe(&recipe) {
-                    if new_type != explicit_type {
+                    // Allow RE→VE coercion: assigning a scalar RE to a VE
+                    // variable resets it to a single-element vector (COSY compat).
+                    let is_re_to_ve_coercion = explicit_type == RosyType::VE()
+                        && new_type == RosyType::RE();
+                    if new_type != explicit_type && !is_re_to_ve_coercion {
                         let scope_str = if ctx.scope_path.is_empty() {
                             "global scope".to_string()
                         } else {
@@ -335,11 +352,76 @@ impl Transpile for AssignStatement {
         &self,
         context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>> {
-        // Get the variable type and ensure the value type is compatible
+        // Get the variable type
         let variable_type = self.identifier.type_of(context).map_err(|e| {
             vec![e.context("...while determining type of variable identifier for assignment")]
         })?;
-        let value_type = self.value.type_of(context).map_err(|e| {
+
+        // Handle clear assignment (`:= .`)
+        if self.value.is_none() {
+            // Only allowed on VE or array types (dimensions > 0)
+            let is_ve = variable_type.base_type == RosyBaseType::VE && variable_type.dimensions == 0;
+            let is_array = variable_type.dimensions > 0;
+            if !is_ve && !is_array {
+                return Err(vec![anyhow!(
+                    "Cannot use '.' (clear) on variable '{}' of type '{}' — only VE or array types can be cleared.",
+                    self.identifier.name,
+                    variable_type
+                )]);
+            }
+
+            let mut requested_variables = BTreeSet::new();
+            let ident_output = self.identifier.transpile(context).map_err(|e| {
+                e.into_iter()
+                    .map(|err| err.context(format!(
+                        "...while transpiling identifier for clear assignment to '{}'",
+                        self.identifier.name
+                    )))
+                    .collect::<Vec<Error>>()
+            })?;
+            requested_variables.extend(ident_output.requested_variables.iter().cloned());
+
+            // Generate the empty value for the type
+            let empty_value = if is_ve {
+                "vec![]".to_string()
+            } else {
+                // For arrays, create nested empty vecs
+                let mut result = "vec![]".to_string();
+                for _ in 1..variable_type.dimensions {
+                    result = format!("vec![{}]", result);
+                }
+                result
+            };
+
+            let dereference = match context
+                .variables
+                .get(&self.identifier.name)
+                .ok_or(vec![anyhow::anyhow!(
+                    "Variable '{}' is not defined in this scope!",
+                    self.identifier.name
+                )])?
+                .scope
+            {
+                VariableScope::Local => "",
+                VariableScope::Arg => "*",
+                VariableScope::Higher => {
+                    requested_variables.insert(self.identifier.name.clone());
+                    "*"
+                }
+            };
+            let serialization = format!(
+                "{}{} = {};",
+                dereference, ident_output.serialization, empty_value
+            );
+            return Ok(TranspilationOutput {
+                serialization,
+                requested_variables,
+                ..Default::default()
+            });
+        }
+
+        let value = self.value.as_ref().unwrap();
+        let value_type = value.type_of(context).map_err(|e| {
             vec![e.context("...while determining type of value expression for assignment")]
         })?;
         // Check for RE→VE coercion: if variable is VE and value is RE,
@@ -378,7 +460,7 @@ impl Transpile for AssignStatement {
         let serialized_identifier = ident_output.serialization;
 
         // Serialize the value
-        let value_output = match self.value.transpile(context) {
+        let value_output = match value.transpile(context) {
             Ok(output) => output,
             Err(value_errors) => {
                 for err in value_errors {

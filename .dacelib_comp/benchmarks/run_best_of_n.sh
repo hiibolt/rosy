@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-#  Rosy (release) vs Rosy (optimized) vs DACELIB (-O3) — Best of 50
+#  Rosy (release) vs Rosy (optimized) vs DACELIB (-O3) — Best of N
 # ============================================================================
 set -euo pipefail
 
@@ -10,7 +10,7 @@ ROSY_BIN="$ROSY_ROOT/target/release/rosy"
 DACE_BENCH_DIR="$ROSY_ROOT/.dacelib_comp/benchmarks/build"
 NON_MPI_DIR="$ROSY_ROOT/examples/performance/non_mpi"
 BUILD_DIR=$(mktemp -d /tmp/rosy_dace_bench_XXXXXX)
-RUNS=50
+RUNS="${1:-50}"
 trap "rm -rf $BUILD_DIR" EXIT
 
 echo ""

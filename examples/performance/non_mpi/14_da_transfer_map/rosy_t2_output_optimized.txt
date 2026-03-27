@@ -1,3 +1,0 @@
-DA Transfer Map Benchmark T2: order 5, 6 vars, 1000 iterations
-Result constant part:  0.000000000000000    
-CPUSEC: 0.9268010000000000E-03

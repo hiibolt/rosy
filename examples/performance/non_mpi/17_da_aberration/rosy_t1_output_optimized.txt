@@ -1,3 +1,0 @@
-DA Aberration Benchmark T1: order 5, 6 vars, 10 iterations
-Result constant part:  1.800000000000000    
-CPUSEC: 0.3980000000000010E-04

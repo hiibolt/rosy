@@ -270,8 +270,9 @@ endif = { ^"ENDIF" ~ semicolon }
     "DA" |
     "CD" }
 
-/// Assignment
-assignment  = { variable_identifier ~ ":=" ~ expr ~ semicolon }
+/// Assignment — RHS can be an expression or `.` (clear/reset)
+assignment  = { variable_identifier ~ ":=" ~ (empty_literal | expr) ~ semicolon }
+empty_literal = { "." }
 
 // Expression parsing using Pratt parser
 expr = { term ~ (infix_op ~ term)* }

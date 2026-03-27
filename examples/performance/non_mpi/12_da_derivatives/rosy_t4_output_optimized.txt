@@ -1,3 +1,0 @@
-DA Derivatives Benchmark T4: order 10, 3 vars, 500000 iterations
-Result constant part:  0.000000000000000    
-CPUSEC:  2.045960055999999    

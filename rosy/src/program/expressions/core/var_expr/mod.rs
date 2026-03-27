@@ -199,6 +199,55 @@ impl TranspileableExpr for VarExpr {
             )),
         }
     }
+    fn discover_expr_function_calls(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &ScopeContext,
+    ) -> Option<Result<()>> {
+        let ident = &self.identifier;
+        let num_groups = ident.paren_groups.len();
+        let is_var = ctx.variables.contains_key(&ident.name);
+        let is_func = ctx.functions.contains_key(&ident.name);
+
+        let is_function_call = match num_groups {
+            0 => false,
+            1 => {
+                let num_args = ident.paren_groups[0].len();
+                if num_args > 1 {
+                    true
+                } else {
+                    !is_var && is_func
+                }
+            }
+            _ => false,
+        };
+
+        if is_function_call {
+            // Recursively discover function calls in each argument expression
+            for arg in &ident.paren_groups[0] {
+                if let Err(e) = resolver.discover_expr_function_calls(arg, ctx) {
+                    return Some(Err(e));
+                }
+            }
+            // Wire up call-site argument type dependencies
+            Some(resolver.discover_call_site_deps(&ident.name, &ident.paren_groups[0], true, ctx))
+        } else {
+            // Variable access — recurse into any index expressions
+            for group in &ident.paren_groups {
+                for expr in group {
+                    if let Err(e) = resolver.discover_expr_function_calls(expr, ctx) {
+                        return Some(Err(e));
+                    }
+                }
+            }
+            for expr in &ident.bracket_indices {
+                if let Err(e) = resolver.discover_expr_function_calls(expr, ctx) {
+                    return Some(Err(e));
+                }
+            }
+            None
+        }
+    }
     fn build_expr_recipe(
         &self,
         _resolver: &TypeResolver,
@@ -206,7 +255,37 @@ impl TranspileableExpr for VarExpr {
         deps: &mut HashSet<TypeSlot>,
     ) -> Option<ExprRecipe> {
         let ident = &self.identifier;
-        if let Some(slot) = ctx.variables.get(&ident.name) {
+        let num_groups = ident.paren_groups.len();
+        let is_var = ctx.variables.contains_key(&ident.name);
+        let is_func = ctx.functions.contains_key(&ident.name);
+
+        // Apply the same disambiguation logic as classify():
+        // - 0 paren groups → variable
+        // - 1 group, multiple args → function call
+        // - 1 group, 1 arg → prefer variable if it exists, else function
+        // - ≥2 groups → variable (multi-dim indexing)
+        let is_function_call = match num_groups {
+            0 => false,
+            1 => {
+                let num_args = ident.paren_groups[0].len();
+                if num_args > 1 {
+                    true
+                } else {
+                    // Single arg: variable wins if it exists, else function
+                    !is_var && is_func
+                }
+            }
+            _ => false,
+        };
+
+        if is_function_call {
+            if let Some((ret_slot, _)) = ctx.functions.get(&ident.name) {
+                deps.insert(ret_slot.clone());
+                Some(ExprRecipe::Variable(ret_slot.clone()))
+            } else {
+                Some(ExprRecipe::Unknown)
+            }
+        } else if let Some(slot) = ctx.variables.get(&ident.name) {
             deps.insert(slot.clone());
             let num_indices = ident.num_index_dimensions();
             if num_indices > 0 {
