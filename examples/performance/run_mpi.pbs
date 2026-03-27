@@ -50,12 +50,17 @@ for dir in mpi/*/; do
     [[ -f "$rosy_file" ]] || continue
     NUM=$((NUM + 1))
 
-    # Build Rosy (fresh build dir per benchmark to avoid stale LTO artifacts)
-    BUILD_DIR=$(mktemp -d /tmp/rosy_mpi_XXXXXX)
+    # Build Rosy (fresh build dir per benchmark, retry once on failure)
+    BUILD_DIR=$(mktemp -d /tmp/rosy_mpi_rel_XXXXXX)
     if ! rosy build "$rosy_file" --release -d "$BUILD_DIR" -o "$dir/bench_rosy" 2>/dev/null; then
         rm -rf "$BUILD_DIR"
-        printf "%-30s %11s\n" "$name" "BUILD FAIL"
-        continue
+        sleep 5
+        BUILD_DIR=$(mktemp -d /tmp/rosy_mpi_rel_XXXXXX)
+        if ! rosy build "$rosy_file" --release -d "$BUILD_DIR" -o "$dir/bench_rosy" 2>/dev/null; then
+            rm -rf "$BUILD_DIR"
+            printf "%-30s %11s\n" "$name" "BUILD FAIL"
+            continue
+        fi
     fi
 
     # Run Rosy with MPI
