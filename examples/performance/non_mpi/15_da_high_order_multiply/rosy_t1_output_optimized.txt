@@ -1,3 +1,0 @@
-DA High-Order Multiply Benchmark T1: order 7, 6 vars, 10 iterations
-Result constant part:  0.000000000000000    
-CPUSEC: 0.3759999999999961E-04

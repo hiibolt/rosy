@@ -13,6 +13,7 @@ rosy_output
 *.fuse_*
 bench_t4
 settings.local.json
+*_t*_output*.txt
 *.bins
 *.dat
 .codegraph
