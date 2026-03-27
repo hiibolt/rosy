@@ -41,6 +41,9 @@ pub const MULT_INVALID: u32 = u32::MAX;
 /// Above this threshold, DA multiply falls back to on-the-fly index computation.
 const MAX_MULT_TABLE_BYTES: usize = 256 * 1024 * 1024;
 
+/// Sentinel value for invalid derivative/integral targets (target monomial doesn't exist or exceeds order).
+pub const DERIV_INVALID: u32 = u32::MAX;
+
 /// Precomputed runtime tables for fast DA operations.
 ///
 /// Built once at `init_taylor()` time. The multiplication table enables
@@ -64,6 +67,17 @@ pub struct TaylorRuntime {
     /// monomial_i × monomial_j, or `MULT_INVALID` if the product exceeds init_order.
     /// `None` when num_monomials is too large for a table (falls back to on-the-fly).
     pub mult_table: Option<Vec<u32>>,
+    /// Precomputed derivative target indices: `deriv_target[v * num_monomials + k]` =
+    /// flat index of the monomial obtained by decrementing exponent `v` of monomial `k`,
+    /// or `DERIV_INVALID` if exponent `v` is 0.
+    pub deriv_target: Vec<u32>,
+    /// Precomputed derivative exponents: `deriv_exponent[v * num_monomials + k]` =
+    /// the exponent of variable `v` in monomial `k` (the multiplier for differentiation).
+    pub deriv_exponent: Vec<u8>,
+    /// Precomputed integral target indices: `integ_target[v * num_monomials + k]` =
+    /// flat index of the monomial obtained by incrementing exponent `v` of monomial `k`,
+    /// or `DERIV_INVALID` if the result would exceed init_order.
+    pub integ_target: Vec<u32>,
 }
 
 /// Read guard wrapper that dereferences directly to `TaylorRuntime`.
@@ -145,6 +159,45 @@ pub fn init_taylor(max_order: u32, num_vars: usize) -> Result<()> {
         None
     };
 
+    // Build precomputed derivative/integral index tables (#19 + #21).
+    // For each variable v and monomial index k, precompute:
+    //   deriv_target[v*N+k]  = index of monomial with exponents[v] decremented by 1
+    //   deriv_exponent[v*N+k] = exponents[v] (the derivative multiplier)
+    //   integ_target[v*N+k]  = index of monomial with exponents[v] incremented by 1
+    let table_size = num_vars * num_monomials;
+    let mut deriv_target = vec![DERIV_INVALID; table_size];
+    let mut deriv_exponent = vec![0u8; table_size];
+    let mut integ_target = vec![DERIV_INVALID; table_size];
+
+    for v in 0..num_vars {
+        let base = v * num_monomials;
+        for k in 0..num_monomials {
+            let mono = &monomial_list[k];
+            let exp_v = mono.exponents[v];
+            deriv_exponent[base + k] = exp_v;
+
+            // Derivative target: decrement exponent v
+            if exp_v > 0 {
+                let mut new_exp = mono.exponents;
+                new_exp[v] -= 1;
+                let new_mono = Monomial::new(new_exp);
+                if let Some(&idx) = monomial_index.get(&new_mono) {
+                    deriv_target[base + k] = idx;
+                }
+            }
+
+            // Integral target: increment exponent v
+            let mut new_exp = mono.exponents;
+            new_exp[v] += 1;
+            let new_mono = Monomial::new(new_exp);
+            if new_mono.within_order(max_order) {
+                if let Some(&idx) = monomial_index.get(&new_mono) {
+                    integ_target[base + k] = idx;
+                }
+            }
+        }
+    }
+
     *guard = Some(TaylorRuntime {
         config,
         init_order: max_order,
@@ -154,6 +207,9 @@ pub fn init_taylor(max_order: u32, num_vars: usize) -> Result<()> {
         monomial_orders,
         variable_indices,
         mult_table,
+        deriv_target,
+        deriv_exponent,
+        integ_target,
     });
 
     Ok(())

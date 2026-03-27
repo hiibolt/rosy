@@ -28,11 +28,15 @@ use super::config::{get_runtime, MULT_INVALID, TaylorRuntime};
 /// Layout: for each output monomial k in 0..N, the slice
 /// `lhs_indices[offsets[k]..offsets[k+1]]` and `rhs_coeffs[offsets[k]..offsets[k+1]]`
 /// contain the LHS indices and fixed RHS coefficients that contribute to k.
+///
+/// The `output_max_order` array stores the order of each output monomial for
+/// progressive truncation support.
 pub struct FixedMultiplier {
     offsets: Vec<u32>,
     lhs_indices: Vec<u32>,
     rhs_coeffs: Vec<f64>,
     num_monomials: usize,
+    output_orders: Vec<u8>,
 }
 
 impl FixedMultiplier {
@@ -83,16 +87,27 @@ impl FixedMultiplier {
             }
         }
 
-        Some(Self { offsets, lhs_indices, rhs_coeffs, num_monomials: n })
+        Some(Self { offsets, lhs_indices, rhs_coeffs, num_monomials: n, output_orders: rt.monomial_orders.clone() })
     }
 
     /// Multiply LHS by the fixed RHS, returning a new DA.
     pub fn multiply_to_da(&self, lhs: &DA<f64>, epsilon: f64) -> DA<f64> {
+        self.multiply_to_da_truncated(lhs, epsilon, u32::MAX)
+    }
+
+    /// Multiply LHS by the fixed RHS with progressive truncation.
+    ///
+    /// Only produces output monomials with order <= `trunc_order`.
+    /// Used by Horner evaluation for progressive order truncation (#18).
+    pub fn multiply_to_da_truncated(&self, lhs: &DA<f64>, epsilon: f64, trunc_order: u32) -> DA<f64> {
         let n = self.num_monomials;
         let mut coeffs = f64::pool_alloc(n);
         let mut nonzero = Vec::new();
 
         for k in 0..n {
+            // Progressive truncation: skip output monomials above the current truncation order
+            if self.output_orders[k] as u32 > trunc_order { continue; }
+
             let start = self.offsets[k] as usize;
             let end = self.offsets[k + 1] as usize;
             if start == end { continue; }
@@ -160,17 +175,30 @@ impl DA<f64> {
     /// Evaluate a polynomial P(x) = c₀ + x·(c₁ + x·(c₂ + ···)) via Horner's method.
     ///
     /// `da_prime` is the fixed DA multiplied at each step (typically the input DA
-    /// with constant part removed). Uses standard scatter multiply for the hot path.
-    /// For large DA arrays (N >= 500), call `horner_eval_fixed` instead.
+    /// with constant part removed). Uses progressive order truncation: at step `i`
+    /// from the end, the multiply is truncated to order `(n-1-i)` since higher-order
+    /// terms cannot contribute to the final result (issue #18).
     #[inline(always)]
     pub fn horner_eval(da_prime: &DA<f64>, taylor_coeffs: &[f64]) -> Result<DA<f64>> {
         let n = taylor_coeffs.len();
         if n == 0 { return Ok(DA::zero()); }
         if n == 1 { return Ok(DA::from_coeff(taylor_coeffs[0])); }
 
+        let rt = get_runtime()?;
+        let full_order = rt.config.max_order;
+        drop(rt);
+
         let mut result = DA::from_coeff(taylor_coeffs[n - 1]);
+        // Progressive truncation: at step i (counting from 0 at the last coeff),
+        // the intermediate result can only contribute up to order (steps_remaining).
+        // Step 0: result = c[n-1], no multiply needed
+        // Step 1: result = c[n-1]*x + c[n-2], truncate multiply to order 1
+        // Step k: truncate to order k
+        // Final step (k=n-2): truncate to full order
         for i in (0..n - 1).rev() {
-            result = (&result * da_prime)?;
+            let steps_from_end = (n - 1) - i;
+            let trunc_order = (steps_from_end as u32).min(full_order);
+            result = result.multiply_truncated(da_prime, trunc_order)?;
             result.add_constant_in_place(taylor_coeffs[i]);
         }
         Ok(result)
@@ -178,8 +206,9 @@ impl DA<f64> {
 
     /// Horner evaluation with FixedMultiplier for large DA arrays (N >= 500).
     ///
-    /// Uses cache-optimized output-grouped multiplication with optional SIMD.
-    /// Falls back to standard scatter multiply if mult_table is unavailable.
+    /// Uses cache-optimized output-grouped multiplication with optional SIMD
+    /// and progressive order truncation. Falls back to standard scatter multiply
+    /// if mult_table is unavailable.
     pub fn horner_eval_fixed(da_prime: &DA<f64>, taylor_coeffs: &[f64]) -> Result<DA<f64>> {
         let n = taylor_coeffs.len();
         if n == 0 { return Ok(DA::zero()); }
@@ -187,34 +216,42 @@ impl DA<f64> {
 
         let rt = get_runtime()?;
         let epsilon = rt.config.epsilon;
+        let full_order = rt.config.max_order;
         if let Some(fixed) = FixedMultiplier::new(da_prime, &rt) {
             drop(rt);
             let mut result = DA::from_coeff(taylor_coeffs[n - 1]);
             for i in (0..n - 1).rev() {
-                result = fixed.multiply_to_da(&result, epsilon);
+                let steps_from_end = (n - 1) - i;
+                let trunc_order = (steps_from_end as u32).min(full_order);
+                result = fixed.multiply_to_da_truncated(&result, epsilon, trunc_order);
                 result.add_constant_in_place(taylor_coeffs[i]);
             }
             return Ok(result);
         }
         drop(rt);
 
-        // Fallback: standard scatter multiply
+        // Fallback: standard scatter multiply with progressive truncation
         Self::horner_eval(da_prime, taylor_coeffs)
     }
 }
 
 impl DA<Complex64> {
-    /// Horner evaluation for Complex DA. Uses regular DA×DA multiply
-    /// (FixedMultiplier is f64-only for now).
+    /// Horner evaluation for Complex DA with progressive truncation.
     #[inline]
     pub fn horner_eval(cd_prime: &DA<Complex64>, taylor_coeffs: &[Complex64]) -> Result<DA<Complex64>> {
         let n = taylor_coeffs.len();
         if n == 0 { return Ok(DA::zero()); }
         if n == 1 { return Ok(DA::from_coeff(taylor_coeffs[0])); }
 
+        let rt = get_runtime()?;
+        let full_order = rt.config.max_order;
+        drop(rt);
+
         let mut result = DA::from_coeff(taylor_coeffs[n - 1]);
         for i in (0..n - 1).rev() {
-            result = (&result * cd_prime)?;
+            let steps_from_end = (n - 1) - i;
+            let trunc_order = (steps_from_end as u32).min(full_order);
+            result = result.multiply_truncated(cd_prime, trunc_order)?;
             result.add_constant_in_place(taylor_coeffs[i]);
         }
 
