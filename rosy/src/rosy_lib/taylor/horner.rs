@@ -178,6 +178,9 @@ impl DA<f64> {
     /// with constant part removed). Uses progressive order truncation: at step `i`
     /// from the end, the multiply is truncated to order `(n-1-i)` since higher-order
     /// terms cannot contribute to the final result (issue #18).
+    ///
+    /// Acquires the runtime lock once and passes it to all inner multiplies,
+    /// avoiding repeated RwLock acquisition in the hot loop.
     #[inline(always)]
     pub fn horner_eval(da_prime: &DA<f64>, taylor_coeffs: &[f64]) -> Result<DA<f64>> {
         let n = taylor_coeffs.len();
@@ -186,19 +189,12 @@ impl DA<f64> {
 
         let rt = get_runtime()?;
         let full_order = rt.config.max_order;
-        drop(rt);
 
         let mut result = DA::from_coeff(taylor_coeffs[n - 1]);
-        // Progressive truncation: at step i (counting from 0 at the last coeff),
-        // the intermediate result can only contribute up to order (steps_remaining).
-        // Step 0: result = c[n-1], no multiply needed
-        // Step 1: result = c[n-1]*x + c[n-2], truncate multiply to order 1
-        // Step k: truncate to order k
-        // Final step (k=n-2): truncate to full order
         for i in (0..n - 1).rev() {
             let steps_from_end = (n - 1) - i;
             let trunc_order = (steps_from_end as u32).min(full_order);
-            result = result.multiply_truncated(da_prime, trunc_order)?;
+            result = DA::multiply_truncated_with_rt(&result, da_prime, trunc_order, &rt)?;
             result.add_constant_in_place(taylor_coeffs[i]);
         }
         Ok(result)
@@ -218,7 +214,6 @@ impl DA<f64> {
         let epsilon = rt.config.epsilon;
         let full_order = rt.config.max_order;
         if let Some(fixed) = FixedMultiplier::new(da_prime, &rt) {
-            drop(rt);
             let mut result = DA::from_coeff(taylor_coeffs[n - 1]);
             for i in (0..n - 1).rev() {
                 let steps_from_end = (n - 1) - i;
@@ -228,15 +223,22 @@ impl DA<f64> {
             }
             return Ok(result);
         }
-        drop(rt);
 
-        // Fallback: standard scatter multiply with progressive truncation
-        Self::horner_eval(da_prime, taylor_coeffs)
+        // Fallback: standard scatter multiply with progressive truncation (lock held)
+        let mut result = DA::from_coeff(taylor_coeffs[n - 1]);
+        for i in (0..n - 1).rev() {
+            let steps_from_end = (n - 1) - i;
+            let trunc_order = (steps_from_end as u32).min(full_order);
+            result = DA::multiply_truncated_with_rt(&result, da_prime, trunc_order, &rt)?;
+            result.add_constant_in_place(taylor_coeffs[i]);
+        }
+        Ok(result)
     }
 }
 
 impl DA<Complex64> {
     /// Horner evaluation for Complex DA with progressive truncation.
+    /// Holds runtime lock for the entire loop.
     #[inline]
     pub fn horner_eval(cd_prime: &DA<Complex64>, taylor_coeffs: &[Complex64]) -> Result<DA<Complex64>> {
         let n = taylor_coeffs.len();
@@ -245,13 +247,12 @@ impl DA<Complex64> {
 
         let rt = get_runtime()?;
         let full_order = rt.config.max_order;
-        drop(rt);
 
         let mut result = DA::from_coeff(taylor_coeffs[n - 1]);
         for i in (0..n - 1).rev() {
             let steps_from_end = (n - 1) - i;
             let trunc_order = (steps_from_end as u32).min(full_order);
-            result = result.multiply_truncated(cd_prime, trunc_order)?;
+            result = DA::multiply_truncated_with_rt(&result, cd_prime, trunc_order, &rt)?;
             result.add_constant_in_place(taylor_coeffs[i]);
         }
 

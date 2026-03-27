@@ -43,6 +43,30 @@ pub trait DACoefficient:
 
 thread_local! {
     static F64_POOL: RefCell<Vec<Vec<f64>>> = RefCell::new(Vec::new());
+    static BITSET_POOL: RefCell<Vec<Vec<u64>>> = RefCell::new(Vec::new());
+}
+
+/// Get a zeroed bitset from the thread-local pool, or allocate fresh.
+pub(crate) fn bitset_pool_alloc(words: usize) -> Vec<u64> {
+    BITSET_POOL.with(|pool| {
+        let mut pool = pool.borrow_mut();
+        while let Some(v) = pool.pop() {
+            if v.len() == words {
+                return v;
+            }
+        }
+        vec![0u64; words]
+    })
+}
+
+/// Return a bitset to the pool after clearing the set bits (O(popcount)).
+pub(crate) fn bitset_pool_return(mut v: Vec<u64>) {
+    if v.is_empty() { return; }
+    // Clear only the set words — most words are zero
+    for w in v.iter_mut() {
+        *w = 0;
+    }
+    BITSET_POOL.with(|pool| pool.borrow_mut().push(v));
 }
 
 impl DACoefficient for f64 {
@@ -513,6 +537,12 @@ impl<T: DACoefficient> DA<T> {
     /// This enables progressive order truncation in Horner evaluation (issue #18).
     pub fn multiply_truncated(&self, rhs: &DA<T>, trunc_order: u32) -> Result<DA<T>> {
         let rt = get_runtime()?;
+        Self::multiply_truncated_with_rt(self, rhs, trunc_order, &rt)
+    }
+
+    /// Inner implementation that takes an already-acquired runtime reference.
+    /// Avoids redundant RwLock acquisition when called in a loop (e.g. Horner).
+    pub(crate) fn multiply_truncated_with_rt(lhs: &DA<T>, rhs: &DA<T>, trunc_order: u32, rt: &TaylorRuntime) -> Result<DA<T>> {
         let n = rt.num_monomials;
         let epsilon = rt.config.epsilon;
         let orders = &rt.monomial_orders;
@@ -520,11 +550,11 @@ impl<T: DACoefficient> DA<T> {
 
         let mut result = T::pool_alloc(n);
         let words = (n + 63) / 64;
-        let mut written = vec![0u64; words];
+        let mut written = bitset_pool_alloc(words);
 
         if let Some(table) = &rt.mult_table {
-            for &i in &self.nonzero {
-                let ci = self.coeffs[i as usize];
+            for &i in &lhs.nonzero {
+                let ci = lhs.coeffs[i as usize];
                 let oi = orders[i as usize];
                 if oi > trunc_order_u8 { continue; }
                 let max_b_order = trunc_order_u8 - oi;
@@ -540,8 +570,8 @@ impl<T: DACoefficient> DA<T> {
                 }
             }
         } else {
-            for &i in &self.nonzero {
-                let ci = self.coeffs[i as usize];
+            for &i in &lhs.nonzero {
+                let ci = lhs.coeffs[i as usize];
                 let oi = orders[i as usize];
                 if oi > trunc_order_u8 { continue; }
                 let max_b_order = trunc_order_u8 - oi;
@@ -576,6 +606,8 @@ impl<T: DACoefficient> DA<T> {
             }
         }
 
+        bitset_pool_return(written);
+
         Ok(DA { coeffs: result, nonzero })
     }
 }
@@ -593,7 +625,7 @@ impl<T: DACoefficient> Mul<&DA<T>> for &DA<T> {
         let mut result = T::pool_alloc(n);
 
         let words = (n + 63) / 64;
-        let mut written = vec![0u64; words];
+        let mut written = bitset_pool_alloc(words);
 
         if let Some(table) = &rt.mult_table {
             for &i in &self.nonzero {
@@ -642,6 +674,8 @@ impl<T: DACoefficient> Mul<&DA<T>> for &DA<T> {
                 word &= word - 1;
             }
         }
+
+        bitset_pool_return(written);
 
         Ok(DA { coeffs: result, nonzero })
     }
