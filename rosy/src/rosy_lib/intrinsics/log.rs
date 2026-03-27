@@ -82,30 +82,27 @@ impl RosyLOG for DA {
 }
 
 fn da_log(da: &DA) -> anyhow::Result<DA> {
-    let config = crate::rosy_lib::taylor::get_config()?;
-    let max_order = config.max_order as usize;
+    let rt = crate::rosy_lib::taylor::get_runtime()?;
+    let nocut = rt.config.max_order as usize;
 
     let f0 = da.constant_part();
     anyhow::ensure!(f0 != 0.0, "LOG: constant part of DA argument must be non-zero");
 
     let ln_f0 = f0.ln();
-
-    let mut da_prime = da.clone();
-    da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
+    let da_prime = da.make_prime();
 
     // u = δf / f₀
     let u = (&da_prime * DA::from_coeff(1.0 / f0))?;
 
     // ln(f) = ln(f₀) + u - u²/2 + u³/3 - ...
-    // Precompute: c_0 = ln(f₀), c_n = (-1)^(n+1) / n
-    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
-    taylor_coeffs.push(ln_f0);
-    for n in 1..=max_order {
+    // DACE-style: xf[0] = ln(f0), xf[n] = (-1)^(n+1) / n
+    let mut xf = Vec::with_capacity(nocut + 1);
+    xf.push(ln_f0);
+    for n in 1..=nocut {
         let sign = if n % 2 == 1 { 1.0 } else { -1.0 };
-        taylor_coeffs.push(sign / (n as f64));
+        xf.push(sign / (n as f64));
     }
 
-    // Horner's on u
-    DA::horner_eval(&u, &taylor_coeffs)
+    DA::horner_eval_with_rt(&u, &xf, &rt)
 }
 

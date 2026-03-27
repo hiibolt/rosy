@@ -141,3 +141,26 @@ The two benchmarks where DACE still wins are both Horner-evaluation-heavy:
 
 Closing these gaps requires DACE-style order bucketing in the Horner multiply
 path, or a fundamentally different sparse multiply strategy.
+
+---
+
+## Failed Attempt: Order Bucketing (reverted, March 27 2026)
+
+Implemented DACE-style order bucketing for Horner multiply:
+
+- **`BucketedNonzero` struct** — counting-sort of RHS nonzero indices by order,
+  with `up_to_order(max_o)` returning a bounded slice instead of per-pair branching
+- **`order_boundary` table** — precomputed cumulative monomial counts by order in
+  `TaylorRuntime`, used by `FixedMultiplier` to limit output loop without branching
+- **`multiply_bucketed_rt()`** — new multiply path using bucketed RHS slices
+
+**Result:** DA Bending Magnet improved slightly (0.66× → 0.83× T3), but other
+benchmarks regressed or were flat. Net effect was ~zero or slightly negative.
+The overhead of bucket-sorting the RHS nonzeros on every Horner multiply (even
+though it's O(K)) outweighs the savings from eliminating per-pair branches on
+small DA vectors (21-126 monomials). Order bucketing wins for DACE because DACE
+also uses it for dense-workspace addressing (`ia1`/`ia2`), which Rosy doesn't
+have.
+
+**Lesson:** At our monomial counts, branch misprediction cost is already low
+(predictable patterns in tight loops). The bottleneck is elsewhere.

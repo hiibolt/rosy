@@ -74,35 +74,28 @@ impl RosyISRT3 for DA {
 fn da_isrt3(da: &DA) -> anyhow::Result<DA> {
     use crate::rosy_lib::taylor::DACoefficient;
 
-    let config = crate::rosy_lib::taylor::get_config()?;
-    let max_order = config.max_order as usize;
+    let rt = crate::rosy_lib::taylor::get_runtime()?;
+    let nocut = rt.config.max_order as usize;
 
     let f0 = da.constant_part();
     anyhow::ensure!(f0 > 0.0, "ISRT3: constant part of DA must be positive, got {}", f0);
 
     let alpha = -1.5_f64;
     let f0_alpha = f0.powf(alpha);
-
-    // Create delta = (f - f0) / f0
-    let mut da_prime = da.clone();
-    da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
+    let da_prime = da.make_prime();
     let da_delta = (&da_prime * DA::from_coeff(1.0 / f0))?;
 
-    // Precompute binomial coefficients C(alpha, n)
-    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
-    taylor_coeffs.push(1.0); // C(alpha, 0) = 1
+    // Binomial coefficients C(alpha, n) via recurrence
+    let mut xf = Vec::with_capacity(nocut + 1);
+    xf.push(1.0);
     let mut binom_coeff = alpha;
-    for n in 1..=max_order {
-        taylor_coeffs.push(binom_coeff);
+    for n in 1..=nocut {
+        xf.push(binom_coeff);
         binom_coeff *= (alpha - n as f64) / (n as f64 + 1.0);
     }
 
-    // Horner's evaluation of (1 + u)^alpha
-    let mut result = DA::horner_eval(&da_delta, &taylor_coeffs)?;
-
-    // Multiply by f0^alpha
+    let mut result = DA::horner_eval_with_rt(&da_delta, &xf, &rt)?;
     result = (&result * DA::from_coeff(f0_alpha))?;
-
     Ok(result)
 }
 

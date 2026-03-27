@@ -88,29 +88,22 @@ impl RosyEXP for CD {
 ///
 /// exp(f) = exp(f₀) · (1 + δf + δf²/2! + ...) evaluated via Horner's.
 fn da_exp(da: &DA) -> anyhow::Result<DA> {
-    let config = crate::rosy_lib::taylor::get_config()?;
-    let max_order = config.max_order as usize;
+    let rt = crate::rosy_lib::taylor::get_runtime()?;
+    let nocut = rt.config.max_order as usize;
 
     let f0 = da.constant_part();
     let exp_f0 = f0.exp();
+    let da_prime = da.make_prime();
 
-    let mut da_prime = da.clone();
-    da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
-
-    // Precompute c_n = 1/n! (then multiply by exp_f0 at end)
-    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
-    let mut factorial = 1.0;
-    for n in 0..=max_order {
-        if n > 0 { factorial *= n as f64; }
-        taylor_coeffs.push(1.0 / factorial);
+    // DACE-style recurrence: xf[i] = xf[i-1] / i
+    let mut xf = Vec::with_capacity(nocut + 1);
+    xf.push(1.0);
+    for i in 1..=nocut {
+        xf.push(xf[i - 1] / (i as f64));
     }
 
-    // Horner's evaluation of exp(δf)
-    let mut result = DA::horner_eval(&da_prime, &taylor_coeffs)?;
-
-    // Multiply by exp(f₀)
+    let mut result = DA::horner_eval_with_rt(&da_prime, &xf, &rt)?;
     result = (&result * DA::from_coeff(exp_f0))?;
-
     Ok(result)
 }
 
@@ -120,25 +113,21 @@ fn cd_exp(cd: &CD) -> anyhow::Result<CD> {
     use num_complex::Complex64;
 
     let config = crate::rosy_lib::taylor::get_config()?;
-    let max_order = config.max_order as usize;
+    let nocut = config.max_order as usize;
 
     let f0 = cd.constant_part();
     let exp_f0 = f0.exp();
+    let cd_prime = cd.make_prime();
 
-    let mut cd_prime = cd.clone();
-    cd_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), Complex64::zero());
-
-    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
-    let mut factorial = 1.0;
-    for n in 0..=max_order {
-        if n > 0 { factorial *= n as f64; }
-        taylor_coeffs.push(Complex64::new(1.0 / factorial, 0.0));
+    // DACE-style recurrence: xf[i] = xf[i-1] / i
+    let mut xf = Vec::with_capacity(nocut + 1);
+    xf.push(Complex64::new(1.0, 0.0));
+    for i in 1..=nocut {
+        xf.push(xf[i - 1] / Complex64::new(i as f64, 0.0));
     }
 
-    let mut result = CD::horner_eval(&cd_prime, &taylor_coeffs)?;
-
+    let mut result = CD::horner_eval(&cd_prime, &xf)?;
     result = (&result * CD::from_coeff(exp_f0))?;
-
     Ok(result)
 }
 

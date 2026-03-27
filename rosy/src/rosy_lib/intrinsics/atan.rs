@@ -75,39 +75,34 @@ impl RosyATAN for DA {
 fn da_atan(da: &DA) -> anyhow::Result<DA> {
     use crate::rosy_lib::taylor::DACoefficient;
 
-    let config = crate::rosy_lib::taylor::get_config()?;
-    let max_order = config.max_order as usize;
+    let rt = crate::rosy_lib::taylor::get_runtime()?;
+    let nocut = rt.config.max_order as usize;
 
     let f0 = da.constant_part();
+    let da_prime = da.make_prime();
 
-    // Create DA with constant part removed (δf = f - f₀)
-    let mut da_prime = da.clone();
-    da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
-
-    // Compute derivatives of atan at f0.
-    // atan'(x) = 1/(1+x²)
-    // Recurrence: (1+x²)*f^(n+1) + 2*n*x*f^(n) + n*(n-1)*f^(n-1) = 0
-    let mut derivs = vec![0.0f64; max_order + 1];
+    // Compute derivatives of atan at f0 via recurrence
+    let mut derivs = vec![0.0f64; nocut + 1];
     derivs[0] = f0.atan();
-    if max_order >= 1 {
+    if nocut >= 1 {
         derivs[1] = 1.0 / (1.0 + f0 * f0);
     }
-    if max_order >= 2 {
+    if nocut >= 2 {
         let denom = 1.0 + f0 * f0;
-        for n in 1..max_order {
+        for n in 1..nocut {
             let n_f = n as f64;
             derivs[n + 1] = -(2.0 * n_f * f0 * derivs[n] + n_f * (n_f - 1.0) * derivs[n - 1]) / denom;
         }
     }
 
-    // Precompute Taylor coefficients c_n = derivs[n] / n!
-    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
+    // Taylor coefficients c_n = derivs[n] / n!
+    let mut xf = Vec::with_capacity(nocut + 1);
     let mut factorial = 1.0;
-    for n in 0..=max_order {
+    for n in 0..=nocut {
         if n > 0 { factorial *= n as f64; }
-        taylor_coeffs.push(derivs[n] / factorial);
+        xf.push(derivs[n] / factorial);
     }
 
-    DA::horner_eval(&da_prime, &taylor_coeffs)
+    DA::horner_eval_with_rt(&da_prime, &xf, &rt)
 }
 

@@ -183,11 +183,20 @@ impl DA<f64> {
     /// avoiding repeated RwLock acquisition in the hot loop.
     #[inline(always)]
     pub fn horner_eval(da_prime: &DA<f64>, taylor_coeffs: &[f64]) -> Result<DA<f64>> {
+        let rt = get_runtime()?;
+        Self::horner_eval_with_rt(da_prime, taylor_coeffs, &rt)
+    }
+
+    /// Horner evaluation with an already-acquired runtime reference.
+    ///
+    /// Avoids the RwLock acquire when the caller already holds it
+    /// (e.g. transcendental functions that need config + Horner).
+    #[inline(always)]
+    pub fn horner_eval_with_rt(da_prime: &DA<f64>, taylor_coeffs: &[f64], rt: &TaylorRuntime) -> Result<DA<f64>> {
         let n = taylor_coeffs.len();
         if n == 0 { return Ok(DA::zero()); }
         if n == 1 { return Ok(DA::from_coeff(taylor_coeffs[0])); }
 
-        let rt = get_runtime()?;
         let full_order = rt.config.max_order;
 
         let mut result = DA::from_coeff(taylor_coeffs[n - 1]);

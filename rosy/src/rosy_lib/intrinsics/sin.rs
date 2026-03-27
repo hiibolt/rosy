@@ -90,26 +90,21 @@ impl RosySIN for CD {
 /// Evaluates P(δf) = c₀ + δf·(c₁ + δf·(c₂ + ...)) where c_n = d^n(sin)(f₀)/n!
 /// Horner's reduces allocations from 3 per iteration to 1 (just the DA×DA multiply).
 fn da_sin(da: &DA) -> anyhow::Result<DA> {
-    let config = crate::rosy_lib::taylor::get_config()?;
-    let max_order = config.max_order as usize;
+    let rt = crate::rosy_lib::taylor::get_runtime()?;
+    let nocut = rt.config.max_order as usize;
 
     let f0 = da.constant_part();
-    let sin_f0 = f0.sin();
-    let cos_f0 = f0.cos();
+    let da_prime = da.make_prime();
 
-    let mut da_prime = da.clone();
-    da_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), 0.0);
-
-    // Precompute Taylor coefficients c_n = [sin,cos,-sin,-cos][n%4] / n!
-    let cycle = [sin_f0, cos_f0, -sin_f0, -cos_f0];
-    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
-    let mut factorial = 1.0;
-    for n in 0..=max_order {
-        if n > 0 { factorial *= n as f64; }
-        taylor_coeffs.push(cycle[n % 4] / factorial);
+    // DACE-style recurrence: xf[i] = -xf[i-2] / (i*(i-1))
+    let mut xf = Vec::with_capacity(nocut + 1);
+    xf.push(f0.sin());
+    if nocut >= 1 { xf.push(f0.cos()); }
+    for i in 2..=nocut {
+        xf.push(-xf[i - 2] / ((i * (i - 1)) as f64));
     }
 
-    DA::horner_eval(&da_prime, &taylor_coeffs)
+    DA::horner_eval_with_rt(&da_prime, &xf, &rt)
 }
 
 /// Compute sine of a CD object using Horner's method for Taylor composition.
@@ -118,23 +113,19 @@ fn cd_sin(cd: &CD) -> anyhow::Result<CD> {
     use num_complex::Complex64;
 
     let config = crate::rosy_lib::taylor::get_config()?;
-    let max_order = config.max_order as usize;
+    let nocut = config.max_order as usize;
 
     let f0 = cd.constant_part();
-    let sin_f0 = f0.sin();
-    let cos_f0 = f0.cos();
+    let cd_prime = cd.make_prime();
 
-    let mut cd_prime = cd.clone();
-    cd_prime.set_coeff(crate::rosy_lib::taylor::Monomial::constant(), Complex64::zero());
-
-    let cycle = [sin_f0, cos_f0, -sin_f0, -cos_f0];
-    let mut taylor_coeffs = Vec::with_capacity(max_order + 1);
-    let mut factorial = 1.0;
-    for n in 0..=max_order {
-        if n > 0 { factorial *= n as f64; }
-        taylor_coeffs.push(cycle[n % 4] / factorial);
+    // DACE-style recurrence for complex sin coefficients
+    let mut xf = Vec::with_capacity(nocut + 1);
+    xf.push(f0.sin());
+    if nocut >= 1 { xf.push(f0.cos()); }
+    for i in 2..=nocut {
+        xf.push(-xf[i - 2] / Complex64::new((i * (i - 1)) as f64, 0.0));
     }
 
-    CD::horner_eval(&cd_prime, &taylor_coeffs)
+    CD::horner_eval(&cd_prime, &xf)
 }
 

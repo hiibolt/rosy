@@ -342,6 +342,23 @@ impl<T: DACoefficient> DA<T> {
             self.coeffs[0] = T::zero();
         }
     }
+
+    /// Create the "prime" (non-constant) part of a DA for series evaluation.
+    ///
+    /// Clones the DA and zeroes its constant part in O(1). Unlike the old
+    /// pattern of `da.clone()` + `set_coeff(Monomial::constant(), 0.0)`,
+    /// this avoids the RwLock acquisition and HashMap lookup in `set_coeff`.
+    pub fn make_prime(&self) -> Self {
+        let mut prime = self.clone();
+        if prime.coeffs[0].abs() > 1e-15 {
+            prime.coeffs[0] = T::zero();
+            // Remove 0 from nonzero list
+            if let Some(pos) = prime.nonzero.iter().position(|&i| i == 0) {
+                prime.nonzero.swap_remove(pos);
+            }
+        }
+        prime
+    }
 }
 
 // ============================================================================
