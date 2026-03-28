@@ -8,37 +8,9 @@
             "Read(*)",
             "Fetch(*)",
             "WebSearch",
-            "mcp__plugin_github_github__get_me",
-            "mcp__plugin_github_github__search_issues",
-            "mcp__plugin_github_github__search_pull_requests",
-            "mcp__plugin_github_github__search_code",
-            "mcp__plugin_github_github__search_repositories",
-            "mcp__plugin_github_github__issue_read",
-            "mcp__plugin_github_github__issue_write",
-            "mcp__plugin_github_github__add_issue_comment",
-            "mcp__plugin_github_github__list_issues",
-            "mcp__plugin_github_github__sub_issue_write",
-            "mcp__plugin_github_github__get_label",
-            "mcp__plugin_github_github__list_issue_types",
-            "mcp__plugin_github_github__pull_request_read",
-            "mcp__plugin_github_github__create_pull_request",
-            "mcp__plugin_github_github__update_pull_request",
-            "mcp__plugin_github_github__merge_pull_request",
-            "mcp__plugin_github_github__update_pull_request_branch",
-            "mcp__plugin_github_github__pull_request_review_write",
-            "mcp__plugin_github_github__add_comment_to_pending_review",
-            "mcp__plugin_github_github__add_reply_to_pull_request_comment",
-            "mcp__plugin_github_github__list_pull_requests",
-            "mcp__plugin_github_github__create_branch",
-            "mcp__plugin_github_github__list_branches",
-            "mcp__plugin_github_github__list_commits",
-            "mcp__plugin_github_github__get_commit",
-            "mcp__plugin_github_github__get_file_contents",
-            "mcp__plugin_github_github__list_releases",
-            "mcp__plugin_github_github__get_latest_release",
-            "mcp__plugin_github_github__list_tags",
-            "mcp__plugin_github_github__get_tag",
-            "mcp__plugin_github_github__run_secret_scanning",
+            "mcp__github__search_issues",
+            "mcp__github__create_issue",
+            "mcp__github__update_issue",
             "mcp__github-projects__list_projects",
             "mcp__github-projects__view_project",
             "mcp__github-projects__list_items",
@@ -54,13 +26,46 @@
             "mcp__github-projects__add_item",
             "mcp__github-projects__edit_item",
             "mcp__github-projects__archive_item",
-            "mcp__github-projects__create_draft_item"
+            "mcp__github-projects__create_draft_item",
+            "mcp__codegraph__codegraph_search",
+            "mcp__codegraph__codegraph_context",
+            "mcp__codegraph__codegraph_callers",
+            "mcp__codegraph__codegraph_callees",
+            "mcp__codegraph__codegraph_impact",
+            "mcp__codegraph__codegraph_node",
+            "mcp__codegraph__codegraph_status",
+            "mcp__codegraph__codegraph_files"
         ]
     },
-    "enabledMcpjsonServers": ["github-projects", "github"],
+    "enabledMcpjsonServers": ["github-projects", "github", "codegraph"],
     "enabledPlugins": {
         "skill-creator@claude-plugins-official": true,
         "rust-analyzer-lsp@claude-plugins-official": true
     },
-    "outputStyle": "Explanatory"
+    "outputStyle": "Explanatory",
+    "hooks": {
+        "PostToolUse": [
+            {
+                "matcher": "Edit|Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "codegraph mark-dirty",
+                        "async": true
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "matcher": ".*",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "codegraph sync-if-dirty"
+                    }
+                ]
+            }
+        ]
+    }
 }

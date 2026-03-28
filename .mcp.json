@@ -13,6 +13,10 @@
             "env": {
                 "GH_OWNER": "${GH_OWNER}"
             }
+        },
+        "codegraph": {
+            "command": "codegraph",
+            "args": ["serve", "--mcp"]
         }
     }
 }

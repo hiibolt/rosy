@@ -41,6 +41,7 @@
             cmake
             mpi
             bun
+            nodejs
           ]);
           buildInputs = with pkgs; [
             mpi

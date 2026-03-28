@@ -24,8 +24,8 @@
 //! |--------------|--------|------|
 //! | Declare a variable | `VARIABLE (RE) x;` | [`statements::core::var_decl`](program::statements::core::var_decl) |
 //! | Assign a value | `x := expr;` | [`statements::core::assign`](program::statements::core::assign) |
-//! | Branch with if/else | `IF cond; ... ENDIF;` | [`statements::core::if`](program::statements::core::r#if) |
-//! | Loop (counted) | `LOOP i 1 10; ... ENDLOOP;` | [`statements::core::loop`](program::statements::core::r#loop) |
+//! | Branch with if/else | `IF cond; ... ENDIF;` | [`statements::core::if`](program::statements::core::if) |
+//! | Loop (counted) | `LOOP i 1 10; ... ENDLOOP;` | [`statements::core::loop`](program::statements::core::loop) |
 //! | Loop (conditional) | `WHILE cond; ... ENDWHILE;` | [`statements::core::while_loop`](program::statements::core::while_loop) |
 //! | Loop (MPI parallel) | `PLOOP ... ENDPLOOP;` | [`statements::core::ploop`](program::statements::core::ploop) |
 //! | Define a function | `FUNCTION (RE) F x (RE); ... ENDFUNCTION;` | [`statements::core::function`](program::statements::core::function) |
@@ -199,7 +199,12 @@ enum Commands {
     },
 }
 
-fn rosy(script_path: &PathBuf, output_dir: Option<PathBuf>, release: bool, optimized: bool) -> Result<PathBuf> {
+fn rosy(
+    script_path: &PathBuf,
+    output_dir: Option<PathBuf>,
+    release: bool,
+    optimized: bool,
+) -> Result<PathBuf> {
     let total_start = Instant::now();
     let filename = script_path
         .file_name()
@@ -212,13 +217,8 @@ fn rosy(script_path: &PathBuf, output_dir: Option<PathBuf>, release: bool, optim
     } else {
         "debug"
     };
-    eprintln!(
-        "{BOLD}        Rosy{RESET} v{}",
-        env!("CARGO_PKG_VERSION")
-    );
-    eprintln!(
-        "{BOLD}  Transpiling{RESET} {filename} ({profile_label})"
-    );
+    eprintln!("{BOLD}        Rosy{RESET} v{}", env!("CARGO_PKG_VERSION"));
+    eprintln!("{BOLD}  Transpiling{RESET} {filename} ({profile_label})");
 
     // --- Step 1: Parse ---
     step(1, 5, "Parsing");
@@ -344,17 +344,43 @@ fn main() -> Result<()> {
 
     // Extract common fields and transpile
     let (source, output_dir, release, optimized, cosy_syntax, output_name) = match &cli.command {
-        Commands::Run { source, output_dir, release, optimized, cosy_syntax } => {
-            (source.clone(), output_dir.clone(), *release || *optimized, *optimized, *cosy_syntax, None)
-        }
-        Commands::Build { source, output, output_dir, release, optimized, cosy_syntax } => {
+        Commands::Run {
+            source,
+            output_dir,
+            release,
+            optimized,
+            cosy_syntax,
+        } => (
+            source.clone(),
+            output_dir.clone(),
+            *release || *optimized,
+            *optimized,
+            *cosy_syntax,
+            None,
+        ),
+        Commands::Build {
+            source,
+            output,
+            output_dir,
+            release,
+            optimized,
+            cosy_syntax,
+        } => {
             let name = output.clone().unwrap_or_else(|| {
-                source.file_stem()
+                source
+                    .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("rosy_output")
                     .to_string()
             });
-            (source.clone(), output_dir.clone(), *release || *optimized, *optimized, *cosy_syntax, Some(name))
+            (
+                source.clone(),
+                output_dir.clone(),
+                *release || *optimized,
+                *optimized,
+                *cosy_syntax,
+                Some(name),
+            )
         }
     };
 
@@ -382,10 +408,7 @@ fn main() -> Result<()> {
             let destination = PathBuf::from(output_name.unwrap());
             std::fs::copy(&binary_path, &destination)
                 .context("Failed to copy binary to current directory")?;
-            eprintln!(
-                "  Binary written to {BOLD}{}{RESET}",
-                destination.display()
-            );
+            eprintln!("  Binary written to {BOLD}{}{RESET}", destination.display());
         }
     }
 
