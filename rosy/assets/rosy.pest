@@ -34,6 +34,23 @@ statement   = _{
   | danot
   | daeps
   | datrn
+  | dascl
+  | dasgn
+  | dader
+  | daint
+  | danoro
+  | danors
+  | daplu
+  | dadiu
+  | dadmu
+  | dacliw
+  | dacqlc
+  | darea
+  | dapew
+  | dapee
+  | dapea
+  | dapep
+  | daest
   | linv
   | ldet
   | substr
@@ -80,7 +97,7 @@ memory_size = { expr }
 
 /// Keywords - define all reserved words (must be followed by a non-identifier character)
 keyword = @{ keyword_raw ~ !(ASCII_ALPHANUMERIC | "_") }
-keyword_raw = { ^"ENDPROCEDURE" | ^"ENDFUNCTION" | ^"ENDWHILE" | ^"ENDLOOP" | ^"ENDPLOOP" | ^"ENDFIT" | ^"ENDIF" | ^"ELSEIF" | ^"ELSE" | ^"BEGIN" | ^"END" | ^"WRITEB" | ^"WRITE" | ^"READB" | ^"READ" | ^"VARIABLE" | ^"PROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"WHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"DANOT" | ^"DAEPS" | ^"DATRN" | ^"LENGTH" | ^"SINH" | ^"SIN" | ^"COSH" | ^"COS" | ^"ASIN" | ^"ACOS" | ^"ATAN" | ^"TANH" | ^"SQRT" | ^"SQR" | ^"VMAX" | ^"VMIN" | ^"ABS" | ^"NORM" | ^"CONS" | ^"INT" | ^"NINT" | ^"TYPE" | ^"REAL" | ^"IMAG" | ^"TRIM" | ^"LTRIM" | ^"ISRT3" | ^"ISRT" | ^"CMPLX" | ^"CONJ" | ^"LST" | ^"LCM" | ^"LCD" | ^"LOG" | ^"BREAK" | ^"QUIT" | ^"SCRLEN" | ^"CPUSEC" | ^"OS" | ^"LINV" | ^"LDET" | ^"SUBSTR" | ^"VELSET" | ^"VELGET" | ^"POLVAL" | ^"VEDOT" | ^"VEUNIT" | ^"VEZERO" | ^"STCRE" | ^"RECST" | ^"RERAN" | ^"PWTIME" | ^"PNPRO" | ^"IMUNIT" | ^"LEV" | ^"MBLOCK" | ^"MTREE" | ^"FIT" | ^"OPENFB" | ^"OPENF" | ^"CLOSEF" | ^"FUNCTION" | ^"LOOP" | ^"PLOOP" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
+keyword_raw = { ^"ENDPROCEDURE" | ^"ENDFUNCTION" | ^"ENDWHILE" | ^"ENDLOOP" | ^"ENDPLOOP" | ^"ENDFIT" | ^"ENDIF" | ^"ELSEIF" | ^"ELSE" | ^"BEGIN" | ^"END" | ^"WRITEB" | ^"WRITE" | ^"READB" | ^"READ" | ^"VARIABLE" | ^"PROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"WHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"DANOT" | ^"DAEPS" | ^"DATRN" | ^"DASCL" | ^"DASGN" | ^"DADER" | ^"DAINT" | ^"DANORO" | ^"DANORS" | ^"DAREA" | ^"DAPEW" | ^"DAPEE" | ^"DAPEA" | ^"DAPEP" | ^"DAEST" | ^"DAPLU" | ^"DADIU" | ^"DADMU" | ^"DACLIW" | ^"DACQLC" | ^"LENGTH" | ^"SINH" | ^"SIN" | ^"COSH" | ^"COS" | ^"ASIN" | ^"ACOS" | ^"ATAN" | ^"TANH" | ^"SQRT" | ^"SQR" | ^"VMAX" | ^"VMIN" | ^"ABS" | ^"NORM" | ^"CONS" | ^"INT" | ^"NINT" | ^"TYPE" | ^"REAL" | ^"IMAG" | ^"TRIM" | ^"LTRIM" | ^"ISRT3" | ^"ISRT" | ^"CMPLX" | ^"CONJ" | ^"LST" | ^"LCM" | ^"LCD" | ^"LOG" | ^"BREAK" | ^"QUIT" | ^"SCRLEN" | ^"CPUSEC" | ^"OS" | ^"LINV" | ^"LDET" | ^"SUBSTR" | ^"VELSET" | ^"VELGET" | ^"POLVAL" | ^"VEDOT" | ^"VEUNIT" | ^"VEZERO" | ^"STCRE" | ^"RECST" | ^"RERAN" | ^"PWTIME" | ^"PNPRO" | ^"IMUNIT" | ^"LEV" | ^"MBLOCK" | ^"MTREE" | ^"FIT" | ^"OPENFB" | ^"OPENF" | ^"CLOSEF" | ^"FUNCTION" | ^"LOOP" | ^"PLOOP" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
 
 /// [ IF / ELSEIF / ELSE / ENDIF ]
 if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
@@ -226,7 +243,24 @@ endif = { ^"ENDIF" ~ semicolon }
   darev = { ^"DAREV" ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   danot = { ^"DANOT" ~ expr ~ semicolon }
   daeps = { ^"DAEPS" ~ expr ~ semicolon }
-  datrn = { ^"DATRN" ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  datrn  = { ^"DATRN"  ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  dascl  = { ^"DASCL"  ~ expr ~ expr ~ semicolon }
+  dasgn  = { ^"DASGN"  ~ expr ~ semicolon }
+  dader  = { ^"DADER"  ~ expr ~ expr ~ semicolon }
+  daint  = { ^"DAINT"  ~ expr ~ expr ~ semicolon }
+  danoro = { ^"DANORO" ~ expr ~ semicolon }
+  danors = { ^"DANORS" ~ expr ~ expr ~ semicolon }
+  daplu  = { ^"DAPLU"  ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  dadiu  = { ^"DADIU"  ~ expr ~ expr ~ expr ~ semicolon }
+  dadmu  = { ^"DADMU"  ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  dacliw = { ^"DACLIW" ~ expr ~ expr ~ expr ~ semicolon }
+  dacqlc = { ^"DACQLC" ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  darea  = { ^"DAREA"  ~ expr ~ expr ~ expr ~ semicolon }
+  dapew  = { ^"DAPEW"  ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  dapee  = { ^"DAPEE"  ~ expr ~ expr ~ expr ~ semicolon }
+  dapea  = { ^"DAPEA"  ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  dapep  = { ^"DAPEP"  ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  daest  = { ^"DAEST"  ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   /// [ CORE ]
   scrlen = { ^"SCRLEN" ~ expr ~ semicolon }
   quit = { ^"QUIT" ~ expr ~ semicolon }

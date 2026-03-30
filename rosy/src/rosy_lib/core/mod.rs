@@ -1,6 +1,8 @@
+pub mod da_ops;
 pub mod display;
 pub mod file_io;
 pub mod daprv;
+pub mod dapew;
 pub mod ldet;
 pub mod lev;
 pub mod linv;
@@ -10,9 +12,11 @@ pub mod polval;
 pub mod recst;
 pub mod reran;
 
+pub use da_ops::*;
 pub use display::*;
 pub use file_io::*;
 pub use daprv::*;
+pub use dapew::*;
 pub use ldet::*;
 pub use lev::*;
 pub use linv::*;

@@ -98,6 +98,23 @@ pub use da::daeps::DaepsStatement;
 pub use da::danot::DanotStatement;
 pub use da::datrn::DatrnStatement;
 pub use da::mtree::MtreeStatement;
+pub use da::dascl::DasclStatement;
+pub use da::dasgn::DasgnStatement;
+pub use da::dader::DaderStatement;
+pub use da::daint::DaintStatement;
+pub use da::danoro::DanoroStatement;
+pub use da::danors::DanorsStatement;
+pub use da::daplu::DapluStatement;
+pub use da::dadiu::DadiuStatement;
+pub use da::dadmu::DadmuStatement;
+pub use da::dacliw::DacliwStatement;
+pub use da::dacqlc::DacqlcStatement;
+pub use da::darea::DareaStatement;
+pub use da::dapew::DapewStatement;
+pub use da::dapee::DapeeStatement;
+pub use da::dapea::DapeaStatement;
+pub use da::dapep::DapepStatement;
+pub use da::daest::DaestStatement;
 
 use crate::{
     ast::{FromRule, Rule},
@@ -191,6 +208,23 @@ pub enum StatementEnum {
     Lev,
     Mblock,
     Mtree,
+    DaScl,
+    DaSgn,
+    DaDer,
+    DaInt,
+    DaNoro,
+    DaNors,
+    DaPlu,
+    DaDiu,
+    DaDmu,
+    DaCliw,
+    DaCqlc,
+    DaArea,
+    DaPew,
+    DaPee,
+    DaPea,
+    DaPep,
+    DaEst,
 }
 impl TranspileableStatement for Statement {}
 impl FromRule for Statement {
@@ -618,6 +652,159 @@ impl FromRule for Statement {
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Mtree,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::dascl => DasclStatement::from_rule(pair)
+                .context("...while building DASCL statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaScl,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::dasgn => DasgnStatement::from_rule(pair)
+                .context("...while building DASGN statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaSgn,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::dader => DaderStatement::from_rule(pair)
+                .context("...while building DADER statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaDer,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::daint => DaintStatement::from_rule(pair)
+                .context("...while building DAINT statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaInt,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::danoro => DanoroStatement::from_rule(pair)
+                .context("...while building DANORO statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaNoro,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::danors => DanorsStatement::from_rule(pair)
+                .context("...while building DANORS statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaNors,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::daplu => DapluStatement::from_rule(pair)
+                .context("...while building DAPLU statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaPlu,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::dadiu => DadiuStatement::from_rule(pair)
+                .context("...while building DADIU statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaDiu,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::dadmu => DadmuStatement::from_rule(pair)
+                .context("...while building DADMU statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaDmu,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::dacliw => DacliwStatement::from_rule(pair)
+                .context("...while building DACLIW statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaCliw,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::dacqlc => DacqlcStatement::from_rule(pair)
+                .context("...while building DACQLC statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaCqlc,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::darea => DareaStatement::from_rule(pair)
+                .context("...while building DAREA statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaArea,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::dapew => DapewStatement::from_rule(pair)
+                .context("...while building DAPEW statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaPew,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::dapee => DapeeStatement::from_rule(pair)
+                .context("...while building DAPEE statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaPee,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::dapea => DapeaStatement::from_rule(pair)
+                .context("...while building DAPEA statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaPea,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::dapep => DapepStatement::from_rule(pair)
+                .context("...while building DAPEP statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaPep,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::daest => DaestStatement::from_rule(pair)
+                .context("...while building DAEST statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaEst,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })

@@ -314,3 +314,247 @@ fn build_exp_str(exponents: &[u8], num_vars: usize) -> String {
     }
     result.trim_end().to_string()
 }
+
+/// DAPLU: Replace independent variable xi by constant C in a DA vector.
+///
+/// For each term c·x₁^e₁·…·xᵢ^eᵢ·…·xₙ^eₙ, the result accumulates
+/// c·C^eᵢ into the monomial with the i-th exponent set to zero.
+///
+/// Arguments:
+/// - `da_in`:   source DA array
+/// - `var_idx`: 1-based index of the variable to substitute
+/// - `c`:       constant value to substitute for xᵢ
+/// - `result`:  output DA array
+pub fn rosy_daplu(da_in: &Vec<DA>, var_idx: usize, c: f64, result: &mut Vec<DA>) -> Result<()> {
+    use rustc_hash::FxHashMap;
+    use crate::rosy_lib::taylor::MAX_VARS;
+
+    let config = get_config().context("DAPLU requires DA to be initialized (call OV first)")?;
+    let var_0idx = var_idx
+        .checked_sub(1)
+        .ok_or_else(|| anyhow::anyhow!("DAPLU: var_idx must be >= 1, got {}", var_idx))?;
+    if var_0idx >= config.num_vars {
+        bail!("DAPLU: var_idx {} out of range [1, {}]", var_idx, config.num_vars);
+    }
+
+    result.resize_with(da_in.len(), DA::zero);
+
+    for (comp_idx, da) in da_in.iter().enumerate() {
+        let mut accum: FxHashMap<Monomial, f64> = FxHashMap::default();
+
+        for (monomial, coeff) in da.coeffs_iter() {
+            if coeff.abs() <= config.epsilon {
+                continue;
+            }
+            let e_v = monomial.exponents[var_0idx] as i32;
+            let contribution = coeff * c.powi(e_v);
+            if contribution.abs() <= config.epsilon {
+                continue;
+            }
+            let mut new_exps = monomial.exponents;
+            new_exps[var_0idx] = 0;
+            let new_mono = Monomial::new(new_exps);
+            *accum.entry(new_mono).or_insert(0.0) += contribution;
+        }
+
+        result[comp_idx] = DA::from_coeffs(accum);
+    }
+
+    Ok(())
+}
+
+/// DADIU: Divide a DA vector by independent variable xi.
+///
+/// For each term whose xi-exponent ≥ 1, the result is the term with that
+/// exponent decremented by 1. Terms without xi as a factor are dropped (return 0).
+///
+/// Arguments:
+/// - `var_idx`: 1-based index of the variable to divide by
+/// - `da_in`:   source DA array
+/// - `result`:  output DA array
+pub fn rosy_dadiu(var_idx: usize, da_in: &Vec<DA>, result: &mut Vec<DA>) -> Result<()> {
+    use rustc_hash::FxHashMap;
+
+    let config = get_config().context("DADIU requires DA to be initialized (call OV first)")?;
+    let var_0idx = var_idx
+        .checked_sub(1)
+        .ok_or_else(|| anyhow::anyhow!("DADIU: var_idx must be >= 1, got {}", var_idx))?;
+    if var_0idx >= config.num_vars {
+        bail!("DADIU: var_idx {} out of range [1, {}]", var_idx, config.num_vars);
+    }
+
+    result.resize_with(da_in.len(), DA::zero);
+
+    for (comp_idx, da) in da_in.iter().enumerate() {
+        let mut accum: FxHashMap<Monomial, f64> = FxHashMap::default();
+
+        for (monomial, coeff) in da.coeffs_iter() {
+            if coeff.abs() <= config.epsilon {
+                continue;
+            }
+            let e_v = monomial.exponents[var_0idx];
+            if e_v == 0 {
+                continue; // term not divisible by xi — dropped
+            }
+            let mut new_exps = monomial.exponents;
+            new_exps[var_0idx] = e_v - 1;
+            let new_mono = Monomial::new(new_exps);
+            *accum.entry(new_mono).or_insert(0.0) += coeff;
+        }
+
+        result[comp_idx] = DA::from_coeffs(accum);
+    }
+
+    Ok(())
+}
+
+/// DADMU: Divide a DA vector by xi then multiply by xj.
+///
+/// For each term whose xi-exponent ≥ 1, the result is the term with the
+/// xi-exponent decremented and the xj-exponent incremented.
+/// Terms not divisible by xi are dropped (return 0).
+///
+/// Arguments:
+/// - `var_i`:  1-based index of the variable to divide by
+/// - `var_j`:  1-based index of the variable to multiply by
+/// - `da_in`:  source DA array
+/// - `result`: output DA array
+pub fn rosy_dadmu(var_i: usize, var_j: usize, da_in: &Vec<DA>, result: &mut Vec<DA>) -> Result<()> {
+    use rustc_hash::FxHashMap;
+
+    let config = get_config().context("DADMU requires DA to be initialized (call OV first)")?;
+    let i_0idx = var_i
+        .checked_sub(1)
+        .ok_or_else(|| anyhow::anyhow!("DADMU: var_i must be >= 1, got {}", var_i))?;
+    let j_0idx = var_j
+        .checked_sub(1)
+        .ok_or_else(|| anyhow::anyhow!("DADMU: var_j must be >= 1, got {}", var_j))?;
+    if i_0idx >= config.num_vars {
+        bail!("DADMU: var_i {} out of range [1, {}]", var_i, config.num_vars);
+    }
+    if j_0idx >= config.num_vars {
+        bail!("DADMU: var_j {} out of range [1, {}]", var_j, config.num_vars);
+    }
+
+    result.resize_with(da_in.len(), DA::zero);
+
+    for (comp_idx, da) in da_in.iter().enumerate() {
+        let mut accum: FxHashMap<Monomial, f64> = FxHashMap::default();
+
+        for (monomial, coeff) in da.coeffs_iter() {
+            if coeff.abs() <= config.epsilon {
+                continue;
+            }
+            let e_i = monomial.exponents[i_0idx];
+            if e_i == 0 {
+                continue; // not divisible by xi — dropped
+            }
+            let mut new_exps = monomial.exponents;
+            new_exps[i_0idx] = e_i - 1;
+            new_exps[j_0idx] = new_exps[j_0idx].saturating_add(1);
+            // total_order is unchanged (div by xi cancels mul by xj)
+            let new_mono = Monomial::new(new_exps);
+            *accum.entry(new_mono).or_insert(0.0) += coeff;
+        }
+
+        result[comp_idx] = DA::from_coeffs(accum);
+    }
+
+    Ok(())
+}
+
+/// DACLIW: Extract the linear (first-order) coefficients of a DA.
+///
+/// The result array `linear[i]` receives the coefficient of xᵢ₊₁ (1-based)
+/// in the first DA component. When order-weighted DA is in use, the weighted
+/// linear coefficients are extracted.
+///
+/// Arguments:
+/// - `da`:     source DA array (first component used)
+/// - `n`:      number of linear coefficients to extract
+/// - `linear`: output vector of size n
+pub fn rosy_dacliw(da: &Vec<DA>, n: usize, linear: &mut Vec<f64>) -> Result<()> {
+    let config = get_config().context("DACLIW requires DA to be initialized (call OV first)")?;
+
+    let da_ref = da.first().context("DACLIW: DA vector is empty")?;
+
+    linear.resize(n, 0.0);
+
+    for i in 0..n {
+        if i < config.num_vars {
+            let mono = Monomial::variable(i);
+            linear[i] = da_ref.get_coeff(&mono);
+        } else {
+            linear[i] = 0.0;
+        }
+    }
+
+    Ok(())
+}
+
+/// DACQLC: Extract coefficients up to second order from a DA.
+///
+/// Decomposes the first DA component as:  xᵀHx/2 + Lx + c
+///
+/// - `hessian[i][j]` = ∂²f/(∂xᵢ∂xⱼ) = coeff(xᵢxⱼ) for i≠j, 2·coeff(xᵢ²) for i=j
+/// - `linear[i]`     = coeff of xᵢ₊₁
+/// - `*constant`     = constant term
+///
+/// Arguments:
+/// - `da`:       source DA array (first component used)
+/// - `n`:        size of the linear and Hessian arrays
+/// - `hessian`:  n×n output matrix
+/// - `linear`:   n-element output vector
+/// - `constant`: output scalar (constant term)
+pub fn rosy_dacqlc(
+    da: &Vec<DA>,
+    n: usize,
+    hessian: &mut Vec<Vec<f64>>,
+    linear: &mut Vec<f64>,
+    constant: &mut f64,
+) -> Result<()> {
+    use crate::rosy_lib::taylor::MAX_VARS;
+
+    let config = get_config().context("DACQLC requires DA to be initialized (call OV first)")?;
+
+    let da_ref = da.first().context("DACQLC: DA vector is empty")?;
+
+    // Constant term
+    *constant = da_ref.get_coeff(&Monomial::constant());
+
+    // Linear terms
+    linear.resize(n, 0.0);
+    for i in 0..n {
+        if i < config.num_vars {
+            linear[i] = da_ref.get_coeff(&Monomial::variable(i));
+        } else {
+            linear[i] = 0.0;
+        }
+    }
+
+    // Quadratic (Hessian) terms
+    hessian.resize_with(n, || vec![0.0; n]);
+    for row in hessian.iter_mut() {
+        row.resize(n, 0.0);
+    }
+
+    for i in 0..n.min(config.num_vars) {
+        for j in 0..n.min(config.num_vars) {
+            let coeff = if i == j {
+                let mut exps = [0u8; MAX_VARS];
+                exps[i] = 2;
+                let mono = Monomial::new(exps);
+                2.0 * da_ref.get_coeff(&mono)
+            } else {
+                let mut exps = [0u8; MAX_VARS];
+                exps[i] = 1;
+                exps[j] = 1;
+                let mono = Monomial::new(exps);
+                da_ref.get_coeff(&mono)
+            };
+            hessian[i][j] = coeff;
+        }
+    }
+
+    Ok(())
+}
