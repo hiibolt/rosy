@@ -7,12 +7,6 @@
 //! designed for beam physics and differential algebra applications.
 //! ROSY programs are transpiled into self-contained, native Rust executables.
 //!
-//! ## Quick Start
-//! ```bash
-//! rosy run examples/basic.rosy             # run a script
-//! rosy build examples/basic.rosy -o out    # build a binary
-//! ```
-//!
 //! ## Language Reference
 //! The official ROSY language reference begins in the [`program`] module.
 //!
