@@ -290,6 +290,11 @@ impl Transpile for VarDeclStatement {
         &self,
         context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>> {
+        // Unused variables have no resolved type — skip them silently
+        if self.data.r#type.is_none() {
+            return Ok(TranspilationOutput::default());
+        }
+
         let resolved_type = self.data.require_type().map_err(|e| {
             vec![e.context(format!(
                 "...while transpiling variable declaration for '{}'",

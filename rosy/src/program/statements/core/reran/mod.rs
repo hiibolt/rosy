@@ -34,6 +34,9 @@ use std::collections::BTreeSet;
 use crate::{
     ast::*,
     program::expressions::core::variable_identifier::VariableIdentifier,
+    program::statements::SourceLocation,
+    resolve::{ExprRecipe, ResolutionRule, ScopeContext, TypeResolver},
+    rosy_lib::RosyType,
     transpile::{
         TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
         VariableScope, add_context_to_all,
@@ -64,7 +67,27 @@ impl FromRule for ReranStatement {
     }
 }
 
-impl TranspileableStatement for ReranStatement {}
+impl TranspileableStatement for ReranStatement {
+    fn discover_dependencies(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &mut ScopeContext,
+        source_location: SourceLocation,
+    ) -> Option<Result<()>> {
+        // RERAN always assigns an RE (f64) value to the target variable
+        let slot = ctx.variables.get(&self.output_var.name)?;
+        if let Some(node) = resolver.nodes.get_mut(slot) {
+            if node.resolved.is_none() {
+                node.rule = ResolutionRule::InferredFrom {
+                    recipe: ExprRecipe::Literal(RosyType::RE()),
+                    reason: format!("inferred from RERAN at {}", source_location),
+                };
+                node.assigned_at = Some(source_location);
+            }
+        }
+        Some(Ok(()))
+    }
+}
 
 impl Transpile for ReranStatement {
     fn transpile(

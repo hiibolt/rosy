@@ -42,7 +42,7 @@ use crate::{
         expressions::{Expr, core::variable_identifier::VariableIdentifier},
         statements::SourceLocation,
     },
-    resolve::{ExprRecipe, ResolutionRule, ScopeContext, TypeResolver},
+    resolve::{ExprRecipe, ResolutionRule, ScopeContext, TypeResolver, TypeSlot},
     transpile::{TranspileableExpr, TranspileableStatement, VariableScope},
 };
 use anyhow::{Context, Error, Result, anyhow, ensure};
@@ -231,8 +231,42 @@ impl TranspileableStatement for AssignStatement {
                 // fail because Y isn't resolved yet. In that case,
                 // temporarily resolve Y to the old type so we can
                 // evaluate what the new assignment produces.
-                let old_type_result = resolver.evaluate_recipe(old_recipe);
+                let mut old_type_result = resolver.evaluate_recipe(old_recipe);
                 let mut new_type_result = resolver.evaluate_recipe(&recipe);
+
+                // If the old recipe can't be evaluated yet (e.g. X:=10.5*J
+                // where J has a known recipe but isn't resolved), try
+                // temporarily resolving leaf dependencies so the conflict
+                // checker can detect RE↔VE coercion patterns.
+                let mut temp_leaf_slots: Vec<TypeSlot> = Vec::new();
+                if old_type_result.is_err() {
+                    let all_deps: HashSet<TypeSlot> = {
+                        let mut d = resolver.nodes.get(&var_slot)
+                            .map(|n| n.depends_on.clone())
+                            .unwrap_or_default();
+                        d.extend(deps.iter().cloned());
+                        d
+                    };
+
+                    for dep_slot in &all_deps {
+                        if *dep_slot == var_slot { continue; }
+                        if let Some(dep_node) = resolver.nodes.get(dep_slot) {
+                            if dep_node.resolved.is_none() && dep_node.depends_on.is_empty() {
+                                if let ResolutionRule::InferredFrom { recipe: ref r, .. } = dep_node.rule {
+                                    if let Ok(t) = resolver.evaluate_recipe(r) {
+                                        temp_leaf_slots.push(dep_slot.clone());
+                                        resolver.nodes.get_mut(dep_slot).unwrap().resolved = Some(t);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if !temp_leaf_slots.is_empty() {
+                        old_type_result = resolver.evaluate_recipe(old_recipe);
+                        new_type_result = resolver.evaluate_recipe(&recipe);
+                    }
+                }
 
                 // If the new recipe failed but old succeeded, try again
                 // with a temporary assumption that the variable has the
@@ -248,6 +282,13 @@ impl TranspileableStatement for AssignStatement {
                         if let Some(node) = resolver.nodes.get_mut(&var_slot) {
                             node.resolved = None;
                         }
+                    }
+                }
+
+                // Undo temporary leaf resolutions
+                for slot in &temp_leaf_slots {
+                    if let Some(node) = resolver.nodes.get_mut(slot) {
+                        node.resolved = None;
                     }
                 }
 

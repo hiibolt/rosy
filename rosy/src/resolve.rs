@@ -5,19 +5,19 @@
 //! left as `None` during parsing.
 //!
 //! ## Algorithm
-//!
+//!s
 //! 1. Walk the AST to discover all "type slots" (variables, function args,
 //!    function return types, procedure args)
 //! 2. Build a dependency graph between unresolved slots
 //! 3. Topologically sort (Kahn's algorithm) and resolve from leaves inward
 //! 4. Report cycles as errors
 
-use std::collections::{HashMap, HashSet, VecDeque};
-use anyhow::{anyhow, Result};
-use crate::rosy_lib::RosyType;
 use crate::program::Program;
-use crate::program::statements::*;
 use crate::program::expressions::*;
+use crate::program::statements::*;
+use crate::rosy_lib::RosyType;
+use anyhow::{Result, anyhow};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 // ─── Type Slot ──────────────────────────────────────────────────────────────
 
@@ -31,7 +31,6 @@ pub enum TypeSlot {
     /// A function/procedure argument: (scope_path, callable_name, arg_name)
     Argument(Vec<String>, String, String),
 }
-
 impl std::fmt::Display for TypeSlot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -46,14 +45,25 @@ impl std::fmt::Display for TypeSlot {
                 if scope.is_empty() {
                     write!(f, "return type of function '{}'", name)
                 } else {
-                    write!(f, "return type of function '{}' (in {})", name, scope.join(" > "))
+                    write!(
+                        f,
+                        "return type of function '{}' (in {})",
+                        name,
+                        scope.join(" > ")
+                    )
                 }
             }
             TypeSlot::Argument(scope, callable, arg) => {
                 if scope.is_empty() {
                     write!(f, "argument '{}' of '{}'", arg, callable)
                 } else {
-                    write!(f, "argument '{}' of '{}' (in {})", arg, callable, scope.join(" > "))
+                    write!(
+                        f,
+                        "argument '{}' of '{}' (in {})",
+                        arg,
+                        callable,
+                        scope.join(" > ")
+                    )
                 }
             }
         }
@@ -98,7 +108,11 @@ pub enum ExprRecipe {
     /// e.g., `A(R)(C)` on a 2D array has num_indices=2, reducing RE** to RE.
     IndexedVariable(TypeSlot, usize),
     /// A binary operator applied to two sub-recipes.
-    BinaryOp { op: BinaryOpKind, left: Box<ExprRecipe>, right: Box<ExprRecipe> },
+    BinaryOp {
+        op: BinaryOpKind,
+        left: Box<ExprRecipe>,
+        right: Box<ExprRecipe>,
+    },
     /// An n-ary concat of sub-recipes.
     Concat(Vec<ExprRecipe>),
     /// SIN intrinsic — result depends on input type.
@@ -113,7 +127,13 @@ pub enum ExprRecipe {
 
 #[derive(Debug, Clone, Copy)]
 pub enum BinaryOpKind {
-    Add, Sub, Mult, Div, Extract, Derive, Pow,
+    Add,
+    Sub,
+    Mult,
+    Div,
+    Extract,
+    Derive,
+    Pow,
 }
 
 // ─── Dependency Graph Node ──────────────────────────────────────────────────
@@ -164,7 +184,8 @@ impl TypeResolver {
     // ─── Public entry point ─────────────────────────────────────────────
 
     /// Run type resolution on a program. Mutates the AST in place.
-    pub fn resolve(program: &mut Program) -> Result<()> {
+    /// Returns a list of warning messages (e.g. unused variables).
+    pub fn resolve(program: &mut Program) -> Result<Vec<String>> {
         let mut resolver = TypeResolver::new();
         let mut ctx = ScopeContext::default();
 
@@ -172,27 +193,35 @@ impl TypeResolver {
         resolver.discover_slots(&program.statements, &mut ctx)?;
 
         // Phase 2: Topological sort + resolve
-        resolver.topological_resolve()?;
+        let warnings = resolver.topological_resolve()?;
 
         // Phase 3: Apply resolved types back to the AST
         resolver.apply_to_ast(&mut program.statements, &[])?;
 
-        Ok(())
+        Ok(warnings)
     }
 
     // ─── Graph Infrastructure ───────────────────────────────────────────
 
     /// Insert a node for a slot. If it has an explicit type, mark it resolved.
-    pub fn insert_slot(&mut self, slot: TypeSlot, explicit_type: Option<&RosyType>, declared_at: Option<SourceLocation>) {
+    pub fn insert_slot(
+        &mut self,
+        slot: TypeSlot,
+        explicit_type: Option<&RosyType>,
+        declared_at: Option<SourceLocation>,
+    ) {
         if let Some(t) = explicit_type {
-            self.nodes.insert(slot.clone(), GraphNode {
-                slot,
-                rule: ResolutionRule::Explicit(t.clone()),
-                depends_on: HashSet::new(),
-                resolved: Some(t.clone()),
-                declared_at,
-                assigned_at: None,
-            });
+            self.nodes.insert(
+                slot.clone(),
+                GraphNode {
+                    slot,
+                    rule: ResolutionRule::Explicit(t.clone()),
+                    depends_on: HashSet::new(),
+                    resolved: Some(t.clone()),
+                    declared_at,
+                    assigned_at: None,
+                },
+            );
         } else {
             // Placeholder — rule and deps will be set by discover_dependencies
             self.nodes.entry(slot.clone()).or_insert_with(|| GraphNode {
@@ -229,12 +258,11 @@ impl TypeResolver {
     }
 
     /// Register a declaration, creating graph nodes for its type slots.
-    pub fn register_declaration(
-        &mut self,
-        stmt: &Statement,
-        ctx: &mut ScopeContext,
-    ) -> Result<()> {
-        let Some(result) = stmt.inner.register_declaration(self, ctx, stmt.source_location.clone()) else {
+    pub fn register_declaration(&mut self, stmt: &Statement, ctx: &mut ScopeContext) -> Result<()> {
+        let Some(result) = stmt
+            .inner
+            .register_declaration(self, ctx, stmt.source_location.clone())
+        else {
             return Ok(()); // not a declaration, skip
         };
 
@@ -247,7 +275,10 @@ impl TypeResolver {
         stmt: &Statement,
         ctx: &mut ScopeContext,
     ) -> Result<()> {
-        let Some(result) = stmt.inner.discover_dependencies(self, ctx, stmt.source_location.clone()) else {
+        let Some(result) =
+            stmt.inner
+                .discover_dependencies(self, ctx, stmt.source_location.clone())
+        else {
             return Ok(()); // no dependencies to discover, skip
         };
 
@@ -256,11 +287,7 @@ impl TypeResolver {
 
     /// Recursively walk an expression tree looking for function calls.
     /// For each one found, wire up call-site argument dependencies.
-    pub fn discover_expr_function_calls(
-        &mut self,
-        expr: &Expr,
-        ctx: &ScopeContext,
-    ) -> Result<()> {
+    pub fn discover_expr_function_calls(&mut self, expr: &Expr, ctx: &ScopeContext) -> Result<()> {
         let Some(result) = expr.inner.discover_expr_function_calls(self, ctx) else {
             return Ok(());
         };
@@ -319,28 +346,34 @@ impl TypeResolver {
         ctx: &ScopeContext,
         deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe {
-        expr.inner.build_expr_recipe(self, ctx, deps).unwrap_or(ExprRecipe::Unknown)
+        expr.inner
+            .build_expr_recipe(self, ctx, deps)
+            .unwrap_or(ExprRecipe::Unknown)
     }
 
     // ─── Phase 2: Topological Resolution ────────────────────────────────
 
     /// Process nodes whose dependencies are all resolved first, resolve them,
     /// then process their dependents, and so on. One pass — no iteration.
-    pub fn topological_resolve(&mut self) -> Result<()> {
+    /// Returns a list of warning messages for unused variables.
+    pub fn topological_resolve(&mut self) -> Result<Vec<String>> {
         // Build reverse dependency map: slot → set of slots that depend on it
         let mut dependents: HashMap<TypeSlot, Vec<TypeSlot>> = HashMap::new();
         let mut in_degree: HashMap<TypeSlot, usize> = HashMap::new();
 
         for (slot, node) in &self.nodes {
             // Only count edges to slots that exist in the graph
-            let real_deps: usize = node.depends_on.iter()
+            let real_deps: usize = node
+                .depends_on
+                .iter()
                 .filter(|d| self.nodes.contains_key(d))
                 .count();
             in_degree.insert(slot.clone(), real_deps);
 
             for dep in &node.depends_on {
                 if self.nodes.contains_key(dep) {
-                    dependents.entry(dep.clone())
+                    dependents
+                        .entry(dep.clone())
                         .or_default()
                         .push(slot.clone());
                 }
@@ -356,9 +389,36 @@ impl TypeResolver {
         }
 
         let mut resolved_count: usize = 0;
+        let mut warnings: Vec<String> = Vec::new();
+        let mut warned_slots: HashSet<TypeSlot> = HashSet::new();
         while let Some(slot) = queue.pop_front() {
             // Resolve this node if not already resolved
             if self.nodes.get(&slot).map_or(true, |n| n.resolved.is_none()) {
+                // Check if this is an unused variable (Unresolved rule, nothing depends on it)
+                let is_unused = {
+                    let node = self.nodes.get(&slot);
+                    node.map_or(false, |n| {
+                        matches!(n.rule, ResolutionRule::Unresolved)
+                            && matches!(n.slot, TypeSlot::Variable(..))
+                    })
+                };
+
+                if is_unused {
+                    let node = self.nodes.get(&slot).unwrap();
+                    let loc_str = node
+                        .declared_at
+                        .as_ref()
+                        .map(|loc| format!(" ({})", loc))
+                        .unwrap_or_default();
+                    warnings.push(format!(
+                        "unused variable {}{} — no type could be inferred (never assigned a value)",
+                        slot, loc_str
+                    ));
+                    warned_slots.insert(slot.clone());
+                    resolved_count += 1;
+                    continue;
+                }
+
                 self.resolve_node(&slot)?;
             }
             resolved_count += 1;
@@ -377,8 +437,11 @@ impl TypeResolver {
         }
 
         // Any remaining unresolved nodes are cycles or truly unresolvable
-        let unresolved: Vec<&GraphNode> = self.nodes.values()
-            .filter(|n| n.resolved.is_none())
+        // (exclude slots that were already warned about as unused variables)
+        let unresolved: Vec<&GraphNode> = self
+            .nodes
+            .values()
+            .filter(|n| n.resolved.is_none() && !warned_slots.contains(&n.slot))
             .collect();
 
         if unresolved.is_empty() {
@@ -387,26 +450,32 @@ impl TypeResolver {
                 resolved_count,
                 if resolved_count == 1 { "" } else { "s" }
             );
-            return Ok(());
+            return Ok(warnings);
         }
 
         self.build_resolution_error(&unresolved)
     }
 
     /// Build a detailed error message for unresolved type slots.
-    fn build_resolution_error(&self, unresolved: &[&GraphNode]) -> Result<()> {
+    fn build_resolution_error(&self, unresolved: &[&GraphNode]) -> Result<Vec<String>> {
         // Partition into cycle nodes (have unresolved deps) vs no-info nodes
-        let cycle_slots: Vec<&TypeSlot> = unresolved.iter()
-            .filter(|n| n.depends_on.iter().any(|d|
-                self.nodes.get(d).map_or(false, |dn| dn.resolved.is_none())
-            ))
+        let cycle_slots: Vec<&TypeSlot> = unresolved
+            .iter()
+            .filter(|n| {
+                n.depends_on
+                    .iter()
+                    .any(|d| self.nodes.get(d).map_or(false, |dn| dn.resolved.is_none()))
+            })
             .map(|n| &n.slot)
             .collect();
 
-        let no_info_slots: Vec<&TypeSlot> = unresolved.iter()
-            .filter(|n| !n.depends_on.iter().any(|d|
-                self.nodes.get(d).map_or(false, |dn| dn.resolved.is_none())
-            ))
+        let no_info_slots: Vec<&TypeSlot> = unresolved
+            .iter()
+            .filter(|n| {
+                !n.depends_on
+                    .iter()
+                    .any(|d| self.nodes.get(d).map_or(false, |dn| dn.resolved.is_none()))
+            })
             .map(|n| &n.slot)
             .collect();
 
@@ -423,13 +492,13 @@ impl TypeResolver {
             msg.push_str("\n│");
             for slot in &cycle_slots {
                 let node = self.nodes.get(slot).unwrap();
-                let dep_names: Vec<String> = node.depends_on.iter()
+                let dep_names: Vec<String> = node
+                    .depends_on
+                    .iter()
                     .filter(|d| self.nodes.get(*d).map_or(false, |n| n.resolved.is_none()))
                     .map(|d| format!("{}", d))
                     .collect();
-                msg.push_str(&format!("\n│    ✗ {} depends on:",
-                    slot,
-                ));
+                msg.push_str(&format!("\n│    ✗ {} depends on:", slot,));
                 for dep in &dep_names {
                     msg.push_str(&format!("\n│        → {}", dep));
                 }
@@ -464,7 +533,9 @@ impl TypeResolver {
                     } else {
                         format!("'{}'", scope.join(" > "))
                     };
-                    let decl_hint = node.declared_at.as_ref()
+                    let decl_hint = node
+                        .declared_at
+                        .as_ref()
                         .map(|loc| format!("\n\x20   • Declared at: {}", loc))
                         .unwrap_or_default();
                     format!(
@@ -517,7 +588,9 @@ impl TypeResolver {
 
     /// Resolve a single node by evaluating its rule.
     fn resolve_node(&mut self, slot: &TypeSlot) -> Result<()> {
-        let node = self.nodes.get(slot)
+        let node = self
+            .nodes
+            .get(slot)
             .ok_or_else(|| anyhow!("No node for slot {}", slot))?;
 
         if node.resolved.is_some() {
@@ -542,20 +615,25 @@ impl TypeResolver {
                     e.context(ctx)
                 })?
             }
-            ResolutionRule::Mirror { source, .. } => {
-                self.nodes.get(&source)
-                    .and_then(|n| n.resolved.clone())
-                    .ok_or_else(|| anyhow!(
+            ResolutionRule::Mirror { source, .. } => self
+                .nodes
+                .get(&source)
+                .and_then(|n| n.resolved.clone())
+                .ok_or_else(|| {
+                    anyhow!(
                         "Mirror source {} not resolved when resolving {}",
-                        source, slot
-                    ))?
-            }
+                        source,
+                        slot
+                    )
+                })?,
             ResolutionRule::Unresolved => {
                 let mut msg = format!("No type could be determined for {}", slot);
                 if let Some(loc) = &node.declared_at {
                     msg.push_str(&format!("\n  📍 Declared at: {}", loc));
                 }
-                msg.push_str("\n  💡 Add an explicit type annotation or assign a value with a known type.");
+                msg.push_str(
+                    "\n  💡 Add an explicit type annotation or assign a value with a known type.",
+                );
                 return Err(anyhow!("{}", msg));
             }
         };
@@ -568,26 +646,42 @@ impl TypeResolver {
     pub fn evaluate_recipe(&self, recipe: &ExprRecipe) -> Result<RosyType> {
         match recipe {
             ExprRecipe::Literal(t) => Ok(t.clone()),
-            ExprRecipe::Variable(slot) => {
-                self.nodes.get(slot)
-                    .and_then(|n| n.resolved.clone())
-                    .ok_or_else(|| anyhow!("Variable slot {} not resolved", slot))
-            }
+            ExprRecipe::Variable(slot) => self
+                .nodes
+                .get(slot)
+                .and_then(|n| n.resolved.clone())
+                .ok_or_else(|| anyhow!("Variable slot {} not resolved", slot)),
             ExprRecipe::IndexedVariable(slot, num_indices) => {
-                let base = self.nodes.get(slot)
+                let base = self
+                    .nodes
+                    .get(slot)
                     .and_then(|n| n.resolved.clone())
                     .ok_or_else(|| anyhow!("Variable slot {} not resolved", slot))?;
-                Ok(RosyType::new(base.base_type, base.dimensions.saturating_sub(*num_indices)))
+                Ok(RosyType::new(
+                    base.base_type,
+                    base.dimensions.saturating_sub(*num_indices),
+                ))
             }
             ExprRecipe::BinaryOp { op, left, right } => {
                 let left_type = self.evaluate_recipe(left)?;
                 let right_type = self.evaluate_recipe(right)?;
                 let result = match op {
-                    BinaryOpKind::Add => crate::rosy_lib::operators::add::get_return_type(&left_type, &right_type),
-                    BinaryOpKind::Sub => crate::rosy_lib::operators::sub::get_return_type(&left_type, &right_type),
-                    BinaryOpKind::Mult => crate::rosy_lib::operators::mult::get_return_type(&left_type, &right_type),
-                    BinaryOpKind::Div => crate::rosy_lib::operators::div::get_return_type(&left_type, &right_type),
-                    BinaryOpKind::Extract => crate::rosy_lib::operators::extract::get_return_type(&left_type, &right_type),
+                    BinaryOpKind::Add => {
+                        crate::rosy_lib::operators::add::get_return_type(&left_type, &right_type)
+                    }
+                    BinaryOpKind::Sub => {
+                        crate::rosy_lib::operators::sub::get_return_type(&left_type, &right_type)
+                    }
+                    BinaryOpKind::Mult => {
+                        crate::rosy_lib::operators::mult::get_return_type(&left_type, &right_type)
+                    }
+                    BinaryOpKind::Div => {
+                        crate::rosy_lib::operators::div::get_return_type(&left_type, &right_type)
+                    }
+                    BinaryOpKind::Extract => crate::rosy_lib::operators::extract::get_return_type(
+                        &left_type,
+                        &right_type,
+                    ),
                     BinaryOpKind::Derive => {
                         // Derive preserves the object type: DA%RE -> DA, CD%RE -> CD
                         match left_type {
@@ -596,15 +690,23 @@ impl TypeResolver {
                             _ => None,
                         }
                     }
-                    BinaryOpKind::Pow => crate::rosy_lib::operators::pow::get_return_type(&left_type, &right_type),
+                    BinaryOpKind::Pow => {
+                        crate::rosy_lib::operators::pow::get_return_type(&left_type, &right_type)
+                    }
                 };
-                result.ok_or_else(|| anyhow!(
-                    "No operator rule for {:?}({}, {})", op, left_type, right_type
-                ))
+                result.ok_or_else(|| {
+                    anyhow!(
+                        "No operator rule for {:?}({}, {})",
+                        op,
+                        left_type,
+                        right_type
+                    )
+                })
             }
             ExprRecipe::Concat(recipes) => {
                 let mut iter = recipes.iter();
-                let first = iter.next()
+                let first = iter
+                    .next()
                     .ok_or_else(|| anyhow!("Empty concat expression"))?;
                 let mut result = self.evaluate_recipe(first)?;
                 for r in iter {
@@ -629,9 +731,7 @@ impl TypeResolver {
                 crate::rosy_lib::intrinsics::imag_fn::get_return_type(&input_type)
                     .ok_or_else(|| anyhow!("No IMAG rule for {}", input_type))
             }
-            ExprRecipe::Unknown => {
-                Err(anyhow!("Cannot evaluate unknown expression recipe"))
-            }
+            ExprRecipe::Unknown => Err(anyhow!("Cannot evaluate unknown expression recipe")),
         }
     }
 
