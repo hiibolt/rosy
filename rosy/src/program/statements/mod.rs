@@ -21,7 +21,22 @@
 //! | Initialize DA (`OV`) | **[`da::da_init`]** |
 //! | Print DA values | **[`da::daprv`]**, **[`da::darev`]** |
 //! | Use `FIT` (optimization) | **[`math::fit`]** |
-//! | Use `BREAK` or `QUIT` | **[`core::break_statement`]**, **[`core::quit`]** |
+//! | Use `BREAK` or `QUIT` | **[`core::break`]**, **[`core::quit`]** |
+//! | Measure time | **[`io::cpusec`]**, **[`io::pwtime`]** |
+//! | Run a shell command | **[`io::os_call`]** |
+//! | Read vectors from files | **[`io::velget`]** |
+//! | Extract a substring | **[`core::substr`]** |
+//! | Parse string to number | **[`core::stcre`]** |
+//! | Format number as string | **[`core::recst`]** |
+//! | Set a vector component | **[`core::velset`]** |
+//! | Get a random number | **[`core::reran`]** |
+//! | Get imaginary unit | **[`core::imunit`]** |
+//! | Get process count | **[`core::pnpro`]** |
+//! | Configure DA | **[`da::daeps`]**, **[`da::danot`]**, **[`da::datrn`]** |
+//! | DA tree evaluation | **[`da::mtree`]** |
+//! | Matrix operations | **[`math::linv`]**, **[`math::ldet`]**, **[`math::lev`]**, **[`math::mblock`]** |
+//! | Polynomial evaluation | **[`math::polval`]** |
+//! | Vector math | **[`math::vedot`]**, **[`math::veunit`]**, **[`math::vezero`]** |
 
 pub mod core;
 pub mod da;
@@ -29,28 +44,28 @@ pub mod io;
 pub mod math;
 
 pub use core::assign::AssignStatement;
-pub use core::var_decl::{VarDeclStatement, VariableDeclarationData};
-pub use core::r#loop::LoopStatement;
-pub use core::while_loop::WhileStatement;
-pub use core::ploop::PLoopStatement;
-pub use core::r#if::IfStatement;
-pub use core::function_call::FunctionCallStatement;
-pub use core::procedure_call::ProcedureCallStatement;
-pub use core::function::FunctionStatement;
-pub use core::procedure::ProcedureStatement;
 pub use core::r#break::BreakStatement;
+pub use core::function::FunctionStatement;
+pub use core::function_call::FunctionCallStatement;
+pub use core::r#if::IfStatement;
+pub use core::r#loop::LoopStatement;
+pub use core::ploop::PLoopStatement;
+pub use core::procedure::ProcedureStatement;
+pub use core::procedure_call::ProcedureCallStatement;
+pub use core::var_decl::{VarDeclStatement, VariableDeclarationData};
+pub use core::while_loop::WhileStatement;
 
 pub use da::da_init::DAInitStatement;
 pub use da::daprv::DaprvStatement;
 pub use da::darev::DarevStatement;
 
-pub use io::write::WriteStatement;
-pub use io::read::ReadStatement;
-pub use io::writeb::WritebStatement;
-pub use io::readb::ReadbStatement;
+pub use io::closef::ClosefStatement;
 pub use io::openf::OpenfStatement;
 pub use io::openfb::OpenfbStatement;
-pub use io::closef::ClosefStatement;
+pub use io::read::ReadStatement;
+pub use io::readb::ReadbStatement;
+pub use io::write::WriteStatement;
+pub use io::writeb::WritebStatement;
 
 pub use math::fit::FitStatement;
 pub use math::ldet::LdetStatement;
@@ -66,25 +81,28 @@ pub use core::velset::VelsetStatement;
 
 pub use io::cpusec::CpusecStatement;
 pub use io::os_call::OsCallStatement;
-pub use io::velget::VelgetStatement;
 pub use io::pwtime::PwtimeStatement;
+pub use io::velget::VelgetStatement;
 
 pub use math::vedot::VedotStatement;
 pub use math::veunit::VeunitStatement;
 pub use math::vezero::VezeroStatement;
 
-pub use core::stcre::StcreStatement;
+pub use core::imunit::ImunitStatement;
+pub use core::pnpro::PnproStatement;
 pub use core::recst::RecstStatement;
 pub use core::reran::ReranStatement;
-pub use core::pnpro::PnproStatement;
-pub use core::imunit::ImunitStatement;
+pub use core::stcre::StcreStatement;
 
 pub use da::daeps::DaepsStatement;
 pub use da::danot::DanotStatement;
 pub use da::datrn::DatrnStatement;
 pub use da::mtree::MtreeStatement;
 
-use crate::{ast::{FromRule, Rule}, transpile::*};
+use crate::{
+    ast::{FromRule, Rule},
+    transpile::*,
+};
 use anyhow::{Context, Error, Result, bail};
 
 /// Source location captured from the pest parse span.
@@ -176,359 +194,462 @@ pub enum StatementEnum {
 }
 impl TranspileableStatement for Statement {}
 impl FromRule for Statement {
-    fn from_rule (
-        pair: pest::iterators::Pair<Rule>
-    ) -> Result<Option<Statement>> {
+    fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
         // Capture source location before the pair is consumed
         let loc = SourceLocation::from_pair(&pair);
         match pair.as_rule() {
             Rule::daini => DAInitStatement::from_rule(pair)
                 .context("...while building DA initialization statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::DAInit,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DAInit,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::daprv => DaprvStatement::from_rule(pair)
                 .context("...while building DAPRV statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::DaPrv,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaPrv,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::darev => DarevStatement::from_rule(pair)
                 .context("...while building DAREV statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::DaRev,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaRev,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::var_decl => VarDeclStatement::from_rule(pair)
                 .context("...while building variable declaration!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::VarDecl,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::VarDecl,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::write => WriteStatement::from_rule(pair)
                 .context("...while building write statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Write,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Write,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::read => ReadStatement::from_rule(pair)
                 .context("...while building read statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Read,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Read,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::writeb => WritebStatement::from_rule(pair)
                 .context("...while building WRITEB statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Writeb,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Writeb,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::readb => ReadbStatement::from_rule(pair)
                 .context("...while building READB statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Readb,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Readb,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::openf => OpenfStatement::from_rule(pair)
                 .context("...while building OPENF statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Openf,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Openf,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::openfb => OpenfbStatement::from_rule(pair)
                 .context("...while building OPENFB statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Openfb,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Openfb,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::closef => ClosefStatement::from_rule(pair)
                 .context("...while building CLOSEF statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Closef,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Closef,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::assignment => AssignStatement::from_rule(pair)
                 .context("...while building assignment statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Assign,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Assign,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::r#loop => LoopStatement::from_rule(pair)
                 .context("...while building loop statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Loop,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Loop,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::while_loop => WhileStatement::from_rule(pair)
                 .context("...while building while statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::WhileLoop,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::WhileLoop,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::ploop => PLoopStatement::from_rule(pair)
                 .context("...while building ploop statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::PLoop,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::PLoop,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::procedure => ProcedureStatement::from_rule(pair)
                 .context("...while building procedure declaration!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Procedure,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Procedure,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::procedure_call => ProcedureCallStatement::from_rule(pair)
                 .context("...while building procedure call!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::ProcedureCall,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::ProcedureCall,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::function => FunctionStatement::from_rule(pair)
                 .context("...while building function declaration!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Function,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Function,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::function_call => FunctionCallStatement::from_rule(pair)
                 .context("...while building function call!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::FunctionCall,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::FunctionCall,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::if_statement => IfStatement::from_rule(pair)
                 .context("...while building if statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::If,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::If,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::break_statement => BreakStatement::from_rule(pair)
                 .context("...while building break statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Break,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Break,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::fit_statement => FitStatement::from_rule(pair)
                 .context("...while building FIT statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Fit,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Fit,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
 
             Rule::scrlen => ScrlenStatement::from_rule(pair)
                 .context("...while building SCRLEN statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Scrlen,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Scrlen,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::cpusec => CpusecStatement::from_rule(pair)
                 .context("...while building CPUSEC statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Cpusec,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Cpusec,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::quit => QuitStatement::from_rule(pair)
                 .context("...while building QUIT statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Quit,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Quit,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::os_call => OsCallStatement::from_rule(pair)
                 .context("...while building OS statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::OsCall,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::OsCall,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::danot => DanotStatement::from_rule(pair)
                 .context("...while building DANOT statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::DaNot,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaNot,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::daeps => DaepsStatement::from_rule(pair)
                 .context("...while building DAEPS statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::DaEps,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaEps,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::datrn => DatrnStatement::from_rule(pair)
                 .context("...while building DATRN statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::DaTrn,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaTrn,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::linv => LinvStatement::from_rule(pair)
                 .context("...while building LINV statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Linv,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Linv,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::ldet => LdetStatement::from_rule(pair)
                 .context("...while building LDET statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Ldet,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Ldet,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::substr => SubstrStatement::from_rule(pair)
                 .context("...while building SUBSTR statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Substr,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Substr,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::velset => VelsetStatement::from_rule(pair)
                 .context("...while building VELSET statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Velset,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Velset,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::velget => VelgetStatement::from_rule(pair)
                 .context("...while building VELGET statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Velget,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Velget,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::polval => PolvalStatement::from_rule(pair)
                 .context("...while building POLVAL statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Polval,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Polval,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::vedot => VedotStatement::from_rule(pair)
                 .context("...while building VEDOT statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Vedot,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Vedot,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::veunit => VeunitStatement::from_rule(pair)
                 .context("...while building VEUNIT statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Veunit,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Veunit,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::vezero => VezeroStatement::from_rule(pair)
                 .context("...while building VEZERO statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Vezero,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Vezero,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::stcre => StcreStatement::from_rule(pair)
                 .context("...while building STCRE statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Stcre,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Stcre,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::recst => RecstStatement::from_rule(pair)
                 .context("...while building RECST statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Recst,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Recst,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::reran => ReranStatement::from_rule(pair)
                 .context("...while building RERAN statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Reran,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Reran,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::pwtime => PwtimeStatement::from_rule(pair)
                 .context("...while building PWTIME statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Pwtime,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Pwtime,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::pnpro => PnproStatement::from_rule(pair)
                 .context("...while building PNPRO statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Pnpro,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Pnpro,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::imunit => ImunitStatement::from_rule(pair)
                 .context("...while building IMUNIT statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Imunit,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Imunit,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::lev => LevStatement::from_rule(pair)
                 .context("...while building LEV statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Lev,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Lev,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::mblock => MblockStatement::from_rule(pair)
                 .context("...while building MBLOCK statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Mblock,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Mblock,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::mtree => MtreeStatement::from_rule(pair)
                 .context("...while building MTREE statement!")
-                .map(|opt| opt.map(|stmt| Statement {
-                    enum_variant: StatementEnum::Mtree,
-                    inner: Box::new(stmt),
-                    source_location: loc.clone(),
-                })),
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Mtree,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
 
             // Ignored
-            Rule::begin | Rule::end | Rule::EOI | Rule::end_procedure |
-            Rule::end_function | Rule::end_loop | Rule::end_while | Rule::endif |
-            Rule::end_fit => Ok(None),
+            Rule::begin
+            | Rule::end
+            | Rule::EOI
+            | Rule::end_procedure
+            | Rule::end_function
+            | Rule::end_loop
+            | Rule::end_while
+            | Rule::endif
+            | Rule::end_fit => Ok(None),
             other => bail!("Unexpected statement: {:?}", other),
         }
     }
 }
 impl Transpile for Statement {
-    fn transpile ( &self, context: &mut TranspilationInputContext ) -> Result<TranspilationOutput, Vec<Error>> {
-        self.inner.transpile(context)
-            .map_err(|err_vec| {
-                add_context_to_all(err_vec, format!(
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
+        self.inner.transpile(context).map_err(|err_vec| {
+            add_context_to_all(
+                err_vec,
+                format!(
                     "...while transpiling {:?} at {}",
                     self.enum_variant, self.source_location
-                ))
-            })
+                ),
+            )
+        })
     }
 }

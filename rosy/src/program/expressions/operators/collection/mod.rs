@@ -2,9 +2,9 @@
 //!
 //! | Operator | Symbol | Description |
 //! |----------|--------|-------------|
-//! | `&` | [`concat`] | Vector/string concatenation |
+//! | `&` | [`mod@concat`] | Vector/string concatenation |
 //! | `\|` | [`extract`] | Element extraction (indexing) |
-//! | `%` | [`derive`] | DA partial derivative |
+//! | `%` | [`mod@derive`] | DA partial derivative |
 
 pub mod concat;
 pub mod extract;

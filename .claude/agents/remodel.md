@@ -29,7 +29,7 @@ For each skill in `.claude/skills/`:
 **rosy-idioms:** Compare code recipes against actual patterns.
 - Read a recent operator (e.g., `rosy/src/program/expressions/operators/add.rs`) -- does the recipe still match?
 - Read a recent intrinsic (e.g., `rosy/src/program/expressions/functions/math/sqr.rs`) -- recipe still match?
-- Read a recent statement (e.g., `rosy/src/program/statements/core/break_statement.rs`) -- recipe still match?
+- Read a recent statement (e.g., `rosy/src/program/statements/core/break.rs`) -- recipe still match?
 - Has `build.rs` changed its codegen calling convention?
 - Have new files been added to the implementation pattern (e.g., new mod.rs files)?
 

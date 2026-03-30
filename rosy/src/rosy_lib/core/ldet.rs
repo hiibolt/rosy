@@ -1,7 +1,7 @@
 //! LDET - Matrix determinant computation.
 //!
 //! Computes the determinant of an n×n matrix using LU decomposition
-//! with partial pivoting. The matrix is stored as a Vec<Vec<f64>>.
+//! with partial pivoting. The matrix is stored as a `Vec<Vec<f64>>`.
 
 use anyhow::{Result, bail};
 
@@ -9,7 +9,7 @@ use anyhow::{Result, bail};
 /// with partial pivoting.
 ///
 /// Arguments:
-/// - `matrix`: the input matrix (Vec<Vec<f64>>), allocation dimension × allocation dimension
+/// - `matrix`: the input matrix (`Vec<Vec<f64>>`), allocation dimension × allocation dimension
 /// - `n`: number of actual rows/columns to use
 /// - `alloc_dim`: allocation dimension (used for indexing, 1-based in COSY convention)
 /// - `det`: output determinant value (written in-place)

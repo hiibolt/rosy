@@ -40,12 +40,15 @@ While you don't need to audit the documentation of the expressions or statements
 you do need to need to audit the module-level documentation especially since those tend to go
 out of sync as more additions are made. 
 
-Take care with Markdown links, since many features were defined with `r#` - but the links don't
-need them.
+**Important: `r#` in doc links.** Modules like `break`, `if`, `loop` use `r#` in Rust code
+(`pub mod r#break`) because they're reserved keywords. However, rustdoc intra-doc links must
+**not** include the `r#` prefix — write `[`break`]`, not `[`r#break`]`. Rustdoc parses `r#foo`
+as a link to item `r` with anchor `#foo`, producing a confusing "unresolved link to `r`" warning.
+Always grep for `\[`r#` after editing module docs and fix any occurrences.
 
 **Files:**
-- `rosy/src/program/expressions/**/.mod`
-- `rosy/src/program/statements/**/.mod`
+- `rosy/src/program/expressions/**/mod.rs`
+- `rosy/src/program/statements/**/mod.rs`
 
 Note that they recurse down. All modulefiles should be checked. If any changes were made or
 are necessary, update the root documentation accordingly (`rosy/src/main.rs`).

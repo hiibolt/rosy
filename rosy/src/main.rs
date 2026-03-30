@@ -33,9 +33,24 @@
 //! | Print output | `WRITE 6 'hello';` | [`statements::io::write`](program::statements::io::write) |
 //! | Read input | `READ 5 x;` | [`statements::io::read`](program::statements::io::read) |
 //! | Work with files | `OPENF`, `CLOSEF` | [`statements::io`](program::statements::io) |
+//! | Use binary I/O | `WRITEB`, `READB` | [`statements::io::writeb`](program::statements::io::writeb), [`readb`](program::statements::io::readb) |
+//! | Measure time | `CPUSEC`, `PWTIME` | [`statements::io::cpusec`](program::statements::io::cpusec), [`pwtime`](program::statements::io::pwtime) |
+//! | Run shell command | `OS cmd;` | [`statements::io::os_call`](program::statements::io::os_call) |
+//! | Extract substring | `SUBSTR src f l dest;` | [`statements::core::substr`](program::statements::core::substr) |
+//! | Parse string→number | `STCRE str var;` | [`statements::core::stcre`](program::statements::core::stcre) |
+//! | Format number→string | `RECST val fmt var;` | [`statements::core::recst`](program::statements::core::recst) |
+//! | Set vector component | `VELSET vec i val;` | [`statements::core::velset`](program::statements::core::velset) |
+//! | Get random number | `RERAN var;` | [`statements::core::reran`](program::statements::core::reran) |
+//! | Get imaginary unit | `IMUNIT var;` | [`statements::core::imunit`](program::statements::core::imunit) |
+//! | Get process count | `PNPRO var;` | [`statements::core::pnpro`](program::statements::core::pnpro) |
 //! | Initialize DA | `OV 5 3;` | [`statements::da::da_init`](program::statements::da::da_init) |
 //! | Print DA values | `DAPRV`, `DAREV` | [`statements::da`](program::statements::da) |
+//! | Configure DA | `DAEPS`, `DANOT`, `DATRN` | [`statements::da`](program::statements::da) |
+//! | DA tree evaluation | `MTREE ...;` | [`statements::da::mtree`](program::statements::da::mtree) |
 //! | Optimize (FIT) | `FIT ... ENDFIT;` | [`statements::math::fit`](program::statements::math::fit) |
+//! | Matrix operations | `LINV`, `LDET`, `LEV`, `MBLOCK` | [`statements::math`](program::statements::math) |
+//! | Polynomial evaluation | `POLVAL coeffs x r;` | [`statements::math::polval`](program::statements::math::polval) |
+//! | Vector math | `VEDOT`, `VEUNIT`, `VEZERO` | [`statements::math`](program::statements::math) |
 //!
 //! ### Operators
 //!
@@ -58,6 +73,7 @@
 //! | Vector | `VMIN`, `VMAX` | [`math::vector`](program::expressions::functions::math::vector) |
 //! | Query | `TYPE`, `ISRT`, `ISRT3` | [`math::query`](program::expressions::functions::math::query) |
 //! | Type conversion | `ST()`, `CM()`, `RE()`, `LO()`, `VE()` | [`conversion`](program::expressions::functions::conversion) |
+//! | Memory (COSY compat) | `LST`, `LCM`, `LCD` | [`math::memory`](program::expressions::functions::math::memory) |
 //! | String/utility | `LENGTH`, `TRIM`, `LTRIM` | [`sys`](program::expressions::functions::sys) |
 //!
 //! ### Literals

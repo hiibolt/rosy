@@ -11,6 +11,7 @@
 //! - **[`openfb`]** — `OPENFB unit file status;` — open a binary file
 //! - **[`closef`]** — `CLOSEF unit;` — close a file
 //! - **[`cpusec`]** — `CPUSEC var;` — get CPU time
+//! - **[`pwtime`]** — `PWTIME var;` — wall-clock elapsed time
 //! - **[`os_call`]** — `OS cmd;` — execute a shell command
 //! - **[`velget`]** — `VELGET unit var;` — read a vector from a file
 

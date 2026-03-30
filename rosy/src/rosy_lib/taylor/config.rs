@@ -61,7 +61,7 @@ pub struct TaylorRuntime {
     pub monomial_index: FxHashMap<Monomial, u32>,
     /// Index → total_order (fast lookup for DANOT truncation checks)
     pub monomial_orders: Vec<u8>,
-    /// Flat-index of each variable's monomial: variable_indices[v] = index of x_{v+1}
+    /// Flat-index of each variable's monomial: `variable_indices[v]` = index of x\_{v+1}
     pub variable_indices: [u32; MAX_VARS],
     /// Multiplication index table: `mult_table[i * num_monomials + j]` = index of
     /// monomial_i × monomial_j, or `MULT_INVALID` if the product exceeds init_order.

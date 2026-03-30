@@ -8,6 +8,7 @@
 //! - **[`daeps`]** — `DAEPS eps;` — set DA epsilon
 //! - **[`danot`]** — `DANOT order;` — set DA notation order
 //! - **[`datrn`]** — `DATRN var;` — DA truncation
+//! - **[`mtree`]** — `MTREE ...;` — tree representation for fast DA evaluation
 
 pub mod da_init;
 pub mod daeps;

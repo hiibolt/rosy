@@ -76,7 +76,7 @@ impl RosyCOSH for DA {
 
 /// Compute hyperbolic cosine of a DA object using Horner's method.
 ///
-/// c_n = [cosh_f0, sinh_f0][n%2] / n!
+/// `c_n = [cosh_f0, sinh_f0][n%2] / n!`
 fn da_cosh(da: &DA) -> anyhow::Result<DA> {
     let rt = crate::rosy_lib::taylor::get_runtime()?;
     let nocut = rt.config.max_order as usize;

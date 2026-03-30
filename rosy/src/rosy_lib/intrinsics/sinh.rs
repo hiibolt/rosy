@@ -76,7 +76,7 @@ impl RosySINH for DA {
 
 /// Compute hyperbolic sine of a DA object using Horner's method.
 ///
-/// c_n = [sinh_f0, cosh_f0][n%2] / n!
+/// `c_n = [sinh_f0, cosh_f0][n%2] / n!`
 fn da_sinh(da: &DA) -> anyhow::Result<DA> {
     let rt = crate::rosy_lib::taylor::get_runtime()?;
     let nocut = rt.config.max_order as usize;

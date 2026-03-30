@@ -24,7 +24,7 @@
 //! | [`intrinsics`] | Built-in math functions (sin, sqr, exp, etc.) |
 //! | [`core`] | Core I/O, file management, concatenation |
 //! | [`taylor`] | DA/CD Taylor series implementation |
-//! | [`mpi`] | MPI parallel context |
+//! | `mpi` | MPI parallel context |
 //! | [`optimizer`] | FIT loop optimization algorithms |
 
 pub mod operators;
