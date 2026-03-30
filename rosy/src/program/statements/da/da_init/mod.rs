@@ -1,4 +1,4 @@
-//! # OV Statement (DA Initialization)
+//! # DAINI Statement (DA Initialization)
 //!
 //! Initializes the Differential Algebra (Taylor series) environment with
 //! a specified computation order and number of variables.
@@ -6,7 +6,7 @@
 //! ## Syntax
 //!
 //! ```text
-//! OV order nvars;
+//! DAINI order nvars; { note - Rosy doesn't need the 3rd or 4th args }
 //! ```
 //!
 //! Must be called before any DA or CD operations.
