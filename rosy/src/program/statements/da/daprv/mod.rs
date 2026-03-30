@@ -22,10 +22,11 @@ use std::collections::BTreeSet;
 
 use crate::{
     ast::*,
-    program::expressions::Expr,
+    program::{expressions::Expr, statements::SourceLocation},
+    resolve::{ScopeContext, TypeResolver},
     transpile::{
         TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        add_context_to_all,
+        TypeslotDeclarationResult, add_context_to_all,
     },
 };
 
@@ -90,7 +91,16 @@ impl FromRule for DaprvStatement {
         }))
     }
 }
-impl TranspileableStatement for DaprvStatement {}
+impl TranspileableStatement for DaprvStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+}
 impl Transpile for DaprvStatement {
     fn transpile(
         &self,

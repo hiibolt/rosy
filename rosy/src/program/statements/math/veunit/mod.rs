@@ -33,10 +33,11 @@ use std::collections::BTreeSet;
 
 use crate::{
     ast::*,
-    program::expressions::{Expr, core::variable_identifier::VariableIdentifier},
+    program::{expressions::{Expr, core::variable_identifier::VariableIdentifier}, statements::SourceLocation},
+    resolve::{ScopeContext, TypeResolver},
     transpile::{
         TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        VariableScope, add_context_to_all,
+        TypeslotDeclarationResult, VariableScope, add_context_to_all,
     },
 };
 
@@ -75,7 +76,16 @@ impl FromRule for VeunitStatement {
     }
 }
 
-impl TranspileableStatement for VeunitStatement {}
+impl TranspileableStatement for VeunitStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+}
 
 impl Transpile for VeunitStatement {
     fn transpile(

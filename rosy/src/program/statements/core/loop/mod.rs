@@ -39,12 +39,9 @@ use crate::{
         expressions::Expr,
         statements::{SourceLocation, Statement},
     },
-    resolve::{ScopeContext, TypeResolver, TypeSlot},
+    resolve::*,
     rosy_lib::RosyType,
-    transpile::{
-        ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableExpr, TranspileableStatement, VariableData, VariableScope, indent,
-    },
+    transpile::*,
 };
 
 /// AST node for the counted `LOOP i start end [step]; ... ENDLOOP;` statement.
@@ -142,6 +139,14 @@ impl FromRule for LoopStatement {
     }
 }
 impl TranspileableStatement for LoopStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
     fn discover_dependencies(
         &self,
         resolver: &mut TypeResolver,

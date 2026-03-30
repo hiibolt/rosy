@@ -36,10 +36,9 @@ use std::collections::BTreeSet;
 use crate::{
     ast::*,
     program::expressions::{Expr, core::variable_identifier::VariableIdentifier},
-    transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        VariableScope, add_context_to_all,
-    },
+    program::statements::SourceLocation,
+    resolve::*,
+    transpile::*,
 };
 
 /// AST node for `SUBSTR source first last destination;`.
@@ -98,7 +97,16 @@ impl FromRule for SubstrStatement {
     }
 }
 
-impl TranspileableStatement for SubstrStatement {}
+impl TranspileableStatement for SubstrStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+}
 
 impl Transpile for SubstrStatement {
     fn transpile(

@@ -34,11 +34,12 @@ use std::collections::BTreeSet;
 
 use crate::{
     ast::*,
-    program::expressions::{Expr, core::variable_identifier::VariableIdentifier},
-    transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        add_context_to_all,
+    program::{
+        expressions::{Expr, core::variable_identifier::VariableIdentifier},
+        statements::SourceLocation,
     },
+    resolve::{ScopeContext, TypeResolver},
+    transpile::*,
 };
 
 /// AST node for `VELSET vector component value;`.
@@ -86,7 +87,35 @@ impl FromRule for VelsetStatement {
     }
 }
 
-impl TranspileableStatement for VelsetStatement {}
+impl TranspileableStatement for VelsetStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+    fn discover_dependencies(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> Option<Result<()>> {
+        // Discover function call sites within the component and value expressions
+        if let Err(e) = resolver.discover_expr_function_calls(&self.component_expr, ctx) {
+            return Some(Err(e.context(
+                "...while discovering function call dependencies in VELSET component expression",
+            )));
+        }
+        if let Err(e) = resolver.discover_expr_function_calls(&self.value_expr, ctx) {
+            return Some(Err(e.context(
+                "...while discovering function call dependencies in VELSET value expression",
+            )));
+        }
+        Some(Ok(()))
+    }
+}
 
 impl Transpile for VelsetStatement {
     fn transpile(

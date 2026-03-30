@@ -42,8 +42,8 @@ use crate::{
         expressions::{Expr, core::variable_identifier::VariableIdentifier},
         statements::SourceLocation,
     },
-    resolve::{ExprRecipe, ResolutionRule, ScopeContext, TypeResolver, TypeSlot},
-    transpile::{TranspileableExpr, TranspileableStatement, VariableScope},
+    resolve::*,
+    transpile::*,
 };
 use anyhow::{Context, Error, Result, anyhow, ensure};
 
@@ -73,24 +73,33 @@ impl FromRule for AssignStatement {
                 anyhow::anyhow!("Expected variable identifier for assignment statement")
             })?;
 
-        let rhs_pair = inner.next().context("Missing second token in assignment!")?;
+        let rhs_pair = inner
+            .next()
+            .context("Missing second token in assignment!")?;
         let value = if rhs_pair.as_rule() == crate::ast::Rule::empty_literal {
             None
         } else {
             Some(
                 Expr::from_rule(rhs_pair)
                     .context("Failed to build expression for assignment statement!")?
-                    .ok_or_else(|| anyhow::anyhow!("Expected expression for assignment statement"))?,
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Expected expression for assignment statement")
+                    })?,
             )
         };
 
-        Ok(Some(AssignStatement {
-            identifier,
-            value,
-        }))
+        Ok(Some(AssignStatement { identifier, value }))
     }
 }
 impl TranspileableStatement for AssignStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
     fn discover_dependencies(
         &self,
         resolver: &mut TypeResolver,
@@ -133,8 +142,8 @@ impl TranspileableStatement for AssignStatement {
                 if let Ok(new_type) = resolver.evaluate_recipe(&recipe) {
                     // Allow RE→VE coercion: assigning a scalar RE to a VE
                     // variable resets it to a single-element vector (COSY compat).
-                    let is_re_to_ve_coercion = explicit_type == RosyType::VE()
-                        && new_type == RosyType::RE();
+                    let is_re_to_ve_coercion =
+                        explicit_type == RosyType::VE() && new_type == RosyType::RE();
                     if new_type != explicit_type && !is_re_to_ve_coercion {
                         let scope_str = if ctx.scope_path.is_empty() {
                             "global scope".to_string()
@@ -241,7 +250,9 @@ impl TranspileableStatement for AssignStatement {
                 let mut temp_leaf_slots: Vec<TypeSlot> = Vec::new();
                 if old_type_result.is_err() {
                     let all_deps: HashSet<TypeSlot> = {
-                        let mut d = resolver.nodes.get(&var_slot)
+                        let mut d = resolver
+                            .nodes
+                            .get(&var_slot)
                             .map(|n| n.depends_on.clone())
                             .unwrap_or_default();
                         d.extend(deps.iter().cloned());
@@ -249,13 +260,18 @@ impl TranspileableStatement for AssignStatement {
                     };
 
                     for dep_slot in &all_deps {
-                        if *dep_slot == var_slot { continue; }
+                        if *dep_slot == var_slot {
+                            continue;
+                        }
                         if let Some(dep_node) = resolver.nodes.get(dep_slot) {
                             if dep_node.resolved.is_none() && dep_node.depends_on.is_empty() {
-                                if let ResolutionRule::InferredFrom { recipe: ref r, .. } = dep_node.rule {
+                                if let ResolutionRule::InferredFrom { recipe: ref r, .. } =
+                                    dep_node.rule
+                                {
                                     if let Ok(t) = resolver.evaluate_recipe(r) {
                                         temp_leaf_slots.push(dep_slot.clone());
-                                        resolver.nodes.get_mut(dep_slot).unwrap().resolved = Some(t);
+                                        resolver.nodes.get_mut(dep_slot).unwrap().resolved =
+                                            Some(t);
                                     }
                                 }
                             }
@@ -401,7 +417,8 @@ impl Transpile for AssignStatement {
         // Handle clear assignment (`:= .`)
         if self.value.is_none() {
             // Only allowed on VE or array types (dimensions > 0)
-            let is_ve = variable_type.base_type == RosyBaseType::VE && variable_type.dimensions == 0;
+            let is_ve =
+                variable_type.base_type == RosyBaseType::VE && variable_type.dimensions == 0;
             let is_array = variable_type.dimensions > 0;
             if !is_ve && !is_array {
                 return Err(vec![anyhow!(
@@ -414,10 +431,12 @@ impl Transpile for AssignStatement {
             let mut requested_variables = BTreeSet::new();
             let ident_output = self.identifier.transpile(context).map_err(|e| {
                 e.into_iter()
-                    .map(|err| err.context(format!(
-                        "...while transpiling identifier for clear assignment to '{}'",
-                        self.identifier.name
-                    )))
+                    .map(|err| {
+                        err.context(format!(
+                            "...while transpiling identifier for clear assignment to '{}'",
+                            self.identifier.name
+                        ))
+                    })
                     .collect::<Vec<Error>>()
             })?;
             requested_variables.extend(ident_output.requested_variables.iter().cloned());
@@ -541,10 +560,20 @@ impl Transpile for AssignStatement {
                 "*"
             }
         };
-        let serialization = format!(
-            "{}{} = {};",
-            dereference, serialized_identifier, serialized_value
-        );
+        let serialization = if !dereference.is_empty() && self.identifier.num_index_dimensions() > 0
+        {
+            // (*NAME)[indices] instead of *NAME[indices]
+            let index_suffix = &serialized_identifier[self.identifier.name.len()..];
+            format!(
+                "({}{}){} = {};",
+                dereference, self.identifier.name, index_suffix, serialized_value
+            )
+        } else {
+            format!(
+                "{}{} = {};",
+                dereference, serialized_identifier, serialized_value
+            )
+        };
         if errors.is_empty() {
             Ok(TranspilationOutput {
                 serialization,

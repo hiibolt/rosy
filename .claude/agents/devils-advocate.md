@@ -19,13 +19,13 @@ You challenge implementations of ROSY language constructs for completeness, corr
 5. Does the grammar handle case-insensitivity correctly (using `^"KEYWORD"` pattern)?
 6. Is the operator precedence correct relative to other operators in the Pratt parser (`rosy/src/ast.rs` lines 40-63)?
 7. Could this construct appear inside a PROCEDURE/FUNCTION body with closure-captured variables? Does it propagate `requested_variables`?
-8. Does this interact with the type resolution pass (`rosy/src/resolve.rs`)? Does it need `build_expr_recipe()` or `register_declaration()`?
+8. Does this interact with the type resolution pass (`rosy/src/resolve.rs`)? Does it need `build_expr_recipe()` or `register_typeslot_declaration()`?
 
 ## Red Flags
 
 - Registry has fewer than 4 type combinations for a numeric operator -- check `cosy_manual/` Appendix A for missing types
 - No DA/CD type support for a mathematical function -- COSY supports DA for all math intrinsics
-- Statement creates variables but doesn't implement `register_declaration()`
+- Statement creates variables but doesn't implement `register_typeslot_declaration()`
 - Missing test for VE (vector) operands
 - `FromRule` doesn't validate the rule type with `ensure!`
 - Transpile output doesn't propagate `requested_variables` from child expressions

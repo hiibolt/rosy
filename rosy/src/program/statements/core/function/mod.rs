@@ -31,16 +31,7 @@
 use anyhow::{Context, Error, Result, anyhow, ensure};
 use std::collections::BTreeSet;
 
-use crate::{
-    ast::*,
-    program::statements::*,
-    resolve::{ResolutionRule, ScopeContext, TypeResolver, TypeSlot},
-    rosy_lib::RosyType,
-    transpile::{
-        ScopedVariableData, TranspilationInputContext, TranspilationInputFunctionContext,
-        TranspilationOutput, Transpile, VariableData, VariableScope, indent,
-    },
-};
+use crate::{ast::*, program::statements::*, resolve::*, rosy_lib::RosyType, transpile::*};
 
 /// AST node for a user-defined function declaration.
 #[derive(Debug)]
@@ -172,12 +163,12 @@ impl FromRule for FunctionStatement {
     }
 }
 impl TranspileableStatement for FunctionStatement {
-    fn register_declaration(
+    fn register_typeslot_declaration(
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
         source_location: SourceLocation,
-    ) -> Option<Result<()>> {
+    ) -> TypeslotDeclarationResult {
         // Return type slot
         let ret_slot = TypeSlot::FunctionReturn(ctx.scope_path.clone(), self.name.clone());
         resolver.insert_slot(
@@ -236,7 +227,7 @@ impl TranspileableStatement for FunctionStatement {
             .insert(self.name.clone(), inner_ret_var_slot.clone());
 
         if let Err(e) = resolver.discover_slots(&self.body, &mut inner_ctx) {
-            return Some(Err(e));
+            return TypeslotDeclarationResult::VarFuncOrProcedureDecl { result: Err(e) };
         }
 
         // If the return type is NOT explicit, it depends on the inner return var
@@ -254,7 +245,7 @@ impl TranspileableStatement for FunctionStatement {
             }
         }
 
-        Some(Ok(()))
+        TypeslotDeclarationResult::VarFuncOrProcedureDecl { result: Ok(()) }
     }
     fn apply_resolved_types(
         &mut self,
@@ -437,7 +428,7 @@ impl Transpile for FunctionStatement {
             }
             for arg_data in &resolved_arg_data {
                 serialized_args.push(format!(
-                    "{}: &{}",
+                    "{}: &mut {}",
                     arg_data.name,
                     arg_data.r#type.as_rust_type()
                 ));

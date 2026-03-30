@@ -30,10 +30,14 @@ use std::collections::BTreeSet;
 
 use crate::{
     ast::*,
-    program::expressions::core::variable_identifier::VariableIdentifier,
+    program::{
+        expressions::core::variable_identifier::VariableIdentifier,
+        statements::SourceLocation,
+    },
+    resolve::{ScopeContext, TypeResolver},
     transpile::{
         TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        VariableScope,
+        TypeslotDeclarationResult, VariableScope,
     },
 };
 
@@ -68,7 +72,16 @@ impl FromRule for CpusecStatement {
     }
 }
 
-impl TranspileableStatement for CpusecStatement {}
+impl TranspileableStatement for CpusecStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+}
 
 impl Transpile for CpusecStatement {
     fn transpile(

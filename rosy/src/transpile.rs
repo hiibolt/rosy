@@ -21,24 +21,31 @@
 //! accumulate multiple errors before failing. Use `.context()` to add
 //! breadcrumbs for error diagnostics.
 
+use crate::{
+    program::{expressions::Expr, statements::SourceLocation},
+    resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot},
+    rosy_lib::RosyType,
+};
+use anyhow::{Error, Result};
 use std::collections::{BTreeSet, HashMap, HashSet};
-use anyhow::{Result, Error};
-use crate::{program::{expressions::Expr, statements::SourceLocation}, resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot}, rosy_lib::RosyType};
+
+pub enum TypeslotDeclarationResult {
+    VarFuncOrProcedureDecl { result: Result<()> },
+    NotAVarFuncOrProcedureDecl,
+}
 
 pub trait TranspileableStatement: Transpile + Send + Sync {
-    fn register_declaration(
+    fn register_typeslot_declaration(
         &self,
         _resolver: &mut TypeResolver,
         _ctx: &mut ScopeContext,
-        _source_location: SourceLocation
-    ) -> Option<Result<()>> {
-        None
-    }
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult;
     fn discover_dependencies(
         &self,
         _resolver: &mut TypeResolver,
         _ctx: &mut ScopeContext,
-        _source_location: SourceLocation
+        _source_location: SourceLocation,
     ) -> Option<Result<()>> {
         None
     }
@@ -51,16 +58,12 @@ pub trait TranspileableStatement: Transpile + Send + Sync {
     }
     /// Set the type of an implicit return variable if it matches the given name.
     /// Used by FunctionStatement to propagate its return type to the first body VarDecl.
-    fn set_implicit_return_type(
-        &mut self,
-        _name: &str,
-        _return_type: &RosyType,
-    ) -> bool {
+    fn set_implicit_return_type(&mut self, _name: &str, _return_type: &RosyType) -> bool {
         false
     }
 }
 pub trait TranspileableExpr: Transpile + Send + Sync {
-    fn type_of ( &self, context: &TranspilationInputContext ) -> Result<RosyType>;
+    fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType>;
     fn discover_expr_function_calls(
         &self,
         _resolver: &mut TypeResolver,
@@ -78,16 +81,14 @@ pub trait TranspileableExpr: Transpile + Send + Sync {
     }
     /// Extend a Concat expression's terms with an additional expression.
     /// Returns true if this expression is a Concat and the term was added.
-    fn extend_concat(
-        &mut self,
-        _right: Expr,
-    ) -> bool {
+    fn extend_concat(&mut self, _right: Expr) -> bool {
         false
     }
 }
 pub trait Transpile: std::fmt::Debug {
-    fn transpile (
-        &self, context: &mut TranspilationInputContext
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>>;
 }
 
@@ -95,33 +96,33 @@ pub trait Transpile: std::fmt::Debug {
 pub enum VariableScope {
     Local,
     Arg,
-    Higher
+    Higher,
 }
 #[derive(Debug, Clone)]
 pub struct VariableData {
     pub name: String,
-    pub r#type: RosyType
+    pub r#type: RosyType,
 }
 #[derive(Debug, Clone)]
 pub struct ScopedVariableData {
     pub scope: VariableScope,
-    pub data: VariableData
+    pub data: VariableData,
 }
 #[derive(Debug, Clone)]
 pub struct TranspilationInputFunctionContext {
     pub return_type: RosyType,
     pub args: Vec<VariableData>,
-    pub requested_variables: BTreeSet<String>
+    pub requested_variables: BTreeSet<String>,
 }
 #[derive(Debug, Clone)]
 pub struct TranspilationInputProcedureContext {
     pub args: Vec<VariableData>,
-    pub requested_variables: BTreeSet<String>
+    pub requested_variables: BTreeSet<String>,
 }
 #[derive(Default, Clone)]
 pub struct TranspilationInputContext {
-    pub variables:  HashMap<String, ScopedVariableData>,
-    pub functions:  HashMap<String, TranspilationInputFunctionContext>,
+    pub variables: HashMap<String, ScopedVariableData>,
+    pub functions: HashMap<String, TranspilationInputFunctionContext>,
     pub procedures: HashMap<String, TranspilationInputProcedureContext>,
     pub in_loop: bool,
 }
@@ -192,6 +193,23 @@ impl TranspilationOutput {
         }
     }
 
+    /// Get this expression as a mutable reference for function/procedure arguments.
+    /// - Owned → &mut expr
+    /// - Ref(&X) → &mut X (strip & and add &mut)
+    /// - Ref(X) → &mut *X (deref &mut T to get &mut T)
+    pub fn as_mut_ref(&self) -> String {
+        match self.value_kind {
+            ValueKind::Owned => format!("&mut {}", self.serialization),
+            ValueKind::Ref => {
+                if let Some(inner) = self.serialization.strip_prefix('&') {
+                    format!("&mut {}", inner)
+                } else {
+                    format!("&mut *{}", self.serialization)
+                }
+            }
+        }
+    }
+
     /// Get this expression as a plain value (for Copy-type arithmetic, conditions).
     /// - Owned → expr
     /// - Ref(&X) → X (strip & to deref)
@@ -210,16 +228,15 @@ impl TranspilationOutput {
     }
 }
 
-
 // helper for indenting blocks
-pub fn indent ( st: String ) -> String {
+pub fn indent(st: String) -> String {
     st.lines()
         .map(|line| format!("\t{}", line))
         .collect::<Vec<String>>()
         .join("\n")
 }
 // helper for adding context to a vec of  errors
-pub fn add_context_to_all ( arr: Vec<Error>, context: String ) -> Vec<Error> {
+pub fn add_context_to_all(arr: Vec<Error>, context: String) -> Vec<Error> {
     arr.into_iter()
         .map(|err| err.context(context.clone()))
         .collect()

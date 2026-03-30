@@ -41,10 +41,7 @@ use crate::{
     resolve::{ScopeContext, TypeResolver, TypeSlot},
     rosy_lib::{RosyBaseType, RosyType},
     syntax_config,
-    transpile::{
-        ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableExpr, TranspileableStatement, VariableData, VariableScope,
-    },
+    transpile::*,
 };
 
 #[derive(Debug)]
@@ -240,12 +237,12 @@ impl FromRule for VarDeclStatement {
     }
 }
 impl TranspileableStatement for VarDeclStatement {
-    fn register_declaration(
+    fn register_typeslot_declaration(
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
         source_location: SourceLocation,
-    ) -> Option<Result<()>> {
+    ) -> TypeslotDeclarationResult {
         let slot = TypeSlot::Variable(ctx.scope_path.clone(), self.data.name.clone());
 
         resolver.insert_slot(
@@ -255,7 +252,7 @@ impl TranspileableStatement for VarDeclStatement {
         );
         ctx.variables.insert(self.data.name.clone(), slot);
 
-        Some(Ok(()))
+        TypeslotDeclarationResult::VarFuncOrProcedureDecl { result: Ok(()) }
     }
     fn apply_resolved_types(
         &mut self,

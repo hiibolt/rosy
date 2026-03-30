@@ -131,12 +131,12 @@ impl FromRule for ProcedureStatement {
     }
 }
 impl TranspileableStatement for ProcedureStatement {
-    fn register_declaration(
+    fn register_typeslot_declaration(
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
         source_location: SourceLocation,
-    ) -> Option<Result<()>> {
+    ) -> TypeslotDeclarationResult {
         let mut arg_slots = Vec::new();
         for arg in &self.args {
             let arg_slot =
@@ -169,10 +169,10 @@ impl TranspileableStatement for ProcedureStatement {
         }
 
         if let Err(e) = resolver.discover_slots(&self.body, &mut inner_ctx) {
-            return Some(Err(e));
+            return TypeslotDeclarationResult::VarFuncOrProcedureDecl { result: Err(e) };
         }
 
-        Some(Ok(()))
+        TypeslotDeclarationResult::VarFuncOrProcedureDecl { result: Ok(()) }
     }
     fn apply_resolved_types(
         &mut self,

@@ -14,18 +14,31 @@
 
 use std::collections::BTreeSet;
 
-use crate::{ast::{FromRule, Rule}, program::statements::Statement, transpile::*};
-use anyhow::{Result, Context, Error};
+use crate::{
+    ast::{FromRule, Rule},
+    program::statements::{SourceLocation, Statement},
+    resolve::*,
+    transpile::*,
+};
+use anyhow::{Context, Error, Result};
 
-pub mod statements;
 pub mod expressions;
-
+pub mod statements;
 
 #[derive(Debug)]
 pub struct Program {
     pub statements: Vec<Statement>,
 }
-impl TranspileableStatement for Program {}
+impl TranspileableStatement for Program {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+}
 impl FromRule for Program {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Program>> {
         let mut statements = Vec::new();
@@ -43,8 +56,9 @@ impl FromRule for Program {
     }
 }
 impl Transpile for Program {
-    fn transpile (
-        &self, context: &mut TranspilationInputContext
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut serialization = Vec::new();
         let mut errors = Vec::new();
@@ -52,7 +66,7 @@ impl Transpile for Program {
             match statement.transpile(context) {
                 Ok(output) => {
                     serialization.push(output.serialization);
-                },
+                }
                 Err(stmt_errors) => {
                     for e in stmt_errors {
                         errors.push(e.context("...while transpiling a top-level statement"));

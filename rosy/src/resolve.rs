@@ -16,6 +16,7 @@ use crate::program::Program;
 use crate::program::expressions::*;
 use crate::program::statements::*;
 use crate::rosy_lib::RosyType;
+use crate::transpile::TypeslotDeclarationResult;
 use anyhow::{Result, anyhow};
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -246,7 +247,7 @@ impl TypeResolver {
     ) -> Result<()> {
         // First pass: register all declarations so we know what exists
         for stmt in statements {
-            self.register_declaration(stmt, ctx)?;
+            self.register_typeslot_declaration(stmt, ctx)?;
         }
 
         // Second pass: discover dependencies from assignments and call sites
@@ -258,10 +259,14 @@ impl TypeResolver {
     }
 
     /// Register a declaration, creating graph nodes for its type slots.
-    pub fn register_declaration(&mut self, stmt: &Statement, ctx: &mut ScopeContext) -> Result<()> {
-        let Some(result) = stmt
+    pub fn register_typeslot_declaration(
+        &mut self,
+        stmt: &Statement,
+        ctx: &mut ScopeContext,
+    ) -> Result<()> {
+        let TypeslotDeclarationResult::VarFuncOrProcedureDecl { result } = stmt
             .inner
-            .register_declaration(self, ctx, stmt.source_location.clone())
+            .register_typeslot_declaration(self, ctx, stmt.source_location.clone())
         else {
             return Ok(()); // not a declaration, skip
         };

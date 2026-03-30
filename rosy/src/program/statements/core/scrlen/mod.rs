@@ -34,12 +34,8 @@ use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
 
 use crate::{
-    ast::*,
-    program::expressions::Expr,
-    transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        add_context_to_all,
-    },
+    ast::*, program::expressions::Expr, program::statements::SourceLocation, resolve::*,
+    transpile::*,
 };
 
 /// AST node for `SCRLEN c;`.
@@ -66,7 +62,16 @@ impl FromRule for ScrlenStatement {
         Ok(Some(ScrlenStatement { size_expr }))
     }
 }
-impl TranspileableStatement for ScrlenStatement {}
+impl TranspileableStatement for ScrlenStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+}
 impl Transpile for ScrlenStatement {
     fn transpile(
         &self,

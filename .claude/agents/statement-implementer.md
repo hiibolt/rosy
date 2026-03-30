@@ -33,7 +33,7 @@ Determine which category your statement belongs to:
 
 **Control flow** (like If, Loop, While):
 Reference `rosy/src/program/statements/core/if.rs` or `core/loop.rs`. These statements contain a body of child statements and need:
-- `TranspileableStatement` with `register_declaration()` if declaring variables (e.g., loop iterator)
+- `TranspileableStatement` with `register_typeslot_declaration()` if declaring variables (e.g., loop iterator)
 - `discover_dependencies()` if containing assignments or calls
 - `apply_resolved_types()` to recurse into child body statements
 

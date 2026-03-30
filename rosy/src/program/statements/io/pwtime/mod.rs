@@ -30,10 +30,14 @@ use std::collections::BTreeSet;
 
 use crate::{
     ast::*,
-    program::expressions::core::variable_identifier::VariableIdentifier,
+    program::{
+        expressions::core::variable_identifier::VariableIdentifier,
+        statements::SourceLocation,
+    },
+    resolve::{ScopeContext, TypeResolver},
     transpile::{
         TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        VariableScope, add_context_to_all,
+        TypeslotDeclarationResult, VariableScope, add_context_to_all,
     },
 };
 
@@ -63,7 +67,16 @@ impl FromRule for PwtimeStatement {
     }
 }
 
-impl TranspileableStatement for PwtimeStatement {}
+impl TranspileableStatement for PwtimeStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+}
 
 impl Transpile for PwtimeStatement {
     fn transpile(

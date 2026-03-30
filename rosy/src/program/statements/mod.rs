@@ -94,30 +94,31 @@ pub use core::recst::RecstStatement;
 pub use core::reran::ReranStatement;
 pub use core::stcre::StcreStatement;
 
-pub use da::daeps::DaepsStatement;
-pub use da::danot::DanotStatement;
-pub use da::datrn::DatrnStatement;
-pub use da::mtree::MtreeStatement;
-pub use da::dascl::DasclStatement;
-pub use da::dasgn::DasgnStatement;
+pub use da::dacliw::DacliwStatement;
+pub use da::dacqlc::DacqlcStatement;
 pub use da::dader::DaderStatement;
+pub use da::dadiu::DadiuStatement;
+pub use da::dadmu::DadmuStatement;
+pub use da::daeps::DaepsStatement;
+pub use da::daest::DaestStatement;
 pub use da::daint::DaintStatement;
 pub use da::danoro::DanoroStatement;
 pub use da::danors::DanorsStatement;
-pub use da::daplu::DapluStatement;
-pub use da::dadiu::DadiuStatement;
-pub use da::dadmu::DadmuStatement;
-pub use da::dacliw::DacliwStatement;
-pub use da::dacqlc::DacqlcStatement;
-pub use da::darea::DareaStatement;
-pub use da::dapew::DapewStatement;
-pub use da::dapee::DapeeStatement;
+pub use da::danot::DanotStatement;
 pub use da::dapea::DapeaStatement;
+pub use da::dapee::DapeeStatement;
 pub use da::dapep::DapepStatement;
-pub use da::daest::DaestStatement;
+pub use da::dapew::DapewStatement;
+pub use da::daplu::DapluStatement;
+pub use da::darea::DareaStatement;
+pub use da::dascl::DasclStatement;
+pub use da::dasgn::DasgnStatement;
+pub use da::datrn::DatrnStatement;
+pub use da::mtree::MtreeStatement;
 
 use crate::{
     ast::{FromRule, Rule},
+    resolve::*,
     transpile::*,
 };
 use anyhow::{Context, Error, Result, bail};
@@ -226,7 +227,16 @@ pub enum StatementEnum {
     DaPep,
     DaEst,
 }
-impl TranspileableStatement for Statement {}
+impl TranspileableStatement for Statement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+}
 impl FromRule for Statement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Statement>> {
         // Capture source location before the pair is consumed

@@ -37,10 +37,7 @@ use crate::{
     program::statements::SourceLocation,
     resolve::{ExprRecipe, ResolutionRule, ScopeContext, TypeResolver},
     rosy_lib::RosyType,
-    transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        VariableScope, add_context_to_all,
-    },
+    transpile::*,
 };
 
 #[derive(Debug)]
@@ -68,6 +65,14 @@ impl FromRule for ReranStatement {
 }
 
 impl TranspileableStatement for ReranStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
     fn discover_dependencies(
         &self,
         resolver: &mut TypeResolver,

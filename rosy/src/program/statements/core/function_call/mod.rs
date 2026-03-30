@@ -34,10 +34,8 @@ use crate::{
         expressions::{Expr, core::var_expr::function_call_transpile_helper},
         statements::SourceLocation,
     },
-    resolve::{ScopeContext, TypeResolver},
-    transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-    },
+    resolve::*,
+    transpile::*,
 };
 
 /// AST node for a function call used as a statement.
@@ -79,6 +77,14 @@ impl FromRule for FunctionCallStatement {
     }
 }
 impl TranspileableStatement for FunctionCallStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
     fn discover_dependencies(
         &self,
         resolver: &mut TypeResolver,

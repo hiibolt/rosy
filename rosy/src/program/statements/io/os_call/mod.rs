@@ -30,10 +30,11 @@ use std::collections::BTreeSet;
 
 use crate::{
     ast::*,
-    program::expressions::Expr,
+    program::{expressions::Expr, statements::SourceLocation},
+    resolve::{ScopeContext, TypeResolver},
     transpile::{
         TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        add_context_to_all,
+        TypeslotDeclarationResult, add_context_to_all,
     },
 };
 
@@ -61,7 +62,16 @@ impl FromRule for OsCallStatement {
         Ok(Some(OsCallStatement { cmd_expr }))
     }
 }
-impl TranspileableStatement for OsCallStatement {}
+impl TranspileableStatement for OsCallStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+}
 impl Transpile for OsCallStatement {
     fn transpile(
         &self,

@@ -29,9 +29,11 @@ use anyhow::{Context, Error, Result, ensure};
 
 use crate::{
     ast::*,
-    program::expressions::Expr,
+    program::{expressions::Expr, statements::SourceLocation},
+    resolve::{ScopeContext, TypeResolver},
     transpile::{
         TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        TypeslotDeclarationResult,
     },
 };
 
@@ -61,7 +63,16 @@ impl FromRule for DanotStatement {
         Ok(Some(DanotStatement { order: order_expr }))
     }
 }
-impl TranspileableStatement for DanotStatement {}
+impl TranspileableStatement for DanotStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+}
 impl Transpile for DanotStatement {
     fn transpile(
         &self,

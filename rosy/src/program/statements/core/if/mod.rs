@@ -45,12 +45,9 @@ use crate::{
         expressions::Expr,
         statements::{SourceLocation, Statement},
     },
-    resolve::{ScopeContext, TypeResolver},
+    resolve::*,
     rosy_lib::RosyType,
-    transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr,
-        TranspileableStatement, indent,
-    },
+    transpile::*,
 };
 
 /// AST node for the `IF ... [ELSEIF ...] [ELSE] ENDIF;` statement.
@@ -183,6 +180,14 @@ impl FromRule for IfStatement {
     }
 }
 impl TranspileableStatement for IfStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
     fn discover_dependencies(
         &self,
         resolver: &mut TypeResolver,
@@ -418,4 +423,13 @@ impl Transpile for IfStatement {
         }
     }
 }
-impl TranspileableStatement for ElseIfClause {}
+impl TranspileableStatement for ElseIfClause {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+}

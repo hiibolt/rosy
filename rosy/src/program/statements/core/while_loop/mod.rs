@@ -37,10 +37,7 @@ use crate::{
     },
     resolve::{ScopeContext, TypeResolver},
     rosy_lib::RosyType,
-    transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr,
-        TranspileableStatement, indent,
-    },
+    transpile::*,
 };
 
 #[derive(Debug)]
@@ -96,6 +93,14 @@ impl FromRule for WhileStatement {
     }
 }
 impl TranspileableStatement for WhileStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
     fn discover_dependencies(
         &self,
         resolver: &mut TypeResolver,

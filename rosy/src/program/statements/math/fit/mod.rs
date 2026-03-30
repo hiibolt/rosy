@@ -46,7 +46,7 @@ use crate::{
     rosy_lib::RosyType,
     transpile::{
         TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr,
-        TranspileableStatement, indent,
+        TranspileableStatement, TypeslotDeclarationResult, indent,
     },
 };
 
@@ -168,6 +168,14 @@ impl FromRule for FitStatement {
     }
 }
 impl TranspileableStatement for FitStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
     fn discover_dependencies(
         &self,
         resolver: &mut TypeResolver,

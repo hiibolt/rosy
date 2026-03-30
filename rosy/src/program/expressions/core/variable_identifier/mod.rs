@@ -136,6 +136,20 @@ impl TranspileableExpr for VariableIdentifier {
 
         let num_indices = self.num_index_dimensions();
         let mut var_type = var_data.data.r#type.clone();
+
+        // VE (Vec<f64>) has dimensions=0 but can be indexed with (i) to get RE.
+        // This supports COSY's LIST(I) := expr pattern for VE element assignment.
+        if num_indices > 0 && var_type.dimensions == 0 && var_type.base_type == crate::rosy_lib::RosyBaseType::VE {
+            if num_indices == 1 {
+                return Ok(RosyType::RE());
+            } else {
+                return Err(anyhow::anyhow!(
+                    "VE variable '{}' can only be indexed with 1 index, but {} were provided!",
+                    self.name, num_indices
+                ));
+            }
+        }
+
         var_type.dimensions = var_type.dimensions
             .checked_sub(num_indices)
             .ok_or(anyhow::anyhow!(

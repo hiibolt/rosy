@@ -19,12 +19,7 @@
 use anyhow::{Error, Result, anyhow, ensure};
 use std::collections::BTreeSet;
 
-use crate::{
-    ast::*,
-    transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-    },
-};
+use crate::{ast::*, program::statements::SourceLocation, resolve::*, transpile::*};
 
 #[derive(Debug)]
 pub struct BreakStatement;
@@ -40,7 +35,16 @@ impl FromRule for BreakStatement {
         Ok(Some(BreakStatement))
     }
 }
-impl TranspileableStatement for BreakStatement {}
+impl TranspileableStatement for BreakStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+}
 impl Transpile for BreakStatement {
     fn transpile(
         &self,

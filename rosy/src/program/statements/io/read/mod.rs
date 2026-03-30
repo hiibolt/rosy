@@ -30,10 +30,14 @@ use std::collections::BTreeSet;
 
 use crate::{
     ast::*,
-    program::expressions::core::variable_identifier::VariableIdentifier,
+    program::{
+        expressions::core::variable_identifier::VariableIdentifier,
+        statements::SourceLocation,
+    },
+    resolve::{ScopeContext, TypeResolver},
     transpile::{
         TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr,
-        TranspileableStatement,
+        TranspileableStatement, TypeslotDeclarationResult,
     },
 };
 
@@ -72,7 +76,16 @@ impl FromRule for ReadStatement {
         Ok(Some(ReadStatement { unit, identifier }))
     }
 }
-impl TranspileableStatement for ReadStatement {}
+impl TranspileableStatement for ReadStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+}
 impl Transpile for ReadStatement {
     fn transpile(
         &self,

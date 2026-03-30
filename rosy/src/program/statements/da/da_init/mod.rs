@@ -32,10 +32,12 @@ use anyhow::{Context, Error, Result, ensure};
 
 use crate::{
     ast::*,
-    program::expressions::Expr,
+    program::{expressions::Expr, statements::SourceLocation},
+    resolve::{ScopeContext, TypeResolver},
     syntax_config,
     transpile::{
         TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
+        TypeslotDeclarationResult,
     },
 };
 
@@ -113,7 +115,16 @@ impl FromRule for DAInitStatement {
         }))
     }
 }
-impl TranspileableStatement for DAInitStatement {}
+impl TranspileableStatement for DAInitStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+}
 impl Transpile for DAInitStatement {
     fn transpile(
         &self,

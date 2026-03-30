@@ -29,12 +29,8 @@ use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
 
 use crate::{
-    ast::*,
-    program::expressions::core::variable_identifier::VariableIdentifier,
-    transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        VariableScope, add_context_to_all,
-    },
+    ast::*, program::expressions::core::variable_identifier::VariableIdentifier,
+    program::statements::SourceLocation, resolve::*, transpile::*,
 };
 
 #[derive(Debug)]
@@ -63,7 +59,16 @@ impl FromRule for PnproStatement {
     }
 }
 
-impl TranspileableStatement for PnproStatement {}
+impl TranspileableStatement for PnproStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+}
 
 impl Transpile for PnproStatement {
     fn transpile(

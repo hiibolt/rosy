@@ -20,11 +20,18 @@
 //! ENDPLOOP results;
 //! ```
 
+use anyhow::{Context, Error, Result, anyhow, bail, ensure};
 use std::collections::BTreeSet;
-use anyhow::{Result, Context, Error, anyhow, ensure, bail};
 
 use crate::{
-    ast::*, program::{expressions::{Expr, core::variable_identifier::VariableIdentifier}, statements::{Statement, SourceLocation}}, resolve::{ScopeContext, TypeResolver, TypeSlot}, rosy_lib::RosyType, transpile::{ScopedVariableData, TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, TranspileableStatement, VariableData, VariableScope, indent}
+    ast::*,
+    program::{
+        expressions::{Expr, core::variable_identifier::VariableIdentifier},
+        statements::{SourceLocation, Statement},
+    },
+    resolve::*,
+    rosy_lib::RosyType,
+    transpile::*,
 };
 
 /// AST node for the parallel loop `PLOOP ... ENDPLOOP output;`.
@@ -35,14 +42,17 @@ pub struct PLoopStatement {
     pub end: Expr,
     pub body: Vec<Statement>,
     pub commutivityfrom_rule: Option<u8>,
-    pub output: VariableIdentifier
+    pub output: VariableIdentifier,
 }
 
 impl FromRule for PLoopStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        ensure!(pair.as_rule() == Rule::ploop, 
-            "Expected `ploop` rule when building ploop statement, found: {:?}", pair.as_rule());
-        
+        ensure!(
+            pair.as_rule() == Rule::ploop,
+            "Expected `ploop` rule when building ploop statement, found: {:?}",
+            pair.as_rule()
+        );
+
         let mut inner = pair.into_inner();
         let (iterator, start, end) = {
             let mut start_loop_inner = inner
@@ -50,19 +60,27 @@ impl FromRule for PLoopStatement {
                 .context("Missing first token `start_loop`!")?
                 .into_inner();
 
-            let iterator = start_loop_inner.next()
+            let iterator = start_loop_inner
+                .next()
                 .context("Missing first token `variable_name`!")?
-                .as_str().to_string();
-            let start_pair = start_loop_inner.next()
+                .as_str()
+                .to_string();
+            let start_pair = start_loop_inner
+                .next()
                 .context("Missing second token `start_expr`!")?;
             let start = Expr::from_rule(start_pair)
                 .context("Failed to build `start` expression in `loop` statement!")?
-                .ok_or_else(|| anyhow::anyhow!("Expected expression for `start` in `loop` statement"))?;
-            let end_pair = start_loop_inner.next()
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Expected expression for `start` in `loop` statement")
+                })?;
+            let end_pair = start_loop_inner
+                .next()
                 .context("Missing third token `end_expr`!")?;
             let end = Expr::from_rule(end_pair)
                 .context("Failed to build `end` expression in `loop` statement!")?
-                .ok_or_else(|| anyhow::anyhow!("Expected expression for `end` in `loop` statement"))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Expected expression for `end` in `loop` statement")
+                })?;
 
             (iterator, start, end)
         };
@@ -70,8 +88,9 @@ impl FromRule for PLoopStatement {
         let mut body = Vec::new();
         // Process remaining elements (statements and end)
         let end_ploop_pair = loop {
-            let element = inner.next()
-                .ok_or(anyhow::anyhow!("Expected `end_ploop` statement at end of `ploop`!"))?;
+            let element = inner.next().ok_or(anyhow::anyhow!(
+                "Expected `end_ploop` statement at end of `ploop`!"
+            ))?;
 
             // Skip the end element
             if element.as_rule() == Rule::end_ploop {
@@ -80,37 +99,45 @@ impl FromRule for PLoopStatement {
 
             let pair_input = element.as_str();
             if let Some(stmt) = Statement::from_rule(element)
-                .with_context(|| format!("Failed to build statement from:\n{}", pair_input))? {
+                .with_context(|| format!("Failed to build statement from:\n{}", pair_input))?
+            {
                 body.push(stmt);
             }
         };
-        let (
-            commutivityfrom_rule,
-            output
-        ) = {
-            let mut end_ploop_inner = end_ploop_pair
-                .into_inner();
+        let (commutivityfrom_rule, output) = {
+            let mut end_ploop_inner = end_ploop_pair.into_inner();
 
-            let first_pair = end_ploop_inner.next()
+            let first_pair = end_ploop_inner
+                .next()
                 .context("Missing first token in `end_ploop` statement!")?;
-            let second_pair = end_ploop_inner.next()
+            let second_pair = end_ploop_inner
+                .next()
                 .context("Missing second token in `end_ploop` statement!")?;
 
             match (first_pair.as_rule(), second_pair.as_rule()) {
                 (Rule::unit, Rule::variable_identifier) => {
-                    let commutivityfrom_rule = first_pair.as_str().parse::<u8>()
-                        .context("Failed to parse `commutivityfrom_rule` as u8 in `ploop` statement!")?;
+                    let commutivityfrom_rule = first_pair.as_str().parse::<u8>().context(
+                        "Failed to parse `commutivityfrom_rule` as u8 in `ploop` statement!",
+                    )?;
                     let output = VariableIdentifier::from_rule(second_pair)
-                        .context("Failed to build `output` variable identifier in `ploop` statement!")?
-                        .ok_or_else(|| anyhow::anyhow!("Expected variable identifier for ploop statement"))?;
-                    
+                        .context(
+                            "Failed to build `output` variable identifier in `ploop` statement!",
+                        )?
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("Expected variable identifier for ploop statement")
+                        })?;
+
                     (Some(commutivityfrom_rule), output)
                 }
                 (Rule::variable_identifier, Rule::semicolon) => {
                     let output = VariableIdentifier::from_rule(first_pair)
-                        .context("Failed to build `output` variable identifier in `ploop` statement!")?
-                        .ok_or_else(|| anyhow::anyhow!("Expected variable identifier for ploop statement"))?;
-                    
+                        .context(
+                            "Failed to build `output` variable identifier in `ploop` statement!",
+                        )?
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("Expected variable identifier for ploop statement")
+                        })?;
+
                     (None, output)
                 }
                 _ => bail!("Expected `variable_identifier` in `end_ploop` statement!"),
@@ -123,23 +150,32 @@ impl FromRule for PLoopStatement {
             end,
             commutivityfrom_rule,
             body,
-            output
+            output,
         }))
     }
 }
 impl TranspileableStatement for PLoopStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
     fn discover_dependencies(
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
-        source_location: SourceLocation
+        source_location: SourceLocation,
     ) -> Option<Result<()>> {
         let mut inner_ctx = ctx.clone();
-        let iter_slot = TypeSlot::Variable(
-            ctx.scope_path.clone(),
-            self.iterator.clone(),
+        let iter_slot = TypeSlot::Variable(ctx.scope_path.clone(), self.iterator.clone());
+        resolver.insert_slot(
+            iter_slot.clone(),
+            Some(&RosyType::RE()),
+            Some(source_location),
         );
-        resolver.insert_slot(iter_slot.clone(), Some(&RosyType::RE()), Some(source_location));
         Some(resolver.discover_slots(&self.body, &mut inner_ctx))
     }
     fn apply_resolved_types(
@@ -154,21 +190,24 @@ impl TranspileableStatement for PLoopStatement {
     }
 }
 impl Transpile for PLoopStatement {
-    fn transpile(&self, context: &mut TranspilationInputContext) -> Result<TranspilationOutput, Vec<Error>> {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
         // Verify the start and end expressions are REs
-        let start_type = self.start.type_of(context)
-            .map_err(|e| vec!(e))?;
+        let start_type = self.start.type_of(context).map_err(|e| vec![e])?;
         if start_type != RosyType::RE() {
-            return Err(vec!(anyhow!(
-                "Loop start expression must be of type 'RE', found '{}'", start_type
-            )));
+            return Err(vec![anyhow!(
+                "Loop start expression must be of type 'RE', found '{}'",
+                start_type
+            )]);
         }
-        let end_type = self.end.type_of(context)
-            .map_err(|e| vec!(e))?;
+        let end_type = self.end.type_of(context).map_err(|e| vec![e])?;
         if end_type != RosyType::RE() {
-            return Err(vec!(anyhow!(
-                "Loop end expression must be of type 'RE', found '{}'", end_type
-            )));
+            return Err(vec![anyhow!(
+                "Loop end expression must be of type 'RE', found '{}'",
+                end_type
+            )]);
         }
 
         // Define the iterator
@@ -176,13 +215,16 @@ impl Transpile for PLoopStatement {
         let mut requested_variables = BTreeSet::new();
         let mut errors = Vec::new();
         // Allow reuse of existing variable (COSY behavior)
-        inner_context.variables.insert(self.iterator.clone(), ScopedVariableData { 
-            scope: VariableScope::Local,
-            data: VariableData { 
-                name: self.iterator.clone(),
-                r#type: RosyType::RE()
-            }
-        });
+        inner_context.variables.insert(
+            self.iterator.clone(),
+            ScopedVariableData {
+                scope: VariableScope::Local,
+                data: VariableData {
+                    name: self.iterator.clone(),
+                    r#type: RosyType::RE(),
+                },
+            },
+        );
 
         // Transpile each inner statement
         let mut serialized_statements = Vec::new();
@@ -191,7 +233,7 @@ impl Transpile for PLoopStatement {
                 Ok(output) => {
                     serialized_statements.push(output.serialization);
                     requested_variables.extend(output.requested_variables);
-                },
+                }
                 Err(stmt_errors) => {
                     for e in stmt_errors {
                         errors.push(e.context("...while transpiling statement in loop"));
@@ -229,12 +271,13 @@ impl Transpile for PLoopStatement {
         requested_variables.extend(end_output.requested_variables.iter().cloned());
 
         // Check the type of the output array
-        let output_type = self.output.type_of(context)
-            .map_err(|e| vec!(e))?;
+        let output_type = self.output.type_of(context).map_err(|e| vec![e])?;
         if output_type.dimensions < 1 && output_type != RosyType::VE() {
-            return Err(vec!(anyhow!(
-                "Output variable '{}' for a PLOOP must be an array type, found '{}'", self.output.name, output_type
-            )));
+            return Err(vec![anyhow!(
+                "Output variable '{}' for a PLOOP must be an array type, found '{}'",
+                self.output.name,
+                output_type
+            )]);
         }
 
         // Serialize the output identifier
@@ -242,7 +285,7 @@ impl Transpile for PLoopStatement {
             Ok(output) => {
                 requested_variables.extend(output.requested_variables);
                 output.serialization
-            },
+            }
             Err(vec_err) => {
                 for e in vec_err {
                     errors.push(e.context(format!(
@@ -253,7 +296,6 @@ impl Transpile for PLoopStatement {
                 return Err(errors);
             }
         };
-
 
         let iterator_declaration_serialization = {
             requested_variables.insert("rosy_mpi_context".to_string());

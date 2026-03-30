@@ -424,8 +424,8 @@ pub fn function_call_transpile_helper(
                     ));
                 } else {
                     // If the type is correct, add the serialization
-                    // Functions take &T args, so use as_ref()
-                    serialized_args.push(arg_output.as_ref());
+                    // Functions take &mut T args (COSY semantics: args are mutable)
+                    serialized_args.push(arg_output.as_mut_ref());
                     requested_variables.extend(arg_output.requested_variables);
                 }
             }

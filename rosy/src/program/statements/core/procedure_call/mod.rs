@@ -36,11 +36,8 @@ use std::collections::BTreeSet;
 use crate::{
     ast::*,
     program::{expressions::Expr, statements::SourceLocation},
-    resolve::{ScopeContext, TypeResolver},
-    transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr,
-        TranspileableStatement, VariableScope,
-    },
+    resolve::*,
+    transpile::*,
 };
 
 /// AST node for a procedure call statement.
@@ -82,6 +79,14 @@ impl FromRule for ProcedureCallStatement {
     }
 }
 impl TranspileableStatement for ProcedureCallStatement {
+    fn register_typeslot_declaration(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> TypeslotDeclarationResult {
+        TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
     fn discover_dependencies(
         &self,
         resolver: &mut TypeResolver,
