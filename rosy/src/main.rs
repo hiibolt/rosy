@@ -8,112 +8,15 @@
 //! ROSY programs are transpiled into self-contained, native Rust executables.
 //!
 //! ## Quick Start
-//!
 //! ```bash
-//! rosy run examples/basic.rosy          # run a script
-//! rosy build examples/basic.rosy -o out # build a binary
+//! rosy run examples/basic.rosy             # run a script
+//! rosy build examples/basic.rosy -o out    # build a binary
 //! ```
 //!
 //! ## Language Reference
-//!
-//! Jump directly to what you need:
-//!
-//! ### Statements — things that *do* something
-//!
-//! | I want to... | Syntax | Link |
-//! |--------------|--------|------|
-//! | Declare a variable | `VARIABLE (RE) x;` | [`statements::core::var_decl`](program::statements::core::var_decl) |
-//! | Assign a value | `x := expr;` | [`statements::core::assign`](program::statements::core::assign) |
-//! | Branch with if/else | `IF cond; ... ENDIF;` | [`statements::core::if`](program::statements::core::if) |
-//! | Loop (counted) | `LOOP i 1 10; ... ENDLOOP;` | [`statements::core::loop`](program::statements::core::loop) |
-//! | Loop (conditional) | `WHILE cond; ... ENDWHILE;` | [`statements::core::while_loop`](program::statements::core::while_loop) |
-//! | Loop (MPI parallel) | `PLOOP ... ENDPLOOP;` | [`statements::core::ploop`](program::statements::core::ploop) |
-//! | Define a function | `FUNCTION (RE) F x (RE); ... ENDFUNCTION;` | [`statements::core::function`](program::statements::core::function) |
-//! | Define a procedure | `PROCEDURE P; ... ENDPROCEDURE;` | [`statements::core::procedure`](program::statements::core::procedure) |
-//! | Print output | `WRITE 6 'hello';` | [`statements::io::write`](program::statements::io::write) |
-//! | Read input | `READ 5 x;` | [`statements::io::read`](program::statements::io::read) |
-//! | Work with files | `OPENF`, `CLOSEF` | [`statements::io`](program::statements::io) |
-//! | Use binary I/O | `WRITEB`, `READB` | [`statements::io::writeb`](program::statements::io::writeb), [`readb`](program::statements::io::readb) |
-//! | Measure time | `CPUSEC`, `PWTIME` | [`statements::io::cpusec`](program::statements::io::cpusec), [`pwtime`](program::statements::io::pwtime) |
-//! | Run shell command | `OS cmd;` | [`statements::io::os_call`](program::statements::io::os_call) |
-//! | Extract substring | `SUBSTR src f l dest;` | [`statements::core::substr`](program::statements::core::substr) |
-//! | Parse string→number | `STCRE str var;` | [`statements::core::stcre`](program::statements::core::stcre) |
-//! | Format number→string | `RECST val fmt var;` | [`statements::core::recst`](program::statements::core::recst) |
-//! | Set vector component | `VELSET vec i val;` | [`statements::core::velset`](program::statements::core::velset) |
-//! | Get random number | `RERAN var;` | [`statements::core::reran`](program::statements::core::reran) |
-//! | Get imaginary unit | `IMUNIT var;` | [`statements::core::imunit`](program::statements::core::imunit) |
-//! | Get process count | `PNPRO var;` | [`statements::core::pnpro`](program::statements::core::pnpro) |
-//! | Initialize DA | `OV 5 3;` | [`statements::da::da_init`](program::statements::da::da_init) |
-//! | Print DA values | `DAPRV`, `DAREV` | [`statements::da`](program::statements::da) |
-//! | Configure DA | `DAEPS`, `DANOT`, `DATRN` | [`statements::da`](program::statements::da) |
-//! | DA tree evaluation | `MTREE ...;` | [`statements::da::mtree`](program::statements::da::mtree) |
-//! | Optimize (FIT) | `FIT ... ENDFIT;` | [`statements::math::fit`](program::statements::math::fit) |
-//! | Matrix operations | `LINV`, `LDET`, `LEV`, `MBLOCK` | [`statements::math`](program::statements::math) |
-//! | Polynomial evaluation | `POLVAL coeffs x r;` | [`statements::math::polval`](program::statements::math::polval) |
-//! | Vector math | `VEDOT`, `VEUNIT`, `VEZERO` | [`statements::math`](program::statements::math) |
-//!
-//! ### Operators
-//!
-//! | Operator | Symbol | Link |
-//! |----------|--------|------|
-//! | Arithmetic | `+`, `-`, `*`, `/` | [`operators::arithmetic`](program::expressions::operators::arithmetic) |
-//! | Comparison | `=`, `<>`, `<`, `>`, `<=`, `>=` | [`operators::comparison`](program::expressions::operators::comparison) |
-//! | Unary | `-x`, `NOT x` | [`operators::unary`](program::expressions::operators::unary) |
-//! | Collection | `&` (concat), `\|` (extract), `%` (derive) | [`operators::collection`](program::expressions::operators::collection) |
-//! | Power | `^` | [`exponential::pow`](program::expressions::functions::math::exponential::pow) |
-//!
-//! ### Built-in Functions
-//!
-//! | Category | Functions | Link |
-//! |----------|-----------|------|
-//! | Trigonometry | `SIN`, `COS`, `TAN`, `ASIN`, `ACOS`, `ATAN`, `SINH`, `COSH`, `TANH` | [`math::trig`](program::expressions::functions::math::trig) |
-//! | Exponential | `EXP`, `LOG`, `SQR`, `SQRT` | [`math::exponential`](program::expressions::functions::math::exponential) |
-//! | Complex | `CMPLX`, `CONJ`, `REAL`, `IMAG` | [`math::complex`](program::expressions::functions::math::complex) |
-//! | Rounding | `ABS`, `INT`, `NINT`, `NORM`, `CONS` | [`math::rounding`](program::expressions::functions::math::rounding) |
-//! | Vector | `VMIN`, `VMAX` | [`math::vector`](program::expressions::functions::math::vector) |
-//! | Query | `TYPE`, `ISRT`, `ISRT3` | [`math::query`](program::expressions::functions::math::query) |
-//! | Type conversion | `ST()`, `CM()`, `RE()`, `LO()`, `VE()` | [`conversion`](program::expressions::functions::conversion) |
-//! | Memory (COSY compat) | `LST`, `LCM`, `LCD` | [`math::memory`](program::expressions::functions::math::memory) |
-//! | String/utility | `LENGTH`, `TRIM`, `LTRIM` | [`sys`](program::expressions::functions::sys) |
-//!
-//! ### Literals
-//!
-//! | Type | Example | Link |
-//! |------|---------|------|
-//! | `RE` (real) | `3.14`, `42` | [`types::number`](program::expressions::types::number) |
-//! | `ST` (string) | `'hello'` | [`types::string`](program::expressions::types::string) |
-//! | `LO` (boolean) | `TRUE`, `FALSE` | [`types::boolean`](program::expressions::types::boolean) |
-//! | `DA` | `DA(1)` | [`types::da`](program::expressions::types::da) |
-//! | `CD` | `CD(1)` | [`types::cd`](program::expressions::types::cd) |
-//!
-//! ## Type System
-//!
-//! | Type | Description |
-//! |------|-------------|
-//! | `RE` | Real number (64-bit float) |
-//! | `ST` | String |
-//! | `LO` | Logical (boolean) |
-//! | `CM` | Complex number |
-//! | `VE` | Vector of reals |
-//! | `DA` | Differential Algebra (Taylor series) |
-//! | `CD` | Complex Differential Algebra |
-//!
-//! Multi-dimensional arrays are supported: `(RE 2 2)` creates a 2×2 matrix of reals.
-//!
-//! ## Example Program
-//!
-//! ```text
-//! BEGIN;
-//!     VARIABLE (RE) x;
-//!     VARIABLE (RE) y;
-//!     x := 3;
-//!     y := SIN(x) + 1;
-//!     WRITE 6 'y = ' ST(y);
-//! END;
-//! ```
+//! The official ROSY language reference begins in the [`program`] module.
 //!
 //! ## More Resources
-//!
 //! - **[Example programs](https://github.com/hiibolt/rosy/tree/master/examples)** on GitHub
 //! - **[Installation & usage](https://github.com/hiibolt/rosy)** in the README
 
