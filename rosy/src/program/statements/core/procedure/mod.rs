@@ -174,11 +174,19 @@ impl TranspileableStatement for ProcedureStatement {
 
         TypeslotDeclarationResult::VarFuncOrProcedureDecl { result: Ok(()) }
     }
-    fn apply_resolved_types(
+    fn wire_inference_edges(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> InferenceEdgeResult {
+        InferenceEdgeResult::NoEdges
+    }
+    fn hydrate_resolved_types(
         &mut self,
         resolver: &TypeResolver,
         current_scope: &[String],
-    ) -> Option<Result<()>> {
+    ) -> TypeHydrationResult {
         for arg in &mut self.args {
             if arg.r#type.is_none() {
                 let slot =
@@ -194,10 +202,10 @@ impl TranspileableStatement for ProcedureStatement {
         let mut inner_scope = current_scope.to_vec();
         inner_scope.push(self.name.clone());
         if let Err(e) = resolver.apply_to_ast(&mut self.body, &inner_scope) {
-            return Some(Err(e));
+            return TypeHydrationResult::Hydrated { result: Err(e) };
         }
 
-        Some(Ok(()))
+        TypeHydrationResult::Hydrated { result: Ok(()) }
     }
 }
 impl Transpile for ProcedureStatement {

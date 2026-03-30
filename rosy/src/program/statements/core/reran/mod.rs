@@ -73,14 +73,17 @@ impl TranspileableStatement for ReranStatement {
     ) -> TypeslotDeclarationResult {
         TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
     }
-    fn discover_dependencies(
+    fn wire_inference_edges(
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
         source_location: SourceLocation,
-    ) -> Option<Result<()>> {
+    ) -> InferenceEdgeResult {
         // RERAN always assigns an RE (f64) value to the target variable
-        let slot = ctx.variables.get(&self.output_var.name)?;
+        let slot = match ctx.variables.get(&self.output_var.name) {
+            Some(s) => s,
+            None => return InferenceEdgeResult::NoEdges,
+        };
         if let Some(node) = resolver.nodes.get_mut(slot) {
             if node.resolved.is_none() {
                 node.rule = ResolutionRule::InferredFrom {
@@ -90,7 +93,14 @@ impl TranspileableStatement for ReranStatement {
                 node.assigned_at = Some(source_location);
             }
         }
-        Some(Ok(()))
+        InferenceEdgeResult::HasEdges { result: Ok(()) }
+    }
+    fn hydrate_resolved_types(
+        &mut self,
+        _resolver: &TypeResolver,
+        _current_scope: &[String],
+    ) -> TypeHydrationResult {
+        TypeHydrationResult::NothingToHydrate
     }
 }
 

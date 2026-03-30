@@ -46,7 +46,8 @@ use crate::{
     rosy_lib::RosyType,
     transpile::{
         TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr,
-        TranspileableStatement, TypeslotDeclarationResult, indent,
+        TranspileableStatement, TypeslotDeclarationResult, InferenceEdgeResult,
+        TypeHydrationResult, indent,
     },
 };
 
@@ -176,23 +177,25 @@ impl TranspileableStatement for FitStatement {
     ) -> TypeslotDeclarationResult {
         TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
     }
-    fn discover_dependencies(
+    fn wire_inference_edges(
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
         _source_location: SourceLocation,
-    ) -> Option<Result<()>> {
-        Some(resolver.discover_slots(&self.body, &mut ctx.clone()))
+    ) -> InferenceEdgeResult {
+        InferenceEdgeResult::HasEdges {
+            result: resolver.discover_slots(&self.body, &mut ctx.clone()),
+        }
     }
-    fn apply_resolved_types(
+    fn hydrate_resolved_types(
         &mut self,
         resolver: &TypeResolver,
         current_scope: &[String],
-    ) -> Option<Result<()>> {
+    ) -> TypeHydrationResult {
         if let Err(e) = resolver.apply_to_ast(&mut self.body, current_scope) {
-            return Some(Err(e));
+            return TypeHydrationResult::Hydrated { result: Err(e) };
         }
-        Some(Ok(()))
+        TypeHydrationResult::Hydrated { result: Ok(()) }
     }
 }
 impl Transpile for FitStatement {

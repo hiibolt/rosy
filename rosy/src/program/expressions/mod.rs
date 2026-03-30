@@ -39,7 +39,7 @@ pub mod operators;
 pub mod types;
 
 use std::collections::HashSet;
-use crate::{ast::{FromRule, PRATT_PARSER, Rule}, resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot}, rosy_lib::RosyType, transpile::{TranspileableExpr, add_context_to_all}};
+use crate::{ast::{FromRule, PRATT_PARSER, Rule}, resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot}, rosy_lib::RosyType, transpile::{TranspileableExpr, ExprFunctionCallResult, ConcatExtensionResult, add_context_to_all}};
 use crate::transpile::{Transpile, TranspilationInputContext, TranspilationOutput};
 
 use crate::program::expressions::core::var_expr::VarExpr;
@@ -619,10 +619,9 @@ impl FromRule for Expr {
                     // If left is already a Concat, extend its terms instead of nesting
                     if left.enum_variant == ExprEnum::Concat {
                         let mut left = left;
-                        if left.inner.extend_concat(right) {
-                            Ok(left)
-                        } else {
-                            bail!("Failed to extend Concat expression - internal inconsistency")
+                        match left.inner.extend_concat(right) {
+                            ConcatExtensionResult::Extended => Ok(left),
+                            ConcatExtensionResult::NotAConcatExpr => bail!("Failed to extend Concat expression - internal inconsistency"),
                         }
                     } else {
                         let terms = vec![left, right];
@@ -735,7 +734,7 @@ impl TranspileableExpr for Expr {
         &self,
         resolver: &mut TypeResolver,
         ctx: &ScopeContext,
-    ) -> Option<Result<()>> {
+    ) -> ExprFunctionCallResult {
         self.inner.discover_expr_function_calls(resolver, ctx)
     }
     fn build_expr_recipe(
@@ -743,8 +742,11 @@ impl TranspileableExpr for Expr {
         resolver: &TypeResolver,
         ctx: &ScopeContext,
         deps: &mut HashSet<TypeSlot>,
-    ) -> Option<ExprRecipe> {
+    ) -> ExprRecipe {
         self.inner.build_expr_recipe(resolver, ctx, deps)
+    }
+    fn extend_concat(&mut self, right: Expr) -> ConcatExtensionResult {
+        self.inner.extend_concat(right)
     }
 }
 impl Transpile for Expr {

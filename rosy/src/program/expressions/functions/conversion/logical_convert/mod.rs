@@ -29,7 +29,7 @@ use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use crate::transpile::TranspileableExpr;
+use crate::transpile::{ConcatExtensionResult, ExprFunctionCallResult, TranspileableExpr};
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, ValueKind};
 use anyhow::{Context, Error, Result, anyhow};
 use std::collections::HashSet;
@@ -64,13 +64,25 @@ impl TranspileableExpr for LogicalConvertExpr {
             "Cannot convert type '{expr_type}' to 'LO'!"
         ))
     }
+    fn discover_expr_function_calls(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &ScopeContext,
+    ) -> ExprFunctionCallResult {
+        ExprFunctionCallResult::HasFunctionCalls {
+            result: resolver.discover_expr_function_calls(&self.expr, ctx),
+        }
+    }
     fn build_expr_recipe(
         &self,
         _resolver: &TypeResolver,
         _ctx: &ScopeContext,
         _deps: &mut HashSet<TypeSlot>,
-    ) -> Option<ExprRecipe> {
-        Some(ExprRecipe::Literal(RosyType::LO()))
+    ) -> ExprRecipe {
+        ExprRecipe::Literal(RosyType::LO())
+    }
+    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
+        ConcatExtensionResult::NotAConcatExpr
     }
 }
 impl Transpile for LogicalConvertExpr {

@@ -188,46 +188,46 @@ impl TranspileableStatement for IfStatement {
     ) -> TypeslotDeclarationResult {
         TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
     }
-    fn discover_dependencies(
+    fn wire_inference_edges(
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
         _source_location: SourceLocation,
-    ) -> Option<Result<()>> {
+    ) -> InferenceEdgeResult {
         if let Err(e) = resolver.discover_slots(&self.then_body, &mut ctx.clone()) {
-            return Some(Err(e));
+            return InferenceEdgeResult::HasEdges { result: Err(e) };
         }
         for elseif in &self.elseif_clauses {
             if let Err(e) = resolver.discover_slots(&elseif.body, &mut ctx.clone()) {
-                return Some(Err(e));
+                return InferenceEdgeResult::HasEdges { result: Err(e) };
             }
         }
         if let Some(else_body) = &self.else_body {
             if let Err(e) = resolver.discover_slots(else_body, &mut ctx.clone()) {
-                return Some(Err(e));
+                return InferenceEdgeResult::HasEdges { result: Err(e) };
             }
         }
-        Some(Ok(()))
+        InferenceEdgeResult::HasEdges { result: Ok(()) }
     }
-    fn apply_resolved_types(
+    fn hydrate_resolved_types(
         &mut self,
         resolver: &TypeResolver,
         current_scope: &[String],
-    ) -> Option<Result<()>> {
+    ) -> TypeHydrationResult {
         if let Err(e) = resolver.apply_to_ast(&mut self.then_body, current_scope) {
-            return Some(Err(e));
+            return TypeHydrationResult::Hydrated { result: Err(e) };
         }
         for elseif in &mut self.elseif_clauses {
             if let Err(e) = resolver.apply_to_ast(&mut elseif.body, current_scope) {
-                return Some(Err(e));
+                return TypeHydrationResult::Hydrated { result: Err(e) };
             }
         }
         if let Some(else_body) = &mut self.else_body {
             if let Err(e) = resolver.apply_to_ast(else_body, current_scope) {
-                return Some(Err(e));
+                return TypeHydrationResult::Hydrated { result: Err(e) };
             }
         }
-        Some(Ok(()))
+        TypeHydrationResult::Hydrated { result: Ok(()) }
     }
 }
 impl Transpile for ElseIfClause {
@@ -431,5 +431,20 @@ impl TranspileableStatement for ElseIfClause {
         _source_location: SourceLocation,
     ) -> TypeslotDeclarationResult {
         TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
+    }
+    fn wire_inference_edges(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> InferenceEdgeResult {
+        InferenceEdgeResult::NoEdges
+    }
+    fn hydrate_resolved_types(
+        &mut self,
+        _resolver: &TypeResolver,
+        _current_scope: &[String],
+    ) -> TypeHydrationResult {
+        TypeHydrationResult::NothingToHydrate
     }
 }

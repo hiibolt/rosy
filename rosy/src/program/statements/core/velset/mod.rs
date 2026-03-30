@@ -96,24 +96,31 @@ impl TranspileableStatement for VelsetStatement {
     ) -> TypeslotDeclarationResult {
         TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
     }
-    fn discover_dependencies(
+    fn wire_inference_edges(
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
         _source_location: SourceLocation,
-    ) -> Option<Result<()>> {
+    ) -> InferenceEdgeResult {
         // Discover function call sites within the component and value expressions
         if let Err(e) = resolver.discover_expr_function_calls(&self.component_expr, ctx) {
-            return Some(Err(e.context(
+            return InferenceEdgeResult::HasEdges { result: Err(e.context(
                 "...while discovering function call dependencies in VELSET component expression",
-            )));
+            )) };
         }
         if let Err(e) = resolver.discover_expr_function_calls(&self.value_expr, ctx) {
-            return Some(Err(e.context(
+            return InferenceEdgeResult::HasEdges { result: Err(e.context(
                 "...while discovering function call dependencies in VELSET value expression",
-            )));
+            )) };
         }
-        Some(Ok(()))
+        InferenceEdgeResult::HasEdges { result: Ok(()) }
+    }
+    fn hydrate_resolved_types(
+        &mut self,
+        _resolver: &TypeResolver,
+        _current_scope: &[String],
+    ) -> TypeHydrationResult {
+        TypeHydrationResult::NothingToHydrate
     }
 }
 

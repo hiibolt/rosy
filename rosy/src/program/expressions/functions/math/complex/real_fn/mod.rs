@@ -39,7 +39,8 @@ use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
 use crate::transpile::{
-    TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
+    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    Transpile, TranspileableExpr, ValueKind,
 };
 use anyhow::{Context as AnyhowContext, Error, Result};
 use std::collections::HashSet;
@@ -104,16 +105,21 @@ impl TranspileableExpr for RealFnExpr {
         &self,
         resolver: &mut TypeResolver,
         ctx: &ScopeContext,
-    ) -> Option<Result<()>> {
-        Some(resolver.discover_expr_function_calls(&self.expr, ctx))
+    ) -> ExprFunctionCallResult {
+        ExprFunctionCallResult::HasFunctionCalls {
+            result: resolver.discover_expr_function_calls(&self.expr, ctx),
+        }
     }
     fn build_expr_recipe(
         &self,
         resolver: &TypeResolver,
         ctx: &ScopeContext,
         deps: &mut HashSet<TypeSlot>,
-    ) -> Option<ExprRecipe> {
+    ) -> ExprRecipe {
         let inner = resolver.build_expr_recipe(&self.expr, ctx, deps);
-        Some(ExprRecipe::RealFn(Box::new(inner)))
+        ExprRecipe::RealFn(Box::new(inner))
+    }
+    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
+        ConcatExtensionResult::NotAConcatExpr
     }
 }

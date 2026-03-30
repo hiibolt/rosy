@@ -16,7 +16,7 @@ use crate::program::Program;
 use crate::program::expressions::*;
 use crate::program::statements::*;
 use crate::rosy_lib::RosyType;
-use crate::transpile::TypeslotDeclarationResult;
+use crate::transpile::{ExprFunctionCallResult, InferenceEdgeResult, TypeHydrationResult, TypeslotDeclarationResult};
 use anyhow::{Result, anyhow};
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -116,8 +116,8 @@ pub enum ExprRecipe {
     },
     /// An n-ary concat of sub-recipes.
     Concat(Vec<ExprRecipe>),
-    /// SIN intrinsic — result depends on input type.
-    Sin(Box<ExprRecipe>),
+    /// Any type-preserving intrinsic (sin, cos, tan, exp, log, sqrt, etc.) — output type equals input type.
+    TypePreserving(Box<ExprRecipe>),
     /// REAL intrinsic — result depends on input type (RE/CM->RE, DA->DA).
     RealFn(Box<ExprRecipe>),
     /// IMAG intrinsic — result depends on input type (RE/CM->RE, DA->DA).
@@ -280,11 +280,11 @@ impl TypeResolver {
         stmt: &Statement,
         ctx: &mut ScopeContext,
     ) -> Result<()> {
-        let Some(result) =
+        let InferenceEdgeResult::HasEdges { result } =
             stmt.inner
-                .discover_dependencies(self, ctx, stmt.source_location.clone())
+                .wire_inference_edges(self, ctx, stmt.source_location.clone())
         else {
-            return Ok(()); // no dependencies to discover, skip
+            return Ok(());
         };
 
         result
@@ -293,11 +293,10 @@ impl TypeResolver {
     /// Recursively walk an expression tree looking for function calls.
     /// For each one found, wire up call-site argument dependencies.
     pub fn discover_expr_function_calls(&mut self, expr: &Expr, ctx: &ScopeContext) -> Result<()> {
-        let Some(result) = expr.inner.discover_expr_function_calls(self, ctx) else {
-            return Ok(());
-        };
-
-        result
+        match expr.inner.discover_expr_function_calls(self, ctx) {
+            ExprFunctionCallResult::HasFunctionCalls { result } => result,
+            ExprFunctionCallResult::NoFunctionCalls => Ok(()),
+        }
     }
 
     /// For a call site like `F(X, Y)`, if `F` has untyped parameters, add
@@ -351,9 +350,7 @@ impl TypeResolver {
         ctx: &ScopeContext,
         deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe {
-        expr.inner
-            .build_expr_recipe(self, ctx, deps)
-            .unwrap_or(ExprRecipe::Unknown)
+        expr.inner.build_expr_recipe(self, ctx, deps)
     }
 
     // ─── Phase 2: Topological Resolution ────────────────────────────────
@@ -721,11 +718,7 @@ impl TypeResolver {
                 }
                 Ok(result)
             }
-            ExprRecipe::Sin(inner) => {
-                let input_type = self.evaluate_recipe(inner)?;
-                crate::rosy_lib::intrinsics::sin::get_return_type(&input_type)
-                    .ok_or_else(|| anyhow!("No SIN rule for {}", input_type))
-            }
+            ExprRecipe::TypePreserving(inner) => self.evaluate_recipe(inner),
             ExprRecipe::RealFn(inner) => {
                 let input_type = self.evaluate_recipe(inner)?;
                 crate::rosy_lib::intrinsics::real_fn::get_return_type(&input_type)
@@ -749,7 +742,9 @@ impl TypeResolver {
         current_scope: &[String],
     ) -> Result<()> {
         for stmt in statements.iter_mut() {
-            let Some(result) = stmt.inner.apply_resolved_types(self, current_scope) else {
+            let TypeHydrationResult::Hydrated { result } =
+                stmt.inner.hydrate_resolved_types(self, current_scope)
+            else {
                 continue;
             };
             result?;

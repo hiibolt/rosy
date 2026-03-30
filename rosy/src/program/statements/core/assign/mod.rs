@@ -100,29 +100,29 @@ impl TranspileableStatement for AssignStatement {
     ) -> TypeslotDeclarationResult {
         TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
     }
-    fn discover_dependencies(
+    fn wire_inference_edges(
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
         source_location: SourceLocation,
-    ) -> Option<Result<()>> {
+    ) -> InferenceEdgeResult {
         // Clear assignments (`:= .`) don't affect type resolution
         let value = match &self.value {
             Some(v) => v,
-            None => return Some(Ok(())),
+            None => return InferenceEdgeResult::HasEdges { result: Ok(()) },
         };
 
         // Discover function call sites within the RHS expression
         if let Err(e) = resolver.discover_expr_function_calls(value, ctx) {
-            return Some(Err(e.context(
+            return InferenceEdgeResult::HasEdges { result: Err(e.context(
                 "...while discovering function call dependencies in assignment statement",
-            )));
+            )) };
         }
 
         let var_name = &self.identifier.name;
         let var_slot = match ctx.variables.get(var_name) {
             Some(s) => s.clone(),
-            None => return Some(Ok(())), // unknown variable, skip
+            None => return InferenceEdgeResult::HasEdges { result: Ok(()) }, // unknown variable, skip
         };
 
         // Build a recipe for the RHS expression and collect its dependencies
@@ -184,7 +184,7 @@ impl TranspileableStatement for AssignStatement {
                                 String::new()
                             }
                         };
-                        return Some(Err(anyhow!(
+                        return InferenceEdgeResult::HasEdges { result: Err(anyhow!(
                             "\n╭─ Type Conflict ──────────────────────────────────────────\n\
                                 │\n\
                                 │  Variable '{}' (in {}) is declared as {} but is\n\
@@ -206,13 +206,13 @@ impl TranspileableStatement for AssignStatement {
                             var_name,
                             new_type.base_type,
                             ve_hint,
-                        )));
+                        )) };
                     }
                 }
-                return Some(Ok(())); // already has explicit type, no inference needed
+                return InferenceEdgeResult::HasEdges { result: Ok(()) }; // already has explicit type, no inference needed
             }
         } else {
-            return Some(Ok(()));
+            return InferenceEdgeResult::HasEdges { result: Ok(()) };
         }
 
         // Check for conflicting re-assignment: if a previous assignment
@@ -333,7 +333,7 @@ impl TranspileableStatement for AssignStatement {
                                 };
                                 node.depends_on.clear();
                             }
-                            return Some(Ok(()));
+                            return InferenceEdgeResult::HasEdges { result: Ok(()) };
                         }
 
                         let scope_str = if ctx.scope_path.is_empty() {
@@ -349,7 +349,7 @@ impl TranspileableStatement for AssignStatement {
                             .unwrap_or_default();
                         let second_assign_hint =
                             format!("\n│  📍 Then assigned at:   {}", source_location);
-                        return Some(Err(anyhow!(
+                        return InferenceEdgeResult::HasEdges { result: Err(anyhow!(
                             "\n╭─ Type Conflict ──────────────────────────────────────────\n\
                                 │\n\
                                 │  Variable '{}' (in {}) is assigned conflicting types:\n\
@@ -375,7 +375,7 @@ impl TranspileableStatement for AssignStatement {
                             old_type.base_type,
                             var_name,
                             new_type.base_type,
-                        )));
+                        )) };
                     }
                 }
             }
@@ -386,7 +386,7 @@ impl TranspileableStatement for AssignStatement {
             // cycles when a variable is re-assigned from a value that
             // transitively depends on itself (e.g. X1 := f(X3) after
             // X3 := g(X1)).
-            return Some(Ok(()));
+            return InferenceEdgeResult::HasEdges { result: Ok(()) };
         }
 
         if let Some(node) = resolver.nodes.get_mut(&var_slot) {
@@ -401,7 +401,14 @@ impl TranspileableStatement for AssignStatement {
             node.assigned_at = Some(source_location);
         }
 
-        Some(Ok(()))
+        InferenceEdgeResult::HasEdges { result: Ok(()) }
+    }
+    fn hydrate_resolved_types(
+        &mut self,
+        _resolver: &TypeResolver,
+        _current_scope: &[String],
+    ) -> TypeHydrationResult {
+        TypeHydrationResult::NothingToHydrate
     }
 }
 impl Transpile for AssignStatement {

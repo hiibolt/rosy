@@ -41,8 +41,10 @@ use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::{RosyBaseType, RosyType};
-use crate::transpile::TranspileableExpr;
-use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, ValueKind};
+use crate::transpile::{
+    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    Transpile, TranspileableExpr, ValueKind,
+};
 use anyhow::{Context, Error, Result, anyhow};
 use std::collections::BTreeSet;
 use std::collections::HashSet;
@@ -90,30 +92,30 @@ impl TranspileableExpr for ConcatExpr {
         &self,
         resolver: &mut TypeResolver,
         ctx: &ScopeContext,
-    ) -> Option<Result<()>> {
+    ) -> ExprFunctionCallResult {
         for term in &self.terms {
             if let Err(e) = resolver.discover_expr_function_calls(term, ctx) {
-                return Some(Err(e));
+                return ExprFunctionCallResult::HasFunctionCalls { result: Err(e) };
             }
         }
-        Some(Ok(()))
+        ExprFunctionCallResult::HasFunctionCalls { result: Ok(()) }
     }
     fn build_expr_recipe(
         &self,
         resolver: &TypeResolver,
         ctx: &ScopeContext,
         deps: &mut HashSet<TypeSlot>,
-    ) -> Option<ExprRecipe> {
+    ) -> ExprRecipe {
         let recipes: Vec<ExprRecipe> = self
             .terms
             .iter()
             .map(|t| resolver.build_expr_recipe(t, ctx, deps))
             .collect();
-        Some(ExprRecipe::Concat(recipes))
+        ExprRecipe::Concat(recipes)
     }
-    fn extend_concat(&mut self, right: Expr) -> bool {
+    fn extend_concat(&mut self, right: Expr) -> ConcatExtensionResult {
         self.terms.push(right);
-        true
+        ConcatExtensionResult::Extended
     }
 }
 impl Transpile for ConcatExpr {

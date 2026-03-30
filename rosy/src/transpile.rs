@@ -34,6 +34,26 @@ pub enum TypeslotDeclarationResult {
     NotAVarFuncOrProcedureDecl,
 }
 
+pub enum InferenceEdgeResult {
+    HasEdges { result: Result<()> },
+    NoEdges,
+}
+
+pub enum TypeHydrationResult {
+    Hydrated { result: Result<()> },
+    NothingToHydrate,
+}
+
+pub enum ExprFunctionCallResult {
+    HasFunctionCalls { result: Result<()> },
+    NoFunctionCalls,
+}
+
+pub enum ConcatExtensionResult {
+    Extended,
+    NotAConcatExpr,
+}
+
 pub trait TranspileableStatement: Transpile + Send + Sync {
     fn register_typeslot_declaration(
         &self,
@@ -41,49 +61,32 @@ pub trait TranspileableStatement: Transpile + Send + Sync {
         _ctx: &mut ScopeContext,
         _source_location: SourceLocation,
     ) -> TypeslotDeclarationResult;
-    fn discover_dependencies(
+    fn wire_inference_edges(
         &self,
         _resolver: &mut TypeResolver,
         _ctx: &mut ScopeContext,
         _source_location: SourceLocation,
-    ) -> Option<Result<()>> {
-        None
-    }
-    fn apply_resolved_types(
+    ) -> InferenceEdgeResult;
+    fn hydrate_resolved_types(
         &mut self,
         _resolver: &TypeResolver,
         _current_scope: &[String],
-    ) -> Option<Result<()>> {
-        None
-    }
-    /// Set the type of an implicit return variable if it matches the given name.
-    /// Used by FunctionStatement to propagate its return type to the first body VarDecl.
-    fn set_implicit_return_type(&mut self, _name: &str, _return_type: &RosyType) -> bool {
-        false
-    }
+    ) -> TypeHydrationResult;
 }
 pub trait TranspileableExpr: Transpile + Send + Sync {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType>;
     fn discover_expr_function_calls(
         &self,
-        _resolver: &mut TypeResolver,
-        _ctx: &ScopeContext,
-    ) -> Option<Result<()>> {
-        None
-    }
+        resolver: &mut TypeResolver,
+        ctx: &ScopeContext,
+    ) -> ExprFunctionCallResult;
     fn build_expr_recipe(
         &self,
-        _resolver: &TypeResolver,
-        _ctx: &ScopeContext,
-        _deps: &mut HashSet<TypeSlot>,
-    ) -> Option<ExprRecipe> {
-        None
-    }
-    /// Extend a Concat expression's terms with an additional expression.
-    /// Returns true if this expression is a Concat and the term was added.
-    fn extend_concat(&mut self, _right: Expr) -> bool {
-        false
-    }
+        resolver: &TypeResolver,
+        ctx: &ScopeContext,
+        deps: &mut HashSet<TypeSlot>,
+    ) -> ExprRecipe;
+    fn extend_concat(&mut self, right: Expr) -> ConcatExtensionResult;
 }
 pub trait Transpile: std::fmt::Debug {
     fn transpile(

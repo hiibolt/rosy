@@ -40,7 +40,8 @@ use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
 use crate::transpile::{
-    TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
+    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    Transpile, TranspileableExpr, ValueKind,
 };
 use anyhow::{Context as AnyhowContext, Error, Result};
 use std::collections::HashSet;
@@ -111,8 +112,10 @@ impl TranspileableExpr for ConsExpr {
         &self,
         resolver: &mut TypeResolver,
         ctx: &ScopeContext,
-    ) -> Option<Result<()>> {
-        Some(resolver.discover_expr_function_calls(&self.expr, ctx))
+    ) -> ExprFunctionCallResult {
+        ExprFunctionCallResult::HasFunctionCalls {
+            result: resolver.discover_expr_function_calls(&self.expr, ctx),
+        }
     }
 
     fn build_expr_recipe(
@@ -120,11 +123,12 @@ impl TranspileableExpr for ConsExpr {
         _resolver: &TypeResolver,
         _ctx: &ScopeContext,
         _deps: &mut HashSet<TypeSlot>,
-    ) -> Option<ExprRecipe> {
+    ) -> ExprRecipe {
         // CONS has non-uniform type mapping (VE->RE, DA->RE, RE->RE, CM->CM),
-        // so we cannot represent it with ExprRecipe::Sin (which assumes type
-        // preservation). Return None so the type resolver skips conflict
-        // checking for explicitly-typed variables assigned from CONS.
-        None
+        // so we cannot represent it with a type-preserving recipe.
+        ExprRecipe::Unknown
+    }
+    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
+        ConcatExtensionResult::NotAConcatExpr
     }
 }

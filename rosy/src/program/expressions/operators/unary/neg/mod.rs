@@ -37,7 +37,8 @@ use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
 use crate::transpile::{
-    TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
+    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    Transpile, TranspileableExpr, ValueKind,
 };
 use anyhow::{Error, Result, anyhow};
 
@@ -74,16 +75,21 @@ impl TranspileableExpr for NegExpr {
         &self,
         resolver: &mut TypeResolver,
         ctx: &ScopeContext,
-    ) -> Option<Result<()>> {
-        Some(resolver.discover_expr_function_calls(&self.operand, ctx))
+    ) -> ExprFunctionCallResult {
+        ExprFunctionCallResult::HasFunctionCalls {
+            result: resolver.discover_expr_function_calls(&self.operand, ctx),
+        }
     }
     fn build_expr_recipe(
         &self,
         resolver: &TypeResolver,
         ctx: &ScopeContext,
         deps: &mut HashSet<TypeSlot>,
-    ) -> Option<ExprRecipe> {
-        Some(resolver.build_expr_recipe(&self.operand, ctx, deps))
+    ) -> ExprRecipe {
+        resolver.build_expr_recipe(&self.operand, ctx, deps)
+    }
+    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
+        ConcatExtensionResult::NotAConcatExpr
     }
 }
 

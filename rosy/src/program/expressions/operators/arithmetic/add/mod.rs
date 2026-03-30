@@ -57,7 +57,7 @@ use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::resolve::{BinaryOpKind, ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use crate::transpile::TranspileableExpr;
+use crate::transpile::{ConcatExtensionResult, ExprFunctionCallResult, TranspileableExpr};
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, ValueKind};
 use anyhow::{Error, Result, anyhow};
 
@@ -92,26 +92,30 @@ impl TranspileableExpr for AddExpr {
         &self,
         resolver: &mut TypeResolver,
         ctx: &ScopeContext,
-    ) -> Option<Result<()>> {
-        Some(
-            resolver
-                .discover_expr_function_calls(&self.left, ctx)
-                .and_then(|_| resolver.discover_expr_function_calls(&self.right, ctx)),
-        )
+    ) -> ExprFunctionCallResult {
+        if let Err(e) = resolver.discover_expr_function_calls(&self.left, ctx) {
+            return ExprFunctionCallResult::HasFunctionCalls { result: Err(e) };
+        }
+        ExprFunctionCallResult::HasFunctionCalls {
+            result: resolver.discover_expr_function_calls(&self.right, ctx),
+        }
     }
     fn build_expr_recipe(
         &self,
         resolver: &TypeResolver,
         ctx: &ScopeContext,
         deps: &mut HashSet<TypeSlot>,
-    ) -> Option<ExprRecipe> {
+    ) -> ExprRecipe {
         let left = resolver.build_expr_recipe(&self.left, ctx, deps);
         let right = resolver.build_expr_recipe(&self.right, ctx, deps);
-        Some(ExprRecipe::BinaryOp {
+        ExprRecipe::BinaryOp {
             op: BinaryOpKind::Add,
             left: Box::new(left),
             right: Box::new(right),
-        })
+        }
+    }
+    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
+        ConcatExtensionResult::NotAConcatExpr
     }
 }
 impl Transpile for AddExpr {

@@ -32,7 +32,8 @@ use crate::{
     ast::{FromRule, Rule},
     program::expressions::Expr,
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
+        ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext,
+        TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
     },
 };
 use anyhow::{Context, Error};
@@ -65,13 +66,25 @@ impl TranspileableExpr for CDExpr {
     fn type_of(&self, _context: &TranspilationInputContext) -> anyhow::Result<RosyType> {
         Ok(RosyType::CD())
     }
+    fn discover_expr_function_calls(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &ScopeContext,
+    ) -> ExprFunctionCallResult {
+        ExprFunctionCallResult::HasFunctionCalls {
+            result: resolver.discover_expr_function_calls(&self.index, ctx),
+        }
+    }
     fn build_expr_recipe(
         &self,
         _resolver: &TypeResolver,
         _ctx: &ScopeContext,
         _deps: &mut HashSet<TypeSlot>,
-    ) -> Option<ExprRecipe> {
-        Some(ExprRecipe::Literal(RosyType::CD()))
+    ) -> ExprRecipe {
+        ExprRecipe::Literal(RosyType::CD())
+    }
+    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
+        ConcatExtensionResult::NotAConcatExpr
     }
 }
 impl Transpile for CDExpr {

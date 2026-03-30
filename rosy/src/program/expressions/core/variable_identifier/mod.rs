@@ -38,7 +38,9 @@ use std::collections::BTreeSet;
 use crate::ast::Rule;
 use crate::program::expressions::Expr;
 use crate::rosy_lib::RosyType;
+use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::{ast::FromRule, transpile::*};
+use std::collections::HashSet;
 use anyhow::{Context, Error, Result, ensure};
 
 /// A parsed identifier with optional parenthesized arguments and bracket indices.
@@ -158,6 +160,34 @@ impl TranspileableExpr for VariableIdentifier {
             ))?;
 
         Ok(var_type)
+    }
+    fn discover_expr_function_calls(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &ScopeContext,
+    ) -> ExprFunctionCallResult {
+        ExprFunctionCallResult::NoFunctionCalls
+    }
+    fn build_expr_recipe(
+        &self,
+        _resolver: &TypeResolver,
+        ctx: &ScopeContext,
+        deps: &mut HashSet<TypeSlot>,
+    ) -> ExprRecipe {
+        if let Some(slot) = ctx.variables.get(&self.name) {
+            deps.insert(slot.clone());
+            let num_indices = self.num_index_dimensions();
+            if num_indices > 0 {
+                ExprRecipe::IndexedVariable(slot.clone(), num_indices)
+            } else {
+                ExprRecipe::Variable(slot.clone())
+            }
+        } else {
+            ExprRecipe::Unknown
+        }
+    }
+    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
+        ConcatExtensionResult::NotAConcatExpr
     }
 }
 

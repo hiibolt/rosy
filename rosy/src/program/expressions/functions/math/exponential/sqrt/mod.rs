@@ -39,7 +39,8 @@ use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
 use crate::transpile::{
-    TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
+    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    Transpile, TranspileableExpr, ValueKind,
 };
 use anyhow::{Context as AnyhowContext, Error, Result};
 use std::collections::HashSet;
@@ -105,12 +106,24 @@ impl TranspileableExpr for SqrtExpr {
         sqrt::get_return_type(&inner_type)
             .ok_or_else(|| anyhow::anyhow!("SQRT not supported for type: {:?}", inner_type))
     }
+    fn discover_expr_function_calls(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &ScopeContext,
+    ) -> ExprFunctionCallResult {
+        ExprFunctionCallResult::HasFunctionCalls {
+            result: resolver.discover_expr_function_calls(&self.expr, ctx),
+        }
+    }
     fn build_expr_recipe(
         &self,
-        _resolver: &TypeResolver,
-        _ctx: &ScopeContext,
-        _deps: &mut HashSet<TypeSlot>,
-    ) -> Option<ExprRecipe> {
-        None
+        resolver: &TypeResolver,
+        ctx: &ScopeContext,
+        deps: &mut HashSet<TypeSlot>,
+    ) -> ExprRecipe {
+        ExprRecipe::TypePreserving(Box::new(resolver.build_expr_recipe(&self.expr, ctx, deps)))
+    }
+    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
+        ConcatExtensionResult::NotAConcatExpr
     }
 }

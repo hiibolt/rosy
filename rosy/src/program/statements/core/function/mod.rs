@@ -247,11 +247,19 @@ impl TranspileableStatement for FunctionStatement {
 
         TypeslotDeclarationResult::VarFuncOrProcedureDecl { result: Ok(()) }
     }
-    fn apply_resolved_types(
+    fn wire_inference_edges(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &mut ScopeContext,
+        _source_location: SourceLocation,
+    ) -> InferenceEdgeResult {
+        InferenceEdgeResult::NoEdges
+    }
+    fn hydrate_resolved_types(
         &mut self,
         resolver: &TypeResolver,
         current_scope: &[String],
-    ) -> Option<Result<()>> {
+    ) -> TypeHydrationResult {
         // Return type
         if self.return_type.is_none() {
             let slot = TypeSlot::FunctionReturn(current_scope.to_vec(), self.name.clone());
@@ -275,23 +283,14 @@ impl TranspileableStatement for FunctionStatement {
             }
         }
 
-        // Resolve the implicit return variable (first stmt in body)
-        if let Some(first_stmt) = self.body.first_mut() {
-            if let Some(return_type) = &self.return_type {
-                first_stmt
-                    .inner
-                    .set_implicit_return_type(&self.name, return_type);
-            }
-        }
-
         // Recurse into body
         let mut inner_scope = current_scope.to_vec();
         inner_scope.push(self.name.clone());
         if let Err(e) = resolver.apply_to_ast(&mut self.body, &inner_scope) {
-            return Some(Err(e));
+            return TypeHydrationResult::Hydrated { result: Err(e) };
         }
 
-        Some(Ok(()))
+        TypeHydrationResult::Hydrated { result: Ok(()) }
     }
 }
 impl Transpile for FunctionStatement {

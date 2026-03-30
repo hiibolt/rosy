@@ -46,7 +46,7 @@ use super::variable_identifier::VariableIdentifier;
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::rosy_lib::RosyType;
-use crate::transpile::TranspileableExpr;
+use crate::transpile::{ConcatExtensionResult, ExprFunctionCallResult, TranspileableExpr};
 use crate::transpile::{
     TranspilationInputContext, TranspilationOutput, Transpile, ValueKind, VariableScope,
 };
@@ -203,7 +203,7 @@ impl TranspileableExpr for VarExpr {
         &self,
         resolver: &mut TypeResolver,
         ctx: &ScopeContext,
-    ) -> Option<Result<()>> {
+    ) -> ExprFunctionCallResult {
         let ident = &self.identifier;
         let num_groups = ident.paren_groups.len();
         let is_var = ctx.variables.contains_key(&ident.name);
@@ -226,26 +226,33 @@ impl TranspileableExpr for VarExpr {
             // Recursively discover function calls in each argument expression
             for arg in &ident.paren_groups[0] {
                 if let Err(e) = resolver.discover_expr_function_calls(arg, ctx) {
-                    return Some(Err(e));
+                    return ExprFunctionCallResult::HasFunctionCalls { result: Err(e) };
                 }
             }
             // Wire up call-site argument type dependencies
-            Some(resolver.discover_call_site_deps(&ident.name, &ident.paren_groups[0], true, ctx))
+            ExprFunctionCallResult::HasFunctionCalls {
+                result: resolver.discover_call_site_deps(
+                    &ident.name,
+                    &ident.paren_groups[0],
+                    true,
+                    ctx,
+                ),
+            }
         } else {
             // Variable access — recurse into any index expressions
             for group in &ident.paren_groups {
                 for expr in group {
                     if let Err(e) = resolver.discover_expr_function_calls(expr, ctx) {
-                        return Some(Err(e));
+                        return ExprFunctionCallResult::HasFunctionCalls { result: Err(e) };
                     }
                 }
             }
             for expr in &ident.bracket_indices {
                 if let Err(e) = resolver.discover_expr_function_calls(expr, ctx) {
-                    return Some(Err(e));
+                    return ExprFunctionCallResult::HasFunctionCalls { result: Err(e) };
                 }
             }
-            None
+            ExprFunctionCallResult::NoFunctionCalls
         }
     }
     fn build_expr_recipe(
@@ -253,7 +260,7 @@ impl TranspileableExpr for VarExpr {
         _resolver: &TypeResolver,
         ctx: &ScopeContext,
         deps: &mut HashSet<TypeSlot>,
-    ) -> Option<ExprRecipe> {
+    ) -> ExprRecipe {
         let ident = &self.identifier;
         let num_groups = ident.paren_groups.len();
         let is_var = ctx.variables.contains_key(&ident.name);
@@ -281,21 +288,24 @@ impl TranspileableExpr for VarExpr {
         if is_function_call {
             if let Some((ret_slot, _)) = ctx.functions.get(&ident.name) {
                 deps.insert(ret_slot.clone());
-                Some(ExprRecipe::Variable(ret_slot.clone()))
+                ExprRecipe::Variable(ret_slot.clone())
             } else {
-                Some(ExprRecipe::Unknown)
+                ExprRecipe::Unknown
             }
         } else if let Some(slot) = ctx.variables.get(&ident.name) {
             deps.insert(slot.clone());
             let num_indices = ident.num_index_dimensions();
             if num_indices > 0 {
-                Some(ExprRecipe::IndexedVariable(slot.clone(), num_indices))
+                ExprRecipe::IndexedVariable(slot.clone(), num_indices)
             } else {
-                Some(ExprRecipe::Variable(slot.clone()))
+                ExprRecipe::Variable(slot.clone())
             }
         } else {
-            Some(ExprRecipe::Unknown)
+            ExprRecipe::Unknown
         }
+    }
+    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
+        ConcatExtensionResult::NotAConcatExpr
     }
 }
 impl Transpile for VarExpr {

@@ -33,11 +33,13 @@ use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use anyhow::{Error, Result};
 use std::collections::{BTreeSet, HashSet};
 
+use crate::program::expressions::Expr;
 use crate::{
     ast::{FromRule, Rule},
     rosy_lib::RosyType,
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
+        ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext,
+        TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
     },
 };
 
@@ -63,13 +65,23 @@ impl TranspileableExpr for String {
     fn type_of(&self, _context: &TranspilationInputContext) -> Result<RosyType> {
         Ok(RosyType::ST())
     }
+    fn discover_expr_function_calls(
+        &self,
+        _resolver: &mut TypeResolver,
+        _ctx: &ScopeContext,
+    ) -> ExprFunctionCallResult {
+        ExprFunctionCallResult::NoFunctionCalls
+    }
     fn build_expr_recipe(
         &self,
         _resolver: &TypeResolver,
         _ctx: &ScopeContext,
         _deps: &mut HashSet<TypeSlot>,
-    ) -> Option<ExprRecipe> {
-        Some(ExprRecipe::Literal(RosyType::ST()))
+    ) -> ExprRecipe {
+        ExprRecipe::Literal(RosyType::ST())
+    }
+    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
+        ConcatExtensionResult::NotAConcatExpr
     }
 }
 impl Transpile for String {

@@ -87,13 +87,20 @@ impl TranspileableStatement for ProcedureCallStatement {
     ) -> TypeslotDeclarationResult {
         TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
     }
-    fn discover_dependencies(
+    fn wire_inference_edges(
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
         _source_location: SourceLocation,
-    ) -> Option<Result<()>> {
-        Some(resolver.discover_call_site_deps(&self.name, &self.args, false, ctx))
+    ) -> InferenceEdgeResult {
+        InferenceEdgeResult::HasEdges { result: resolver.discover_call_site_deps(&self.name, &self.args, false, ctx) }
+    }
+    fn hydrate_resolved_types(
+        &mut self,
+        _resolver: &TypeResolver,
+        _current_scope: &[String],
+    ) -> TypeHydrationResult {
+        TypeHydrationResult::NothingToHydrate
     }
 }
 impl Transpile for ProcedureCallStatement {

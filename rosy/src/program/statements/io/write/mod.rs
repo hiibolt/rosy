@@ -42,7 +42,7 @@ use crate::{
     resolve::{ScopeContext, TypeResolver},
     transpile::{
         TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        TypeslotDeclarationResult, add_context_to_all,
+        TypeslotDeclarationResult, InferenceEdgeResult, TypeHydrationResult, add_context_to_all,
     },
 };
 
@@ -98,22 +98,31 @@ impl TranspileableStatement for WriteStatement {
         TypeslotDeclarationResult::NotAVarFuncOrProcedureDecl
     }
 
-    fn discover_dependencies(
+    fn wire_inference_edges(
         &self,
         resolver: &mut TypeResolver,
         ctx: &mut ScopeContext,
         _source_location: SourceLocation,
-    ) -> Option<Result<()>> {
+    ) -> InferenceEdgeResult {
         // Discover function call sites within all write expressions
         for expr in &self.exprs {
             if let Err(e) = resolver.discover_expr_function_calls(expr, ctx) {
-                return Some(Err(e.context(
-                    "...while discovering function call dependencies in WRITE statement",
-                )));
+                return InferenceEdgeResult::HasEdges {
+                    result: Err(e.context(
+                        "...while discovering function call dependencies in WRITE statement",
+                    )),
+                };
             }
         }
 
-        Some(Ok(()))
+        InferenceEdgeResult::HasEdges { result: Ok(()) }
+    }
+    fn hydrate_resolved_types(
+        &mut self,
+        _resolver: &TypeResolver,
+        _current_scope: &[String],
+    ) -> TypeHydrationResult {
+        TypeHydrationResult::NothingToHydrate
     }
 }
 impl Transpile for WriteStatement {

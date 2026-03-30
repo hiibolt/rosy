@@ -32,7 +32,10 @@ use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use crate::transpile::*;
+use crate::transpile::{
+    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    Transpile, TranspileableExpr, ValueKind,
+};
 use anyhow::{Context, Error, Result, anyhow};
 
 /// AST node for the `ST(expr)` type conversion function.
@@ -70,16 +73,21 @@ impl TranspileableExpr for StringConvertExpr {
         &self,
         resolver: &mut TypeResolver,
         ctx: &ScopeContext,
-    ) -> Option<Result<()>> {
-        Some(resolver.discover_expr_function_calls(&self.expr, ctx))
+    ) -> ExprFunctionCallResult {
+        ExprFunctionCallResult::HasFunctionCalls {
+            result: resolver.discover_expr_function_calls(&self.expr, ctx),
+        }
     }
     fn build_expr_recipe(
         &self,
         _resolver: &TypeResolver,
         _ctx: &ScopeContext,
         _deps: &mut HashSet<TypeSlot>,
-    ) -> Option<ExprRecipe> {
-        Some(ExprRecipe::Literal(RosyType::ST()))
+    ) -> ExprRecipe {
+        ExprRecipe::Literal(RosyType::ST())
+    }
+    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
+        ConcatExtensionResult::NotAConcatExpr
     }
 }
 impl Transpile for StringConvertExpr {
