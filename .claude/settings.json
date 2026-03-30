@@ -1,71 +1,56 @@
 {
-    "env": {
-        "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "true"
-    },
-    "permissions": {
-        "allow": [
-            "Bash(*)",
-            "Read(*)",
-            "Fetch(*)",
-            "WebSearch",
-            "mcp__github__search_issues",
-            "mcp__github__create_issue",
-            "mcp__github__update_issue",
-            "mcp__github-projects__list_projects",
-            "mcp__github-projects__view_project",
-            "mcp__github-projects__list_items",
-            "mcp__github-projects__list_fields",
-            "mcp__github-projects__add_item",
-            "mcp__github-projects__create_draft_item",
-            "mcp__github-projects__edit_item",
-            "mcp__github-projects__archive_item",
-            "mcp__github-projects__list_projects",
-            "mcp__github-projects__view_project",
-            "mcp__github-projects__list_fields",
-            "mcp__github-projects__list_items",
-            "mcp__github-projects__add_item",
-            "mcp__github-projects__edit_item",
-            "mcp__github-projects__archive_item",
-            "mcp__github-projects__create_draft_item",
-            "mcp__codegraph__codegraph_search",
-            "mcp__codegraph__codegraph_context",
-            "mcp__codegraph__codegraph_callers",
-            "mcp__codegraph__codegraph_callees",
-            "mcp__codegraph__codegraph_impact",
-            "mcp__codegraph__codegraph_node",
-            "mcp__codegraph__codegraph_status",
-            "mcp__codegraph__codegraph_files"
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "true"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Fetch(*)",
+      "WebSearch",
+      "WebFetch(*)",
+      "mcp__github__search_issues",
+      "mcp__github__create_issue",
+      "mcp__github__update_issue",
+      "mcp__codegraph__codegraph_search",
+      "mcp__codegraph__codegraph_context",
+      "mcp__codegraph__codegraph_callers",
+      "mcp__codegraph__codegraph_callees",
+      "mcp__codegraph__codegraph_impact",
+      "mcp__codegraph__codegraph_node",
+      "mcp__codegraph__codegraph_status",
+      "mcp__codegraph__codegraph_files"
+    ]
+  },
+  "enabledMcpjsonServers": ["github-projects", "github", "codegraph"],
+  "enabledPlugins": {
+    "skill-creator@claude-plugins-official": true,
+    "rust-analyzer-lsp@claude-plugins-official": true
+  },
+  "outputStyle": "Explanatory",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "codegraph mark-dirty",
+            "async": true
+          }
         ]
-    },
-    "enabledMcpjsonServers": ["github-projects", "github", "codegraph"],
-    "enabledPlugins": {
-        "skill-creator@claude-plugins-official": true,
-        "rust-analyzer-lsp@claude-plugins-official": true
-    },
-    "outputStyle": "Explanatory",
-    "hooks": {
-        "PostToolUse": [
-            {
-                "matcher": "Edit|Write",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "codegraph mark-dirty",
-                        "async": true
-                    }
-                ]
-            }
-        ],
-        "Stop": [
-            {
-                "matcher": ".*",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "codegraph sync-if-dirty"
-                    }
-                ]
-            }
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "codegraph sync-if-dirty"
+          }
         ]
-    }
+      }
+    ]
+  }
 }
