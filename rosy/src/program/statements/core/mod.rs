@@ -31,6 +31,7 @@
 //!
 //! - **[`velset`]** — `VELSET vec comp value;` — set vector component
 //! - **[`reran`]** — `RERAN var;` — random number in [-1, 1]
+//! - **[`ranseed`]** — `RANSEED seed;` — set global RNG seed
 //! - **[`imunit`]** — `IMUNIT var;` — imaginary unit *i* as CM
 //!
 //! ## System
@@ -50,6 +51,7 @@ pub mod pnpro;
 pub mod procedure;
 pub mod procedure_call;
 pub mod quit;
+pub mod ranseed;
 pub mod recst;
 pub mod reran;
 pub mod scrlen;

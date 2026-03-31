@@ -7,39 +7,10 @@
 /// local minima. As the temperature cools, it becomes more selective and
 /// converges toward the best solution found.
 ///
-/// This implementation uses a deterministic pseudo-random number generator
-/// (linear congruential generator) for reproducible results, matching COSY's
-/// behavior of producing identical results across runs.
+/// Randomness is drawn from the global seeded RNG (see [`crate::core::rng`]),
+/// ensuring reproducible results when the seed is fixed (default: 0).
 
-/// Simple deterministic pseudo-random number generator (LCG).
-/// Uses the same constants as the classic Numerical Recipes LCG for
-/// reproducibility.
-struct Rng {
-    state: u64,
-}
-
-impl Rng {
-    fn new(seed: u64) -> Self {
-        Self { state: seed }
-    }
-
-    /// Generate next pseudo-random u64
-    fn next_u64(&mut self) -> u64 {
-        // LCG parameters (Knuth MMIX)
-        self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-        self.state
-    }
-
-    /// Generate a random f64 in [0, 1)
-    fn next_f64(&mut self) -> f64 {
-        (self.next_u64() >> 11) as f64 / (1u64 << 53) as f64
-    }
-
-    /// Generate a random f64 in [-1, 1)
-    fn next_f64_symmetric(&mut self) -> f64 {
-        2.0 * self.next_f64() - 1.0
-    }
-}
+use super::super::core::rng;
 
 /// Evaluate the merit function (sum of squares of objectives)
 fn merit(objectives: &[f64]) -> f64 {
@@ -67,7 +38,6 @@ where
     F: FnMut(&mut [f64]) -> anyhow::Result<Vec<f64>>,
 {
     let nv = variables.len();
-    let mut rng = Rng::new(12345); // Deterministic seed for reproducibility
 
     // Initial evaluation
     let mut current = variables.to_vec();
@@ -115,7 +85,7 @@ where
         // Generate a random neighbor by perturbing one variable at a time
         let mut candidate = current.clone();
         for j in 0..nv {
-            candidate[j] += step_sizes[j] * rng.next_f64_symmetric();
+            candidate[j] += step_sizes[j] * rng::rng_f64_symmetric();
         }
 
         // Evaluate candidate
@@ -128,7 +98,7 @@ where
         } else {
             let delta = candidate_cost - current_cost;
             let acceptance_prob = (-delta / temperature).exp();
-            rng.next_f64() < acceptance_prob
+            rng::rng_f64() < acceptance_prob
         };
 
         if accept {

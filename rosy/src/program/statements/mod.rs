@@ -41,6 +41,7 @@
 //! | Format number as string | **[`core::recst`]** |
 //! | Set a vector component | **[`core::velset`]** |
 //! | Get a random number | **[`core::reran`]** |
+//! | Set RNG seed | **[`core::ranseed`]** |
 //! | Get imaginary unit | **[`core::imunit`]** |
 //! | Get process count | **[`core::pnpro`]** |
 //! | Matrix operations | **[`math::linv`]**, **[`math::ldet`]**, **[`math::lev`]**, **[`math::mblock`]** |
@@ -100,6 +101,7 @@ pub use math::vezero::VezeroStatement;
 pub use core::imunit::ImunitStatement;
 pub use core::pnpro::PnproStatement;
 pub use core::recst::RecstStatement;
+pub use core::ranseed::RanseedStatement;
 pub use core::reran::ReranStatement;
 pub use core::stcre::StcreStatement;
 
@@ -211,6 +213,7 @@ pub enum StatementEnum {
     Vezero,
     Stcre,
     Recst,
+    Ranseed,
     Reran,
     Pwtime,
     Pnpro,
@@ -632,6 +635,15 @@ impl FromRule for Statement {
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Reran,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::ranseed => RanseedStatement::from_rule(pair)
+                .context("...while building RANSEED statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Ranseed,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
