@@ -25,6 +25,17 @@
 //! ```
 #![doc = include_str!("rosy_output.txt")]
 //! ```
+//! ## COSY Example
+//!
+//! > **COSY note**: In COSY INFINITY, scalar arrays passed to `DATRN` must be declared
+//! > as `VARIABLE X 1 N;` (N indexable scalars), not `VARIABLE X N;` (single N-slot variable).
+//! ```
+#![doc = include_str!("test.fox")]
+//! ```
+//! **Output**:
+//! ```
+#![doc = include_str!("cosy_output.txt")]
+//! ```
 
 use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;

@@ -13,6 +13,23 @@
 //! 1. `i`      (RE, read)         - 1-based variable index
 //! 2. `da_in`  (DA vector, read)  - source DA array
 //! 3. `result` (DA vector, write) - result DA array
+//!
+//! ## Rosy Example
+//! ```
+#![doc = include_str!("test.rosy")]
+//! ```
+//! **Output**:
+//! ```
+#![doc = include_str!("rosy_output.txt")]
+//! ```
+//! ## COSY Example
+//! ```
+#![doc = include_str!("test.fox")]
+//! ```
+//! **Output**:
+//! ```
+#![doc = include_str!("cosy_output.txt")]
+//! ```
 
 use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;

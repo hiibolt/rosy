@@ -24,6 +24,17 @@
 //! ```
 #![doc = include_str!("rosy_output.txt")]
 //! ```
+//! ## COSY Example
+//!
+//! > **COSY note**: In COSY INFINITY, `MTREE` requires the DA array to be declared
+//! > as a 2D variable `VARIABLE MAP 2000 N;` and accessed as `MAP(i)`.
+//! ```
+#![doc = include_str!("test.fox")]
+//! ```
+//! **Output**:
+//! ```
+#![doc = include_str!("cosy_output.txt")]
+//! ```
 
 use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;

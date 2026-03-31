@@ -12,6 +12,26 @@
 //! Arguments:
 //! 1. `da_var`    (DA array, in/out) — DA vector to integrate in place
 //! 2. `var_index` (RE, integer)      — 1-based index of the variable to integrate w.r.t.
+//!
+//! > **COSY note**: In COSY INFINITY, `DAINT` takes 3 arguments `(index, input, result)`
+//! > and writes to a separate output variable. Rosy's form is in-place `(da_var, index)`.
+//!
+//! ## Rosy Example
+//! ```
+#![doc = include_str!("test.rosy")]
+//! ```
+//! **Output**:
+//! ```
+#![doc = include_str!("rosy_output.txt")]
+//! ```
+//! ## COSY Example
+//! ```
+#![doc = include_str!("test.fox")]
+//! ```
+//! **Output**:
+//! ```
+#![doc = include_str!("cosy_output.txt")]
+//! ```
 
 use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;

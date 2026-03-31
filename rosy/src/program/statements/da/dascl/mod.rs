@@ -11,6 +11,27 @@
 //! Arguments:
 //! 1. `da_var` (DA array, in/out) — DA vector to scale in place
 //! 2. `scalar` (RE)              — scale factor
+//!
+//! > **COSY note**: In COSY INFINITY, `DASCL` has different semantics — it scales the
+//! > **i-th independent variable** by a factor and takes 4 arguments `(DA, i, a, result)`.
+//! > Rosy's form scales **all coefficients** in place with 2 arguments.
+//!
+//! ## Rosy Example
+//! ```
+#![doc = include_str!("test.rosy")]
+//! ```
+//! **Output**:
+//! ```
+#![doc = include_str!("rosy_output.txt")]
+//! ```
+//! ## COSY Example
+//! ```
+#![doc = include_str!("test.fox")]
+//! ```
+//! **Output**:
+//! ```
+#![doc = include_str!("cosy_output.txt")]
+//! ```
 
 use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;

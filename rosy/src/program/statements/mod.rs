@@ -20,6 +20,17 @@
 //! | Use binary I/O | **[`io::writeb`]**, **[`io::readb`]** |
 //! | Initialize DA (`OV`) | **[`da::da_init`]** |
 //! | Print DA values | **[`da::daprv`]**, **[`da::darev`]** |
+//! | Print DA by variable/order | **[`da::dapew`]** |
+//! | Read DA from file | **[`da::darea`]** |
+//! | Configure DA | **[`da::daeps`]**, **[`da::danot`]**, **[`da::datrn`]** |
+//! | Scale / negate DA | **[`da::dascl`]**, **[`da::dasgn`]** |
+//! | Differentiate / integrate DA | **[`da::dader`]**, **[`da::daint`]** |
+//! | Filter DA terms | **[`da::danoro`]**, **[`da::danors`]** |
+//! | Substitute variable in DA | **[`da::daplu`]** |
+//! | DA division / shift | **[`da::dadiu`]**, **[`da::dadmu`]** |
+//! | Extract DA coefficients | **[`da::dacliw`]**, **[`da::dacqlc`]**, **[`da::dapee`]**, **[`da::dapea`]**, **[`da::dapep`]** |
+//! | Estimate DA term size | **[`da::daest`]** |
+//! | DA tree evaluation | **[`da::mtree`]** |
 //! | Use `FIT` (optimization) | **[`math::fit`]** |
 //! | Use `BREAK` or `QUIT` | **[`core::break`]**, **[`core::quit`]** |
 //! | Measure time | **[`io::cpusec`]**, **[`io::pwtime`]** |
@@ -32,8 +43,6 @@
 //! | Get a random number | **[`core::reran`]** |
 //! | Get imaginary unit | **[`core::imunit`]** |
 //! | Get process count | **[`core::pnpro`]** |
-//! | Configure DA | **[`da::daeps`]**, **[`da::danot`]**, **[`da::datrn`]** |
-//! | DA tree evaluation | **[`da::mtree`]** |
 //! | Matrix operations | **[`math::linv`]**, **[`math::ldet`]**, **[`math::lev`]**, **[`math::mblock`]** |
 //! | Polynomial evaluation | **[`math::polval`]** |
 //! | Vector math | **[`math::vedot`]**, **[`math::veunit`]**, **[`math::vezero`]** |

@@ -15,6 +15,23 @@
 //! 3. `hessian`  (RE n×n, write)      - n×n Hessian matrix H
 //! 4. `linear`   (VE, write)          - n-element vector L
 //! 5. `constant` (RE, write)          - scalar constant c
+//!
+//! ## Rosy Example
+//! ```
+#![doc = include_str!("test.rosy")]
+//! ```
+//! **Output**:
+//! ```
+#![doc = include_str!("rosy_output.txt")]
+//! ```
+//! ## COSY Example
+//! ```
+#![doc = include_str!("test.fox")]
+//! ```
+//! **Output**:
+//! ```
+#![doc = include_str!("cosy_output.txt")]
+//! ```
 
 use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;

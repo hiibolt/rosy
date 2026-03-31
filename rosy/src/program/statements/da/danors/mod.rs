@@ -11,6 +11,27 @@
 //! Arguments:
 //! 1. `da_var`    (DA array, in/out) — DA vector to filter in place
 //! 2. `threshold` (RE)               — minimum absolute coefficient to retain
+//!
+//! > **COSY note**: In COSY INFINITY, `DANORS` has completely different semantics —
+//! > it computes the **summation norms of power-sorted parts** of a DA and takes
+//! > 5 arguments `(DA, var_index, array_size, norms_out, max_power_out)`.
+//!
+//! ## Rosy Example
+//! ```
+#![doc = include_str!("test.rosy")]
+//! ```
+//! **Output**:
+//! ```
+#![doc = include_str!("rosy_output.txt")]
+//! ```
+//! ## COSY Example
+//! ```
+#![doc = include_str!("test.fox")]
+//! ```
+//! **Output**:
+//! ```
+#![doc = include_str!("cosy_output.txt")]
+//! ```
 
 use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;

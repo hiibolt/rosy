@@ -13,6 +13,23 @@
 //! 1. `da`     (DA vector, read)  - source DA (first component used)
 //! 2. `n`      (RE, read)         - number of coefficients to extract
 //! 3. `linear` (VE, write)        - output array of n linear coefficients
+//!
+//! ## Rosy Example
+//! ```
+#![doc = include_str!("test.rosy")]
+//! ```
+//! **Output**:
+//! ```
+#![doc = include_str!("rosy_output.txt")]
+//! ```
+//! ## COSY Example
+//! ```
+#![doc = include_str!("test.fox")]
+//! ```
+//! **Output**:
+//! ```
+#![doc = include_str!("cosy_output.txt")]
+//! ```
 
 use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;

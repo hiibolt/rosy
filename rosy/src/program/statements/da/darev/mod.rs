@@ -17,6 +17,17 @@
 //! ```
 #![doc = include_str!("rosy_output.txt")]
 //! ```
+//! ## COSY Example
+//!
+//! > **COSY note**: COSY's `DAREV` requires exactly 5 map components (hardcoded limit)
+//! > and the output array must be pre-initialized as DA type before calling.
+//! ```
+#![doc = include_str!("test.fox")]
+//! ```
+//! **Output**:
+//! ```
+#![doc = include_str!("cosy_output.txt")]
+//! ```
 
 use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
