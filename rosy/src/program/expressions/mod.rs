@@ -82,6 +82,8 @@ use crate::program::expressions::functions::math::memory::lcm::LcmExpr;
 use crate::program::expressions::functions::math::memory::lcd::LcdExpr;
 use crate::program::expressions::functions::sys::trim::TrimExpr;
 use crate::program::expressions::functions::sys::ltrim::LtrimExpr;
+use crate::program::expressions::functions::sys::varmem::VarmemExpr;
+use crate::program::expressions::functions::sys::varpoi::VarpoiExpr;
 
 use crate::program::expressions::operators::arithmetic::add::AddExpr;
 use crate::program::expressions::operators::arithmetic::sub::SubExpr;
@@ -177,6 +179,8 @@ pub enum ExprEnum {
     ImagFn,
     ReConvert,
     VeConvert,
+    Varmem,
+    Varpoi,
 }
 
 impl FromRule for Expr {
@@ -542,6 +546,20 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::VeConvert,
                         inner: Box::new(ve_convert_expr.ok_or_else(|| anyhow::anyhow!("Expected VeConvertExpr"))?),
+                    })
+                },
+                Rule::varmem => {
+                    let varmem_expr = VarmemExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Varmem,
+                        inner: Box::new(varmem_expr.ok_or_else(|| anyhow::anyhow!("Expected VarmemExpr"))?),
+                    })
+                },
+                Rule::varpoi => {
+                    let varpoi_expr = VarpoiExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Varpoi,
+                        inner: Box::new(varpoi_expr.ok_or_else(|| anyhow::anyhow!("Expected VarpoiExpr"))?),
                     })
                 },
                 Rule::expr => {

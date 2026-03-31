@@ -60,3 +60,7 @@ pub mod substr;
 pub mod var_decl;
 pub mod velset;
 pub mod while_loop;
+pub mod sleepm;
+pub mod argget;
+pub mod memdpv;
+pub mod memfre;

@@ -36,6 +36,8 @@ pub mod real_fn;
 pub mod imag_fn;
 pub mod re_convert;
 pub mod ve_convert;
+pub mod varmem;
+pub mod varpoi;
 
 pub use cm::RosyCM;
 pub use st::RosyST;
@@ -75,6 +77,8 @@ pub use real_fn::RosyREAL;
 pub use imag_fn::RosyIMAG;
 pub use re_convert::RosyREConvert;
 pub use ve_convert::RosyVEConvert;
+pub use varmem::RosyVARMEM;
+pub use varpoi::RosyVARPOI;
 
 /// Represents a parsed intrinsic type rule from the source code.
 #[derive(Debug, Clone)]

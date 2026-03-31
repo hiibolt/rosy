@@ -103,6 +103,10 @@ pub use core::pnpro::PnproStatement;
 pub use core::recst::RecstStatement;
 pub use core::ranseed::RanseedStatement;
 pub use core::reran::ReranStatement;
+pub use core::sleepm::SleepmStatement;
+pub use core::argget::ArggetStatement;
+pub use core::memdpv::MemdpvStatement;
+pub use core::memfre::MemfreStatement;
 pub use core::stcre::StcreStatement;
 
 pub use da::dacliw::DacliwStatement;
@@ -238,6 +242,10 @@ pub enum StatementEnum {
     DaPea,
     DaPep,
     DaEst,
+    Sleepm,
+    Argget,
+    Memdpv,
+    Memfre,
 }
 impl TranspileableStatement for Statement {
     fn register_typeslot_declaration(
@@ -851,6 +859,43 @@ impl FromRule for Statement {
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaEst,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+
+            Rule::sleepm => SleepmStatement::from_rule(pair)
+                .context("...while building SLEEPM statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Sleepm,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::argget => ArggetStatement::from_rule(pair)
+                .context("...while building ARGGET statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Argget,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::memdpv => MemdpvStatement::from_rule(pair)
+                .context("...while building MEMDPV statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Memdpv,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::memfre => MemfreStatement::from_rule(pair)
+                .context("...while building MEMFRE statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Memfre,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
