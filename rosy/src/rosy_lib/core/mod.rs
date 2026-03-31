@@ -11,6 +11,7 @@ pub mod mtree;
 pub mod polval;
 pub mod recst;
 pub mod reran;
+pub mod rng;
 
 pub use da_ops::*;
 pub use display::*;

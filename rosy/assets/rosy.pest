@@ -23,6 +23,7 @@ statement   = _{
   | while_loop
   | ploop
   | procedure
+  | ranseed
   | procedure_call
   | if_statement
   | break_statement
@@ -280,6 +281,7 @@ endif = { ^"ENDIF" ~ semicolon }
   recst = { ^"RECST" ~ expr ~ expr ~ variable_identifier ~ semicolon }
   /// [ RANDOM ]
   reran = { ^"RERAN" ~ variable_identifier ~ semicolon }
+  ranseed = { ^"RANSEED" ~ expr ~ semicolon }
   /// [ SYSTEM / UTILITY ]
   pwtime = { ^"PWTIME" ~ variable_identifier ~ semicolon }
   pnpro = { ^"PNPRO" ~ variable_identifier ~ semicolon }
