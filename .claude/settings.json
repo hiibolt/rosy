@@ -9,9 +9,6 @@
       "Fetch(*)",
       "WebSearch",
       "WebFetch(*)",
-      "mcp__github__search_issues",
-      "mcp__github__create_issue",
-      "mcp__github__update_issue",
       "mcp__codegraph__codegraph_search",
       "mcp__codegraph__codegraph_context",
       "mcp__codegraph__codegraph_callers",
@@ -22,7 +19,9 @@
       "mcp__codegraph__codegraph_files"
     ]
   },
-  "enabledMcpjsonServers": ["github-projects", "github", "codegraph"],
+  "enabledMcpjsonServers": [
+    "codegraph"
+  ],
   "enabledPlugins": {
     "skill-creator@claude-plugins-official": true,
     "rust-analyzer-lsp@claude-plugins-official": true
