@@ -8,17 +8,17 @@
 //!
 //! WRITEM fills four outputs:
 //!
-//! - `var_info: Vec<f64>` — `[type_code, payload_length, version_id]`
-//! - `dp_array: Vec<f64>` — double-precision payload
-//! - `int_array: Vec<f64>` — integer metadata (stored as f64)
-//! - `da_params: Vec<f64>` — DA parameters `[order, nv]`, or `[0.0]` for non-DA
+//! - `var_info: Vec\<f64\>` — `[type_code, payload_length, version_id]`
+//! - `dp_array: Vec\<f64\>` — double-precision payload
+//! - `int_array: Vec\<f64\>` — integer metadata (stored as f64)
+//! - `da_params: Vec\<f64\>` — DA parameters `[order, nv]`, or `[0.0]` for non-DA
 //!
 //! Type codes (mirroring COSY conventions):
 //! - 1 = RE (f64)
 //! - 2 = ST (String)
 //! - 3 = LO (bool)
 //! - 4 = CM (Complex64)
-//! - 5 = VE (Vec<f64>)
+//! - 5 = VE (Vec\<f64\>)
 //! - 6 = DA
 //! - 7 = CD
 //!
@@ -69,7 +69,9 @@ impl RosyWritem for f64 {
 }
 
 impl RosyReadm for f64 {
-    fn expected_type_code() -> f64 { 1.0 }
+    fn expected_type_code() -> f64 {
+        1.0
+    }
 
     fn readm(
         var_info: &[f64],
@@ -113,7 +115,9 @@ impl RosyWritem for String {
 }
 
 impl RosyReadm for String {
-    fn expected_type_code() -> f64 { 2.0 }
+    fn expected_type_code() -> f64 {
+        2.0
+    }
 
     fn readm(
         var_info: &[f64],
@@ -153,7 +157,9 @@ impl RosyWritem for bool {
 }
 
 impl RosyReadm for bool {
-    fn expected_type_code() -> f64 { 3.0 }
+    fn expected_type_code() -> f64 {
+        3.0
+    }
 
     fn readm(
         var_info: &[f64],
@@ -194,7 +200,9 @@ impl RosyWritem for num_complex::Complex64 {
 }
 
 impl RosyReadm for num_complex::Complex64 {
-    fn expected_type_code() -> f64 { 4.0 }
+    fn expected_type_code() -> f64 {
+        4.0
+    }
 
     fn readm(
         var_info: &[f64],
@@ -235,7 +243,9 @@ impl RosyWritem for Vec<f64> {
 }
 
 impl RosyReadm for Vec<f64> {
-    fn expected_type_code() -> f64 { 5.0 }
+    fn expected_type_code() -> f64 {
+        5.0
+    }
 
     fn readm(
         var_info: &[f64],
@@ -305,7 +315,9 @@ impl RosyWritem for crate::rosy_lib::taylor::DA {
 }
 
 impl RosyReadm for crate::rosy_lib::taylor::DA {
-    fn expected_type_code() -> f64 { 6.0 }
+    fn expected_type_code() -> f64 {
+        6.0
+    }
 
     fn readm(
         var_info: &[f64],
@@ -350,10 +362,20 @@ impl RosyReadm for crate::rosy_lib::taylor::DA {
         let expected_int_len = n_terms * MAX_VARS;
 
         if dp_array.len() < n_terms {
-            bail!("READM: dp_array has {} entries but expected {} DA terms", dp_array.len(), n_terms);
+            bail!(
+                "READM: dp_array has {} entries but expected {} DA terms",
+                dp_array.len(),
+                n_terms
+            );
         }
         if int_array.len() < expected_int_len {
-            bail!("READM: int_array has {} entries but expected {} ({}*{})", int_array.len(), expected_int_len, n_terms, MAX_VARS);
+            bail!(
+                "READM: int_array has {} entries but expected {} ({}*{})",
+                int_array.len(),
+                expected_int_len,
+                n_terms,
+                MAX_VARS
+            );
         }
 
         let mut hash_coeffs: FxHashMap<Monomial, f64> = FxHashMap::default();
@@ -405,7 +427,9 @@ impl RosyWritem for crate::rosy_lib::taylor::CD {
 }
 
 impl RosyReadm for crate::rosy_lib::taylor::CD {
-    fn expected_type_code() -> f64 { 7.0 }
+    fn expected_type_code() -> f64 {
+        7.0
+    }
 
     fn readm(
         var_info: &[f64],
@@ -452,10 +476,19 @@ impl RosyReadm for crate::rosy_lib::taylor::CD {
         let expected_int = n_terms * MAX_VARS;
 
         if dp_array.len() < expected_dp {
-            bail!("READM: dp_array has {} entries but expected {} for CD ({} terms * 2)", dp_array.len(), expected_dp, n_terms);
+            bail!(
+                "READM: dp_array has {} entries but expected {} for CD ({} terms * 2)",
+                dp_array.len(),
+                expected_dp,
+                n_terms
+            );
         }
         if int_array.len() < expected_int {
-            bail!("READM: int_array has {} entries but expected {} for CD", int_array.len(), expected_int);
+            bail!(
+                "READM: int_array has {} entries but expected {} for CD",
+                int_array.len(),
+                expected_int
+            );
         }
 
         let mut hash_coeffs: FxHashMap<Monomial, Complex64> = FxHashMap::default();

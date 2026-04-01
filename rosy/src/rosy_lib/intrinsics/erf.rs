@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
+use crate::rosy_lib::{DA, RE};
 use crate::rosy_lib::{IntrinsicTypeRule, RosyType};
-use crate::rosy_lib::{RE, DA};
 
 /// Type registry for ERF intrinsic function.
 ///
@@ -56,11 +56,11 @@ impl RosyERF for RE {
 ///
 ///   Let g(x) = exp(-x^2). Then g'(x) = -2x * g(x).
 ///   Taylor coefficients of g satisfy: (n+1)*g[n+1] = -2 * sum_{k=0}^{n} (k+1)*x[k+1]*g[n-k]
-///   where x[k] are coefficients of the identity (x[1]=1, rest 0).
+///   where x\[k\] are coefficients of the identity (x\[1\]=1, rest 0).
 ///
 /// For composition erf(f0 + delta), we use:
-///   erf_coeffs[0] = erf(f0)
-///   erf_coeffs[n] = g_coeffs[n-1] / n   for n >= 1
+///   erf_coeffs\[0\] = erf(f0)
+///   erf_coeffs\[n\] = g_coeffs\[n-1\] / n   for n >= 1
 /// where g_coeffs are coefficients of (2/sqrt(pi))*exp(-(f0+t)^2) expanded in t.
 impl RosyERF for DA {
     type Output = DA;
@@ -76,9 +76,9 @@ impl RosyERF for DA {
 /// The coefficients of the integrand expanded in delta are those of
 /// (2/sqrt(pi))*exp(-f0^2)*exp(-2*f0*delta - delta^2).
 ///
-/// We compute these as: c[n] = (2/sqrt(pi)) * exp(-f0^2) * p[n]
-/// where p[n] are the Taylor coefficients of exp(-2*f0*t - t^2).
-/// Then erf_coeffs[n] = c[n-1] / n for n >= 1, erf_coeffs[0] = erf(f0).
+/// We compute these as: c\[n\] = (2/sqrt(pi)) * exp(-f0^2) * p\[n\]
+/// where p\[n\] are the Taylor coefficients of exp(-2*f0*t - t^2).
+/// Then erf_coeffs\[n\] = c\[n-1\] / n for n >= 1, erf_coeffs\[0\] = erf(f0).
 fn da_erf(da: &DA) -> anyhow::Result<DA> {
     let rt = crate::rosy_lib::taylor::get_runtime()?;
     let nocut = rt.config.max_order as usize;

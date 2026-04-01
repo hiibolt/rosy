@@ -13,19 +13,19 @@
 //! Transpiles to `std::thread::sleep(std::time::Duration::from_millis(...))`.
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
 //! ## COSY Example
-//! ```
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -53,7 +53,9 @@ impl FromRule for SleepmStatement {
 
         let mut inner = pair.into_inner();
 
-        let duration_pair = inner.next().context("Missing duration expression in SLEEPM!")?;
+        let duration_pair = inner
+            .next()
+            .context("Missing duration expression in SLEEPM!")?;
         let duration_expr = Expr::from_rule(duration_pair)
             .context("Failed to build duration expression in SLEEPM")?
             .ok_or_else(|| anyhow::anyhow!("Expected duration expression in SLEEPM"))?;

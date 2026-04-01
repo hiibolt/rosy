@@ -22,7 +22,7 @@
 //! ## Fixes applied (vs original implementation)
 //! - Bounds check before `var_info[1]` is no longer needed in transpiler code
 //!   since `readm()` impls now read `var_info[1]` internally with a bounds check.
-//! - Type code validation: each `RosyReadm` impl checks the type code in var_info[0].
+//! - Type code validation: each `RosyReadm` impl checks the type code in var_info\[0\].
 //! - DA/CD config compatibility: checked inside `RosyReadm` impls.
 //! - `length_expr` requested_variables are now propagated (fix #5).
 //! - The `length` argument is passed as `_length` since the authoritative length
@@ -40,9 +40,9 @@ use crate::{
     },
     resolve::{ScopeContext, TypeResolver},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr,
-        TranspileableStatement, TypeslotDeclarationResult, InferenceEdgeResult,
-        TypeHydrationResult, ValueKind, add_context_to_all,
+        InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableExpr, TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult,
+        ValueKind, add_context_to_all,
     },
 };
 
@@ -74,7 +74,9 @@ impl FromRule for ReadmStatement {
         let mut inner = pair.into_inner();
 
         // arg 1: output variable
-        let out_pair = inner.next().context("Missing arg 1 (output_var) in READM!")?;
+        let out_pair = inner
+            .next()
+            .context("Missing arg 1 (output_var) in READM!")?;
         let output_var = VariableIdentifier::from_rule(out_pair)
             .context("Failed to parse output variable in READM")?
             .ok_or_else(|| anyhow::anyhow!("Expected output variable in READM"))?;
@@ -98,13 +100,17 @@ impl FromRule for ReadmStatement {
             .ok_or_else(|| anyhow::anyhow!("Expected dp_array expression in READM"))?;
 
         // arg 5: int_array
-        let int_pair = inner.next().context("Missing arg 5 (int_array) in READM!")?;
+        let int_pair = inner
+            .next()
+            .context("Missing arg 5 (int_array) in READM!")?;
         let int_array_expr = Expr::from_rule(int_pair)
             .context("Failed to parse int_array expression in READM")?
             .ok_or_else(|| anyhow::anyhow!("Expected int_array expression in READM"))?;
 
         // arg 6: da_params
-        let da_pair = inner.next().context("Missing arg 6 (da_params) in READM!")?;
+        let da_pair = inner
+            .next()
+            .context("Missing arg 6 (da_params) in READM!")?;
         let da_params_expr = Expr::from_rule(da_pair)
             .context("Failed to parse da_params expression in READM")?
             .ok_or_else(|| anyhow::anyhow!("Expected da_params expression in READM"))?;
@@ -161,7 +167,10 @@ impl Transpile for ReadmStatement {
                 o
             }
             Err(e) => {
-                errors.extend(add_context_to_all(e, "...while transpiling output_var in READM".to_string()));
+                errors.extend(add_context_to_all(
+                    e,
+                    "...while transpiling output_var in READM".to_string(),
+                ));
                 return Err(errors);
             }
         };
@@ -177,35 +186,67 @@ impl Transpile for ReadmStatement {
         let rust_type = var_type.as_rust_type();
 
         // Helper: transpile a single expression, accumulating errors and requested_variables.
-        let mut macro_transpile = |expr: &Expr, label: &str, errors: &mut Vec<Error>, reqs: &mut BTreeSet<String>| -> Option<String> {
+        let mut macro_transpile = |expr: &Expr,
+                                   label: &str,
+                                   errors: &mut Vec<Error>,
+                                   reqs: &mut BTreeSet<String>|
+         -> Option<String> {
             match expr.transpile(context) {
                 Ok(o) => {
                     reqs.extend(o.requested_variables.iter().cloned());
                     Some(o.as_value())
                 }
                 Err(e) => {
-                    errors.extend(add_context_to_all(e, format!("...while transpiling {label} in READM")));
+                    errors.extend(add_context_to_all(
+                        e,
+                        format!("...while transpiling {label} in READM"),
+                    ));
                     None
                 }
             }
         };
 
-        let var_info_s = macro_transpile(&self.var_info_expr, "var_info", &mut errors, &mut requested_variables);
+        let var_info_s = macro_transpile(
+            &self.var_info_expr,
+            "var_info",
+            &mut errors,
+            &mut requested_variables,
+        );
         // Fix #5: propagate length_expr requested_variables
-        let length_s   = macro_transpile(&self.length_expr,   "length",   &mut errors, &mut requested_variables);
-        let dp_s       = macro_transpile(&self.dp_array_expr, "dp_array", &mut errors, &mut requested_variables);
-        let int_s      = macro_transpile(&self.int_array_expr,"int_array",&mut errors, &mut requested_variables);
-        let da_s       = macro_transpile(&self.da_params_expr,"da_params",&mut errors, &mut requested_variables);
+        let length_s = macro_transpile(
+            &self.length_expr,
+            "length",
+            &mut errors,
+            &mut requested_variables,
+        );
+        let dp_s = macro_transpile(
+            &self.dp_array_expr,
+            "dp_array",
+            &mut errors,
+            &mut requested_variables,
+        );
+        let int_s = macro_transpile(
+            &self.int_array_expr,
+            "int_array",
+            &mut errors,
+            &mut requested_variables,
+        );
+        let da_s = macro_transpile(
+            &self.da_params_expr,
+            "da_params",
+            &mut errors,
+            &mut requested_variables,
+        );
 
         if !errors.is_empty() {
             return Err(errors);
         }
 
         let var_info_s = var_info_s.unwrap();
-        let length_s   = length_s.unwrap();
-        let dp_s       = dp_s.unwrap();
-        let int_s      = int_s.unwrap();
-        let da_s       = da_s.unwrap();
+        let length_s = length_s.unwrap();
+        let dp_s = dp_s.unwrap();
+        let int_s = int_s.unwrap();
+        let da_s = da_s.unwrap();
 
         // Build lvalue assignment for output variable
         fn make_lvalue(ser: &str, value_kind: ValueKind, rhs: &str) -> String {
