@@ -11,7 +11,7 @@ conversationally — don't dump this list on the user.
 | N      | Negotiable     | Is the scope flexible, or is it rigidly over-specified?                |
 | V      | Valuable       | Is it clear who benefits and how?                                      |
 | E      | Estimable      | Could the effort be estimated roughly?                                 |
-| S      | Small          | Does the Size field reflect this? `L`/`XL` issues are a smell — split them. |
+| S      | Small          | Does the Size field reflect this? `Large`/`X-Large`/`Gigantic` issues are a smell — split them. |
 | T      | Testable       | Do the acceptance criteria make it unambiguous whether it's done?      |
 
 If the issue fails **S** — it's too big. Gently suggest splitting it.
