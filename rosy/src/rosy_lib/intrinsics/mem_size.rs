@@ -26,10 +26,48 @@ impl RosyLCM for RE {
     }
 }
 
-/// LCD(ve) - DA memory size estimator (COSY compatibility).
-/// Takes a VE with (order, num_vars) and returns estimated DA memory size.
-/// In COSY, LCD(NO&NV) computes (NO+NV)! / (NO! * NV!) + some overhead.
-/// We compute the binomial coefficient (NO+NV choose NV) + 5 for metadata.
+/// LRE(n) - Real memory size estimator (COSY compatibility).
+/// In COSY, LRE(n) returns 1 (a real always takes 1 unit).
+/// In Rosy, we return 1 for compatibility.
+pub trait RosyLRE {
+    fn rosy_lre(&self) -> RE;
+}
+
+impl RosyLRE for RE {
+    fn rosy_lre(&self) -> RE {
+        1.0
+    }
+}
+
+/// LLO(n) - Logical memory size estimator (COSY compatibility).
+/// In COSY, LLO(n) returns 1 (a logical always takes 1 unit).
+/// In Rosy, we return 1 for compatibility.
+pub trait RosyLLO {
+    fn rosy_llo(&self) -> RE;
+}
+
+impl RosyLLO for RE {
+    fn rosy_llo(&self) -> RE {
+        1.0
+    }
+}
+
+/// LVE(n) - Vector memory size estimator (COSY compatibility).
+/// In COSY, LVE(n) returns n (the number of components).
+/// In Rosy, we pass through the value for compatibility.
+pub trait RosyLVE {
+    fn rosy_lve(&self) -> RE;
+}
+
+impl RosyLVE for RE {
+    fn rosy_lve(&self) -> RE {
+        *self
+    }
+}
+
+/// LCD(ve) - Complex DA memory size estimator (COSY compatibility).
+/// Takes a VE with (order, num_vars) and returns estimated complex DA memory size.
+/// In COSY, LCD(NO&NV) computes 2 * C(NO+NV, NV) — complex DA needs 2x real DA.
 pub trait RosyLCD {
     fn rosy_lcd(&self) -> RE;
 }
@@ -41,15 +79,41 @@ impl RosyLCD for VE {
         }
         let no = self[0] as u64;
         let nv = self[1] as u64;
-        
+
         // Compute binomial coefficient (no + nv) choose nv
         // = (no+nv)! / (no! * nv!)
         let mut result: u64 = 1;
         for i in 1..=nv {
             result = result * (no + i) / i;
         }
-        
-        // Add metadata overhead (matching COSY behavior)
-        (result + 5) as f64
+
+        // Complex DA needs 2x the storage of real DA
+        (2 * result) as f64
+    }
+}
+
+/// LDA(ve) - DA memory size estimator (COSY compatibility).
+/// Takes a VE with (order, num_vars) and returns estimated DA memory size.
+/// Same computation as the number of monomials in `nv` variables up to degree `no`.
+pub trait RosyLDA {
+    fn rosy_lda(&self) -> RE;
+}
+
+impl RosyLDA for VE {
+    fn rosy_lda(&self) -> RE {
+        if self.len() < 2 {
+            return 1.0;
+        }
+        let no = self[0] as u64;
+        let nv = self[1] as u64;
+
+        // Compute binomial coefficient (no + nv) choose nv
+        // = (no+nv)! / (no! * nv!)
+        let mut result: u64 = 1;
+        for i in 1..=nv {
+            result = result * (no + i) / i;
+        }
+
+        result as f64
     }
 }

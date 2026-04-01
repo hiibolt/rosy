@@ -1,0 +1,14 @@
+{ Test LSLINE with y = 3x + 1 — slope=3 intercept=1 }
+BEGIN;
+    VARIABLE (VE) X;
+    VARIABLE (VE) Y;
+    VARIABLE (RE) N;
+    VARIABLE (RE) A;
+    VARIABLE (RE) B;
+    X := 1&2&3&4;
+    Y := 4&7&10&13;
+    N := 4;
+    LSLINE X Y N A B;
+    WRITE 6 A;
+    WRITE 6 B;
+END;

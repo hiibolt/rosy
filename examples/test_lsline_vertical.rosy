@@ -1,0 +1,15 @@
+{ Test LSLINE with vertical line — all x values are the same }
+{ Expected: error "LSLINE: degenerate x data (all x values are equal)" }
+BEGIN;
+    VARIABLE (VE) X;
+    VARIABLE (VE) Y;
+    VARIABLE (RE) N;
+    VARIABLE (RE) A;
+    VARIABLE (RE) B;
+    X := 5&5&5;
+    Y := 1&2&3;
+    N := 3;
+    LSLINE X Y N A B;
+    WRITE 6 A;
+    WRITE 6 B;
+END;

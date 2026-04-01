@@ -68,6 +68,7 @@ serial_test = "3.2"
 num-complex = "0.4"
 rustc-hash = "2"
 rand = "0.9"
+libm = "0.2"
 "#;
 
     std::fs::write(lib_dir.join("Cargo.toml"), lib_cargo_toml)

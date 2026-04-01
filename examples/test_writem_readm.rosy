@@ -1,0 +1,47 @@
+{ Test WRITEM and READM round-trip for RE, ST, LO, and VE types }
+
+BEGIN;
+
+{ --- RE round-trip --- }
+VARIABLE (RE) x;
+VARIABLE (RE) y;
+VARIABLE (VE) vi_re;
+VARIABLE (RE) len_re;
+VARIABLE (VE) dp_re;
+VARIABLE (VE) int_re;
+VARIABLE (VE) dap_re;
+
+x := 3.14159;
+WRITEM x vi_re len_re dp_re int_re dap_re;
+READM y vi_re len_re dp_re int_re dap_re;
+WRITE 6 'RE round-trip: ' y;
+
+{ --- ST round-trip --- }
+VARIABLE (ST) s_in;
+VARIABLE (ST) s_out;
+VARIABLE (VE) vi_st;
+VARIABLE (RE) len_st;
+VARIABLE (VE) dp_st;
+VARIABLE (VE) int_st;
+VARIABLE (VE) dap_st;
+
+s_in := 'Hello, ROSY!';
+WRITEM s_in vi_st len_st dp_st int_st dap_st;
+READM s_out vi_st len_st dp_st int_st dap_st;
+WRITE 6 'ST round-trip: ' s_out;
+
+{ --- LO round-trip --- }
+VARIABLE (LO) b_in;
+VARIABLE (LO) b_out;
+VARIABLE (VE) vi_lo;
+VARIABLE (RE) len_lo;
+VARIABLE (VE) dp_lo;
+VARIABLE (VE) int_lo;
+VARIABLE (VE) dap_lo;
+
+b_in := TRUE;
+WRITEM b_in vi_lo len_lo dp_lo int_lo dap_lo;
+READM b_out vi_lo len_lo dp_lo int_lo dap_lo;
+WRITE 6 'LO round-trip: ' b_out;
+
+END;

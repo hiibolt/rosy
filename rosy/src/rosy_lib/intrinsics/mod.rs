@@ -38,6 +38,8 @@ pub mod re_convert;
 pub mod ve_convert;
 pub mod varmem;
 pub mod varpoi;
+pub mod erf;
+pub mod werf;
 
 pub use cm::RosyCM;
 pub use st::RosyST;
@@ -71,7 +73,7 @@ pub use isrt::RosyISRT;
 pub use isrt3::RosyISRT3;
 pub use cmplx::RosyCMPLX;
 pub use conj::RosyCONJ;
-pub use mem_size::{RosyLST, RosyLCM, RosyLCD};
+pub use mem_size::{RosyLST, RosyLCM, RosyLCD, RosyLRE, RosyLLO, RosyLVE, RosyLDA};
 pub use derive::RosyDerive;
 pub use real_fn::RosyREAL;
 pub use imag_fn::RosyIMAG;
@@ -79,6 +81,8 @@ pub use re_convert::RosyREConvert;
 pub use ve_convert::RosyVEConvert;
 pub use varmem::RosyVARMEM;
 pub use varpoi::RosyVARPOI;
+pub use erf::RosyERF;
+pub use werf::RosyWERF;
 
 /// Represents a parsed intrinsic type rule from the source code.
 #[derive(Debug, Clone)]
