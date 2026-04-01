@@ -344,16 +344,23 @@ impl Transpile for VarExpr {
                         )])?;
                 let var_type = var_data.data.r#type.clone();
 
-                let (reference, value_kind) = match var_data.scope {
-                    VariableScope::Local => {
-                        if var_type.is_copy() {
-                            ("", ValueKind::Owned) // Copy local: just `X`, value is copied
-                        } else {
-                            ("&", ValueKind::Ref) // non-Copy local: `&X`, reference
+                // For indexed access, rosy_get() already returns &T — no
+                // extra reference sigil needed regardless of scope or Copy-ness.
+                let has_indices = self.identifier.num_index_dimensions() > 0;
+                let (reference, value_kind) = if has_indices {
+                    ("", ValueKind::Ref)
+                } else {
+                    match var_data.scope {
+                        VariableScope::Local => {
+                            if var_type.is_copy() {
+                                ("", ValueKind::Owned) // Copy local: just `X`, value is copied
+                            } else {
+                                ("&", ValueKind::Ref) // non-Copy local: `&X`, reference
+                            }
                         }
+                        VariableScope::Arg => ("", ValueKind::Ref), // already a reference
+                        VariableScope::Higher => ("", ValueKind::Ref), // already a reference
                     }
-                    VariableScope::Arg => ("", ValueKind::Ref), // already a reference
-                    VariableScope::Higher => ("", ValueKind::Ref), // already a reference
                 };
                 Ok(TranspilationOutput {
                     serialization: format!("{}{}", reference, ident_output.serialization),
