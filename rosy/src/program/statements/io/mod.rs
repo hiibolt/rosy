@@ -26,3 +26,5 @@ pub mod velget;
 pub mod pwtime;
 pub mod write;
 pub mod writeb;
+pub mod readm;
+pub mod writem;

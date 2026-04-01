@@ -17,3 +17,4 @@ pub mod rounding;
 pub mod vector;
 pub mod memory;
 pub mod query;
+pub mod special;

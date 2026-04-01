@@ -80,8 +80,14 @@ use crate::program::expressions::functions::math::query::isrt3::Isrt3Expr;
 use crate::program::expressions::functions::math::memory::lst::LstExpr;
 use crate::program::expressions::functions::math::memory::lcm::LcmExpr;
 use crate::program::expressions::functions::math::memory::lcd::LcdExpr;
+use crate::program::expressions::functions::math::memory::lre::LreExpr;
+use crate::program::expressions::functions::math::memory::llo::LloExpr;
+use crate::program::expressions::functions::math::memory::lve::LveExpr;
+use crate::program::expressions::functions::math::memory::lda::LdaExpr;
 use crate::program::expressions::functions::sys::trim::TrimExpr;
 use crate::program::expressions::functions::sys::ltrim::LtrimExpr;
+use crate::program::expressions::functions::sys::varmem::VarmemExpr;
+use crate::program::expressions::functions::sys::varpoi::VarpoiExpr;
 
 use crate::program::expressions::operators::arithmetic::add::AddExpr;
 use crate::program::expressions::operators::arithmetic::sub::SubExpr;
@@ -100,6 +106,8 @@ use crate::program::expressions::operators::collection::extract::ExtractExpr;
 use crate::program::expressions::operators::collection::derive::DeriveExpr;
 
 use crate::program::expressions::functions::sys::length::LengthExpr;
+use crate::program::expressions::functions::math::special::erf::ErfExpr;
+use crate::program::expressions::functions::math::special::werf::WerfExpr;
 
 use crate::program::expressions::types::da::DAExpr;
 use crate::program::expressions::types::cd::CDExpr;
@@ -171,12 +179,20 @@ pub enum ExprEnum {
     Lst,
     Lcm,
     Lcd,
+    Lre,
+    Llo,
+    Lve,
+    Lda,
     Neg,
     Derive,
     RealFn,
     ImagFn,
     ReConvert,
     VeConvert,
+    Varmem,
+    Varpoi,
+    Erf,
+    Werf,
 }
 
 impl FromRule for Expr {
@@ -425,6 +441,34 @@ impl FromRule for Expr {
                         inner: Box::new(lcd_expr.ok_or_else(|| anyhow::anyhow!("Expected LcdExpr"))?),
                     })
                 },
+                Rule::lre => {
+                    let lre_expr = LreExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Lre,
+                        inner: Box::new(lre_expr.ok_or_else(|| anyhow::anyhow!("Expected LreExpr"))?),
+                    })
+                },
+                Rule::llo => {
+                    let llo_expr = LloExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Llo,
+                        inner: Box::new(llo_expr.ok_or_else(|| anyhow::anyhow!("Expected LloExpr"))?),
+                    })
+                },
+                Rule::lve => {
+                    let lve_expr = LveExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Lve,
+                        inner: Box::new(lve_expr.ok_or_else(|| anyhow::anyhow!("Expected LveExpr"))?),
+                    })
+                },
+                Rule::lda => {
+                    let lda_expr = LdaExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Lda,
+                        inner: Box::new(lda_expr.ok_or_else(|| anyhow::anyhow!("Expected LdaExpr"))?),
+                    })
+                },
                 Rule::vmin => {
                     let vmin_expr = VminExpr::from_rule(primary)?;
                     Ok(Expr {
@@ -542,6 +586,34 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::VeConvert,
                         inner: Box::new(ve_convert_expr.ok_or_else(|| anyhow::anyhow!("Expected VeConvertExpr"))?),
+                    })
+                },
+                Rule::varmem => {
+                    let varmem_expr = VarmemExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Varmem,
+                        inner: Box::new(varmem_expr.ok_or_else(|| anyhow::anyhow!("Expected VarmemExpr"))?),
+                    })
+                },
+                Rule::varpoi => {
+                    let varpoi_expr = VarpoiExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Varpoi,
+                        inner: Box::new(varpoi_expr.ok_or_else(|| anyhow::anyhow!("Expected VarpoiExpr"))?),
+                    })
+                },
+                Rule::erf_fn => {
+                    let erf_expr = ErfExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Erf,
+                        inner: Box::new(erf_expr.ok_or_else(|| anyhow::anyhow!("Expected ErfExpr"))?),
+                    })
+                },
+                Rule::werf_fn => {
+                    let werf_expr = WerfExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Werf,
+                        inner: Box::new(werf_expr.ok_or_else(|| anyhow::anyhow!("Expected WerfExpr"))?),
                     })
                 },
                 Rule::expr => {

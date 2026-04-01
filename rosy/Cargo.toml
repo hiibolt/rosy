@@ -1,6 +1,6 @@
 [package]
 name = "rosy"
-version = "0.21.0"
+version = "0.22.0"
 edition = "2024"
 
 [features]
@@ -24,6 +24,7 @@ serde = { version = "1", features = ["derive"] }
 num-complex.workspace = true
 rand.workspace = true
 rustc-hash.workspace = true
+libm = "0.2"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("mpi", "nightly-simd"))'] }

@@ -74,15 +74,19 @@ pub use io::openf::OpenfStatement;
 pub use io::openfb::OpenfbStatement;
 pub use io::read::ReadStatement;
 pub use io::readb::ReadbStatement;
+pub use io::readm::ReadmStatement;
 pub use io::write::WriteStatement;
 pub use io::writeb::WritebStatement;
+pub use io::writem::WritemStatement;
 
 pub use math::fit::FitStatement;
 pub use math::ldet::LdetStatement;
 pub use math::lev::LevStatement;
 pub use math::linv::LinvStatement;
+pub use math::lsline::LslineStatement;
 pub use math::mblock::MblockStatement;
 pub use math::polval::PolvalStatement;
+pub use math::rkco::RkcoStatement;
 
 pub use core::quit::QuitStatement;
 pub use core::scrlen::ScrlenStatement;
@@ -103,6 +107,10 @@ pub use core::pnpro::PnproStatement;
 pub use core::recst::RecstStatement;
 pub use core::ranseed::RanseedStatement;
 pub use core::reran::ReranStatement;
+pub use core::sleepm::SleepmStatement;
+pub use core::argget::ArggetStatement;
+pub use core::memdpv::MemdpvStatement;
+pub use core::memfre::MemfreStatement;
 pub use core::stcre::StcreStatement;
 
 pub use da::dacliw::DacliwStatement;
@@ -219,8 +227,10 @@ pub enum StatementEnum {
     Pnpro,
     Imunit,
     Lev,
+    Lsline,
     Mblock,
     Mtree,
+    Rkco,
     DaScl,
     DaSgn,
     DaDer,
@@ -238,6 +248,12 @@ pub enum StatementEnum {
     DaPea,
     DaPep,
     DaEst,
+    Sleepm,
+    Argget,
+    Memdpv,
+    Memfre,
+    Readm,
+    Writem,
 }
 impl TranspileableStatement for Statement {
     fn register_typeslot_declaration(
@@ -702,6 +718,24 @@ impl FromRule for Statement {
                         source_location: loc.clone(),
                     })
                 }),
+            Rule::lsline => LslineStatement::from_rule(pair)
+                .context("...while building LSLINE statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Lsline,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::rkco => RkcoStatement::from_rule(pair)
+                .context("...while building RKCO statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Rkco,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
             Rule::dascl => DasclStatement::from_rule(pair)
                 .context("...while building DASCL statement!")
                 .map(|opt| {
@@ -851,6 +885,62 @@ impl FromRule for Statement {
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaEst,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+
+            Rule::sleepm => SleepmStatement::from_rule(pair)
+                .context("...while building SLEEPM statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Sleepm,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::argget => ArggetStatement::from_rule(pair)
+                .context("...while building ARGGET statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Argget,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::memdpv => MemdpvStatement::from_rule(pair)
+                .context("...while building MEMDPV statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Memdpv,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::memfre => MemfreStatement::from_rule(pair)
+                .context("...while building MEMFRE statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Memfre,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+
+            Rule::readm => ReadmStatement::from_rule(pair)
+                .context("...while building READM statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Readm,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::writem => WritemStatement::from_rule(pair)
+                .context("...while building WRITEM statement!")
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Writem,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })

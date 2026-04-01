@@ -7,3 +7,5 @@
 pub mod length;
 pub mod trim;
 pub mod ltrim;
+pub mod varmem;
+pub mod varpoi;

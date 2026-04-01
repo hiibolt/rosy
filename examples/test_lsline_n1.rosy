@@ -1,0 +1,14 @@
+{ Test LSLINE with n=1 single point — degenerate case: n=1 means denom = 1*x1^2 - x1^2 = 0 }
+BEGIN;
+    VARIABLE (VE) X;
+    VARIABLE (VE) Y;
+    VARIABLE (RE) N;
+    VARIABLE (RE) A;
+    VARIABLE (RE) B;
+    X := 3&99;
+    Y := 7&99;
+    N := 1;
+    LSLINE X Y N A B;
+    WRITE 6 A;
+    WRITE 6 B;
+END;

@@ -24,6 +24,8 @@ statement   = _{
   | ploop
   | procedure
   | ranseed
+  | writem
+  | readm
   | procedure_call
   | if_statement
   | break_statement
@@ -69,7 +71,13 @@ statement   = _{
   | imunit
   | lev
   | mblock
-  | mtree }
+  | mtree
+  | sleepm
+  | argget
+  | memdpv
+  | memfre
+  | lsline
+  | rkco }
 
 /// BREAK
 break_statement = { ^"BREAK" ~ semicolon }
@@ -98,7 +106,7 @@ memory_size = { expr }
 
 /// Keywords - define all reserved words (must be followed by a non-identifier character)
 keyword = @{ keyword_raw ~ !(ASCII_ALPHANUMERIC | "_") }
-keyword_raw = { ^"ENDPROCEDURE" | ^"ENDFUNCTION" | ^"ENDWHILE" | ^"ENDLOOP" | ^"ENDPLOOP" | ^"ENDFIT" | ^"ENDIF" | ^"ELSEIF" | ^"ELSE" | ^"BEGIN" | ^"END" | ^"WRITEB" | ^"WRITE" | ^"READB" | ^"READ" | ^"VARIABLE" | ^"PROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"WHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"DANOT" | ^"DAEPS" | ^"DATRN" | ^"DASCL" | ^"DASGN" | ^"DADER" | ^"DAINT" | ^"DANORO" | ^"DANORS" | ^"DAREA" | ^"DAPEW" | ^"DAPEE" | ^"DAPEA" | ^"DAPEP" | ^"DAEST" | ^"DAPLU" | ^"DADIU" | ^"DADMU" | ^"DACLIW" | ^"DACQLC" | ^"LENGTH" | ^"SINH" | ^"SIN" | ^"COSH" | ^"COS" | ^"ASIN" | ^"ACOS" | ^"ATAN" | ^"TANH" | ^"SQRT" | ^"SQR" | ^"VMAX" | ^"VMIN" | ^"ABS" | ^"NORM" | ^"CONS" | ^"INT" | ^"NINT" | ^"TYPE" | ^"REAL" | ^"IMAG" | ^"TRIM" | ^"LTRIM" | ^"ISRT3" | ^"ISRT" | ^"CMPLX" | ^"CONJ" | ^"LST" | ^"LCM" | ^"LCD" | ^"LOG" | ^"BREAK" | ^"QUIT" | ^"SCRLEN" | ^"CPUSEC" | ^"OS" | ^"LINV" | ^"LDET" | ^"SUBSTR" | ^"VELSET" | ^"VELGET" | ^"POLVAL" | ^"VEDOT" | ^"VEUNIT" | ^"VEZERO" | ^"STCRE" | ^"RECST" | ^"RERAN" | ^"PWTIME" | ^"PNPRO" | ^"IMUNIT" | ^"LEV" | ^"MBLOCK" | ^"MTREE" | ^"FIT" | ^"OPENFB" | ^"OPENF" | ^"CLOSEF" | ^"FUNCTION" | ^"LOOP" | ^"PLOOP" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
+keyword_raw = { ^"ENDPROCEDURE" | ^"ENDFUNCTION" | ^"ENDWHILE" | ^"ENDLOOP" | ^"ENDPLOOP" | ^"ENDFIT" | ^"ENDIF" | ^"ELSEIF" | ^"ELSE" | ^"BEGIN" | ^"END" | ^"WRITEB" | ^"WRITE" | ^"READB" | ^"READ" | ^"VARIABLE" | ^"PROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"WHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"DANOT" | ^"DAEPS" | ^"DATRN" | ^"DASCL" | ^"DASGN" | ^"DADER" | ^"DAINT" | ^"DANORO" | ^"DANORS" | ^"DAREA" | ^"DAPEW" | ^"DAPEE" | ^"DAPEA" | ^"DAPEP" | ^"DAEST" | ^"DAPLU" | ^"DADIU" | ^"DADMU" | ^"DACLIW" | ^"DACQLC" | ^"LENGTH" | ^"SINH" | ^"SIN" | ^"COSH" | ^"COS" | ^"ASIN" | ^"ACOS" | ^"ATAN" | ^"TANH" | ^"SQRT" | ^"SQR" | ^"VMAX" | ^"VMIN" | ^"ABS" | ^"NORM" | ^"CONS" | ^"INT" | ^"NINT" | ^"TYPE" | ^"REAL" | ^"IMAG" | ^"TRIM" | ^"LTRIM" | ^"ISRT3" | ^"ISRT" | ^"CMPLX" | ^"CONJ" | ^"LST" | ^"LCM" | ^"LCD" | ^"LRE" | ^"LLO" | ^"LVE" | ^"LDA" | ^"LOG" | ^"BREAK" | ^"QUIT" | ^"SCRLEN" | ^"CPUSEC" | ^"OS" | ^"LINV" | ^"LDET" | ^"SUBSTR" | ^"VELSET" | ^"VELGET" | ^"POLVAL" | ^"VEDOT" | ^"VEUNIT" | ^"VEZERO" | ^"STCRE" | ^"RECST" | ^"RERAN" | ^"PWTIME" | ^"PNPRO" | ^"IMUNIT" | ^"LEV" | ^"MBLOCK" | ^"MTREE" | ^"LSLINE" | ^"RKCO" | ^"WRITEM" | ^"READM" | ^"ERF" | ^"WERF" | ^"FIT" | ^"OPENFB" | ^"OPENF" | ^"CLOSEF" | ^"FUNCTION" | ^"LOOP" | ^"PLOOP" | ^"VARMEM" | ^"VARPOI" | ^"SLEEPM" | ^"ARGGET" | ^"MEMDPV" | ^"MEMFRE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
 
 /// [ IF / ELSEIF / ELSE / ENDIF ]
 if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
@@ -155,7 +163,7 @@ endif = { ^"ENDIF" ~ semicolon }
   end_fit = { ^"ENDFIT" ~ expr ~ expr ~ expr ~ variable_name+ ~ semicolon }
 
 /// [ INTRINSIC FUNCTIONS ]
-  builtin_function = _{ cm | st | lo | da | cd_intrinsic | length | sin | cos_fn | asin_fn | acos_fn | atan_fn | sinh_fn | cosh_fn | tanh_fn | sqrt_fn | sqr | exp_fn | log_fn | tan_fn | vmax | vmin | abs_fn | norm_fn | cons_fn | int_fn | nint_fn | type_fn | real_fn | imag_fn | re_fn | ve_fn | trim_fn | ltrim_fn | isrt3_fn | isrt_fn | cmplx_fn | conj_fn | lst | lcm | lcd }
+  builtin_function = _{ cm | st | lo | da | cd_intrinsic | length | varmem | varpoi | sin | cos_fn | asin_fn | acos_fn | atan_fn | sinh_fn | cosh_fn | tanh_fn | sqrt_fn | sqr | exp_fn | log_fn | tan_fn | vmax | vmin | abs_fn | norm_fn | cons_fn | int_fn | nint_fn | type_fn | real_fn | imag_fn | re_fn | ve_fn | trim_fn | ltrim_fn | isrt3_fn | isrt_fn | cmplx_fn | conj_fn | lst | lcm | lcd | lre | llo | lve | lda | werf_fn | erf_fn }
   /// CM
   cm = { ^"CM" ~ "(" ~ expr ~ ")" }
   /// ST - String conversion
@@ -236,6 +244,22 @@ endif = { ^"ENDIF" ~ semicolon }
   lcm = { ^"LCM" ~ "(" ~ expr ~ ")" }
   /// LCD - DA memory size estimator (compatibility)
   lcd = { ^"LCD" ~ "(" ~ expr ~ ")" }
+  /// LRE - Real memory size estimator (compatibility)
+  lre = { ^"LRE" ~ "(" ~ expr ~ ")" }
+  /// LLO - Logical memory size estimator (compatibility)
+  llo = { ^"LLO" ~ "(" ~ expr ~ ")" }
+  /// LVE - Vector memory size estimator (compatibility)
+  lve = { ^"LVE" ~ "(" ~ expr ~ ")" }
+  /// LDA - DA memory size estimator (compatibility)
+  lda = { ^"LDA" ~ "(" ~ expr ~ ")" }
+  /// WERF - Faddeeva function w(z) = exp(-z^2)*erfc(-iz) -- must appear before ERF
+  werf_fn = { ^"WERF" ~ "(" ~ expr ~ ")" }
+  /// ERF - Real error function erf(x)
+  erf_fn = { ^"ERF" ~ "(" ~ expr ~ ")" }
+  /// VARMEM - Memory address of an object
+  varmem = { ^"VARMEM" ~ "(" ~ expr ~ ")" }
+  /// VARPOI - Pointer address of an object
+  varpoi = { ^"VARPOI" ~ "(" ~ expr ~ ")" }
 
 /// [ INTRINSIC PROCEDURES ]
   /// [ DA ]
@@ -295,6 +319,19 @@ endif = { ^"ENDIF" ~ semicolon }
   mblock = { ^"MBLOCK" ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   /// [ DA EVALUATION ]
   mtree = { ^"MTREE" ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  /// [ SYSTEM UTILITIES ]
+  sleepm = { ^"SLEEPM" ~ expr ~ semicolon }
+  argget = { ^"ARGGET" ~ expr ~ variable_identifier ~ semicolon }
+  memdpv = { ^"MEMDPV" ~ expr ~ expr ~ semicolon }
+  memfre = { ^"MEMFRE" ~ variable_identifier ~ semicolon }
+  /// [ NUMERICAL / INTEGRATION ]
+  lsline = { ^"LSLINE" ~ expr ~ expr ~ expr ~ variable_identifier ~ variable_identifier ~ semicolon }
+  rkco = { ^"RKCO" ~ variable_identifier ~ variable_identifier ~ variable_identifier ~ variable_identifier ~ variable_identifier ~ semicolon }
+  /// [ MEMORY SERIALIZATION ]
+  /// WRITEM( c v c v v v ) — serialize variable into arrays
+  writem = { ^"WRITEM" ~ expr ~ variable_identifier ~ expr ~ variable_identifier ~ variable_identifier ~ variable_identifier ~ semicolon }
+  /// READM( v c c c c c ) — deserialize variable from arrays
+  readm = { ^"READM" ~ variable_identifier ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
 /// [ INTRINSIC TYPES ]
   type = { "(" ~ inner_type ~ expr* ~ ")"}
   inner_type = {
