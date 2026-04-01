@@ -59,7 +59,7 @@ impl RosyExtract<&RE> for &ST {
     type Output = ST;
     
     fn rosy_extract(self, index: &RE) -> Result<Self::Output> {
-        let idx = *index as usize;
+        let idx = index.round() as usize;
         if idx == 0 || idx > self.len() {
             bail!("String index {} out of bounds (1-{})", idx, self.len());
         }
@@ -81,9 +81,9 @@ impl RosyExtract<&VE> for &ST {
             bail!("String extraction with vector index requires exactly two elements (start and end)");
         }
         
-        let start = index[0] as usize;
-        let end = index[1] as usize;
-        
+        let start = index[0].round() as usize;
+        let end = index[1].round() as usize;
+
         if start == 0 || end == 0 || start > self.len() || end > self.len() || start > end {
             bail!("String index range {}-{} out of bounds (1-{})", start, end, self.len());
         }
@@ -113,7 +113,7 @@ impl RosyExtract<&RE> for &VE {
     type Output = RE;
     
     fn rosy_extract(self, index: &RE) -> Result<Self::Output> {
-        let idx = *index as usize;
+        let idx = index.round() as usize;
         if idx == 0 || idx > self.len() {
             bail!("Vector index {} out of bounds (1-{})", idx, self.len());
         }
@@ -132,9 +132,9 @@ impl RosyExtract<&VE> for &VE {
             bail!("Vector extraction with vector index requires exactly two elements (start and end)");
         }
         
-        let start = index[0] as usize;
-        let end = index[1] as usize;
-        
+        let start = index[0].round() as usize;
+        let end = index[1].round() as usize;
+
         if start == 0 || end == 0 || start > self.len() || end > self.len() || start > end {
             bail!("Vector index range {}-{} out of bounds (1-{})", start, end, self.len());
         }

@@ -42,6 +42,30 @@ pub use core::*;
 pub use mpi::*;
 
 pub use taylor::{DA, CD};
+/// Immutable 1-based index. Returns `&T`.
+/// Rounds the float index to nearest integer (matching COSY INFINITY's NINT),
+/// then validates bounds with a 1-based error message.
+#[inline(always)]
+pub fn rosy_get<'a, T, C: AsRef<[T]>>(container: &'a C, one_based: f64, var_name: &str) -> &'a T {
+    let slice = container.as_ref();
+    let idx = one_based.round() as usize;
+    slice.get(idx.wrapping_sub(1)).unwrap_or_else(|| {
+        panic!("Index {} into '{}' is out of bounds (1-{})", idx, var_name, slice.len())
+    })
+}
+
+/// Mutable 1-based index. Returns `&mut T`.
+/// Same rounding and bounds checking as [`rosy_get`].
+#[inline(always)]
+pub fn rosy_get_mut<'a, T, C: AsMut<[T]>>(container: &'a mut C, one_based: f64, var_name: &str) -> &'a mut T {
+    let slice = container.as_mut();
+    let len = slice.len();
+    let idx = one_based.round() as usize;
+    slice.get_mut(idx.wrapping_sub(1)).unwrap_or_else(|| {
+        panic!("Index {} into '{}' is out of bounds (1-{})", idx, var_name, len)
+    })
+}
+
 pub type RE = f64;
 pub type ST = String;
 pub type LO = bool;

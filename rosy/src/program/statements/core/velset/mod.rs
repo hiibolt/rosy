@@ -161,12 +161,23 @@ impl Transpile for VelsetStatement {
         requested_variables.extend(value_output.requested_variables.iter().cloned());
 
         // COSY uses 1-indexed components; convert to 0-indexed for Rust.
-        // vec_name is a plain variable name so it can be used as a mutable l-value directly.
+        // Local scope: owned Vec, needs &mut to borrow mutably.
+        // Arg/Higher scope: already &mut Vec, pass directly (auto-reborrows).
+        let var_scope = context
+            .variables
+            .get(&self.vector_ident.name)
+            .map(|v| v.scope.clone())
+            .unwrap_or(VariableScope::Local);
+        let mut_ref = match var_scope {
+            VariableScope::Local => format!("&mut {}", vec_name),
+            VariableScope::Arg | VariableScope::Higher => vec_name.clone(),
+        };
         let serialization = format!(
-            "{{ let __velset_idx = ({} as usize).checked_sub(1).expect(\"VELSET component index must be >= 1\"); {}[__velset_idx] = {}; }}",
-            component_output.as_value(),
-            vec_name,
-            value_output.as_value(),
+            "*rosy_get_mut({mut_ref}, {comp}, \"{vec_name}\") = {val};",
+            mut_ref = mut_ref,
+            comp = component_output.as_value(),
+            vec_name = vec_name,
+            val = value_output.as_value(),
         );
 
         Ok(TranspilationOutput {

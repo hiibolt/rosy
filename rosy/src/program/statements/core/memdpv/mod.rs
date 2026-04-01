@@ -15,19 +15,19 @@
 //! to stderr regardless of the unit number.
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
 //! ## COSY Example
-//! ```
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -61,12 +61,17 @@ impl FromRule for MemdpvStatement {
             .context("Failed to build unit expression in MEMDPV")?
             .ok_or_else(|| anyhow::anyhow!("Expected unit expression in MEMDPV"))?;
 
-        let var_pair = inner.next().context("Missing variable expression in MEMDPV!")?;
+        let var_pair = inner
+            .next()
+            .context("Missing variable expression in MEMDPV!")?;
         let var_expr = Expr::from_rule(var_pair)
             .context("Failed to build variable expression in MEMDPV")?
             .ok_or_else(|| anyhow::anyhow!("Expected variable expression in MEMDPV"))?;
 
-        Ok(Some(MemdpvStatement { unit_expr, var_expr }))
+        Ok(Some(MemdpvStatement {
+            unit_expr,
+            var_expr,
+        }))
     }
 }
 impl TranspileableStatement for MemdpvStatement {

@@ -555,8 +555,8 @@ impl Transpile for AssignStatement {
             value_output.as_owned(&variable_type)
         };
 
-        // Serialize the entire function
-        let dereference = match context
+        // Serialize the entire assignment
+        let var_scope = context
             .variables
             .get(&self.identifier.name)
             .ok_or(vec![anyhow::anyhow!(
@@ -564,23 +564,56 @@ impl Transpile for AssignStatement {
                 self.identifier.name
             )])?
             .scope
-        {
+            .clone();
+        let dereference = match var_scope {
             VariableScope::Local => "",
             VariableScope::Arg => "*",
             VariableScope::Higher => {
-                // Also add to requested variables
                 requested_variables.insert(self.identifier.name.clone());
                 "*"
             }
         };
-        let serialization = if !dereference.is_empty() && self.identifier.num_index_dimensions() > 0
-        {
-            // (*NAME)[indices] instead of *NAME[indices]
-            let index_suffix = &serialized_identifier[self.identifier.name.len()..];
-            format!(
-                "({}{}){} = {};",
-                dereference, self.identifier.name, index_suffix, serialized_value
-            )
+
+        let num_indices = self.identifier.num_index_dimensions();
+        let serialization = if num_indices > 0 {
+            // Indexed assignment: build a rosy_get_mut() chain.
+            // The mutable borrow is passed into the function, avoiding
+            // borrow-checker conflicts with container[expr_that_borrows_container].
+            let flat = self.identifier.flat_indices();
+            let mut idx_exprs = Vec::new();
+            for index_expr in flat.iter() {
+                match index_expr.transpile(context) {
+                    Ok(output) => {
+                        requested_variables.extend(output.requested_variables.iter().cloned());
+                        idx_exprs.push(output.as_value());
+                    }
+                    Err(vec_err) => {
+                        for err in vec_err {
+                            errors.push(err.context(format!(
+                                "...while transpiling index expression for assignment to '{}'",
+                                self.identifier.name
+                            )));
+                        }
+                    }
+                }
+            }
+            // Build nested rosy_get_mut(container, idx, "name") calls.
+            // Local scope: owned value, needs &mut to borrow mutably.
+            // Arg/Higher scope: already &mut T, pass directly (auto-reborrows).
+            let mut_ref = match var_scope {
+                VariableScope::Local => format!("&mut {}", self.identifier.name),
+                VariableScope::Arg | VariableScope::Higher => self.identifier.name.clone(),
+            };
+            let mut result = mut_ref;
+            for idx_expr in &idx_exprs {
+                result = format!(
+                    "rosy_get_mut({result}, {expr}, \"{name}\")",
+                    result = result,
+                    expr = idx_expr,
+                    name = self.identifier.name,
+                );
+            }
+            format!("*{} = {};", result, serialized_value)
         } else {
             format!(
                 "{}{} = {};",

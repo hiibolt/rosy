@@ -210,11 +210,14 @@ impl Transpile for VariableIdentifier {
         })?;
 
         // Serialize the indices
-        let mut serialized_indicies = String::new();
         let mut requested_variables = BTreeSet::new();
         let mut errors = Vec::new();
 
+        // Collect all transpiled index expressions first so we can
+        // build bounds-checked access for each dimension.
         let flat = self.flat_indices();
+        let mut transpiled_indices: Vec<String> = Vec::new();
+
         for (i, index_expr) in flat.iter().enumerate() {
             let i = i + 1;
             let name = &self.name;
@@ -235,8 +238,7 @@ impl Transpile for VariableIdentifier {
             // Transpile it
             match index_expr.transpile(context) {
                 Ok(output) => {
-                    serialized_indicies
-                        .push_str(&format!("[({} - 1.0f64) as usize]", output.as_value()));
+                    transpiled_indices.push(output.as_value());
                     requested_variables.extend(output.requested_variables);
                 }
                 Err(vec_err) => {
@@ -263,7 +265,23 @@ impl Transpile for VariableIdentifier {
         {
             requested_variables.insert(self.name.clone());
         }
-        let serialization = format!("{}{}", self.name, serialized_indicies);
+
+        // Build the serialization: either bare name (no indices) or
+        // nested rosy_get() calls that return &T with 1-based bounds checking.
+        let serialization = if transpiled_indices.is_empty() {
+            self.name.clone()
+        } else {
+            let mut result = format!("&{}", self.name);
+            for idx_expr in &transpiled_indices {
+                result = format!(
+                    "rosy_get({result}, {expr}, \"{name}\")",
+                    result = result,
+                    expr = idx_expr,
+                    name = self.name,
+                );
+            }
+            result
+        };
         if errors.is_empty() {
             Ok(TranspilationOutput {
                 serialization,
