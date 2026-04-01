@@ -17,19 +17,19 @@
 //! > and writes to a separate output variable. Rosy's form is in-place `(da_var, index)`.
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -41,15 +41,15 @@ use crate::{
     program::{expressions::Expr, statements::SourceLocation},
     resolve::{ScopeContext, TypeResolver},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        TypeslotDeclarationResult, InferenceEdgeResult, TypeHydrationResult, add_context_to_all,
+        InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, add_context_to_all,
     },
 };
 
 /// AST node for `DAINT da_var var_index;`.
 #[derive(Debug)]
 pub struct DaintStatement {
-    pub da_expr:    Expr,
+    pub da_expr: Expr,
     pub index_expr: Expr,
 }
 
@@ -68,12 +68,17 @@ impl FromRule for DaintStatement {
             .context("Failed to build da_var expression in DAINT")?
             .ok_or_else(|| anyhow::anyhow!("Expected da_var expression in DAINT"))?;
 
-        let index_pair = inner.next().context("Missing var_index parameter in DAINT!")?;
+        let index_pair = inner
+            .next()
+            .context("Missing var_index parameter in DAINT!")?;
         let index_expr = Expr::from_rule(index_pair)
             .context("Failed to build var_index expression in DAINT")?
             .ok_or_else(|| anyhow::anyhow!("Expected var_index expression in DAINT"))?;
 
-        Ok(Some(DaintStatement { da_expr, index_expr }))
+        Ok(Some(DaintStatement {
+            da_expr,
+            index_expr,
+        }))
     }
 }
 
@@ -120,7 +125,10 @@ impl Transpile for DaintStatement {
         })?;
         requested_variables.extend(index_output.requested_variables.iter().cloned());
 
-        let da_mut = da_output.as_ref().replace("&mut ", "").replace("&", "&mut ");
+        let da_mut = da_output
+            .as_ref()
+            .replace("&mut ", "")
+            .replace("&", "&mut ");
 
         let serialization = format!(
             "rosy_lib::core::da_ops::rosy_daint({}, {} as usize)?;",

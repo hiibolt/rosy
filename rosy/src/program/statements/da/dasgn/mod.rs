@@ -16,19 +16,19 @@
 //! > It takes 4 arguments `(DA, Ns, signs_out, result)`. Rosy's form negates all coefficients.
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -39,8 +39,8 @@ use crate::{
     program::{expressions::Expr, statements::SourceLocation},
     resolve::{ScopeContext, TypeResolver},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        TypeslotDeclarationResult, InferenceEdgeResult, TypeHydrationResult, add_context_to_all,
+        InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, add_context_to_all,
     },
 };
 
@@ -104,12 +104,12 @@ impl Transpile for DasgnStatement {
             add_context_to_all(e, "...while transpiling da_var in DASGN".to_string())
         })?;
 
-        let da_mut = da_output.as_ref().replace("&mut ", "").replace("&", "&mut ");
+        let da_mut = da_output
+            .as_ref()
+            .replace("&mut ", "")
+            .replace("&", "&mut ");
 
-        let serialization = format!(
-            "rosy_lib::core::da_ops::rosy_dasgn({})?;",
-            da_mut,
-        );
+        let serialization = format!("rosy_lib::core::da_ops::rosy_dasgn({})?;", da_mut,);
 
         Ok(TranspilationOutput {
             serialization,

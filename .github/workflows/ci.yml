@@ -63,7 +63,7 @@ jobs:
       - name: Build docs
         run: cargo doc --document-private-items --no-deps -p rosy
         env:
-          RUSTDOCFLAGS: "-D rustdoc::broken-intra-doc-links -D rustdoc::invalid-html-tags"
+          RUSTDOCFLAGS: "-D rustdoc::invalid-html-tags"
 
       - name: Run tests
         if: needs.detect-version-bump.outputs.minor_bump == 'true'

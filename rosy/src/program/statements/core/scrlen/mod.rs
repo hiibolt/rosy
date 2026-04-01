@@ -14,19 +14,19 @@
 //! SCRLEN is accepted for COSY compatibility but is a no-op.
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 

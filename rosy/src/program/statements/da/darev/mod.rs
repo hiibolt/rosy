@@ -10,22 +10,22 @@
 //! ```
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
 //! ## COSY Example
 //!
 //! > **COSY note**: COSY's `DAREV` requires exactly 5 map components (hardcoded limit)
 //! > and the output array must be pre-initialized as DA type before calling.
-//! ```
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -37,8 +37,8 @@ use crate::{
     program::{expressions::Expr, statements::SourceLocation},
     resolve::{ScopeContext, TypeResolver},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        TypeslotDeclarationResult, InferenceEdgeResult, TypeHydrationResult, add_context_to_all,
+        InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, add_context_to_all,
     },
 };
 

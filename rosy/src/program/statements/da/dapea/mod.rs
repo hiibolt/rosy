@@ -10,19 +10,19 @@
 //! ```
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -34,8 +34,8 @@ use crate::{
     program::{expressions::Expr, statements::SourceLocation},
     resolve::{ScopeContext, TypeResolver},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        TypeslotDeclarationResult, InferenceEdgeResult, TypeHydrationResult, add_context_to_all,
+        InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, add_context_to_all,
     },
 };
 
@@ -148,7 +148,10 @@ impl Transpile for DapeaStatement {
             da_var_output.as_ref(),
             exps_array_output.as_ref(),
             size_output.as_value(),
-            result_output.as_ref().replace("&mut ", "").replace("&", "&mut "),
+            result_output
+                .as_ref()
+                .replace("&mut ", "")
+                .replace("&", "&mut "),
         );
 
         Ok(TranspilationOutput {

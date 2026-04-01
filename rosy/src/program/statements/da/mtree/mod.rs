@@ -17,22 +17,22 @@
 //! - `tree_length` — variable for total tree length (RE)
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
 //! ## COSY Example
 //!
 //! > **COSY note**: In COSY INFINITY, `MTREE` requires the DA array to be declared
 //! > as a 2D variable `VARIABLE MAP 2000 N;` and accessed as `MAP(i)`.
-//! ```
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -44,8 +44,8 @@ use crate::{
     program::{expressions::Expr, statements::SourceLocation},
     resolve::{ScopeContext, TypeResolver},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        TypeslotDeclarationResult, InferenceEdgeResult, TypeHydrationResult, ValueKind,
+        InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, ValueKind,
         add_context_to_all,
     },
 };

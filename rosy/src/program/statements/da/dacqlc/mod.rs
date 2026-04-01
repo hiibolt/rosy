@@ -17,19 +17,19 @@
 //! 5. `constant` (RE, write)          - scalar constant c
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -41,8 +41,8 @@ use crate::{
     program::{expressions::Expr, statements::SourceLocation},
     resolve::{ScopeContext, TypeResolver},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        TypeslotDeclarationResult, InferenceEdgeResult, TypeHydrationResult, add_context_to_all,
+        InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, add_context_to_all,
     },
 };
 
@@ -76,17 +76,23 @@ impl FromRule for DacqlcStatement {
             .context("Failed to build n expression in DACQLC")?
             .ok_or_else(|| anyhow::anyhow!("Expected n expression in DACQLC"))?;
 
-        let hessian_pair = inner.next().context("Missing hessian parameter in DACQLC!")?;
+        let hessian_pair = inner
+            .next()
+            .context("Missing hessian parameter in DACQLC!")?;
         let hessian_expr = Expr::from_rule(hessian_pair)
             .context("Failed to build hessian expression in DACQLC")?
             .ok_or_else(|| anyhow::anyhow!("Expected hessian expression in DACQLC"))?;
 
-        let linear_pair = inner.next().context("Missing linear parameter in DACQLC!")?;
+        let linear_pair = inner
+            .next()
+            .context("Missing linear parameter in DACQLC!")?;
         let linear_expr = Expr::from_rule(linear_pair)
             .context("Failed to build linear expression in DACQLC")?
             .ok_or_else(|| anyhow::anyhow!("Expected linear expression in DACQLC"))?;
 
-        let constant_pair = inner.next().context("Missing constant parameter in DACQLC!")?;
+        let constant_pair = inner
+            .next()
+            .context("Missing constant parameter in DACQLC!")?;
         let constant_expr = Expr::from_rule(constant_pair)
             .context("Failed to build constant expression in DACQLC")?
             .ok_or_else(|| anyhow::anyhow!("Expected constant expression in DACQLC"))?;
@@ -134,14 +140,16 @@ impl Transpile for DacqlcStatement {
     ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
 
-        let da_output = self.da_expr.transpile(context).map_err(|e| {
-            add_context_to_all(e, "...while transpiling da in DACQLC".to_string())
-        })?;
+        let da_output = self
+            .da_expr
+            .transpile(context)
+            .map_err(|e| add_context_to_all(e, "...while transpiling da in DACQLC".to_string()))?;
         requested_variables.extend(da_output.requested_variables.iter().cloned());
 
-        let n_output = self.n_expr.transpile(context).map_err(|e| {
-            add_context_to_all(e, "...while transpiling n in DACQLC".to_string())
-        })?;
+        let n_output = self
+            .n_expr
+            .transpile(context)
+            .map_err(|e| add_context_to_all(e, "...while transpiling n in DACQLC".to_string()))?;
         requested_variables.extend(n_output.requested_variables.iter().cloned());
 
         let hessian_output = self.hessian_expr.transpile(context).map_err(|e| {

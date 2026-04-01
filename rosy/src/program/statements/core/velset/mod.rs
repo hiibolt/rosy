@@ -13,19 +13,19 @@
 //! - `value`     — RE expression for the value to assign
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -109,9 +109,11 @@ impl TranspileableStatement for VelsetStatement {
             )) };
         }
         if let Err(e) = resolver.discover_expr_function_calls(&self.value_expr, ctx) {
-            return InferenceEdgeResult::HasEdges { result: Err(e.context(
-                "...while discovering function call dependencies in VELSET value expression",
-            )) };
+            return InferenceEdgeResult::HasEdges {
+                result: Err(e.context(
+                    "...while discovering function call dependencies in VELSET value expression",
+                )),
+            };
         }
         InferenceEdgeResult::HasEdges { result: Ok(()) }
     }

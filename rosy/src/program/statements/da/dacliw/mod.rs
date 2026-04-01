@@ -15,19 +15,19 @@
 //! 3. `linear` (VE, write)        - output array of n linear coefficients
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -39,8 +39,8 @@ use crate::{
     program::{expressions::Expr, statements::SourceLocation},
     resolve::{ScopeContext, TypeResolver},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        TypeslotDeclarationResult, InferenceEdgeResult, TypeHydrationResult, add_context_to_all,
+        InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, add_context_to_all,
     },
 };
 
@@ -72,7 +72,9 @@ impl FromRule for DacliwStatement {
             .context("Failed to build n expression in DACLIW")?
             .ok_or_else(|| anyhow::anyhow!("Expected n expression in DACLIW"))?;
 
-        let linear_pair = inner.next().context("Missing linear parameter in DACLIW!")?;
+        let linear_pair = inner
+            .next()
+            .context("Missing linear parameter in DACLIW!")?;
         let linear_expr = Expr::from_rule(linear_pair)
             .context("Failed to build linear expression in DACLIW")?
             .ok_or_else(|| anyhow::anyhow!("Expected linear expression in DACLIW"))?;
@@ -118,14 +120,16 @@ impl Transpile for DacliwStatement {
     ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
 
-        let da_output = self.da_expr.transpile(context).map_err(|e| {
-            add_context_to_all(e, "...while transpiling da in DACLIW".to_string())
-        })?;
+        let da_output = self
+            .da_expr
+            .transpile(context)
+            .map_err(|e| add_context_to_all(e, "...while transpiling da in DACLIW".to_string()))?;
         requested_variables.extend(da_output.requested_variables.iter().cloned());
 
-        let n_output = self.n_expr.transpile(context).map_err(|e| {
-            add_context_to_all(e, "...while transpiling n in DACLIW".to_string())
-        })?;
+        let n_output = self
+            .n_expr
+            .transpile(context)
+            .map_err(|e| add_context_to_all(e, "...while transpiling n in DACLIW".to_string()))?;
         requested_variables.extend(n_output.requested_variables.iter().cloned());
 
         let linear_output = self.linear_expr.transpile(context).map_err(|e| {

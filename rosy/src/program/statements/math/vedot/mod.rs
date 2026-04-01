@@ -13,19 +13,19 @@
 //! - `result` — variable that receives the RE dot product
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -34,11 +34,14 @@ use std::collections::BTreeSet;
 
 use crate::{
     ast::*,
-    program::{expressions::{Expr, core::variable_identifier::VariableIdentifier}, statements::SourceLocation},
+    program::{
+        expressions::{Expr, core::variable_identifier::VariableIdentifier},
+        statements::SourceLocation,
+    },
     resolve::{ScopeContext, TypeResolver},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        TypeslotDeclarationResult, InferenceEdgeResult, TypeHydrationResult, VariableScope,
+        InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, VariableScope,
         add_context_to_all,
     },
 };

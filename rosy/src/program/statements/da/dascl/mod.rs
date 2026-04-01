@@ -17,19 +17,19 @@
 //! > Rosy's form scales **all coefficients** in place with 2 arguments.
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -41,15 +41,15 @@ use crate::{
     program::{expressions::Expr, statements::SourceLocation},
     resolve::{ScopeContext, TypeResolver},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        TypeslotDeclarationResult, InferenceEdgeResult, TypeHydrationResult, add_context_to_all,
+        InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, add_context_to_all,
     },
 };
 
 /// AST node for `DASCL da_var scalar;`.
 #[derive(Debug)]
 pub struct DasclStatement {
-    pub da_expr:     Expr,
+    pub da_expr: Expr,
     pub scalar_expr: Expr,
 }
 
@@ -73,7 +73,10 @@ impl FromRule for DasclStatement {
             .context("Failed to build scalar expression in DASCL")?
             .ok_or_else(|| anyhow::anyhow!("Expected scalar expression in DASCL"))?;
 
-        Ok(Some(DasclStatement { da_expr, scalar_expr }))
+        Ok(Some(DasclStatement {
+            da_expr,
+            scalar_expr,
+        }))
     }
 }
 
@@ -120,7 +123,10 @@ impl Transpile for DasclStatement {
         })?;
         requested_variables.extend(scalar_output.requested_variables.iter().cloned());
 
-        let da_mut = da_output.as_ref().replace("&mut ", "").replace("&", "&mut ");
+        let da_mut = da_output
+            .as_ref()
+            .replace("&mut ", "")
+            .replace("&", "&mut ");
 
         let serialization = format!(
             "rosy_lib::core::da_ops::rosy_dascl({}, {} as f64)?;",

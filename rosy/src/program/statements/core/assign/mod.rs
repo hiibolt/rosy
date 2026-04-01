@@ -16,19 +16,19 @@
 //! variable. Indexed assignments check that the resulting element type matches.
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -114,9 +114,11 @@ impl TranspileableStatement for AssignStatement {
 
         // Discover function call sites within the RHS expression
         if let Err(e) = resolver.discover_expr_function_calls(value, ctx) {
-            return InferenceEdgeResult::HasEdges { result: Err(e.context(
-                "...while discovering function call dependencies in assignment statement",
-            )) };
+            return InferenceEdgeResult::HasEdges {
+                result: Err(e.context(
+                    "...while discovering function call dependencies in assignment statement",
+                )),
+            };
         }
 
         let var_name = &self.identifier.name;
@@ -184,8 +186,9 @@ impl TranspileableStatement for AssignStatement {
                                 String::new()
                             }
                         };
-                        return InferenceEdgeResult::HasEdges { result: Err(anyhow!(
-                            "\n╭─ Type Conflict ──────────────────────────────────────────\n\
+                        return InferenceEdgeResult::HasEdges {
+                            result: Err(anyhow!(
+                                "\n╭─ Type Conflict ──────────────────────────────────────────\n\
                                 │\n\
                                 │  Variable '{}' (in {}) is declared as {} but is\n\
                                 │  assigned a value of type {}.{}{}\n\
@@ -195,18 +198,19 @@ impl TranspileableStatement for AssignStatement {
                                 │     • Split into separate variables: {}_{:?}  and  {}_{:?}\n\
                                 │{}\n\
                                 ╰──────────────────────────────────────────────────────────",
-                            var_name,
-                            scope_str,
-                            explicit_type,
-                            new_type,
-                            decl_hint,
-                            assign_hint,
-                            var_name,
-                            explicit_type.base_type,
-                            var_name,
-                            new_type.base_type,
-                            ve_hint,
-                        )) };
+                                var_name,
+                                scope_str,
+                                explicit_type,
+                                new_type,
+                                decl_hint,
+                                assign_hint,
+                                var_name,
+                                explicit_type.base_type,
+                                var_name,
+                                new_type.base_type,
+                                ve_hint,
+                            )),
+                        };
                     }
                 }
                 return InferenceEdgeResult::HasEdges { result: Ok(()) }; // already has explicit type, no inference needed
@@ -349,8 +353,9 @@ impl TranspileableStatement for AssignStatement {
                             .unwrap_or_default();
                         let second_assign_hint =
                             format!("\n│  📍 Then assigned at:   {}", source_location);
-                        return InferenceEdgeResult::HasEdges { result: Err(anyhow!(
-                            "\n╭─ Type Conflict ──────────────────────────────────────────\n\
+                        return InferenceEdgeResult::HasEdges {
+                            result: Err(anyhow!(
+                                "\n╭─ Type Conflict ──────────────────────────────────────────\n\
                                 │\n\
                                 │  Variable '{}' (in {}) is assigned conflicting types:\n\
                                 │     • First inferred as:  {}\n\
@@ -363,19 +368,20 @@ impl TranspileableStatement for AssignStatement {
                                 │     • Split into separate variables: {}_{:?}  and  {}_{:?}\n\
                                 │\n\
                                 ╰──────────────────────────────────────────────────────────",
-                            var_name,
-                            scope_str,
-                            old_type,
-                            new_type,
-                            first_assign_hint,
-                            second_assign_hint,
-                            old_type.base_type,
-                            var_name,
-                            var_name,
-                            old_type.base_type,
-                            var_name,
-                            new_type.base_type,
-                        )) };
+                                var_name,
+                                scope_str,
+                                old_type,
+                                new_type,
+                                first_assign_hint,
+                                second_assign_hint,
+                                old_type.base_type,
+                                var_name,
+                                var_name,
+                                old_type.base_type,
+                                var_name,
+                                new_type.base_type,
+                            )),
+                        };
                     }
                 }
             }

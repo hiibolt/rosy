@@ -9,19 +9,19 @@
 //! ```
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -31,13 +31,12 @@ use std::collections::BTreeSet;
 use crate::{
     ast::*,
     program::{
-        expressions::core::variable_identifier::VariableIdentifier,
-        statements::SourceLocation,
+        expressions::core::variable_identifier::VariableIdentifier, statements::SourceLocation,
     },
     resolve::{ScopeContext, TypeResolver},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableExpr,
-        TranspileableStatement, TypeslotDeclarationResult, InferenceEdgeResult, TypeHydrationResult,
+        InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableExpr, TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult,
     },
 };
 

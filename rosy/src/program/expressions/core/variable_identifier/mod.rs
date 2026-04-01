@@ -17,19 +17,19 @@
 //! by [`super::var_expr::VarExpr::classify`].
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -37,11 +37,11 @@ use std::collections::BTreeSet;
 
 use crate::ast::Rule;
 use crate::program::expressions::Expr;
-use crate::rosy_lib::RosyType;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
+use crate::rosy_lib::RosyType;
 use crate::{ast::FromRule, transpile::*};
-use std::collections::HashSet;
 use anyhow::{Context, Error, Result, ensure};
+use std::collections::HashSet;
 
 /// A parsed identifier with optional parenthesized arguments and bracket indices.
 #[derive(Debug, PartialEq)]
@@ -141,13 +141,17 @@ impl TranspileableExpr for VariableIdentifier {
 
         // VE (Vec<f64>) has dimensions=0 but can be indexed with (i) to get RE.
         // This supports COSY's LIST(I) := expr pattern for VE element assignment.
-        if num_indices > 0 && var_type.dimensions == 0 && var_type.base_type == crate::rosy_lib::RosyBaseType::VE {
+        if num_indices > 0
+            && var_type.dimensions == 0
+            && var_type.base_type == crate::rosy_lib::RosyBaseType::VE
+        {
             if num_indices == 1 {
                 return Ok(RosyType::RE());
             } else {
                 return Err(anyhow::anyhow!(
                     "VE variable '{}' can only be indexed with 1 index, but {} were provided!",
-                    self.name, num_indices
+                    self.name,
+                    num_indices
                 ));
             }
         }

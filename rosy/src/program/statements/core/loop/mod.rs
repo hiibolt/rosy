@@ -14,19 +14,19 @@
 //! automatically declared as `RE` within the loop scope.
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -162,7 +162,9 @@ impl TranspileableStatement for LoopStatement {
             Some(source_location),
         );
         inner_ctx.variables.insert(self.iterator.clone(), iter_slot);
-        InferenceEdgeResult::HasEdges { result: resolver.discover_slots(&self.body, &mut inner_ctx) }
+        InferenceEdgeResult::HasEdges {
+            result: resolver.discover_slots(&self.body, &mut inner_ctx),
+        }
     }
     fn hydrate_resolved_types(
         &mut self,

@@ -14,19 +14,19 @@
 //! the caller's variables.
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -93,7 +93,9 @@ impl TranspileableStatement for ProcedureCallStatement {
         ctx: &mut ScopeContext,
         _source_location: SourceLocation,
     ) -> InferenceEdgeResult {
-        InferenceEdgeResult::HasEdges { result: resolver.discover_call_site_deps(&self.name, &self.args, false, ctx) }
+        InferenceEdgeResult::HasEdges {
+            result: resolver.discover_call_site_deps(&self.name, &self.args, false, ctx),
+        }
     }
     fn hydrate_resolved_types(
         &mut self,

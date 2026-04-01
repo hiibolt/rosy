@@ -15,19 +15,19 @@
 //! 4. `result` (DA vector, write) - result DA array
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -39,8 +39,8 @@ use crate::{
     program::{expressions::Expr, statements::SourceLocation},
     resolve::{ScopeContext, TypeResolver},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        TypeslotDeclarationResult, InferenceEdgeResult, TypeHydrationResult, add_context_to_all,
+        InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, add_context_to_all,
     },
 };
 
@@ -135,9 +135,10 @@ impl Transpile for DapluStatement {
         })?;
         requested_variables.extend(var_idx_output.requested_variables.iter().cloned());
 
-        let c_output = self.c_expr.transpile(context).map_err(|e| {
-            add_context_to_all(e, "...while transpiling C in DAPLU".to_string())
-        })?;
+        let c_output = self
+            .c_expr
+            .transpile(context)
+            .map_err(|e| add_context_to_all(e, "...while transpiling C in DAPLU".to_string()))?;
         requested_variables.extend(c_output.requested_variables.iter().cloned());
 
         let result_output = self.result_expr.transpile(context).map_err(|e| {

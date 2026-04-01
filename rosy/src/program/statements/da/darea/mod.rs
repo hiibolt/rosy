@@ -10,19 +10,19 @@
 //! ```
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
-//! ## COSY Example
-//! ```
+//! ## COSY INFINITY Example
+//! ```text
 #![doc = include_str!("test.fox")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("cosy_output.txt")]
 //! ```
 
@@ -34,8 +34,8 @@ use crate::{
     program::{expressions::Expr, statements::SourceLocation},
     resolve::{ScopeContext, TypeResolver},
     transpile::{
-        TranspilationInputContext, TranspilationOutput, Transpile, TranspileableStatement,
-        TypeslotDeclarationResult, InferenceEdgeResult, TypeHydrationResult, add_context_to_all,
+        InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, add_context_to_all,
     },
 };
 
@@ -67,7 +67,9 @@ impl FromRule for DareaStatement {
             .context("Failed to build da_var expression in DAREA")?
             .ok_or_else(|| anyhow::anyhow!("Expected da_var expression in DAREA"))?;
 
-        let num_vars_pair = inner.next().context("Missing num_vars parameter in DAREA!")?;
+        let num_vars_pair = inner
+            .next()
+            .context("Missing num_vars parameter in DAREA!")?;
         let num_vars_expr = Expr::from_rule(num_vars_pair)
             .context("Failed to build num_vars expression in DAREA")?
             .ok_or_else(|| anyhow::anyhow!("Expected num_vars expression in DAREA"))?;
@@ -132,7 +134,10 @@ impl Transpile for DareaStatement {
         let serialization = format!(
             "rosy_lib::core::dapew::rosy_darea({} as u64, {}, {} as usize)?;",
             unit_output.as_value(),
-            da_var_output.as_ref().replace("&mut ", "").replace("&", "&mut "),
+            da_var_output
+                .as_ref()
+                .replace("&mut ", "")
+                .replace("&", "&mut "),
             num_vars_output.as_value(),
         );
 
