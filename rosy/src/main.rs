@@ -105,6 +105,21 @@ enum Commands {
 
     /// Start the Language Server Protocol (LSP) server on stdin/stdout
     Lsp,
+
+    /// Install editor extensions for ROSY language support
+    Setup {
+        /// Which editor to install for
+        #[command(subcommand)]
+        editor: EditorTarget,
+    },
+}
+
+#[derive(Subcommand)]
+enum EditorTarget {
+    /// Install the VS Code extension (syntax highlighting + LSP)
+    Vscode,
+    /// Install the Zed extension (syntax highlighting + LSP)
+    Zed,
 }
 
 fn rosy(
@@ -576,6 +591,121 @@ fn run_construct_tests(filter: Option<&str>, release: bool, parallel: usize) -> 
     }
 }
 
+// ─── Editor Extension Installer ────────────────────────────────────────────
+
+// VS Code extension files embedded at compile time
+const VSCODE_PACKAGE_JSON: &str = include_str!("../../editors/vscode/package.json");
+const VSCODE_LANG_CONFIG: &str = include_str!("../../editors/vscode/language-configuration.json");
+const VSCODE_EXTENSION_JS: &str = include_str!("../../editors/vscode/extension.js");
+const VSCODE_TM_GRAMMAR: &str = include_str!("../../editors/vscode/syntaxes/rosy.tmLanguage.json");
+
+fn install_editor_extension(editor: &EditorTarget) -> Result<()> {
+    match editor {
+        EditorTarget::Vscode => install_vscode_extension(),
+        EditorTarget::Zed => install_zed_extension(),
+    }
+}
+
+fn install_vscode_extension() -> Result<()> {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .context("Could not determine home directory (neither HOME nor USERPROFILE is set)")?;
+
+    // VS Code extensions directory varies by platform
+    let extensions_dir = if cfg!(target_os = "macos") {
+        PathBuf::from(&home).join(".vscode/extensions")
+    } else if cfg!(target_os = "windows") {
+        PathBuf::from(&home).join(".vscode/extensions")
+    } else {
+        // Linux
+        PathBuf::from(&home).join(".vscode/extensions")
+    };
+
+    let ext_dir = extensions_dir.join("rosy-language-support");
+    let syntaxes_dir = ext_dir.join("syntaxes");
+
+    let action = if ext_dir.exists() { "Updating" } else { "Installing" };
+    eprintln!("{BOLD}  {action}{RESET} VS Code extension");
+    eprintln!("         to: {}", ext_dir.display());
+
+    fs::create_dir_all(&syntaxes_dir)
+        .context("Failed to create extension directory")?;
+
+    write(ext_dir.join("package.json"), VSCODE_PACKAGE_JSON)?;
+    write(ext_dir.join("language-configuration.json"), VSCODE_LANG_CONFIG)?;
+    write(ext_dir.join("extension.js"), VSCODE_EXTENSION_JS)?;
+    write(syntaxes_dir.join("rosy.tmLanguage.json"), VSCODE_TM_GRAMMAR)?;
+
+    let done_verb = if action == "Updating" { "Updated" } else { "Installed" };
+    eprintln!("{BOLD}{GREEN}    {done_verb}{RESET} ROSY Language Support for VS Code");
+    eprintln!();
+    eprintln!("  Reload VS Code to activate. Open any {BOLD}.rosy{RESET} file to see");
+    eprintln!("  syntax highlighting, diagnostics, and type hints.");
+    eprintln!();
+    eprintln!("  {DIM}Make sure `rosy` is in your PATH so the LSP server can start.{RESET}");
+
+    Ok(())
+}
+
+fn install_zed_extension() -> Result<()> {
+    let home = std::env::var("HOME")
+        .context("Could not determine home directory (HOME is not set)")?;
+
+    let extensions_dir = if cfg!(target_os = "macos") {
+        PathBuf::from(&home).join(".config/zed/extensions/installed")
+    } else {
+        PathBuf::from(&home).join(".config/zed/extensions/installed")
+    };
+
+    let ext_dir = extensions_dir.join("rosy");
+    let languages_dir = ext_dir.join("languages/rosy");
+
+    let action = if ext_dir.exists() { "Updating" } else { "Installing" };
+    eprintln!("{BOLD}  {action}{RESET} Zed extension");
+    eprintln!("         to: {}", ext_dir.display());
+
+    fs::create_dir_all(&languages_dir)
+        .context("Failed to create extension directory")?;
+
+    // extension.toml
+    write(
+        ext_dir.join("extension.toml"),
+        r#"id = "rosy"
+name = "ROSY"
+version = "0.1.0"
+schema_version = 1
+authors = ["hiibolt"]
+description = "ROSY language support — syntax highlighting and LSP"
+
+[language_servers.rosy]
+name = "rosy"
+languages = ["ROSY"]
+"#,
+    )?;
+
+    // languages/rosy/config.toml
+    write(
+        languages_dir.join("config.toml"),
+        r#"name = "ROSY"
+grammar = "rosy"
+path_suffixes = ["rosy", "fox"]
+block_comment = ["{", "}"]
+"#,
+    )?;
+
+    let done_verb = if action == "Updating" { "Updated" } else { "Installed" };
+    eprintln!("{BOLD}{GREEN}    {done_verb}{RESET} ROSY Language Support for Zed");
+    eprintln!();
+    eprintln!("  Restart Zed to activate. Open any {BOLD}.rosy{RESET} file to see");
+    eprintln!("  language support.");
+    eprintln!();
+    eprintln!("  {DIM}Note: Full LSP and syntax highlighting require a Tree-sitter");
+    eprintln!("  grammar for ROSY, which is not yet available. Basic language");
+    eprintln!("  configuration (file association, comments) is installed now.{RESET}");
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .compact()
@@ -597,6 +727,12 @@ fn main() -> Result<()> {
         let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
         rt.block_on(rosy::lsp::run());
         return Ok(());
+    }
+
+    // Handle Setup command — install editor extensions
+    if let Commands::Setup { editor } = &cli.command {
+        update_handle.finish();
+        return install_editor_extension(editor);
     }
 
     // Handle Test command separately (no transpilation pipeline)
@@ -650,7 +786,7 @@ fn main() -> Result<()> {
                 Some(name),
             )
         }
-        Commands::Test { .. } | Commands::Lsp => unreachable!(),
+        Commands::Test { .. } | Commands::Lsp | Commands::Setup { .. } => unreachable!(),
     };
 
     syntax_config::set_cosy_syntax(cosy_syntax);
@@ -679,7 +815,7 @@ fn main() -> Result<()> {
                 .context("Failed to copy binary to current directory")?;
             eprintln!("  Binary written to {BOLD}{}{RESET}", destination.display());
         }
-        Commands::Test { .. } | Commands::Lsp => unreachable!(),
+        Commands::Test { .. } | Commands::Lsp | Commands::Setup { .. } => unreachable!(),
     }
 
     Ok(())
