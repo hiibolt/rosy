@@ -151,7 +151,7 @@ fn rosy(
     // --- Step 3: Type Resolution ---
     step(3, 5, "Resolving types");
     let t = Instant::now();
-    let warnings = resolve::TypeResolver::resolve(&mut ast).context("Failed to resolve types!")?;
+    let (_resolver, warnings) = resolve::TypeResolver::resolve(&mut ast).context("Failed to resolve types!")?;
     step_done(t);
     for w in &warnings {
         eprintln!("{BOLD}{YELLOW}    warning{RESET}: {w}");

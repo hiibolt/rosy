@@ -76,8 +76,21 @@ pub const LEGEND_TOKEN_TYPES: &[tower_lsp::lsp_types::SemanticTokenType] = &[
 pub struct InlayHintData {
     /// Position right after the variable name in the declaration.
     pub position: Position,
-    /// The resolved type label (e.g. "RE", "CM", "DA").
+    /// The resolved type label (e.g. "(RE)", "(CM)", "(DA 2D)").
     pub label: String,
+    /// Where the type was inferred from (assignment RHS, function call, etc.)
+    /// If present, the inlay hint label part becomes clickable, navigating here.
+    pub inferred_from: Option<InferredFromLocation>,
+}
+
+/// Where a type was inferred from — used for clickable inlay hint labels.
+#[derive(Debug)]
+pub struct InferredFromLocation {
+    /// LSP position of the source of inference (e.g. the assignment RHS).
+    pub line: u32,
+    pub col: u32,
+    /// Human-readable description of how the type was determined.
+    pub reason: String,
 }
 
 /// Extract a line and column from an error message using regex patterns.
@@ -165,8 +178,9 @@ pub fn analyze(source: &str) -> AnalysisResult {
     };
 
     // Step 3: Type Resolution
-    match TypeResolver::resolve(&mut ast) {
-        Ok(warnings) => {
+    // The resolver is returned so we can inspect resolved nodes for inlay hints.
+    let resolver = match TypeResolver::resolve(&mut ast) {
+        Ok((resolver, warnings)) => {
             for w in warnings {
                 let position = extract_location_from_error(&w).unwrap_or(Position::new(0, 0));
                 result.diagnostics.push(Diagnostic {
@@ -177,6 +191,7 @@ pub fn analyze(source: &str) -> AnalysisResult {
                     ..Default::default()
                 });
             }
+            Some(resolver)
         }
         Err(e) => {
             let error_msg = format!("{e}");
@@ -188,33 +203,18 @@ pub fn analyze(source: &str) -> AnalysisResult {
                 source: Some("rosy".to_string()),
                 ..Default::default()
             });
-            return result;
+            None
         }
-    }
+    };
 
-    // Step 4: Extract resolved types for inlay hints
-    //
-    // Re-run the resolver to access the graph nodes (the resolve() method
-    // above consumed the resolver internally). We build a fresh one just
-    // for inspection. This is cheap for typical ROSY files.
-    if let Ok(resolver) = build_resolver_for_inspection(&ast) {
+    // Step 4: Extract resolved types for inlay hints from the resolver's graph nodes.
+    if let Some(resolver) = resolver {
         for (_slot, node) in &resolver.nodes {
             extract_inlay_hint(node, &mut result.variable_types);
         }
     }
 
     result
-}
-
-/// Build a TypeResolver just for reading the resolved graph — does not mutate the AST.
-fn build_resolver_for_inspection(_ast: &Program) -> Result<TypeResolver, anyhow::Error> {
-    // The AST has already been type-resolved (hydrated), so we need to
-    // re-discover slots from the already-resolved AST. The resolved types
-    // are stored on the AST nodes themselves after hydration.
-    //
-    // For now, we re-run the full pipeline on a clone-like approach.
-    // TODO: Refactor TypeResolver to expose resolved nodes after resolve().
-    Ok(TypeResolver::new())
 }
 
 /// Extract an inlay hint from a resolved graph node, if applicable.
@@ -232,6 +232,21 @@ fn extract_inlay_hint(node: &GraphNode, hints: &mut Vec<InlayHintData>) {
         return;
     };
 
+    // If the type was inferred (not explicitly annotated), record where it came from.
+    let inferred_from = node.assigned_at.as_ref().map(|assigned_at| {
+        let reason = match &node.rule {
+            rosy::resolve::ResolutionRule::Explicit(_) => "Explicitly annotated".to_string(),
+            rosy::resolve::ResolutionRule::InferredFrom { reason, .. } => reason.clone(),
+            rosy::resolve::ResolutionRule::Mirror { reason, .. } => reason.clone(),
+            rosy::resolve::ResolutionRule::Unresolved => "Unresolved".to_string(),
+        };
+        InferredFromLocation {
+            line: assigned_at.line.saturating_sub(1) as u32,
+            col: assigned_at.col.saturating_sub(1) as u32,
+            reason,
+        }
+    });
+
     hints.push(InlayHintData {
         // Position the hint right after the variable name
         // SourceLocation uses 1-based line/col, LSP uses 0-based
@@ -240,6 +255,7 @@ fn extract_inlay_hint(node: &GraphNode, hints: &mut Vec<InlayHintData>) {
             declared_at.col.saturating_sub(1) as u32,
         ),
         label: format!("{resolved_type}"),
+        inferred_from,
     });
 }
 

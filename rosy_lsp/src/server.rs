@@ -190,8 +190,9 @@ impl LanguageServer for RosyLanguageServer {
     // ─── Inlay Hints ───────────────────────────────────────────────────
 
     async fn inlay_hint(&self, params: InlayHintParams) -> Result<Option<Vec<InlayHint>>> {
+        let uri = params.text_document.uri.clone();
         let docs = self.documents.lock().unwrap();
-        let Some(doc) = docs.get(&params.text_document.uri) else {
+        let Some(doc) = docs.get(&uri) else {
             return Ok(None);
         };
 
@@ -203,18 +204,41 @@ impl LanguageServer for RosyLanguageServer {
                 h.position.line >= params.range.start.line
                     && h.position.line <= params.range.end.line
             })
-            .map(|h| InlayHint {
-                position: h.position,
-                label: InlayHintLabel::String(format!(": {}", h.label)),
-                kind: Some(InlayHintKind::TYPE),
-                text_edits: None,
-                tooltip: Some(InlayHintTooltip::String(format!(
-                    "Inferred type: {}",
-                    h.label
-                ))),
-                padding_left: Some(false),
-                padding_right: Some(true),
-                data: None,
+            .map(|h| {
+                // Build the label as InlayHintLabelPart(s) for rich interaction.
+                let type_part = InlayHintLabelPart {
+                    value: format!(": {}", h.label),
+                    tooltip: Some(InlayHintLabelPartTooltip::MarkupContent(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value: match &h.inferred_from {
+                            Some(loc) => format!(
+                                "**{}**\n\n{}\n\n*Click to jump to inference source*",
+                                h.label, loc.reason
+                            ),
+                            None => format!("**{}**", h.label),
+                        },
+                    })),
+                    // If we know where the type was inferred from, make it clickable
+                    location: h.inferred_from.as_ref().map(|loc| Location {
+                        uri: uri.clone(),
+                        range: Range::new(
+                            Position::new(loc.line, loc.col),
+                            Position::new(loc.line, loc.col),
+                        ),
+                    }),
+                    command: None,
+                };
+
+                InlayHint {
+                    position: h.position,
+                    label: InlayHintLabel::LabelParts(vec![type_part]),
+                    kind: Some(InlayHintKind::TYPE),
+                    text_edits: None,
+                    tooltip: None, // tooltip is on the label part instead
+                    padding_left: Some(false),
+                    padding_right: Some(true),
+                    data: None,
+                }
             })
             .collect();
 

@@ -185,8 +185,10 @@ impl TypeResolver {
     // ─── Public entry point ─────────────────────────────────────────────
 
     /// Run type resolution on a program. Mutates the AST in place.
-    /// Returns a list of warning messages (e.g. unused variables).
-    pub fn resolve(program: &mut Program) -> Result<Vec<String>> {
+    /// Returns the resolver (with all resolved graph nodes) and a list of
+    /// warning messages (e.g. unused variables). The caller can inspect
+    /// `resolver.nodes` for resolved types, declaration locations, etc.
+    pub fn resolve(program: &mut Program) -> Result<(TypeResolver, Vec<String>)> {
         let mut resolver = TypeResolver::new();
         let mut ctx = ScopeContext::default();
 
@@ -199,7 +201,7 @@ impl TypeResolver {
         // Phase 3: Apply resolved types back to the AST
         resolver.apply_to_ast(&mut program.statements, &[])?;
 
-        Ok(warnings)
+        Ok((resolver, warnings))
     }
 
     // ─── Graph Infrastructure ───────────────────────────────────────────
