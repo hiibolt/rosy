@@ -660,12 +660,17 @@ fn install_vscode_extension() -> Result<()> {
 }
 
 fn install_zed_extension() -> Result<()> {
-    let home = std::env::var("HOME")
-        .context("Could not determine home directory (HOME is not set)")?;
-
     // Write the full extension source directory. Zed compiles the WASM
     // component when the user installs it as a dev extension.
-    let ext_dir = PathBuf::from(&home).join(".local/share/rosy/zed-extension");
+    let ext_dir = if cfg!(target_os = "windows") {
+        let appdata = std::env::var("LOCALAPPDATA")
+            .context("Could not determine data directory (LOCALAPPDATA is not set)")?;
+        PathBuf::from(appdata).join("rosy/zed-extension")
+    } else {
+        let home = std::env::var("HOME")
+            .context("Could not determine home directory (HOME is not set)")?;
+        PathBuf::from(home).join(".local/share/rosy/zed-extension")
+    };
     let src_dir = ext_dir.join("src");
     let languages_dir = ext_dir.join("languages/rosy");
 
