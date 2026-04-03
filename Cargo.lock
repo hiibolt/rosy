@@ -1010,22 +1010,13 @@ dependencies = [
  "rustc-hash",
  "semver",
  "serde",
+ "serde_json",
  "serial_test",
+ "tokio",
+ "tower-lsp",
  "tracing",
  "tracing-subscriber",
  "ureq",
-]
-
-[[package]]
-name = "rosy-lsp"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "pest",
- "rosy",
- "serde_json",
- "tokio",
- "tower-lsp",
 ]
 
 [[package]]

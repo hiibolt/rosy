@@ -10,7 +10,7 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
 
-use crate::analysis;
+use super::analysis;
 
 /// Per-document state cached between requests.
 struct DocumentState {
@@ -30,7 +30,7 @@ impl RosyLanguageServer {
         // Ensure Rosy syntax mode is set (not COSY mode) for LSP usage
         // Ignore the error if it's already been set
         let _ = std::panic::catch_unwind(|| {
-            rosy::syntax_config::set_cosy_syntax(false);
+            crate::syntax_config::set_cosy_syntax(false);
         });
 
         RosyLanguageServer {

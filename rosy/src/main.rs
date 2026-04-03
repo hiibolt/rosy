@@ -102,6 +102,9 @@ enum Commands {
         #[arg(long)]
         cosy_syntax: bool,
     },
+
+    /// Start the Language Server Protocol (LSP) server on stdin/stdout
+    Lsp,
 }
 
 fn rosy(
@@ -588,6 +591,14 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
+    // Handle LSP command — launch language server on stdin/stdout
+    if matches!(&cli.command, Commands::Lsp) {
+        update_handle.finish();
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        rt.block_on(rosy::lsp::run());
+        return Ok(());
+    }
+
     // Handle Test command separately (no transpilation pipeline)
     if let Commands::Test {
         filter,
@@ -639,7 +650,7 @@ fn main() -> Result<()> {
                 Some(name),
             )
         }
-        Commands::Test { .. } => unreachable!(),
+        Commands::Test { .. } | Commands::Lsp => unreachable!(),
     };
 
     syntax_config::set_cosy_syntax(cosy_syntax);
@@ -668,7 +679,7 @@ fn main() -> Result<()> {
                 .context("Failed to copy binary to current directory")?;
             eprintln!("  Binary written to {BOLD}{}{RESET}", destination.display());
         }
-        Commands::Test { .. } => unreachable!(),
+        Commands::Test { .. } | Commands::Lsp => unreachable!(),
     }
 
     Ok(())

@@ -3,7 +3,7 @@
 //! Runs the real rosy pipeline (parse → AST → type resolution) on a document
 //! and extracts diagnostics, resolved types, and symbol locations.
 
-use rosy::{
+use crate::{
     ast::{CosyParser, FromRule, Rule},
     errors::RosyError,
     program::Program,
@@ -233,10 +233,10 @@ fn extract_inlay_hint(node: &GraphNode, hints: &mut Vec<InlayHintData>) {
     // If the type was inferred (not explicitly annotated), record where it came from.
     let inferred_from = node.assigned_at.as_ref().map(|assigned_at| {
         let reason = match &node.rule {
-            rosy::resolve::ResolutionRule::Explicit(_) => "Explicitly annotated".to_string(),
-            rosy::resolve::ResolutionRule::InferredFrom { reason, .. } => reason.clone(),
-            rosy::resolve::ResolutionRule::Mirror { reason, .. } => reason.clone(),
-            rosy::resolve::ResolutionRule::Unresolved => "Unresolved".to_string(),
+            crate::resolve::ResolutionRule::Explicit(_) => "Explicitly annotated".to_string(),
+            crate::resolve::ResolutionRule::InferredFrom { reason, .. } => reason.clone(),
+            crate::resolve::ResolutionRule::Mirror { reason, .. } => reason.clone(),
+            crate::resolve::ResolutionRule::Unresolved => "Unresolved".to_string(),
         };
         InferredFromLocation {
             line: assigned_at.line.saturating_sub(1) as u32,

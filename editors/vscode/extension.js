@@ -6,10 +6,11 @@ let client;
 function activate(context) {
   // Look for rosy-lsp binary in PATH or common locations
   const config = workspace.getConfiguration("rosy");
-  const serverPath = config.get("lspPath", "rosy-lsp");
+  const serverPath = config.get("lspPath", "rosy");
 
   const serverOptions = {
     command: serverPath,
+    args: ["lsp"],
     transport: TransportKind.stdio,
   };
 

@@ -2,7 +2,6 @@
 resolver = "3"
 members = [
     "rosy",
-    "rosy_lsp",
 ]
 exclude = [ ".rosy_output", ".rosy_test_cache" ]
 
