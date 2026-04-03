@@ -19,7 +19,56 @@ pub struct AnalysisResult {
     /// Resolved variable types, keyed by (line, col) of declaration.
     /// Value is the human-readable type string (e.g. "RE", "VE", "DA").
     pub variable_types: Vec<InlayHintData>,
+    /// Semantic tokens for syntax highlighting via the LSP.
+    pub semantic_tokens: Vec<SemanticTokenData>,
 }
+
+/// Data for a single semantic token.
+#[derive(Debug)]
+pub struct SemanticTokenData {
+    pub line: u32,
+    pub start_col: u32,
+    pub length: u32,
+    pub token_type: SemanticTokenType,
+}
+
+/// The token types we report to the editor.
+/// The index in LEGEND_TOKEN_TYPES must match what we register in capabilities.
+#[derive(Debug, Clone, Copy)]
+pub enum SemanticTokenType {
+    Keyword,
+    Function,
+    Type,
+    Variable,
+    Number,
+    String,
+    Comment,
+}
+
+impl SemanticTokenType {
+    pub fn index(self) -> u32 {
+        match self {
+            SemanticTokenType::Keyword => 0,
+            SemanticTokenType::Function => 1,
+            SemanticTokenType::Type => 2,
+            SemanticTokenType::Variable => 3,
+            SemanticTokenType::Number => 4,
+            SemanticTokenType::String => 5,
+            SemanticTokenType::Comment => 6,
+        }
+    }
+}
+
+/// The legend registered with the client. Order must match SemanticTokenType::index().
+pub const LEGEND_TOKEN_TYPES: &[tower_lsp::lsp_types::SemanticTokenType] = &[
+    tower_lsp::lsp_types::SemanticTokenType::KEYWORD,
+    tower_lsp::lsp_types::SemanticTokenType::FUNCTION,
+    tower_lsp::lsp_types::SemanticTokenType::TYPE,
+    tower_lsp::lsp_types::SemanticTokenType::VARIABLE,
+    tower_lsp::lsp_types::SemanticTokenType::NUMBER,
+    tower_lsp::lsp_types::SemanticTokenType::STRING,
+    tower_lsp::lsp_types::SemanticTokenType::COMMENT,
+];
 
 /// Data for a single inlay hint.
 #[derive(Debug)]
@@ -33,6 +82,10 @@ pub struct InlayHintData {
 /// Analyze a ROSY source document, returning diagnostics and type information.
 pub fn analyze(source: &str) -> AnalysisResult {
     let mut result = AnalysisResult::default();
+
+    // Semantic tokens are produced by scanning the source text directly,
+    // so they work even when the parse fails (partial highlighting).
+    result.semantic_tokens = tokenize_source(source);
 
     // Step 1: Parse
     let pairs = match CosyParser::parse(Rule::program, source) {
@@ -158,6 +211,161 @@ fn extract_inlay_hint(node: &GraphNode, hints: &mut Vec<InlayHintData>) {
     });
 }
 
+// ─── Semantic Tokenization ──────────────────────────────────────────────────
+
+/// Tokenize ROSY source text for semantic highlighting.
+/// Scans the source directly (not the AST) so it works even on broken files.
+/// Uses the auto-generated ROSY_KEYWORD_LIST to recognize keywords.
+fn tokenize_source(source: &str) -> Vec<SemanticTokenData> {
+    let mut tokens = Vec::new();
+
+    for (line_idx, line) in source.lines().enumerate() {
+        let line_num = line_idx as u32;
+        let bytes = line.as_bytes();
+        let len = bytes.len();
+        let mut i = 0;
+
+        while i < len {
+            let b = bytes[i];
+
+            // Skip whitespace
+            if b.is_ascii_whitespace() {
+                i += 1;
+                continue;
+            }
+
+            // Comments: { ... } with nesting
+            if b == b'{' {
+                let start = i;
+                let mut depth = 1;
+                i += 1;
+                // Comments can span lines but we only handle single-line here.
+                // Multi-line comments will get the first line highlighted.
+                while i < len && depth > 0 {
+                    if bytes[i] == b'{' {
+                        depth += 1;
+                    } else if bytes[i] == b'}' {
+                        depth -= 1;
+                    }
+                    i += 1;
+                }
+                tokens.push(SemanticTokenData {
+                    line: line_num,
+                    start_col: start as u32,
+                    length: (i - start) as u32,
+                    token_type: SemanticTokenType::Comment,
+                });
+                continue;
+            }
+
+            // Strings: '...' or "..."
+            if b == b'\'' || b == b'"' {
+                let quote = b;
+                let start = i;
+                i += 1;
+                while i < len {
+                    if bytes[i] == quote {
+                        // Handle '' escape in single-quoted strings
+                        if quote == b'\'' && i + 1 < len && bytes[i + 1] == b'\'' {
+                            i += 2;
+                            continue;
+                        }
+                        i += 1;
+                        break;
+                    }
+                    i += 1;
+                }
+                tokens.push(SemanticTokenData {
+                    line: line_num,
+                    start_col: start as u32,
+                    length: (i - start) as u32,
+                    token_type: SemanticTokenType::String,
+                });
+                continue;
+            }
+
+            // Numbers
+            if b.is_ascii_digit() || (b == b'-' && i + 1 < len && bytes[i + 1].is_ascii_digit()) {
+                let start = i;
+                if b == b'-' {
+                    i += 1;
+                }
+                while i < len && bytes[i].is_ascii_digit() {
+                    i += 1;
+                }
+                if i < len && bytes[i] == b'.' && i + 1 < len && bytes[i + 1].is_ascii_digit() {
+                    i += 1;
+                    while i < len && bytes[i].is_ascii_digit() {
+                        i += 1;
+                    }
+                }
+                // Scientific notation
+                if i < len && (bytes[i] == b'e' || bytes[i] == b'E') {
+                    i += 1;
+                    if i < len && (bytes[i] == b'+' || bytes[i] == b'-') {
+                        i += 1;
+                    }
+                    while i < len && bytes[i].is_ascii_digit() {
+                        i += 1;
+                    }
+                }
+                tokens.push(SemanticTokenData {
+                    line: line_num,
+                    start_col: start as u32,
+                    length: (i - start) as u32,
+                    token_type: SemanticTokenType::Number,
+                });
+                continue;
+            }
+
+            // Identifiers / keywords
+            if b.is_ascii_alphabetic() || b == b'_' {
+                let start = i;
+                while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
+                    i += 1;
+                }
+                let word = &line[start..i];
+                let upper = word.to_uppercase();
+
+                // Check if it's a type annotation
+                let token_type = if matches!(
+                    upper.as_str(),
+                    "RE" | "ST" | "LO" | "CM" | "VE" | "DA" | "CD"
+                ) {
+                    // If followed by `(`, it's a function call; otherwise it's a type
+                    let rest = &line[i..].trim_start();
+                    if rest.starts_with('(') {
+                        SemanticTokenType::Function
+                    } else {
+                        SemanticTokenType::Type
+                    }
+                } else if upper == "TRUE" || upper == "FALSE" {
+                    SemanticTokenType::Keyword
+                } else if INTRINSIC_FUNCTIONS.contains(&upper.as_str()) {
+                    SemanticTokenType::Function
+                } else if ROSY_KEYWORD_LIST.iter().any(|(kw, _)| *kw == upper) {
+                    SemanticTokenType::Keyword
+                } else {
+                    SemanticTokenType::Variable
+                };
+
+                tokens.push(SemanticTokenData {
+                    line: line_num,
+                    start_col: start as u32,
+                    length: (i - start) as u32,
+                    token_type,
+                });
+                continue;
+            }
+
+            // Skip operators and punctuation (not semantically highlighted)
+            i += 1;
+        }
+    }
+
+    tokens
+}
+
 /// Convert a pest parse error into an LSP diagnostic.
 fn pest_error_to_diagnostic(error: &pest::error::Error<Rule>) -> Diagnostic {
     let (line, col): (usize, usize) = match error.line_col {
@@ -177,8 +385,9 @@ fn pest_error_to_diagnostic(error: &pest::error::Error<Rule>) -> Diagnostic {
     }
 }
 
-// Include the keyword list generated from rosy.pest at build time.
+// Include generated data from rosy.pest + module docs at build time.
 include!(concat!(env!("OUT_DIR"), "/keywords_generated.rs"));
+include!(concat!(env!("OUT_DIR"), "/hover_generated.rs"));
 
 /// Intrinsic functions — these get `FUNC($0)` snippet insertion.
 /// Everything else in the keyword list gets plain keyword completion.

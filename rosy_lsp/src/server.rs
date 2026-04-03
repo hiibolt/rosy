@@ -77,6 +77,20 @@ impl LanguageServer for RosyLanguageServer {
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 // Inlay hints for variable types
                 inlay_hint_provider: Some(OneOf::Left(true)),
+                // Semantic tokens for syntax highlighting via the real parser
+                semantic_tokens_provider: Some(
+                    SemanticTokensServerCapabilities::SemanticTokensOptions(
+                        SemanticTokensOptions {
+                            legend: SemanticTokensLegend {
+                                token_types: analysis::LEGEND_TOKEN_TYPES.to_vec(),
+                                token_modifiers: vec![],
+                            },
+                            full: Some(SemanticTokensFullOptions::Bool(true)),
+                            range: None,
+                            ..Default::default()
+                        },
+                    ),
+                ),
                 ..Default::default()
             },
             ..Default::default()
@@ -135,52 +149,34 @@ impl LanguageServer for RosyLanguageServer {
             return Ok(None);
         };
 
-        // Find the word under the cursor
         let Some(word) = word_at_position(&doc.text, position) else {
             return Ok(None);
         };
 
         let upper = word.to_uppercase();
-        let base_url = "https://hiibolt.github.com/rosy/rosy";
 
-        // Check if it's a known keyword/construct and provide documentation
-        let hover_text = match upper.as_str() {
-            // Types
-            "RE" => Some(format!("**RE** — Real number (`f64`)\n\n[Documentation]({base_url}/rosy_lib/enum.RosyBaseType.html#variant.RE)")),
-            "ST" => Some(format!("**ST** — String (`String`)\n\n[Documentation]({base_url}/rosy_lib/enum.RosyBaseType.html#variant.ST)")),
-            "LO" => Some(format!("**LO** — Logical / boolean (`bool`)\n\n[Documentation]({base_url}/rosy_lib/enum.RosyBaseType.html#variant.LO)")),
-            "CM" => Some(format!("**CM** — Complex number (`Complex64`)\n\n[Documentation]({base_url}/rosy_lib/enum.RosyBaseType.html#variant.CM)")),
-            "VE" => Some(format!("**VE** — Vector (`Vec<f64>`)\n\n[Documentation]({base_url}/rosy_lib/enum.RosyBaseType.html#variant.VE)")),
-            "DA" => Some(format!("**DA** — Differential Algebra (Taylor series)\n\n[Documentation]({base_url}/rosy_lib/enum.RosyBaseType.html#variant.DA)")),
-            "CD" => Some(format!("**CD** — Complex DA (complex Taylor series)\n\n[Documentation]({base_url}/rosy_lib/enum.RosyBaseType.html#variant.CD)")),
-
-            // Control flow
-            "BEGIN" => Some(format!("**BEGIN** — Program entry point\n\n```rosy\nBEGIN;\n  ...\nEND;\n```\n\n[Documentation]({base_url}/program/)")),
-            "END" => Some(format!("**END** — Program exit point\n\n[Documentation]({base_url}/program/)")),
-            "VARIABLE" => Some(format!("**VARIABLE** — Declare a variable\n\n```rosy\nVARIABLE (RE) x ;          {{ typed scalar }}\nVARIABLE x := 5 ;          {{ inferred type }}\nVARIABLE (RE 3 3) mat ;     {{ 3x3 matrix }}\n```\n\n[Documentation]({base_url}/program/statements/core/var_decl/)")),
-            "IF" => Some(format!("**IF** — Conditional branch\n\n```rosy\nIF condition ;\n  ...\nELSEIF other ;\n  ...\nELSE ;\n  ...\nENDIF ;\n```\n\n[Documentation]({base_url}/program/statements/core/if/)")),
-            "LOOP" => Some(format!("**LOOP** — Counted loop\n\n```rosy\nLOOP var start end [step] ;\n  ...\nENDLOOP ;\n```\n\n[Documentation]({base_url}/program/statements/core/loop/)")),
-            "WHILE" => Some(format!("**WHILE** — Conditional loop\n\n```rosy\nWHILE condition ;\n  ...\nENDWHILE ;\n```\n\n[Documentation]({base_url}/program/statements/core/while_loop/)")),
-            "PROCEDURE" => Some(format!("**PROCEDURE** — Define a procedure\n\n```rosy\nPROCEDURE name arg1 arg2 ;\n  ...\nENDPROCEDURE ;\n```\n\n[Documentation]({base_url}/program/statements/core/procedure/)")),
-            "FUNCTION" => Some(format!("**FUNCTION** — Define a function\n\n```rosy\nFUNCTION (RE) name arg1 arg2 ;\n  ...\nENDFUNCTION ;\n```\n\n[Documentation]({base_url}/program/statements/core/function/)")),
-
-            // I/O
-            "WRITE" => Some(format!("**WRITE** — Write formatted output\n\n```rosy\nWRITE 6 'Hello' x ;\n```\n\n[Documentation]({base_url}/program/statements/io/write/)")),
-            "READ" => Some(format!("**READ** — Read formatted input\n\n```rosy\nREAD 5 x ;\n```\n\n[Documentation]({base_url}/program/statements/io/read/)")),
-
-            // DA
-            "DAINI" | "OV" => Some(format!("**DAINI** (OV) — Initialize DA computation\n\n```rosy\nDAINI order nvars [max_order] [max_terms] ;\n```\n\n[Documentation]({base_url}/program/statements/da/da_init/)")),
-
-            // Intrinsic functions
-            "SIN" => Some(format!("**SIN**(x) — Sine\n\nWorks on RE, DA, CD types.\n\n[Documentation]({base_url}/program/expressions/functions/math/trig/sin/)")),
-            "COS" => Some(format!("**COS**(x) — Cosine\n\nWorks on RE, DA, CD types.\n\n[Documentation]({base_url}/program/expressions/functions/math/trig/cos/)")),
-            "TAN" => Some(format!("**TAN**(x) — Tangent\n\nWorks on RE, DA, CD types.\n\n[Documentation]({base_url}/program/expressions/functions/math/trig/tan/)")),
-            "SQRT" => Some(format!("**SQRT**(x) — Square root\n\nWorks on RE, DA, CD types.\n\n[Documentation]({base_url}/program/expressions/functions/math/exponential/sqrt/)")),
-            "EXP" => Some(format!("**EXP**(x) — Exponential (eˣ)\n\nWorks on RE, DA, CD types.\n\n[Documentation]({base_url}/program/expressions/functions/math/exponential/exp/)")),
-            "LOG" => Some(format!("**LOG**(x) — Natural logarithm\n\nWorks on RE, DA, CD types.\n\n[Documentation]({base_url}/program/expressions/functions/math/exponential/log/)")),
-
-            _ => None,
-        };
+        // All hover docs are auto-generated from module doc comments at build time.
+        // Check type annotations first, then keywords/constructs.
+        let hover_text = analysis::ROSY_TYPE_HOVER
+            .iter()
+            .find(|(name, _, _)| *name == upper)
+            .map(|(_, markdown, _)| markdown.to_string())
+            .or_else(|| {
+                analysis::ROSY_HOVER_DOCS
+                    .iter()
+                    .find(|(kw, _, _, _, _)| *kw == upper)
+                    .map(|(kw, title, desc, url, is_stmt)| {
+                        let kind_label = if *is_stmt { "Statement" } else { "Expression" };
+                        let desc_line = if desc.is_empty() {
+                            String::new()
+                        } else {
+                            format!("\n\n{desc}")
+                        };
+                        format!(
+                            "**{kw}** \u{2014} {title}\n\n*{kind_label}*{desc_line}\n\n[Documentation]({url})"
+                        )
+                    })
+            });
 
         Ok(hover_text.map(|text| Hover {
             contents: HoverContents::Markup(MarkupContent {
@@ -223,6 +219,49 @@ impl LanguageServer for RosyLanguageServer {
             .collect();
 
         Ok(Some(hints))
+    }
+
+    // ─── Semantic Tokens ───────────────────────────────────────────────
+
+    async fn semantic_tokens_full(
+        &self,
+        params: SemanticTokensParams,
+    ) -> Result<Option<SemanticTokensResult>> {
+        let docs = self.documents.lock().unwrap();
+        let Some(doc) = docs.get(&params.text_document.uri) else {
+            return Ok(None);
+        };
+
+        // LSP semantic tokens use delta encoding:
+        // each token is relative to the previous one.
+        let mut lsp_tokens = Vec::new();
+        let mut prev_line = 0u32;
+        let mut prev_start = 0u32;
+
+        for token in &doc.analysis.semantic_tokens {
+            let delta_line = token.line - prev_line;
+            let delta_start = if delta_line == 0 {
+                token.start_col - prev_start
+            } else {
+                token.start_col
+            };
+
+            lsp_tokens.push(SemanticToken {
+                delta_line,
+                delta_start,
+                length: token.length,
+                token_type: token.token_type.index(),
+                token_modifiers_bitset: 0,
+            });
+
+            prev_line = token.line;
+            prev_start = token.start_col;
+        }
+
+        Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
+            result_id: None,
+            data: lsp_tokens,
+        })))
     }
 }
 
