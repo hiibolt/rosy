@@ -177,219 +177,59 @@ fn pest_error_to_diagnostic(error: &pest::error::Error<Rule>) -> Diagnostic {
     }
 }
 
-/// Keywords extracted from the ROSY grammar for completion.
-/// These are derived from the `keyword_raw` rule in rosy.pest.
+// Include the keyword list generated from rosy.pest at build time.
+include!(concat!(env!("OUT_DIR"), "/keywords_generated.rs"));
+
+/// Intrinsic functions — these get `FUNC($0)` snippet insertion.
+/// Everything else in the keyword list gets plain keyword completion.
+const INTRINSIC_FUNCTIONS: &[&str] = &[
+    "ABS", "ACOS", "ASIN", "ATAN", "CD", "CM", "CMPLX", "CONJ", "CONS",
+    "COS", "COSH", "DA", "ERF", "EXP", "IMAG", "INT", "ISRT", "ISRT3",
+    "LCD", "LCM", "LDA", "LENGTH", "LLO", "LO", "LOG", "LRE", "LST",
+    "LTRIM", "LVE", "NINT", "NORM", "RE", "REAL", "SIN", "SINH", "SQR",
+    "SQRT", "ST", "TAN", "TANH", "TRIM", "TYPE", "VARMEM", "VARPOI",
+    "VE", "VMAX", "VMIN", "WERF",
+];
+
+/// Build completion items from the auto-generated keyword list.
+/// Keywords are extracted from `keyword_raw` in rosy.pest at compile time,
+/// so adding a new construct to the grammar automatically updates completions.
 pub fn rosy_keywords() -> Vec<CompletionItem> {
-    // Control flow
-    let control = [
-        ("BEGIN", "Program entry point"),
-        ("END", "Program exit point"),
-        ("IF", "Conditional branch"),
-        ("ELSEIF", "Additional conditional branch"),
-        ("ELSE", "Default branch"),
-        ("ENDIF", "End conditional"),
-        ("LOOP", "Counted loop: LOOP var start end [step]"),
-        ("ENDLOOP", "End counted loop"),
-        ("WHILE", "While loop: WHILE condition"),
-        ("ENDWHILE", "End while loop"),
-        ("PLOOP", "MPI parallel loop"),
-        ("ENDPLOOP", "End parallel loop"),
-        ("BREAK", "Exit current loop"),
-        ("FIT", "Optimization loop"),
-        ("ENDFIT", "End optimization loop"),
-    ];
-
-    // Declarations
-    let declarations = [
-        ("VARIABLE", "Declare a variable: VARIABLE [(type)] name [dims]"),
-        ("PROCEDURE", "Define a procedure"),
-        ("ENDPROCEDURE", "End procedure definition"),
-        ("FUNCTION", "Define a function"),
-        ("ENDFUNCTION", "End function definition"),
-    ];
-
-    // I/O
-    let io = [
-        ("WRITE", "Write formatted output"),
-        ("WRITEB", "Write binary output"),
-        ("READ", "Read formatted input"),
-        ("READB", "Read binary input"),
-        ("OPENF", "Open a text file"),
-        ("OPENFB", "Open a binary file"),
-        ("CLOSEF", "Close a file"),
-        ("WRITEM", "Serialize variable to memory arrays"),
-        ("READM", "Deserialize variable from memory arrays"),
-    ];
-
-    // DA operations
-    let da_ops = [
-        ("DAINI", "Initialize DA: OV order nvars"),
-        ("DAPRV", "Print DA variables"),
-        ("DAREV", "Print DA in reverse format"),
-        ("DANOT", "Set DA truncation order"),
-        ("DAEPS", "Set DA epsilon cutoff"),
-        ("DATRN", "DA transfer (transform)"),
-        ("DASCL", "Scale DA by constant"),
-        ("DASGN", "Negate DA sign"),
-        ("DADER", "Differentiate DA"),
-        ("DAINT", "Integrate DA"),
-        ("DANORO", "Filter DA by order"),
-        ("DANORS", "Filter DA by order range"),
-        ("DAPLU", "Substitute variable in DA (plug)"),
-        ("DADIU", "DA division by unit variable"),
-        ("DADMU", "DA multiplication by unit variable"),
-        ("DACLIW", "Extract DA to linear vector"),
-        ("DACQLC", "Construct DA from linear vector"),
-        ("DAREA", "Read DA from file"),
-        ("DAPEW", "Print DA element-wise"),
-        ("DAPEE", "Print DA element-wise (error format)"),
-        ("DAPEA", "Print DA element-wise (all)"),
-        ("DAPEP", "Print DA element-wise (partial)"),
-        ("DAEST", "Estimate DA bounds"),
-    ];
-
-    // System
-    let system = [
-        ("QUIT", "Exit with status code"),
-        ("OS", "Execute operating system command"),
-        ("SCRLEN", "Set screen/output width"),
-        ("CPUSEC", "Get CPU time"),
-        ("PWTIME", "Get wall-clock time"),
-        ("RANSEED", "Set random number seed"),
-        ("RERAN", "Generate random number"),
-        ("SLEEPM", "Sleep for milliseconds"),
-        ("ARGGET", "Get command-line argument"),
-        ("SUBSTR", "Extract substring"),
-        ("VELSET", "Set vector element"),
-        ("VELGET", "Get vector element"),
-        ("VEDOT", "Vector dot product"),
-        ("VEUNIT", "Normalize vector to unit length"),
-        ("VEZERO", "Zero out vector elements"),
-        ("STCRE", "String to real conversion"),
-        ("RECST", "Real to string conversion"),
-        ("LINV", "Matrix inversion"),
-        ("LDET", "Matrix determinant"),
-        ("LEV", "Solve linear system"),
-        ("MBLOCK", "Extract matrix block"),
-        ("MTREE", "Evaluate DA using tree method"),
-        ("POLVAL", "Polynomial evaluation"),
-        ("LSLINE", "Least-squares line fit"),
-        ("RKCO", "Runge-Kutta coefficients"),
-        ("PNPRO", "Get number of MPI processes"),
-        ("IMUNIT", "Get imaginary unit"),
-        ("MEMDPV", "Memory dump/view"),
-        ("MEMFRE", "Free memory"),
-    ];
-
-    // Intrinsic functions (used as expressions)
-    let functions = [
-        ("SIN", "Sine", CompletionItemKind::FUNCTION),
-        ("COS", "Cosine", CompletionItemKind::FUNCTION),
-        ("TAN", "Tangent", CompletionItemKind::FUNCTION),
-        ("ASIN", "Arcsine", CompletionItemKind::FUNCTION),
-        ("ACOS", "Arccosine", CompletionItemKind::FUNCTION),
-        ("ATAN", "Arctangent", CompletionItemKind::FUNCTION),
-        ("SINH", "Hyperbolic sine", CompletionItemKind::FUNCTION),
-        ("COSH", "Hyperbolic cosine", CompletionItemKind::FUNCTION),
-        ("TANH", "Hyperbolic tangent", CompletionItemKind::FUNCTION),
-        ("SQRT", "Square root", CompletionItemKind::FUNCTION),
-        ("SQR", "Square (x²)", CompletionItemKind::FUNCTION),
-        ("EXP", "Exponential (eˣ)", CompletionItemKind::FUNCTION),
-        ("LOG", "Natural logarithm", CompletionItemKind::FUNCTION),
-        ("ABS", "Absolute value", CompletionItemKind::FUNCTION),
-        ("NORM", "Norm", CompletionItemKind::FUNCTION),
-        ("CONS", "Extract constant part", CompletionItemKind::FUNCTION),
-        ("INT", "Truncate toward zero", CompletionItemKind::FUNCTION),
-        ("NINT", "Round to nearest integer", CompletionItemKind::FUNCTION),
-        ("TYPE", "Return COSY type code", CompletionItemKind::FUNCTION),
-        ("REAL", "Real part", CompletionItemKind::FUNCTION),
-        ("IMAG", "Imaginary part", CompletionItemKind::FUNCTION),
-        ("CMPLX", "Convert to complex", CompletionItemKind::FUNCTION),
-        ("CONJ", "Complex conjugate", CompletionItemKind::FUNCTION),
-        ("VMAX", "Vector maximum", CompletionItemKind::FUNCTION),
-        ("VMIN", "Vector minimum", CompletionItemKind::FUNCTION),
-        ("LENGTH", "Length / memory size", CompletionItemKind::FUNCTION),
-        ("TRIM", "Remove trailing spaces", CompletionItemKind::FUNCTION),
-        ("LTRIM", "Remove leading spaces", CompletionItemKind::FUNCTION),
-        ("ISRT", "Inverse square root (x⁻¹ᐟ²)", CompletionItemKind::FUNCTION),
-        ("ISRT3", "Inverse cube root (x⁻³ᐟ²)", CompletionItemKind::FUNCTION),
-        ("ERF", "Error function", CompletionItemKind::FUNCTION),
-        ("WERF", "Faddeeva function w(z)", CompletionItemKind::FUNCTION),
-        ("VARMEM", "Memory address of variable", CompletionItemKind::FUNCTION),
-        ("VARPOI", "Pointer address of variable", CompletionItemKind::FUNCTION),
-    ];
-
-    // Type conversion functions
-    let type_fns = [
-        ("RE", "Convert to real (f64)", CompletionItemKind::FUNCTION),
-        ("ST", "Convert to string", CompletionItemKind::FUNCTION),
-        ("LO", "Convert to logical (bool)", CompletionItemKind::FUNCTION),
-        ("CM", "Convert to complex", CompletionItemKind::FUNCTION),
-        ("VE", "Convert to vector", CompletionItemKind::FUNCTION),
-        ("DA", "Create DA identity vector", CompletionItemKind::FUNCTION),
-        ("CD", "Create complex DA identity vector", CompletionItemKind::FUNCTION),
-    ];
-
-    // Memory estimators
-    let mem_fns = [
-        ("LST", "String memory size estimator", CompletionItemKind::FUNCTION),
-        ("LCM", "Complex memory size estimator", CompletionItemKind::FUNCTION),
-        ("LCD", "DA memory size estimator", CompletionItemKind::FUNCTION),
-        ("LRE", "Real memory size estimator", CompletionItemKind::FUNCTION),
-        ("LLO", "Logical memory size estimator", CompletionItemKind::FUNCTION),
-        ("LVE", "Vector memory size estimator", CompletionItemKind::FUNCTION),
-        ("LDA", "DA memory size estimator", CompletionItemKind::FUNCTION),
-    ];
-
     let base_url = "https://hiibolt.github.com/rosy/rosy";
 
-    let mut items = Vec::new();
-
-    // Keyword completions
-    for (label, detail) in control
+    let mut items: Vec<CompletionItem> = ROSY_KEYWORD_LIST
         .iter()
-        .chain(declarations.iter())
-        .chain(io.iter())
-        .chain(da_ops.iter())
-        .chain(system.iter())
-    {
-        items.push(CompletionItem {
-            label: label.to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some(detail.to_string()),
-            documentation: Some(Documentation::MarkupContent(MarkupContent {
-                kind: MarkupKind::Markdown,
-                value: format!(
-                    "{detail}\n\n[Documentation]({base_url}/program/statements/)"
-                ),
-            })),
-            ..Default::default()
-        });
-    }
+        .map(|(label, detail)| {
+            let is_function = INTRINSIC_FUNCTIONS.contains(label);
 
-    // Function completions
-    for (label, detail, kind) in functions
-        .iter()
-        .chain(type_fns.iter())
-        .chain(mem_fns.iter())
-    {
-        items.push(CompletionItem {
-            label: label.to_string(),
-            kind: Some(*kind),
-            detail: Some(detail.to_string()),
-            insert_text: Some(format!("{label}($0)")),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            documentation: Some(Documentation::MarkupContent(MarkupContent {
-                kind: MarkupKind::Markdown,
-                value: format!(
-                    "{detail}\n\n[Documentation]({base_url}/program/expressions/)"
-                ),
-            })),
-            ..Default::default()
-        });
-    }
+            CompletionItem {
+                label: label.to_string(),
+                kind: Some(if is_function {
+                    CompletionItemKind::FUNCTION
+                } else {
+                    CompletionItemKind::KEYWORD
+                }),
+                detail: Some(detail.to_string()),
+                insert_text: if is_function {
+                    Some(format!("{label}($0)"))
+                } else {
+                    None
+                },
+                insert_text_format: if is_function {
+                    Some(InsertTextFormat::SNIPPET)
+                } else {
+                    None
+                },
+                documentation: Some(Documentation::MarkupContent(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: format!("{detail}\n\n[Documentation]({base_url}/)"),
+                })),
+                ..Default::default()
+            }
+        })
+        .collect();
 
-    // Boolean constants
+    // Boolean constants (not in keyword_raw since they're expression-level)
     for (label, detail) in [("TRUE", "Boolean true"), ("FALSE", "Boolean false")] {
         items.push(CompletionItem {
             label: label.to_string(),
