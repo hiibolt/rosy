@@ -113,10 +113,13 @@ use crate::program::expressions::types::da::DAExpr;
 use crate::program::expressions::types::cd::CDExpr;
 use anyhow::{Context, Error, Result, bail};
 
+use crate::program::statements::SourceLocation;
+
 #[derive(Debug)]
 pub struct Expr {
     pub enum_variant: ExprEnum,
     pub inner: Box<dyn TranspileableExpr>,
+    pub source_location: SourceLocation,
 }
 impl PartialEq for Expr {
     fn eq(&self, other: &Self) -> bool {
@@ -198,7 +201,9 @@ pub enum ExprEnum {
 impl FromRule for Expr {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Expr>> {
         let result = PRATT_PARSER
-            .map_primary(|primary| match primary.as_rule() {
+            .map_primary(|primary| {
+                let loc = SourceLocation::from_pair(&primary);
+                match primary.as_rule() {
                 Rule::neg_expr => {
                     let mut inner = primary.into_inner();
                     let operand_pair = inner.next()
@@ -209,31 +214,37 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Neg,
                         inner: Box::new(NegExpr { operand: Box::new(operand) }),
+                        source_location: loc,
                     })
                 },
                 Rule::not_expr => {
                     // NOT expression: parse the inner operand
                     // The inner can be: boolean, variable_identifier, or expr (parenthesized)
+                    let not_loc = loc.clone();
                     let mut inner = primary.into_inner();
                     let operand_pair = inner.next()
                         .ok_or_else(|| anyhow::anyhow!("NOT expression missing operand"))?;
-                    
+
                     // Handle different operand types
                     let operand = match operand_pair.as_rule() {
                         Rule::boolean => {
+                            let op_loc = SourceLocation::from_pair(&operand_pair);
                             let b = bool::from_rule(operand_pair)?
                                 .ok_or_else(|| anyhow::anyhow!("Expected boolean"))?;
                             Expr {
                                 enum_variant: ExprEnum::Boolean,
                                 inner: Box::new(b),
+                                source_location: op_loc,
                             }
                         },
                         Rule::variable_identifier => {
+                            let op_loc = SourceLocation::from_pair(&operand_pair);
                             let var_expr = VarExpr::from_rule(operand_pair)?
                                 .ok_or_else(|| anyhow::anyhow!("Expected VarExpr"))?;
                             Expr {
                                 enum_variant: ExprEnum::Var,
                                 inner: Box::new(var_expr),
+                                source_location: op_loc,
                             }
                         },
                         Rule::expr => {
@@ -244,12 +255,13 @@ impl FromRule for Expr {
                             return Err(anyhow::anyhow!("Unexpected NOT operand type: {:?}", other));
                         }
                     };
-                    
+
                     Ok(Expr {
                         enum_variant: ExprEnum::Not,
                         inner: Box::new(NotExpr {
                             operand: Box::new(operand),
                         }),
+                        source_location: not_loc,
                     })
                 },
                 Rule::variable_identifier => {
@@ -257,6 +269,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Var,
                         inner: Box::new(var_expr.ok_or_else(|| anyhow::anyhow!("Expected VarExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::number => {
@@ -264,6 +277,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Number,
                         inner: Box::new(n.ok_or_else(|| anyhow::anyhow!("Expected number"))?),
+                        source_location: loc.clone(),
                     })
                 }
                 Rule::boolean => {
@@ -271,6 +285,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Boolean,
                         inner: Box::new(b.ok_or_else(|| anyhow::anyhow!("Expected boolean"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::string => {
@@ -278,6 +293,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::String,
                         inner: Box::new(s.ok_or_else(|| anyhow::anyhow!("Expected string"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::cm => {
@@ -285,6 +301,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Complex,
                         inner: Box::new(cm_expr.ok_or_else(|| anyhow::anyhow!("Expected ComplexConvertExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::st => {
@@ -292,6 +309,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::StringConvert,
                         inner: Box::new(st_expr.ok_or_else(|| anyhow::anyhow!("Expected StringConvertExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::lo => {
@@ -299,6 +317,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::LogicalConvert,
                         inner: Box::new(lo_expr.ok_or_else(|| anyhow::anyhow!("Expected LogicalConvertExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::da => {
@@ -306,6 +325,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::DA,
                         inner: Box::new(da_expr.ok_or_else(|| anyhow::anyhow!("Expected DAExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::cd_intrinsic => {
@@ -313,6 +333,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::CD,
                         inner: Box::new(cd_expr.ok_or_else(|| anyhow::anyhow!("Expected CDExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::length => {
@@ -320,6 +341,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Length,
                         inner: Box::new(length_expr.ok_or_else(|| anyhow::anyhow!("Expected LengthExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::sin => {
@@ -327,6 +349,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Sin,
                         inner: Box::new(sin_expr.ok_or_else(|| anyhow::anyhow!("Expected SinExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::cos_fn => {
@@ -334,6 +357,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Cos,
                         inner: Box::new(cos_expr.ok_or_else(|| anyhow::anyhow!("Expected CosExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::asin_fn => {
@@ -341,6 +365,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Asin,
                         inner: Box::new(asin_expr.ok_or_else(|| anyhow::anyhow!("Expected AsinExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::acos_fn => {
@@ -348,6 +373,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Acos,
                         inner: Box::new(acos_expr.ok_or_else(|| anyhow::anyhow!("Expected AcosExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::atan_fn => {
@@ -355,6 +381,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Atan,
                         inner: Box::new(atan_expr.ok_or_else(|| anyhow::anyhow!("Expected AtanExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::sinh_fn => {
@@ -362,6 +389,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Sinh,
                         inner: Box::new(sinh_expr.ok_or_else(|| anyhow::anyhow!("Expected SinhExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::cosh_fn => {
@@ -369,6 +397,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Cosh,
                         inner: Box::new(cosh_expr.ok_or_else(|| anyhow::anyhow!("Expected CoshExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::tanh_fn => {
@@ -376,6 +405,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Tanh,
                         inner: Box::new(tanh_expr.ok_or_else(|| anyhow::anyhow!("Expected TanhExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::sqr => {
@@ -383,6 +413,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Sqr,
                         inner: Box::new(sqr_expr.ok_or_else(|| anyhow::anyhow!("Expected SqrExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::sqrt_fn => {
@@ -390,6 +421,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Sqrt,
                         inner: Box::new(sqrt_expr.ok_or_else(|| anyhow::anyhow!("Expected SqrtExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::exp_fn => {
@@ -397,6 +429,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Exp,
                         inner: Box::new(exp_expr.ok_or_else(|| anyhow::anyhow!("Expected ExpExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::log_fn => {
@@ -404,6 +437,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Log,
                         inner: Box::new(log_expr.ok_or_else(|| anyhow::anyhow!("Expected LogExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::tan_fn => {
@@ -411,6 +445,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Tan,
                         inner: Box::new(tan_expr.ok_or_else(|| anyhow::anyhow!("Expected TanExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::vmax => {
@@ -418,6 +453,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Vmax,
                         inner: Box::new(vmax_expr.ok_or_else(|| anyhow::anyhow!("Expected VmaxExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::lst => {
@@ -425,6 +461,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Lst,
                         inner: Box::new(lst_expr.ok_or_else(|| anyhow::anyhow!("Expected LstExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::lcm => {
@@ -432,6 +469,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Lcm,
                         inner: Box::new(lcm_expr.ok_or_else(|| anyhow::anyhow!("Expected LcmExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::lcd => {
@@ -439,6 +477,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Lcd,
                         inner: Box::new(lcd_expr.ok_or_else(|| anyhow::anyhow!("Expected LcdExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::lre => {
@@ -446,6 +485,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Lre,
                         inner: Box::new(lre_expr.ok_or_else(|| anyhow::anyhow!("Expected LreExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::llo => {
@@ -453,6 +493,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Llo,
                         inner: Box::new(llo_expr.ok_or_else(|| anyhow::anyhow!("Expected LloExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::lve => {
@@ -460,6 +501,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Lve,
                         inner: Box::new(lve_expr.ok_or_else(|| anyhow::anyhow!("Expected LveExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::lda => {
@@ -467,6 +509,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Lda,
                         inner: Box::new(lda_expr.ok_or_else(|| anyhow::anyhow!("Expected LdaExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::vmin => {
@@ -474,6 +517,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Vmin,
                         inner: Box::new(vmin_expr.ok_or_else(|| anyhow::anyhow!("Expected VminExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::abs_fn => {
@@ -481,6 +525,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Abs,
                         inner: Box::new(abs_expr.ok_or_else(|| anyhow::anyhow!("Expected AbsExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::norm_fn => {
@@ -488,6 +533,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Norm,
                         inner: Box::new(norm_expr.ok_or_else(|| anyhow::anyhow!("Expected NormExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::cons_fn => {
@@ -495,6 +541,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Cons,
                         inner: Box::new(cons_expr.ok_or_else(|| anyhow::anyhow!("Expected ConsExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::int_fn => {
@@ -502,6 +549,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Int,
                         inner: Box::new(int_expr.ok_or_else(|| anyhow::anyhow!("Expected IntExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::nint_fn => {
@@ -509,6 +557,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Nint,
                         inner: Box::new(nint_expr.ok_or_else(|| anyhow::anyhow!("Expected NintExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::type_fn => {
@@ -516,6 +565,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::TypeFn,
                         inner: Box::new(type_fn_expr.ok_or_else(|| anyhow::anyhow!("Expected TypeFnExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::trim_fn => {
@@ -523,6 +573,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Trim,
                         inner: Box::new(trim_expr.ok_or_else(|| anyhow::anyhow!("Expected TrimExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::ltrim_fn => {
@@ -530,6 +581,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Ltrim,
                         inner: Box::new(ltrim_expr.ok_or_else(|| anyhow::anyhow!("Expected LtrimExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::isrt_fn => {
@@ -537,6 +589,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Isrt,
                         inner: Box::new(isrt_expr.ok_or_else(|| anyhow::anyhow!("Expected IsrtExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::isrt3_fn => {
@@ -544,6 +597,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Isrt3,
                         inner: Box::new(isrt3_expr.ok_or_else(|| anyhow::anyhow!("Expected Isrt3Expr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::cmplx_fn => {
@@ -551,6 +605,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Cmplx,
                         inner: Box::new(cmplx_expr.ok_or_else(|| anyhow::anyhow!("Expected CmplxExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::conj_fn => {
@@ -558,6 +613,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Conj,
                         inner: Box::new(conj_expr.ok_or_else(|| anyhow::anyhow!("Expected ConjExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::real_fn => {
@@ -565,6 +621,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::RealFn,
                         inner: Box::new(real_fn_expr.ok_or_else(|| anyhow::anyhow!("Expected RealFnExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::imag_fn => {
@@ -572,6 +629,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::ImagFn,
                         inner: Box::new(imag_fn_expr.ok_or_else(|| anyhow::anyhow!("Expected ImagFnExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::re_fn => {
@@ -579,6 +637,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::ReConvert,
                         inner: Box::new(re_convert_expr.ok_or_else(|| anyhow::anyhow!("Expected ReConvertExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::ve_fn => {
@@ -586,6 +645,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::VeConvert,
                         inner: Box::new(ve_convert_expr.ok_or_else(|| anyhow::anyhow!("Expected VeConvertExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::varmem => {
@@ -593,6 +653,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Varmem,
                         inner: Box::new(varmem_expr.ok_or_else(|| anyhow::anyhow!("Expected VarmemExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::varpoi => {
@@ -600,6 +661,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Varpoi,
                         inner: Box::new(varpoi_expr.ok_or_else(|| anyhow::anyhow!("Expected VarpoiExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::erf_fn => {
@@ -607,6 +669,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Erf,
                         inner: Box::new(erf_expr.ok_or_else(|| anyhow::anyhow!("Expected ErfExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::werf_fn => {
@@ -614,6 +677,7 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Werf,
                         inner: Box::new(werf_expr.ok_or_else(|| anyhow::anyhow!("Expected WerfExpr"))?),
+                        source_location: loc.clone(),
                     })
                 },
                 Rule::expr => {
@@ -623,12 +687,15 @@ impl FromRule for Expr {
                         .ok_or_else(|| anyhow::anyhow!("Expected expression for parenthesized `expr`"))
                 },
                 _ => bail!("Unexpected primary expr: {:?}", primary.as_rule()),
+                }
             })
             .map_infix(|
                 left,
                 op,
                 right
-            | match op.as_rule() {
+            | {
+                let op_loc = SourceLocation::from_pair(&op);
+                match op.as_rule() {
                 Rule::add => {
                     let left = left.context("...while transpiling left-hand side of `add` expression")?;
                     let right = right.context("...while transpiling right-hand side of `add` expression")?;
@@ -638,7 +705,7 @@ impl FromRule for Expr {
                             left: Box::new(left),
                             right: Box::new(right),
                         })
-                    })
+                    , source_location: op_loc.clone() })
                 },
                 Rule::sub => {
                     let left = left.context("...while transpiling left-hand side of `sub` expression")?;
@@ -649,7 +716,7 @@ impl FromRule for Expr {
                             left: Box::new(left),
                             right: Box::new(right),
                         })
-                    })
+                    , source_location: op_loc.clone() })
                 },
                 Rule::mult => {
                     let left = left.context("...while transpiling left-hand side of `mult` expression")?;
@@ -660,7 +727,7 @@ impl FromRule for Expr {
                             left: Box::new(left),
                             right: Box::new(right),
                         })
-                    })
+                    , source_location: op_loc.clone() })
                 },
                 Rule::div => {
                     let left = left.context("...while transpiling left-hand side of `div` expression")?;
@@ -671,7 +738,7 @@ impl FromRule for Expr {
                             left: Box::new(left),
                             right: Box::new(right),
                         })
-                    })
+                    , source_location: op_loc.clone() })
                 },
                 Rule::pow => {
                     let left = left.context("...while transpiling base of `pow` expression")?;
@@ -682,7 +749,7 @@ impl FromRule for Expr {
                             left: Box::new(left),
                             right: Box::new(right),
                         })
-                    })
+                    , source_location: op_loc.clone() })
                 },
                 Rule::concat => {
                     let left = left.context("...while transpiling left-hand side of `concat` expression")?;
@@ -700,7 +767,7 @@ impl FromRule for Expr {
                         Ok(Expr {
                             enum_variant: ExprEnum::Concat,
                             inner: Box::new(ConcatExpr { terms })
-                        })
+                        , source_location: op_loc.clone() })
                     }
                 },
                 Rule::extract => {
@@ -712,7 +779,7 @@ impl FromRule for Expr {
                             object: Box::new(left),
                             index: Box::new(right),
                         })
-                    })
+                    , source_location: op_loc.clone() })
                 },
                 Rule::derive => {
                     let left = left.context("...while transpiling object of `derive` (%) expression")?;
@@ -723,7 +790,7 @@ impl FromRule for Expr {
                             object: Box::new(left),
                             index: Box::new(right),
                         })
-                    })
+                    , source_location: op_loc.clone() })
                 },
                 Rule::eq => {
                     let left = left.context("...while transpiling left-hand side of `eq` expression")?;
@@ -734,7 +801,7 @@ impl FromRule for Expr {
                             left: Box::new(left),
                             right: Box::new(right),
                         })
-                    })
+                    , source_location: op_loc.clone() })
                 },
                 Rule::neq => {
                     let left = left.context("...while transpiling left-hand side of `neq` expression")?;
@@ -745,7 +812,7 @@ impl FromRule for Expr {
                             left: Box::new(left),
                             right: Box::new(right),
                         })
-                    })
+                    , source_location: op_loc.clone() })
                 },
                 Rule::lt => {
                     let left = left.context("...while transpiling left-hand side of `lt` expression")?;
@@ -756,7 +823,7 @@ impl FromRule for Expr {
                             left: Box::new(left),
                             right: Box::new(right),
                         })
-                    })
+                    , source_location: op_loc.clone() })
                 },
                 Rule::gt => {
                     let left = left.context("...while transpiling left-hand side of `gt` expression")?;
@@ -767,7 +834,7 @@ impl FromRule for Expr {
                             left: Box::new(left),
                             right: Box::new(right),
                         })
-                    })
+                    , source_location: op_loc.clone() })
                 },
                 Rule::lte => {
                     let left = left.context("...while transpiling left-hand side of `lte` expression")?;
@@ -778,7 +845,7 @@ impl FromRule for Expr {
                             left: Box::new(left),
                             right: Box::new(right),
                         })
-                    })
+                    , source_location: op_loc.clone() })
                 },
                 Rule::gte => {
                     let left = left.context("...while transpiling left-hand side of `gte` expression")?;
@@ -789,9 +856,10 @@ impl FromRule for Expr {
                             left: Box::new(left),
                             right: Box::new(right),
                         })
-                    })
+                    , source_location: op_loc.clone() })
                 },
                 _ => bail!("Unexpected infix operator: {:?}", op.as_rule()),
+                }
             })
             .parse(pair.into_inner());
 
