@@ -1,12 +1,12 @@
 # Rosy 🌹
 
-A modern transpiler for the ROSY scientific programming language, designed for beam physics and differential algebra applications.
+A modern transpiler for the Rosy scientific programming language, designed for beam physics and differential algebra applications.
 
-Rosy transpiles ROSY source code into self-contained, native Rust executables — optimized native code with zero runtime dependencies.
+Rosy transpiles Rosy source code into self-contained, native Rust executables — optimized native code with zero runtime dependencies.
 
 ## Language Documentation
 
-The complete ROSY language reference — every operator, function, statement, and type — is in the **[Rustdoc documentation](https://hiibolt.github.io/rosy/)**.
+The complete Rosy language reference — every operator, function, statement, and type — is in the **[Rustdoc documentation](https://hiibolt.github.io/rosy/)**.
 
 ## Example
 
@@ -135,9 +135,16 @@ Programs using `PLOOP` require an MPI implementation and LLVM/Clang at compile t
 - **macOS**: `brew install open-mpi llvm`
 - **NIU Metis**: `module load openmpi/openmpi-5.0.7-gcc-14.2.0-cuda-12.8`
 
-## IDE Support
+## Editor Support
 
-Copy the `rosy-vscode-extension/` folder to your VSCode extensions directory (`~/.vscode/extensions/` on Linux/macOS) and reload. To regenerate after grammar changes: `cargo run --bin generate_vscode_extension`.
+Rosy includes a built-in language server (LSP) with diagnostics, completions, hover documentation, inlay type hints, and syntax highlighting. Install for your editor with:
+
+```bash
+rosy setup vscode   # VS Code
+rosy setup zed      # Zed
+```
+
+The LSP runs as `rosy lsp` — the same binary, no separate install. All features update automatically when you rebuild Rosy; adding a new language construct requires zero editor tooling changes.
 
 ## Differences from COSY INFINITY
 
