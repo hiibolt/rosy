@@ -453,46 +453,4 @@ fn generate_editor_configs(out_dir: &str, keywords: &[String]) {
 
     fs::write(Path::new(out_dir).join("vscode_language_configuration.json"), &vscode_config).unwrap();
 
-    // ─── Zed languages/rosy/config.toml ────────────────────────────────
-    let zed_config = r#"name = "Rosy"
-path_suffixes = ["rosy", "fox"]
-line_comments = []
-block_comment = ["{", "}"]
-autoclose_before = ";:.,=}])> \n\t"
-brackets = [
-  { start = "(", end = ")", close = true, newline = false },
-  { start = "{", end = "}", close = true, newline = false },
-]
-word_characters = ["_"]
-"#;
-    fs::write(Path::new(out_dir).join("zed_config.toml"), zed_config).unwrap();
-
-    // ─── Zed extension.toml ────────────────────────────────────────────
-    let zed_extension = r#"id = "rosy"
-name = "Rosy"
-version = "0.1.0"
-schema_version = 1
-authors = ["hiibolt"]
-description = "Rosy language support for Zed — diagnostics, completions, type hints"
-"#;
-    fs::write(Path::new(out_dir).join("zed_extension.toml"), zed_extension).unwrap();
-
-    // ─── Zed LSP settings snippet ──────────────────────────────────────
-    let zed_settings = r#"{
-  "lsp": {
-    "rosy": {
-      "binary": {
-        "path": "rosy",
-        "arguments": ["lsp"]
-      }
-    }
-  },
-  "languages": {
-    "Rosy": {
-      "language_servers": ["rosy"]
-    }
-  }
-}
-"#;
-    fs::write(Path::new(out_dir).join("zed_lsp_settings.json"), zed_settings).unwrap();
 }

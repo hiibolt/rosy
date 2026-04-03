@@ -602,10 +602,14 @@ const VSCODE_LANG_CONFIG: &str = include_str!(concat!(env!("OUT_DIR"), "/vscode_
 const VSCODE_EXTENSION_JS: &str = include_str!("../../editors/vscode/extension.js");
 const VSCODE_TM_GRAMMAR: &str = include_str!("../../editors/vscode/syntaxes/rosy.tmLanguage.json");
 
-// Zed extension files — all generated at build time from the grammar.
-const ZED_EXTENSION_TOML: &str = include_str!(concat!(env!("OUT_DIR"), "/zed_extension.toml"));
-const ZED_CONFIG_TOML: &str = include_str!(concat!(env!("OUT_DIR"), "/zed_config.toml"));
-const ZED_LSP_SETTINGS: &str = include_str!(concat!(env!("OUT_DIR"), "/zed_lsp_settings.json"));
+// Zed extension files — embedded at build time.
+// Unlike VS Code, Zed extensions need a WASM component, so we write the
+// full extension source directory and the user installs it as a dev extension.
+const ZED_EXTENSION_TOML: &str = include_str!("../../editors/zed/extension.toml");
+const ZED_CARGO_TOML: &str = include_str!("../../editors/zed/Cargo.toml");
+const ZED_LIB_RS: &str = include_str!("../../editors/zed/src/lib.rs");
+const ZED_CONFIG_TOML: &str = include_str!("../../editors/zed/languages/rosy/config.toml");
+const ZED_HIGHLIGHTS_SCM: &str = include_str!("../../editors/zed/languages/rosy/highlights.scm");
 
 fn install_editor_extension(editor: &EditorTarget) -> Result<()> {
     match editor {
@@ -659,51 +663,40 @@ fn install_zed_extension() -> Result<()> {
     let home = std::env::var("HOME")
         .context("Could not determine home directory (HOME is not set)")?;
 
-    // Zed config directory
-    let zed_config = if cfg!(target_os = "macos") {
-        PathBuf::from(&home).join(".config/zed")
-    } else {
-        PathBuf::from(&home).join(".config/zed")
-    };
-
-    let ext_dir = zed_config.join("extensions/installed/rosy");
+    // Write the full extension source directory. Zed compiles the WASM
+    // component when the user installs it as a dev extension.
+    let ext_dir = PathBuf::from(&home).join(".local/share/rosy/zed-extension");
+    let src_dir = ext_dir.join("src");
     let languages_dir = ext_dir.join("languages/rosy");
 
-    let action = if ext_dir.exists() { "Updating" } else { "Installing" };
-    eprintln!("{BOLD}  {action}{RESET} Zed extension");
+    let action = if ext_dir.exists() { "Updating" } else { "Writing" };
+    eprintln!("{BOLD}  {action}{RESET} Zed extension source");
     eprintln!("         to: {}", ext_dir.display());
 
+    fs::create_dir_all(&src_dir)
+        .context("Failed to create extension source directory")?;
     fs::create_dir_all(&languages_dir)
-        .context("Failed to create extension directory")?;
+        .context("Failed to create languages directory")?;
 
-    // All Zed config files are generated at build time from the grammar
     write(ext_dir.join("extension.toml"), ZED_EXTENSION_TOML)?;
+    write(ext_dir.join("Cargo.toml"), ZED_CARGO_TOML)?;
+    write(src_dir.join("lib.rs"), ZED_LIB_RS)?;
     write(languages_dir.join("config.toml"), ZED_CONFIG_TOML)?;
+    write(languages_dir.join("highlights.scm"), ZED_HIGHLIGHTS_SCM)?;
 
-    // Write a Zed settings snippet that configures the LSP
-    let settings_snippet = zed_config.join("rosy-lsp-settings.json");
-    write(&settings_snippet, ZED_LSP_SETTINGS)?;
-
-    let done_verb = if action == "Updating" { "Updated" } else { "Installed" };
-    eprintln!("{BOLD}{GREEN}    {done_verb}{RESET} Rosy Language Support for Zed");
+    let done_verb = if action == "Updating" { "Updated" } else { "Wrote" };
+    eprintln!("{BOLD}{GREEN}    {done_verb}{RESET} Rosy extension for Zed");
     eprintln!();
-    eprintln!("  Restart Zed to activate. Open any {BOLD}.rosy{RESET} file to see");
-    eprintln!("  syntax highlighting, diagnostics, and type hints.");
+    eprintln!("  {BOLD}To install:{RESET}");
+    eprintln!("    1. Open Zed");
+    eprintln!("    2. Open the command palette ({DIM}Cmd+Shift+P / Ctrl+Shift+P{RESET})");
+    eprintln!("    3. Run {BOLD}zed: install dev extension{RESET}");
+    eprintln!("    4. Select: {DIM}{}{RESET}", ext_dir.display());
     eprintln!();
-    eprintln!("  {BOLD}LSP setup:{RESET} Merge the following into your Zed settings");
-    eprintln!("  ({DIM}Zed > Settings > Open Settings{RESET}):");
+    eprintln!("  Zed will compile the extension and activate it. Open any");
+    eprintln!("  {BOLD}.rosy{RESET} file to see diagnostics, completions, and type hints.");
     eprintln!();
-    eprintln!("    {DIM}\"lsp\": {{");
-    eprintln!("      \"rosy\": {{");
-    eprintln!("        \"binary\": {{ \"path\": \"rosy\", \"arguments\": [\"lsp\"] }}");
-    eprintln!("      }}");
-    eprintln!("    }},");
-    eprintln!("    \"languages\": {{");
-    eprintln!("      \"Rosy\": {{ \"language_servers\": [\"rosy\"] }}");
-    eprintln!("    }}{RESET}");
-    eprintln!();
-    eprintln!("  A copy has been saved to:");
-    eprintln!("  {DIM}{}{RESET}", settings_snippet.display());
+    eprintln!("  {DIM}Make sure `rosy` is in your PATH so the LSP server can start.{RESET}");
 
     Ok(())
 }
