@@ -12,7 +12,7 @@ use crate::{
 use pest::Parser;
 use tower_lsp::lsp_types::*;
 
-/// Result of analyzing a single ROSY document.
+/// Result of analyzing a single Rosy document.
 #[derive(Debug, Default)]
 pub struct AnalysisResult {
     /// Parse and type resolution errors as LSP diagnostics.
@@ -112,7 +112,7 @@ fn extract_location_from_anyhow(error: &anyhow::Error) -> Option<Position> {
     None
 }
 
-/// Analyze a ROSY source document, returning diagnostics and type information.
+/// Analyze a Rosy source document, returning diagnostics and type information.
 pub fn analyze(source: &str) -> AnalysisResult {
     let mut result = AnalysisResult::default();
 
@@ -259,7 +259,7 @@ fn extract_inlay_hint(node: &GraphNode, hints: &mut Vec<InlayHintData>) {
 
 // ─── Semantic Tokenization ──────────────────────────────────────────────────
 
-/// Tokenize ROSY source text for semantic highlighting.
+/// Tokenize Rosy source text for semantic highlighting.
 /// Scans the source directly (not the AST) so it works even on broken files.
 /// Uses the auto-generated ROSY_KEYWORD_LIST to recognize keywords.
 fn tokenize_source(source: &str) -> Vec<SemanticTokenData> {

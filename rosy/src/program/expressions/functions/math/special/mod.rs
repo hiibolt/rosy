@@ -1,6 +1,6 @@
 //! # Special Functions
 //!
-//! Special mathematical functions in the ROSY language.
+//! Special mathematical functions in the Rosy language.
 //!
 //! - **[`erf`]** — `ERF` — Real error function
 //! - **[`werf`]** — `WERF` — Complex error function (Faddeeva)

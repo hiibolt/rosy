@@ -1,6 +1,6 @@
 //! # Mathematical Functions
 //!
-//! All built-in math functions in the ROSY language, grouped by category.
+//! All built-in math functions in the Rosy language, grouped by category.
 //!
 //! - **[`trig`]** — `SIN`, `COS`, `TAN`, `ASIN`, `ACOS`, `ATAN`, `SINH`, `COSH`, `TANH`
 //! - **[`exponential`]** — `EXP`, `LOG`, `SQR`, `SQRT`, `^` (power)

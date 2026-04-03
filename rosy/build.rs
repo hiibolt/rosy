@@ -331,7 +331,7 @@ fn generate_keywords_file(out_dir: &str, keywords: &[String], module_docs: &Hash
     for kw in keywords {
         let desc = module_docs.get(kw.as_str())
             .map(|d| if d.description.is_empty() { d.title.clone() } else { d.description.clone() })
-            .unwrap_or_else(|| "ROSY keyword".to_string());
+            .unwrap_or_else(|| "Rosy keyword".to_string());
         let desc = desc.replace('\\', "\\\\").replace('"', "\\\"");
         writeln!(f, "    (\"{kw}\", \"{desc}\"),").unwrap();
     }

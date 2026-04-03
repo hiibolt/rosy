@@ -1,4 +1,4 @@
-//! Power/exponentiation operator for ROSY types.
+//! Power/exponentiation operator for Rosy types.
 //!
 //! This module provides the `RosyPow` trait and implementations for all
 //! supported type combinations. The compatibility rules are defined in the

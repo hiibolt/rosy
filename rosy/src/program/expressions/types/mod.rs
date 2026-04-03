@@ -1,6 +1,6 @@
 //! # Literals
 //!
-//! How to write literal values in ROSY.
+//! How to write literal values in Rosy.
 //!
 //! - **[`number`]** — `3.14`, `42`, `-7` (type `RE`)
 //! - **[`string`]** — `'hello'` (type `ST`)

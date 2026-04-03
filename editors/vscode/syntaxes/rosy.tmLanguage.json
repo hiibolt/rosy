@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-  "name": "ROSY",
+  "name": "Rosy",
   "scopeName": "source.rosy",
   "comment": "Keyword highlighting is handled by the LSP semantic token provider. This grammar covers only structural tokens (comments, strings, numbers, operators) as a fallback when the LSP is not running.",
   "patterns": [

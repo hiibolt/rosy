@@ -47,7 +47,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for getting the LENGTH (memory size in 8-byte blocks) of ROSY data types.
+/// Trait for getting the LENGTH (memory size in 8-byte blocks) of Rosy data types.
 pub trait RosyLENGTH {
     fn rosy_length(&self) -> RE;
 }

@@ -1,6 +1,6 @@
 //! # READM Statement
 //!
-//! Reads arrays (produced by WRITEM) back into a ROSY variable.
+//! Reads arrays (produced by WRITEM) back into a Rosy variable.
 //!
 //! ## Syntax
 //!

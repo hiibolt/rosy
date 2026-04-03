@@ -25,7 +25,7 @@ pub fn get_return_type ( lhs: &RosyType ) -> Option<RosyType> {
     registry.get(&*lhs).copied()
 }           
 
-/// Trait for converting ROSY data types to strings
+/// Trait for converting Rosy data types to strings
 pub trait RosyST {
     fn rosy_to_string(self) -> String;
 }

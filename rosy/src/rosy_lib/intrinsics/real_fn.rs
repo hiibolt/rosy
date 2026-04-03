@@ -35,7 +35,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for computing the real part of ROSY data types.
+/// Trait for computing the real part of Rosy data types.
 pub trait RosyREAL {
     type Output;
     fn rosy_real(&self) -> anyhow::Result<Self::Output>;

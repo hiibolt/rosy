@@ -1,4 +1,4 @@
-//! Division operator for ROSY types.
+//! Division operator for Rosy types.
 //!
 //! This module provides the `RosyDiv` trait and implementations for all
 //! supported type combinations. The compatibility rules are defined in the
@@ -10,7 +10,7 @@
 //!
 //! # Examples
 //! 
-//! See `assets/operators/div/div.rosy` for ROSY examples and 
+//! See `assets/operators/div/div.rosy` for Rosy examples and 
 //! `assets/operators/div/div.fox` for equivalent COSY INFINITY code.
 
 use anyhow::Result;
@@ -23,7 +23,7 @@ use crate::rosy_lib::operators::{TypeRule, build_type_registry};
 /// This is the single source of truth for what type combinations are allowed.
 /// The build script (`build.rs`) parses this to generate:
 /// - Documentation table (`div_table.md`)
-/// - ROSY test script (`div.rosy`)
+/// - Rosy test script (`div.rosy`)
 /// - COSY test script (`div.fox`)
 /// - Integration tests
 pub const DIV_REGISTRY: &[TypeRule] = &[

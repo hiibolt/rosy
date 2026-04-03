@@ -35,7 +35,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for computing arccosine of ROSY data types.
+/// Trait for computing arccosine of Rosy data types.
 pub trait RosyACOS {
     type Output;
     fn rosy_acos(&self) -> anyhow::Result<Self::Output>;

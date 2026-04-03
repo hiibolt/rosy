@@ -1,7 +1,7 @@
 {
   "name": "rosy-language-support",
-  "displayName": "ROSY Language Support",
-  "description": "Syntax highlighting and language server support for the ROSY programming language",
+  "displayName": "Rosy Language Support",
+  "description": "Syntax highlighting and language server support for the Rosy programming language",
   "version": "0.1.0",
   "publisher": "hiibolt",
   "engines": {
@@ -18,7 +18,7 @@
     "languages": [
       {
         "id": "rosy",
-        "aliases": ["ROSY", "rosy"],
+        "aliases": ["Rosy", "rosy"],
         "extensions": [".rosy", ".fox"],
         "configuration": "./language-configuration.json"
       }

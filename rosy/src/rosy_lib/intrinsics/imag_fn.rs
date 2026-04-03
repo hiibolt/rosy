@@ -35,7 +35,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for computing the imaginary part of ROSY data types.
+/// Trait for computing the imaginary part of Rosy data types.
 pub trait RosyIMAG {
     type Output;
     fn rosy_imag(&self) -> anyhow::Result<Self::Output>;

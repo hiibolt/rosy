@@ -36,7 +36,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for computing inverse square root of ROSY data types.
+/// Trait for computing inverse square root of Rosy data types.
 pub trait RosyISRT {
     type Output;
     fn rosy_isrt(&self) -> anyhow::Result<Self::Output>;

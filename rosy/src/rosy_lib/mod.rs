@@ -1,4 +1,4 @@
-//! # ROSY Runtime Library
+//! # Rosy Runtime Library
 //!
 //! The embedded runtime library that ships with every generated Rust project.
 //! Contains operator implementations, intrinsic functions, type definitions,
@@ -6,7 +6,7 @@
 //!
 //! ## Type Aliases
 //!
-//! | ROSY Type | Rust Type | Description |
+//! | Rosy Type | Rust Type | Description |
 //! |-----------|-----------|-------------|
 //! | `RE` | `f64` | Real number |
 //! | `ST` | `String` | String |
@@ -211,7 +211,7 @@ impl TryFrom<&str> for RosyBaseType {
             "VE" => Ok(RosyBaseType::VE),
             "DA" => Ok(RosyBaseType::DA),
             "CD" => Ok(RosyBaseType::CD),
-            _ => Err(anyhow::anyhow!("Can't convert {} to a ROSY type", value)),
+            _ => Err(anyhow::anyhow!("Can't convert {} to a Rosy type", value)),
         }
     }
 }

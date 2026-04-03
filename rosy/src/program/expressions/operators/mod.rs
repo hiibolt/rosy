@@ -1,6 +1,6 @@
 //! # Operators
 //!
-//! All binary and unary operators in the ROSY language.
+//! All binary and unary operators in the Rosy language.
 //!
 //! - **[`arithmetic`]** — `+`, `-`, `*`, `/`
 //! - **[`comparison`]** — `=`, `<>`, `<`, `>`, `<=`, `>=`

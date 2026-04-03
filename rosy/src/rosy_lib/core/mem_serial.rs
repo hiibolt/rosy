@@ -1,6 +1,6 @@
-//! Memory serialization runtime support for ROSY.
+//! Memory serialization runtime support for Rosy.
 //!
-//! Implements WRITEM/READM semantics: serialize a ROSY variable into parallel
+//! Implements WRITEM/READM semantics: serialize a Rosy variable into parallel
 //! arrays (double-precision part, integer metadata part, DA parameters) and
 //! deserialize back again.
 //!
@@ -33,14 +33,14 @@ pub const WRITEM_VERSION: f64 = 1.0;
 // Trait definitions
 // ──────────────────────────────────────────────────────────────────────────────
 
-/// Serialize a ROSY variable to the WRITEM array representation.
+/// Serialize a Rosy variable to the WRITEM array representation.
 ///
 /// Returns `(var_info, dp_array, int_array, da_params)`.
 pub trait RosyWritem {
     fn writem(&self) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
 }
 
-/// Deserialize a ROSY variable from the WRITEM array representation.
+/// Deserialize a Rosy variable from the WRITEM array representation.
 pub trait RosyReadm: Sized {
     /// Expected type code for this type (used for validation).
     fn expected_type_code() -> f64;

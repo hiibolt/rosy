@@ -1,6 +1,6 @@
 use crate::rosy_lib::{RE, VE};
 
-/// Trait for computing the maximum element of ROSY vector types.
+/// Trait for computing the maximum element of Rosy vector types.
 pub trait RosyVMAX {
     fn rosy_vmax(&self) -> anyhow::Result<RE>;
 }

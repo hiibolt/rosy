@@ -1,6 +1,6 @@
-//! Logical NOT (negation) operator for ROSY types.
+//! Logical NOT (negation) operator for Rosy types.
 //!
-//! This is a ROSY extension not present in COSY INFINITY.
+//! This is a Rosy extension not present in COSY INFINITY.
 //! Supports both `!x` and `NOT x` syntax.
 //!
 //! This module provides the `RosyNot` trait and implementations.

@@ -38,7 +38,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for returning the COSY type code of ROSY data types.
+/// Trait for returning the COSY type code of Rosy data types.
 pub trait RosyTYPE {
     fn rosy_type(&self) -> anyhow::Result<RE>;
 }

@@ -1,6 +1,6 @@
 //! # Language Server
 //!
-//! LSP server for ROSY, providing diagnostics, completion, hover,
+//! LSP server for Rosy, providing diagnostics, completion, hover,
 //! inlay type hints, and semantic token highlighting.
 //!
 //! Launched via `rosy lsp` — communicates over stdin/stdout using

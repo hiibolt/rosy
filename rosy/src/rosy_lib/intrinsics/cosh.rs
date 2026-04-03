@@ -36,7 +36,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for computing hyperbolic cosine of ROSY data types.
+/// Trait for computing hyperbolic cosine of Rosy data types.
 pub trait RosyCOSH {
     type Output;
     fn rosy_cosh(&self) -> anyhow::Result<Self::Output>;

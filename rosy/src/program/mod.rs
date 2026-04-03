@@ -1,6 +1,6 @@
-//! # ROSY Language Reference
+//! # Rosy Language Reference
 //!
-//! This is the complete reference for the ROSY programming language. A ROSY
+//! This is the complete reference for the Rosy programming language. A Rosy
 //! program is a `BEGIN; ... END;` block containing [`statements`] that operate
 //! on [`expressions`].
 //!

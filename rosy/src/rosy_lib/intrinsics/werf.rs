@@ -30,7 +30,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for computing the Faddeeva function of ROSY data types.
+/// Trait for computing the Faddeeva function of Rosy data types.
 pub trait RosyWERF {
     type Output;
     fn rosy_werf(&self) -> anyhow::Result<Self::Output>;

@@ -45,7 +45,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for getting the memory address of ROSY data types.
+/// Trait for getting the memory address of Rosy data types.
 ///
 /// Since Rosy transpiles to Rust (not Fortran), true COSY memory addresses
 /// are meaningless. VARMEM returns the actual Rust pointer address cast to f64,

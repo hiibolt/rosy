@@ -38,7 +38,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for computing cosine of ROSY data types.
+/// Trait for computing cosine of Rosy data types.
 pub trait RosyCOS {
     type Output;
     fn rosy_cos(&self) -> anyhow::Result<Self::Output>;

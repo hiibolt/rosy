@@ -1,6 +1,6 @@
 //! # Expressions
 //!
-//! Everything in ROSY that produces a value — operators, functions, literals,
+//! Everything in Rosy that produces a value — operators, functions, literals,
 //! and variable references.
 //!
 //! ## Looking for something?

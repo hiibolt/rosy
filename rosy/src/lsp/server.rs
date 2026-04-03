@@ -1,4 +1,4 @@
-//! LSP server implementation for ROSY.
+//! LSP server implementation for Rosy.
 //!
 //! Provides diagnostics, completion, hover, and inlay hints by running
 //! the real rosy parser and type resolver on each document change.

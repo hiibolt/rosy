@@ -1,6 +1,6 @@
 //! # Transpilation Engine
 //!
-//! Core traits and context types for converting the ROSY AST into Rust source code.
+//! Core traits and context types for converting the Rosy AST into Rust source code.
 //!
 //! ## Key Traits
 //!

@@ -33,7 +33,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for converting ROSY data types to vectors (VE).
+/// Trait for converting Rosy data types to vectors (VE).
 pub trait RosyVEConvert {
     fn rosy_ve_convert(&self) -> anyhow::Result<VE>;
 }

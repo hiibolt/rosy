@@ -5,7 +5,7 @@
 //!
 //! ## Grammar
 //!
-//! The PEG grammar lives at `rosy/assets/rosy.pest` and defines all ROSY
+//! The PEG grammar lives at `rosy/assets/rosy.pest` and defines all Rosy
 //! language constructs. The generated [`CosyParser`] provides parsing entry
 //! points.
 //!

@@ -17,7 +17,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     }
 }
 
-/// Trait for computing the minimum element of ROSY vector types.
+/// Trait for computing the minimum element of Rosy vector types.
 pub trait RosyVMIN {
     fn rosy_vmin(&self) -> anyhow::Result<RE>;
 }

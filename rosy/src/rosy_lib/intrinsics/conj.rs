@@ -32,7 +32,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for computing complex conjugate of ROSY data types.
+/// Trait for computing complex conjugate of Rosy data types.
 pub trait RosyCONJ {
     type Output;
     fn rosy_conj(&self) -> anyhow::Result<Self::Output>;

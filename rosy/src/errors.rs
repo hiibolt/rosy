@@ -6,7 +6,7 @@
 
 use crate::program::statements::SourceLocation;
 
-/// A ROSY error with an associated source location.
+/// A Rosy error with an associated source location.
 ///
 /// Use this instead of plain `anyhow!()` whenever a `SourceLocation` is available.
 /// The LSP extracts the location via `downcast_ref` to place diagnostics precisely.

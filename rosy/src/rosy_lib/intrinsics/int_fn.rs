@@ -24,7 +24,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for truncating ROSY data types toward zero.
+/// Trait for truncating Rosy data types toward zero.
 pub trait RosyINT {
     type Output;
     fn rosy_int(&self) -> anyhow::Result<Self::Output>;

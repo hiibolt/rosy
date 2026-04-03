@@ -1,6 +1,6 @@
 //! # Statements
 //!
-//! Everything in ROSY that *does* something — declarations, control flow, I/O,
+//! Everything in Rosy that *does* something — declarations, control flow, I/O,
 //! and more.
 //!
 //! ## Looking for something?

@@ -39,7 +39,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for computing sine of ROSY data types.
+/// Trait for computing sine of Rosy data types.
 pub trait RosySIN {
     type Output;
     fn rosy_sin(&self) -> anyhow::Result<Self::Output>;

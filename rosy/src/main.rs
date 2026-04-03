@@ -106,7 +106,7 @@ enum Commands {
     /// Start the Language Server Protocol (LSP) server on stdin/stdout
     Lsp,
 
-    /// Install editor extensions for ROSY language support
+    /// Install editor extensions for Rosy language support
     Setup {
         /// Which editor to install for
         #[command(subcommand)]
@@ -118,7 +118,7 @@ enum Commands {
 enum EditorTarget {
     /// Install the VS Code extension (syntax highlighting + LSP)
     Vscode,
-    /// Install the Zed extension (syntax highlighting + LSP)
+    /// Install the Zed extension (language config + LSP setup)
     Zed,
 }
 
@@ -637,7 +637,7 @@ fn install_vscode_extension() -> Result<()> {
     write(syntaxes_dir.join("rosy.tmLanguage.json"), VSCODE_TM_GRAMMAR)?;
 
     let done_verb = if action == "Updating" { "Updated" } else { "Installed" };
-    eprintln!("{BOLD}{GREEN}    {done_verb}{RESET} ROSY Language Support for VS Code");
+    eprintln!("{BOLD}{GREEN}    {done_verb}{RESET} Rosy Language Support for VS Code");
     eprintln!();
     eprintln!("  Reload VS Code to activate. Open any {BOLD}.rosy{RESET} file to see");
     eprintln!("  syntax highlighting, diagnostics, and type hints.");
@@ -651,13 +651,14 @@ fn install_zed_extension() -> Result<()> {
     let home = std::env::var("HOME")
         .context("Could not determine home directory (HOME is not set)")?;
 
-    let extensions_dir = if cfg!(target_os = "macos") {
-        PathBuf::from(&home).join(".config/zed/extensions/installed")
+    // Zed config directory
+    let zed_config = if cfg!(target_os = "macos") {
+        PathBuf::from(&home).join(".config/zed")
     } else {
-        PathBuf::from(&home).join(".config/zed/extensions/installed")
+        PathBuf::from(&home).join(".config/zed")
     };
 
-    let ext_dir = extensions_dir.join("rosy");
+    let ext_dir = zed_config.join("extensions/installed/rosy");
     let languages_dir = ext_dir.join("languages/rosy");
 
     let action = if ext_dir.exists() { "Updating" } else { "Installing" };
@@ -667,41 +668,76 @@ fn install_zed_extension() -> Result<()> {
     fs::create_dir_all(&languages_dir)
         .context("Failed to create extension directory")?;
 
-    // extension.toml
+    // extension.toml — declares the language and LSP server
     write(
         ext_dir.join("extension.toml"),
         r#"id = "rosy"
-name = "ROSY"
+name = "Rosy"
 version = "0.1.0"
 schema_version = 1
 authors = ["hiibolt"]
-description = "ROSY language support — syntax highlighting and LSP"
-
-[language_servers.rosy]
-name = "rosy"
-languages = ["ROSY"]
+description = "Rosy language support for Zed — diagnostics, completions, type hints"
 "#,
     )?;
 
-    // languages/rosy/config.toml
+    // languages/rosy/config.toml — language configuration
     write(
         languages_dir.join("config.toml"),
-        r#"name = "ROSY"
-grammar = "rosy"
+        r#"name = "Rosy"
 path_suffixes = ["rosy", "fox"]
+line_comments = []
 block_comment = ["{", "}"]
+autoclose_before = ";:.,=}])> \n\t"
+brackets = [
+  { start = "(", end = ")", close = true, newline = false },
+  { start = "{", end = "}", close = true, newline = false },
+]
+word_characters = ["_"]
+"#,
+    )?;
+
+    // Write a Zed settings snippet that configures the LSP
+    let settings_snippet = zed_config.join("rosy-lsp-settings.json");
+    write(
+        &settings_snippet,
+        r#"{
+  "lsp": {
+    "rosy": {
+      "binary": {
+        "path": "rosy",
+        "arguments": ["lsp"]
+      }
+    }
+  },
+  "languages": {
+    "Rosy": {
+      "language_servers": ["rosy"]
+    }
+  }
+}
 "#,
     )?;
 
     let done_verb = if action == "Updating" { "Updated" } else { "Installed" };
-    eprintln!("{BOLD}{GREEN}    {done_verb}{RESET} ROSY Language Support for Zed");
+    eprintln!("{BOLD}{GREEN}    {done_verb}{RESET} Rosy Language Support for Zed");
     eprintln!();
     eprintln!("  Restart Zed to activate. Open any {BOLD}.rosy{RESET} file to see");
-    eprintln!("  language support.");
+    eprintln!("  syntax highlighting, diagnostics, and type hints.");
     eprintln!();
-    eprintln!("  {DIM}Note: Full LSP and syntax highlighting require a Tree-sitter");
-    eprintln!("  grammar for ROSY, which is not yet available. Basic language");
-    eprintln!("  configuration (file association, comments) is installed now.{RESET}");
+    eprintln!("  {BOLD}LSP setup:{RESET} Merge the following into your Zed settings");
+    eprintln!("  ({DIM}Zed > Settings > Open Settings{RESET}):");
+    eprintln!();
+    eprintln!("    {DIM}\"lsp\": {{");
+    eprintln!("      \"rosy\": {{");
+    eprintln!("        \"binary\": {{ \"path\": \"rosy\", \"arguments\": [\"lsp\"] }}");
+    eprintln!("      }}");
+    eprintln!("    }},");
+    eprintln!("    \"languages\": {{");
+    eprintln!("      \"Rosy\": {{ \"language_servers\": [\"rosy\"] }}");
+    eprintln!("    }}{RESET}");
+    eprintln!();
+    eprintln!("  A copy has been saved to:");
+    eprintln!("  {DIM}{}{RESET}", settings_snippet.display());
 
     Ok(())
 }

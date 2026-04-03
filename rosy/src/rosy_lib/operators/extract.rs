@@ -1,4 +1,4 @@
-//! Extraction operator for ROSY types.
+//! Extraction operator for Rosy types.
 //!
 //! This module provides the `RosyExtract` trait and implementations for all
 //! supported type combinations. The compatibility rules are defined in the
@@ -10,7 +10,7 @@
 //!
 //! # Examples
 //! 
-//! See `assets/operators/extract/extract.rosy` for ROSY examples and 
+//! See `assets/operators/extract/extract.rosy` for Rosy examples and 
 //! `assets/operators/extract/extract.fox` for equivalent COSY INFINITY code.
 
 use anyhow::{Result, bail};
@@ -25,7 +25,7 @@ use crate::rosy_lib::taylor::monomial::Monomial;
 /// This is the single source of truth for what type combinations are allowed.
 /// The build script (`build.rs`) parses this to generate:
 /// - Documentation table (`extract_table.md`)
-/// - ROSY test script (`extract.rosy`)
+/// - Rosy test script (`extract.rosy`)
 /// - COSY test script (`extract.fox`)
 /// - Integration tests
 /// 
@@ -48,7 +48,7 @@ pub fn get_return_type(base: &RosyType, index: &RosyType) -> Option<RosyType> {
     registry.get(&(*base, *index)).copied()
 }
 
-/// Trait for extracting components from ROSY data types
+/// Trait for extracting components from Rosy data types
 pub trait RosyExtract<T> {
     type Output;
     fn rosy_extract(self, index: T) -> Result<Self::Output>;
@@ -64,7 +64,7 @@ impl RosyExtract<&RE> for &ST {
             bail!("String index {} out of bounds (1-{})", idx, self.len());
         }
         
-        // ROSY uses 1-based indexing
+        // Rosy uses 1-based indexing
         let char_at_idx = self.chars().nth(idx - 1)
             .ok_or_else(|| anyhow::anyhow!("Character at index {} not found", idx))?;
         
@@ -88,7 +88,7 @@ impl RosyExtract<&VE> for &ST {
             bail!("String index range {}-{} out of bounds (1-{})", start, end, self.len());
         }
         
-        // ROSY uses 1-based indexing
+        // Rosy uses 1-based indexing
         let substring: String = self.chars().skip(start - 1).take(end - start + 1).collect();
         
         Ok(substring)
@@ -118,7 +118,7 @@ impl RosyExtract<&RE> for &VE {
             bail!("Vector index {} out of bounds (1-{})", idx, self.len());
         }
         
-        // ROSY uses 1-based indexing
+        // Rosy uses 1-based indexing
         Ok(self[idx - 1])
     }
 }
@@ -139,7 +139,7 @@ impl RosyExtract<&VE> for &VE {
             bail!("Vector index range {}-{} out of bounds (1-{})", start, end, self.len());
         }
         
-        // ROSY uses 1-based indexing
+        // Rosy uses 1-based indexing
         Ok(self[start - 1..end].to_vec())
     }
 }
