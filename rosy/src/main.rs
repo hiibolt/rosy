@@ -594,10 +594,18 @@ fn run_construct_tests(filter: Option<&str>, release: bool, parallel: usize) -> 
 // ─── Editor Extension Installer ────────────────────────────────────────────
 
 // VS Code extension files embedded at compile time
+// VS Code extension files — package.json, extension.js, and tmLanguage are
+// static (embedded from editors/vscode/). The language config is generated
+// from the grammar at build time so folding/indent keywords stay in sync.
 const VSCODE_PACKAGE_JSON: &str = include_str!("../../editors/vscode/package.json");
-const VSCODE_LANG_CONFIG: &str = include_str!("../../editors/vscode/language-configuration.json");
+const VSCODE_LANG_CONFIG: &str = include_str!(concat!(env!("OUT_DIR"), "/vscode_language_configuration.json"));
 const VSCODE_EXTENSION_JS: &str = include_str!("../../editors/vscode/extension.js");
 const VSCODE_TM_GRAMMAR: &str = include_str!("../../editors/vscode/syntaxes/rosy.tmLanguage.json");
+
+// Zed extension files — all generated at build time from the grammar.
+const ZED_EXTENSION_TOML: &str = include_str!(concat!(env!("OUT_DIR"), "/zed_extension.toml"));
+const ZED_CONFIG_TOML: &str = include_str!(concat!(env!("OUT_DIR"), "/zed_config.toml"));
+const ZED_LSP_SETTINGS: &str = include_str!(concat!(env!("OUT_DIR"), "/zed_lsp_settings.json"));
 
 fn install_editor_extension(editor: &EditorTarget) -> Result<()> {
     match editor {
@@ -668,55 +676,13 @@ fn install_zed_extension() -> Result<()> {
     fs::create_dir_all(&languages_dir)
         .context("Failed to create extension directory")?;
 
-    // extension.toml — declares the language and LSP server
-    write(
-        ext_dir.join("extension.toml"),
-        r#"id = "rosy"
-name = "Rosy"
-version = "0.1.0"
-schema_version = 1
-authors = ["hiibolt"]
-description = "Rosy language support for Zed — diagnostics, completions, type hints"
-"#,
-    )?;
-
-    // languages/rosy/config.toml — language configuration
-    write(
-        languages_dir.join("config.toml"),
-        r#"name = "Rosy"
-path_suffixes = ["rosy", "fox"]
-line_comments = []
-block_comment = ["{", "}"]
-autoclose_before = ";:.,=}])> \n\t"
-brackets = [
-  { start = "(", end = ")", close = true, newline = false },
-  { start = "{", end = "}", close = true, newline = false },
-]
-word_characters = ["_"]
-"#,
-    )?;
+    // All Zed config files are generated at build time from the grammar
+    write(ext_dir.join("extension.toml"), ZED_EXTENSION_TOML)?;
+    write(languages_dir.join("config.toml"), ZED_CONFIG_TOML)?;
 
     // Write a Zed settings snippet that configures the LSP
     let settings_snippet = zed_config.join("rosy-lsp-settings.json");
-    write(
-        &settings_snippet,
-        r#"{
-  "lsp": {
-    "rosy": {
-      "binary": {
-        "path": "rosy",
-        "arguments": ["lsp"]
-      }
-    }
-  },
-  "languages": {
-    "Rosy": {
-      "language_servers": ["rosy"]
-    }
-  }
-}
-"#,
-    )?;
+    write(&settings_snippet, ZED_LSP_SETTINGS)?;
 
     let done_verb = if action == "Updating" { "Updated" } else { "Installed" };
     eprintln!("{BOLD}{GREEN}    {done_verb}{RESET} Rosy Language Support for Zed");

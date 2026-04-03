@@ -93,6 +93,7 @@ fn main() {
     let rule_to_keyword = build_rule_keyword_map(&pest_source);
     generate_keywords_file(&out_dir, &keywords, &module_docs);
     generate_hover_file(&out_dir, &module_docs, &rule_to_keyword);
+    generate_editor_configs(&out_dir, &keywords);
 }
 
 fn collect_files(root: &Path, current: &Path) -> Vec<PathBuf> {
@@ -367,4 +368,131 @@ fn generate_hover_file(out_dir: &str, module_docs: &HashMap<String, ModuleDoc>, 
         writeln!(f, "    (\"{name}\", \"**{name}** \\u{{2014}} {desc} (`{rust_type}`)\\n\\n[Documentation]({base}/rosy_lib/enum.RosyBaseType.html#variant.{name})\", \"{desc}\"),").unwrap();
     }
     writeln!(f, "];").unwrap();
+}
+
+/// Generate editor configuration files derived from the keyword list.
+///
+/// Derives folding/indent markers from `END*` keywords and their openers.
+/// Generates VS Code language-configuration.json, Zed config.toml, and
+/// Zed extension.toml + LSP settings snippet.
+fn generate_editor_configs(out_dir: &str, keywords: &[String]) {
+    // Find block-closer keywords (END*) and their openers
+    let mut closers: Vec<String> = Vec::new();
+    let mut openers: Vec<String> = Vec::new();
+    let mut mid_block: Vec<String> = Vec::new();
+
+    for kw in keywords {
+        if kw.starts_with("END") {
+            closers.push(kw.clone());
+            let opener = &kw[3..];
+            if !opener.is_empty() && keywords.contains(&opener.to_string()) {
+                openers.push(opener.to_string());
+            }
+        }
+    }
+
+    if keywords.contains(&"BEGIN".to_string()) {
+        openers.push("BEGIN".to_string());
+    }
+    for kw in ["ELSEIF", "ELSE"] {
+        if keywords.contains(&kw.to_string()) {
+            mid_block.push(kw.to_string());
+        }
+    }
+
+    openers.sort();
+    openers.dedup();
+    closers.sort();
+    mid_block.sort();
+
+    let openers_joined = openers.join("|");
+    let closers_joined = closers.join("|");
+    let mid_block_joined = mid_block.join("|");
+
+    // ─── VS Code language-configuration.json ───────────────────────────
+    let increase = format!("{openers_joined}|{mid_block_joined}");
+    let decrease = format!("{closers_joined}|{mid_block_joined}");
+
+    let vscode_config = format!(
+        r#"{{
+  "comments": {{
+    "blockComment": ["{{", "}}"]
+  }},
+  "brackets": [
+    ["(", ")"],
+    ["[", "]"]
+  ],
+  "autoClosingPairs": [
+    {{ "open": "(", "close": ")" }},
+    {{ "open": "[", "close": "]" }},
+    {{ "open": "{{", "close": "}}" }},
+    {{ "open": "'", "close": "'", "notIn": ["string"] }},
+    {{ "open": "\"", "close": "\"", "notIn": ["string"] }}
+  ],
+  "surroundingPairs": [
+    ["(", ")"],
+    ["[", "]"],
+    ["{{", "}}"],
+    ["'", "'"],
+    ["\"", "\""]
+  ],
+  "folding": {{
+    "markers": {{
+      "start": "^\\s*({openers_joined})\\b",
+      "end": "^\\s*({closers_joined})\\b"
+    }}
+  }},
+  "indentationRules": {{
+    "increaseIndentPattern": "^\\s*({increase})\\b",
+    "decreaseIndentPattern": "^\\s*({decrease})\\b"
+  }},
+  "wordPattern": "[a-zA-Z_][a-zA-Z0-9_]*"
+}}
+"#
+    );
+
+    fs::write(Path::new(out_dir).join("vscode_language_configuration.json"), &vscode_config).unwrap();
+
+    // ─── Zed languages/rosy/config.toml ────────────────────────────────
+    let zed_config = r#"name = "Rosy"
+path_suffixes = ["rosy", "fox"]
+line_comments = []
+block_comment = ["{", "}"]
+autoclose_before = ";:.,=}])> \n\t"
+brackets = [
+  { start = "(", end = ")", close = true, newline = false },
+  { start = "{", end = "}", close = true, newline = false },
+]
+word_characters = ["_"]
+"#;
+    fs::write(Path::new(out_dir).join("zed_config.toml"), zed_config).unwrap();
+
+    // ─── Zed extension.toml ────────────────────────────────────────────
+    let zed_extension = r#"id = "rosy"
+name = "Rosy"
+version = "0.1.0"
+schema_version = 1
+authors = ["hiibolt"]
+description = "Rosy language support for Zed — diagnostics, completions, type hints"
+"#;
+    fs::write(Path::new(out_dir).join("zed_extension.toml"), zed_extension).unwrap();
+
+    // ─── Zed LSP settings snippet ──────────────────────────────────────
+    let zed_settings = r#"{
+  "lsp": {
+    "rosy": {
+      "binary": {
+        "path": "rosy",
+        "arguments": ["lsp"]
+      }
+    }
+  },
+  "languages": {
+    "Rosy": {
+      "language_servers": ["rosy"]
+    }
+  }
+}
+"#;
+    fs::write(Path::new(out_dir).join("zed_lsp_settings.json"), zed_settings).unwrap();
 }
