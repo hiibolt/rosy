@@ -16,6 +16,7 @@
 
 pub mod ast;
 pub mod embedded;
+pub mod errors;
 pub mod program;
 pub mod resolve;
 #[allow(unused_imports, dead_code)]

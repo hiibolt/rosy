@@ -5,11 +5,11 @@
 
 use rosy::{
     ast::{CosyParser, FromRule, Rule},
+    errors::RosyError,
     program::Program,
     resolve::{GraphNode, TypeResolver, TypeSlot},
 };
 use pest::Parser;
-use regex::Regex;
 use tower_lsp::lsp_types::*;
 
 /// Result of analyzing a single ROSY document.
@@ -93,30 +93,23 @@ pub struct InferredFromLocation {
     pub reason: String,
 }
 
-/// Extract a line and column from an error message using regex patterns.
+/// Extract an LSP Position from an anyhow error by downcasting to RosyError.
 ///
-/// Looks for patterns like "line N, col M" in the error text.
+/// Walks the error chain looking for a RosyError with a SourceLocation.
 /// Returns a 0-based LSP Position if found, otherwise None.
-fn extract_location_from_error(error_msg: &str) -> Option<Position> {
-    // Pattern matches "line N, col M" anywhere in the error message
-    // This handles both direct SourceLocation formatting and error context strings
-    let re = Regex::new(r"line\s+(\d+),\s+col\s+(\d+)").ok()?;
-
-    if let Some(caps) = re.captures(error_msg) {
-        let line_str = caps.get(1)?.as_str();
-        let col_str = caps.get(2)?.as_str();
-
-        let line = line_str.parse::<u32>().ok()?;
-        let col = col_str.parse::<u32>().ok()?;
-
-        // Convert from 1-based (ROSY) to 0-based (LSP)
-        Some(Position::new(
-            line.saturating_sub(1),
-            col.saturating_sub(1),
-        ))
-    } else {
-        None
+fn extract_location_from_anyhow(error: &anyhow::Error) -> Option<Position> {
+    // Walk the error chain looking for a RosyError
+    for cause in error.chain() {
+        if let Some(rosy_err) = cause.downcast_ref::<RosyError>() {
+            if let Some(loc) = &rosy_err.location {
+                return Some(Position::new(
+                    loc.line.saturating_sub(1) as u32,
+                    loc.col.saturating_sub(1) as u32,
+                ));
+            }
+        }
     }
+    None
 }
 
 /// Analyze a ROSY source document, returning diagnostics and type information.
@@ -164,12 +157,11 @@ pub fn analyze(source: &str) -> AnalysisResult {
             return result;
         }
         Err(e) => {
-            let error_msg = format!("{e}");
-            let position = extract_location_from_error(&error_msg).unwrap_or(Position::new(0, 0));
+            let position = extract_location_from_anyhow(&e).unwrap_or(Position::new(0, 0));
             result.diagnostics.push(Diagnostic {
                 range: Range::new(position, position),
                 severity: Some(DiagnosticSeverity::ERROR),
-                message: format!("AST construction failed: {error_msg}"),
+                message: format!("AST construction failed: {e}"),
                 source: Some("rosy".to_string()),
                 ..Default::default()
             });
@@ -182,9 +174,9 @@ pub fn analyze(source: &str) -> AnalysisResult {
     let resolver = match TypeResolver::resolve(&mut ast) {
         Ok((resolver, warnings)) => {
             for w in warnings {
-                let position = extract_location_from_error(&w).unwrap_or(Position::new(0, 0));
+                // Warnings are plain strings — no structured location available
                 result.diagnostics.push(Diagnostic {
-                    range: Range::new(position, position),
+                    range: Range::new(Position::new(0, 0), Position::new(0, 0)),
                     severity: Some(DiagnosticSeverity::WARNING),
                     message: w,
                     source: Some("rosy".to_string()),
@@ -194,12 +186,11 @@ pub fn analyze(source: &str) -> AnalysisResult {
             Some(resolver)
         }
         Err(e) => {
-            let error_msg = format!("{e}");
-            let position = extract_location_from_error(&error_msg).unwrap_or(Position::new(0, 0));
+            let position = extract_location_from_anyhow(&e).unwrap_or(Position::new(0, 0));
             result.diagnostics.push(Diagnostic {
                 range: Range::new(position, position),
                 severity: Some(DiagnosticSeverity::ERROR),
-                message: format!("Type resolution failed: {error_msg}"),
+                message: format!("Type resolution failed: {e}"),
                 source: Some("rosy".to_string()),
                 ..Default::default()
             });

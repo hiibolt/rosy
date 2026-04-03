@@ -35,6 +35,7 @@
 use std::collections::{BTreeSet, HashSet};
 
 use super::super::super::{TranspilationInputContext, TranspilationOutput, Transpile};
+use crate::errors::RosyError;
 use crate::rosy_lib::{RosyBaseType, RosyType};
 use crate::{
     ast::*,
@@ -186,8 +187,7 @@ impl TranspileableStatement for AssignStatement {
                                 String::new()
                             }
                         };
-                        return InferenceEdgeResult::HasEdges {
-                            result: Err(anyhow!(
+                        let msg = format!(
                                 "\n╭─ Type Conflict ──────────────────────────────────────────\n\
                                 │\n\
                                 │  Variable '{}' (in {}) is declared as {} but is\n\
@@ -209,7 +209,9 @@ impl TranspileableStatement for AssignStatement {
                                 var_name,
                                 new_type.base_type,
                                 ve_hint,
-                            )),
+                        );
+                        return InferenceEdgeResult::HasEdges {
+                            result: Err(RosyError::at(source_location.clone(), msg).into()),
                         };
                     }
                 }
@@ -353,8 +355,7 @@ impl TranspileableStatement for AssignStatement {
                             .unwrap_or_default();
                         let second_assign_hint =
                             format!("\n│  📍 Then assigned at:   {}", source_location);
-                        return InferenceEdgeResult::HasEdges {
-                            result: Err(anyhow!(
+                        let msg = format!(
                                 "\n╭─ Type Conflict ──────────────────────────────────────────\n\
                                 │\n\
                                 │  Variable '{}' (in {}) is assigned conflicting types:\n\
@@ -380,7 +381,9 @@ impl TranspileableStatement for AssignStatement {
                                 old_type.base_type,
                                 var_name,
                                 new_type.base_type,
-                            )),
+                        );
+                        return InferenceEdgeResult::HasEdges {
+                            result: Err(RosyError::at(source_location.clone(), msg).into()),
                         };
                     }
                 }

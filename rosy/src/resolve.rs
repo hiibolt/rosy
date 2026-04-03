@@ -12,6 +12,7 @@
 //! 3. Topologically sort (Kahn's algorithm) and resolve from leaves inward
 //! 4. Report cycles as errors
 
+use crate::errors::RosyError;
 use crate::program::Program;
 use crate::program::expressions::*;
 use crate::program::statements::*;
@@ -578,7 +579,17 @@ impl TypeResolver {
         msg.push_str("\n│  known type, or is part of a cycle, it cannot be resolved.");
         msg.push_str("\n│");
         msg.push_str("\n╰──────────────────────────────────────────────────────────");
-        Err(anyhow!("{}", msg))
+        // Use the location of the first unresolvable slot for diagnostic placement
+        let first_loc = no_info_slots
+            .iter()
+            .chain(cycle_slots.iter())
+            .filter_map(|s| self.nodes.get(s)?.declared_at.clone())
+            .next();
+        Err(RosyError {
+            message: msg,
+            location: first_loc,
+            severity: crate::errors::RosyErrorSeverity::Error,
+        }.into())
     }
 
     /// Extract the human-readable reason from a resolution rule, if available.
@@ -608,15 +619,17 @@ impl TypeResolver {
             ResolutionRule::Explicit(t) => t,
             ResolutionRule::InferredFrom { recipe, reason } => {
                 self.evaluate_recipe(&recipe).map_err(|e| {
-                    let mut ctx = format!("while resolving {}", slot);
-                    if let Some(loc) = &assigned_at {
-                        ctx.push_str(&format!("\n  📍 Assigned at: {}", loc));
-                    }
-                    if let Some(loc) = &declared_at {
-                        ctx.push_str(&format!("\n  📍 Declared at: {}", loc));
-                    }
-                    ctx.push_str(&format!("\n  ({})", reason));
-                    e.context(ctx)
+                    let msg = format!(
+                        "while resolving {}: {}\n  ({})",
+                        slot, e, reason
+                    );
+                    // Prefer assigned_at (the source of inference), fall back to declared_at
+                    let loc = assigned_at.clone().or_else(|| declared_at.clone());
+                    anyhow::Error::from(RosyError {
+                        message: msg,
+                        location: loc,
+                        severity: crate::errors::RosyErrorSeverity::Error,
+                    })
                 })?
             }
             ResolutionRule::Mirror { source, .. } => self
@@ -631,14 +644,15 @@ impl TypeResolver {
                     )
                 })?,
             ResolutionRule::Unresolved => {
-                let mut msg = format!("No type could be determined for {}", slot);
-                if let Some(loc) = &node.declared_at {
-                    msg.push_str(&format!("\n  📍 Declared at: {}", loc));
-                }
-                msg.push_str(
-                    "\n  💡 Add an explicit type annotation or assign a value with a known type.",
+                let msg = format!(
+                    "No type could be determined for {}\n  💡 Add an explicit type annotation or assign a value with a known type.",
+                    slot
                 );
-                return Err(anyhow!("{}", msg));
+                return Err(RosyError {
+                    message: msg,
+                    location: node.declared_at.clone(),
+                    severity: crate::errors::RosyErrorSeverity::Error,
+                }.into());
             }
         };
 
