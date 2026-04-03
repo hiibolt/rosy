@@ -1,6 +1,7 @@
 pub mod da_ops;
 pub mod display;
 pub mod file_io;
+pub mod memory;
 pub mod daprv;
 pub mod dapew;
 pub mod ldet;
@@ -19,6 +20,7 @@ pub mod mem_serial;
 pub use da_ops::*;
 pub use display::*;
 pub use file_io::*;
+pub use memory::*;
 pub use daprv::*;
 pub use dapew::*;
 pub use ldet::*;

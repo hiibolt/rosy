@@ -64,3 +64,7 @@ pub mod sleepm;
 pub mod argget;
 pub mod memdpv;
 pub mod memfre;
+pub mod memall;
+pub mod memwrt;
+pub mod ltrue;
+pub mod lfalse;

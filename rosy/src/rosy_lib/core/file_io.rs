@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, BufWriter, Read, Write};
+use std::io::{BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::sync::Mutex;
 use anyhow::{Result, Context, bail};
 
@@ -108,6 +108,93 @@ fn open_file_impl(unit: f64, filename: &str, status: &str, is_binary: bool) -> R
     }
 
     Ok(())
+}
+
+/// Rewind a file to the beginning (REWF).
+pub fn rosy_rewf(unit: f64) -> Result<()> {
+    ensure_registry();
+    let unit_num = unit as u64;
+
+    let mut reg = FILE_REGISTRY.lock().unwrap();
+    let registry = reg.as_mut().unwrap();
+
+    if let Some(handle) = registry.get_mut(&unit_num) {
+        if let Some(ref mut reader) = handle.reader {
+            reader.seek(SeekFrom::Start(0))
+                .with_context(|| format!("Failed to rewind file on unit {}", unit_num))?;
+        } else if let Some(ref mut writer) = handle.writer {
+            writer.flush()
+                .with_context(|| format!("Failed to flush before rewind on unit {}", unit_num))?;
+            writer.get_mut().seek(SeekFrom::Start(0))
+                .with_context(|| format!("Failed to rewind writer on unit {}", unit_num))?;
+        }
+        Ok(())
+    } else {
+        // COSY silently ignores rewind on an unopened unit
+        Ok(())
+    }
+}
+
+/// Backspace a file by one record (BACKF).
+///
+/// Seeks the BufReader back to the start of the previous line.
+/// All seeks go through the BufReader (not get_mut()) so its internal
+/// buffer is flushed and the logical position stays consistent.
+pub fn rosy_backf(unit: f64) -> Result<()> {
+    ensure_registry();
+    let unit_num = unit as u64;
+
+    let mut reg = FILE_REGISTRY.lock().unwrap();
+    let registry = reg.as_mut().unwrap();
+
+    if let Some(handle) = registry.get_mut(&unit_num) {
+        if let Some(ref mut reader) = handle.reader {
+            // stream_position() goes through BufReader and reflects the
+            // logical read position (i.e. after any prior read_line calls).
+            let current_pos = reader.stream_position()
+                .with_context(|| format!("Failed to get stream position on unit {}", unit_num))?;
+
+            if current_pos == 0 {
+                return Ok(()); // Already at start
+            }
+
+            // Seek to the beginning through BufReader so its buffer is flushed.
+            reader.seek(SeekFrom::Start(0))
+                .with_context(|| format!("Failed to seek to start for backf scan on unit {}", unit_num))?;
+
+            // Read all bytes up to current_pos through BufReader.
+            let mut buf = vec![0u8; current_pos as usize];
+            reader.read_exact(&mut buf)
+                .with_context(|| format!("Failed to read bytes for backf scan on unit {}", unit_num))?;
+
+            // The buffer ends exactly at current_pos, which is just after the
+            // newline that terminated the last record we read.  We must skip
+            // that trailing newline when searching backwards, otherwise we'd
+            // land at the start of the record we just read rather than the one
+            // before it.  Trim one trailing newline (and optional \r) before
+            // searching.
+            let search_end = buf
+                .iter()
+                .rposition(|&b| b == b'\n')
+                .unwrap_or(buf.len());
+            let newline_pos = buf[..search_end]
+                .iter()
+                .rposition(|&b| b == b'\n')
+                .map(|p| p as u64 + 1)
+                .unwrap_or(0);
+
+            // Seek to that position through BufReader.
+            reader.seek(SeekFrom::Start(newline_pos))
+                .with_context(|| format!("Failed to seek to previous record on unit {}", unit_num))?;
+
+            Ok(())
+        } else {
+            // For write units, BACKF is a no-op in Rosy
+            Ok(())
+        }
+    } else {
+        Ok(())
+    }
 }
 
 /// Close a file (CLOSEF).

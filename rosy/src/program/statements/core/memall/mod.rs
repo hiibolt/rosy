@@ -1,13 +1,14 @@
-//! # MEMFRE Statement
+//! # MEMALL Statement
 //!
-//! Returns the total amount of COSY memory that is currently still available.
+//! Returns the total amount of COSY memory that is currently allocated.
 //! In Rosy (Rust), there is no COSY memory pool — Rust's allocator manages memory
-//! automatically, so this always returns `f64::MAX` to indicate effectively unlimited memory.
+//! automatically, so this always returns `0.0` to indicate nothing is allocated in
+//! COSY's pool.
 //!
 //! ## Syntax
 //!
 //! ```text
-//! MEMFRE v;
+//! MEMALL v;
 //! ```
 //!
 //! ## Rosy Example
@@ -36,15 +37,15 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct MemfreStatement {
+pub struct MemallStatement {
     pub identifier: VariableIdentifier,
 }
 
-impl FromRule for MemfreStatement {
+impl FromRule for MemallStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
         ensure!(
-            pair.as_rule() == Rule::memfre,
-            "Expected `memfre` rule when building MEMFRE statement, found: {:?}",
+            pair.as_rule() == Rule::memall,
+            "Expected `memall` rule when building MEMALL statement, found: {:?}",
             pair.as_rule()
         );
 
@@ -52,16 +53,16 @@ impl FromRule for MemfreStatement {
 
         let expr_pair = inner
             .next()
-            .context("Missing variable expression in MEMFRE!")?;
+            .context("Missing variable expression in MEMALL!")?;
         let identifier = VariableIdentifier::from_rule(expr_pair)
-            .context("Failed to build variable identifier in MEMFRE")?
-            .ok_or_else(|| anyhow::anyhow!("Expected variable identifier in MEMFRE"))?;
+            .context("Failed to build variable identifier in MEMALL")?
+            .ok_or_else(|| anyhow::anyhow!("Expected variable identifier in MEMALL"))?;
 
-        Ok(Some(MemfreStatement { identifier }))
+        Ok(Some(MemallStatement { identifier }))
     }
 }
 
-impl TranspileableStatement for MemfreStatement {
+impl TranspileableStatement for MemallStatement {
     fn register_typeslot_declaration(
         &self,
         _resolver: &mut TypeResolver,
@@ -87,7 +88,7 @@ impl TranspileableStatement for MemfreStatement {
     }
 }
 
-impl Transpile for MemfreStatement {
+impl Transpile for MemallStatement {
     fn transpile(
         &self,
         context: &mut TranspilationInputContext,
@@ -95,7 +96,7 @@ impl Transpile for MemfreStatement {
         let mut requested_variables = BTreeSet::new();
 
         let output = self.identifier.transpile(context).map_err(|e| {
-            add_context_to_all(e, "...while transpiling identifier in MEMFRE".to_string())
+            add_context_to_all(e, "...while transpiling identifier in MEMALL".to_string())
         })?;
         requested_variables.extend(output.requested_variables.clone());
 
@@ -118,10 +119,10 @@ impl Transpile for MemfreStatement {
             }
         };
 
-        // Approximate "available budget" as isize::MAX minus current physical usage.
-        // Falls back to f64::MAX if the platform does not support the query.
+        // Return the process's current physical memory usage via rosy_lib helper.
+        // Falls back to 0.0 if the platform does not support the query.
         let serialization = format!(
-            "{}{} = rosy_memfre();",
+            "{}{} = rosy_memall();",
             dereference, output.serialization
         );
 

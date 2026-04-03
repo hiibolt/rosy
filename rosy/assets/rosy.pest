@@ -6,18 +6,21 @@ COMMENT = _{ "{" ~ (COMMENT | (!("{" | "}") ~ ANY))* ~ "}" }
 
 program = { SOI ~ begin ~ statement* ~ end ~ EOI }
 statement   = _{ 
-  var_decl 
+  var_decl
   | daini
   | daprv
   | darev
   | write
   | writeb
+  | reads
   | read
   | readb
   | openf
   | openfb
   | closef
-  | assignment 
+  | rewf
+  | backf
+  | assignment
   | function
   | loop
   | while_loop
@@ -26,6 +29,7 @@ statement   = _{
   | ranseed
   | writem
   | readm
+  | intpol
   | procedure_call
   | if_statement
   | break_statement
@@ -76,6 +80,10 @@ statement   = _{
   | argget
   | memdpv
   | memfre
+  | memall
+  | memwrt
+  | ltrue
+  | lfalse
   | lsline
   | rkco }
 
@@ -88,6 +96,7 @@ end = { ^"END" ~ semicolon }
 
 /// WRITE
 write = { ^"WRITE" ~ unit ~ expr+ ~ semicolon }
+reads = { ^"READS" ~ expr ~ variable_identifier ~ semicolon }
 read = { ^"READ" ~ unit ~ variable_identifier ~ semicolon }
 writeb = { ^"WRITEB" ~ unit ~ expr+ ~ semicolon }
 readb = { ^"READB" ~ unit ~ variable_identifier ~ semicolon }
@@ -96,6 +105,8 @@ readb = { ^"READB" ~ unit ~ variable_identifier ~ semicolon }
 openf = { ^"OPENF" ~ expr ~ expr ~ expr ~ semicolon }
 openfb = { ^"OPENFB" ~ expr ~ expr ~ expr ~ semicolon }
 closef = { ^"CLOSEF" ~ expr ~ semicolon }
+rewf = { ^"REWF" ~ expr ~ semicolon }
+backf = { ^"BACKF" ~ expr ~ semicolon }
 
 /// VARIABLE
 /// In Rosy mode (default): `VARIABLE (RE) name dim1 dim2 ;` — all trailing exprs are dimensions.
@@ -106,7 +117,7 @@ memory_size = { expr }
 
 /// Keywords - define all reserved words (must be followed by a non-identifier character)
 keyword = @{ keyword_raw ~ !(ASCII_ALPHANUMERIC | "_") }
-keyword_raw = { ^"ENDPROCEDURE" | ^"ENDFUNCTION" | ^"ENDWHILE" | ^"ENDLOOP" | ^"ENDPLOOP" | ^"ENDFIT" | ^"ENDIF" | ^"ELSEIF" | ^"ELSE" | ^"BEGIN" | ^"END" | ^"WRITEB" | ^"WRITE" | ^"READB" | ^"READ" | ^"VARIABLE" | ^"PROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"WHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"DANOT" | ^"DAEPS" | ^"DATRN" | ^"DASCL" | ^"DASGN" | ^"DADER" | ^"DAINT" | ^"DANORO" | ^"DANORS" | ^"DAREA" | ^"DAPEW" | ^"DAPEE" | ^"DAPEA" | ^"DAPEP" | ^"DAEST" | ^"DAPLU" | ^"DADIU" | ^"DADMU" | ^"DACLIW" | ^"DACQLC" | ^"LENGTH" | ^"SINH" | ^"SIN" | ^"COSH" | ^"COS" | ^"ASIN" | ^"ACOS" | ^"ATAN" | ^"TANH" | ^"SQRT" | ^"SQR" | ^"VMAX" | ^"VMIN" | ^"ABS" | ^"NORM" | ^"CONS" | ^"INT" | ^"NINT" | ^"TYPE" | ^"REAL" | ^"IMAG" | ^"TRIM" | ^"LTRIM" | ^"ISRT3" | ^"ISRT" | ^"CMPLX" | ^"CONJ" | ^"LST" | ^"LCM" | ^"LCD" | ^"LRE" | ^"LLO" | ^"LVE" | ^"LDA" | ^"LOG" | ^"BREAK" | ^"QUIT" | ^"SCRLEN" | ^"CPUSEC" | ^"OS" | ^"LINV" | ^"LDET" | ^"SUBSTR" | ^"VELSET" | ^"VELGET" | ^"POLVAL" | ^"VEDOT" | ^"VEUNIT" | ^"VEZERO" | ^"STCRE" | ^"RECST" | ^"RERAN" | ^"PWTIME" | ^"PNPRO" | ^"IMUNIT" | ^"LEV" | ^"MBLOCK" | ^"MTREE" | ^"LSLINE" | ^"RKCO" | ^"WRITEM" | ^"READM" | ^"ERF" | ^"WERF" | ^"FIT" | ^"OPENFB" | ^"OPENF" | ^"CLOSEF" | ^"FUNCTION" | ^"LOOP" | ^"PLOOP" | ^"VARMEM" | ^"VARPOI" | ^"SLEEPM" | ^"ARGGET" | ^"MEMDPV" | ^"MEMFRE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
+keyword_raw = { ^"ENDPROCEDURE" | ^"ENDFUNCTION" | ^"ENDWHILE" | ^"ENDLOOP" | ^"ENDPLOOP" | ^"ENDFIT" | ^"ENDIF" | ^"ELSEIF" | ^"ELSE" | ^"BEGIN" | ^"END" | ^"WRITEB" | ^"WRITE" | ^"READS" | ^"READB" | ^"READ" | ^"VARIABLE" | ^"PROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"WHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"DANOT" | ^"DAEPS" | ^"DATRN" | ^"DASCL" | ^"DASGN" | ^"DADER" | ^"DAINT" | ^"DANORO" | ^"DANORS" | ^"DAREA" | ^"DAPEW" | ^"DAPEE" | ^"DAPEA" | ^"DAPEP" | ^"DAEST" | ^"DAPLU" | ^"DADIU" | ^"DADMU" | ^"DACLIW" | ^"DACQLC" | ^"LENGTH" | ^"SINH" | ^"SIN" | ^"COSH" | ^"COS" | ^"ASIN" | ^"ACOS" | ^"ATAN" | ^"TANH" | ^"SQRT" | ^"SQR" | ^"VMAX" | ^"VMIN" | ^"ABS" | ^"NORM" | ^"CONS" | ^"INTPOL" | ^"INT" | ^"NINT" | ^"TYPE" | ^"REAL" | ^"IMAG" | ^"TRIM" | ^"LTRIM" | ^"ISRT3" | ^"ISRT" | ^"CMPLX" | ^"CONJ" | ^"LST" | ^"LCM" | ^"LCD" | ^"LRE" | ^"LLO" | ^"LVE" | ^"LDA" | ^"LOG" | ^"BREAK" | ^"QUIT" | ^"SCRLEN" | ^"CPUSEC" | ^"OS" | ^"LINV" | ^"LDET" | ^"SUBSTR" | ^"VELSET" | ^"VELGET" | ^"INTPOL" | ^"POLVAL" | ^"VEDOT" | ^"VEUNIT" | ^"VEZERO" | ^"STCRE" | ^"RECST" | ^"RERAN" | ^"PWTIME" | ^"PNPRO" | ^"IMUNIT" | ^"LEV" | ^"MBLOCK" | ^"MTREE" | ^"LSLINE" | ^"RKCO" | ^"WRITEM" | ^"READM" | ^"ERF" | ^"WERF" | ^"FIT" | ^"OPENFB" | ^"OPENF" | ^"CLOSEF" | ^"REWF" | ^"BACKF" | ^"FUNCTION" | ^"LOOP" | ^"PLOOP" | ^"VARMEM" | ^"VARPOI" | ^"SLEEPM" | ^"ARGGET" | ^"MEMDPV" | ^"MEMFRE" | ^"MEMALL" | ^"MEMWRT" | ^"LTRUE" | ^"LFALSE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
 
 /// [ IF / ELSEIF / ELSE / ENDIF ]
 if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
@@ -313,6 +324,7 @@ endif = { ^"ENDIF" ~ semicolon }
   /// [ MATH ]
   linv = { ^"LINV" ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   ldet = { ^"LDET" ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  intpol = { ^"INTPOL" ~ variable_identifier ~ expr ~ semicolon }
   polval = { ^"POLVAL" ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   /// [ LINEAR ALGEBRA ]
   lev = { ^"LEV" ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
@@ -324,6 +336,10 @@ endif = { ^"ENDIF" ~ semicolon }
   argget = { ^"ARGGET" ~ expr ~ variable_identifier ~ semicolon }
   memdpv = { ^"MEMDPV" ~ expr ~ expr ~ semicolon }
   memfre = { ^"MEMFRE" ~ variable_identifier ~ semicolon }
+  memall = { ^"MEMALL" ~ variable_identifier ~ semicolon }
+  memwrt = { ^"MEMWRT" ~ expr ~ semicolon }
+  ltrue  = { ^"LTRUE"  ~ variable_identifier ~ semicolon }
+  lfalse = { ^"LFALSE" ~ variable_identifier ~ semicolon }
   /// [ NUMERICAL / INTEGRATION ]
   lsline = { ^"LSLINE" ~ expr ~ expr ~ expr ~ variable_identifier ~ variable_identifier ~ semicolon }
   rkco = { ^"RKCO" ~ variable_identifier ~ variable_identifier ~ variable_identifier ~ variable_identifier ~ variable_identifier ~ semicolon }
