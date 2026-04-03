@@ -3,6 +3,14 @@ name = "rosy"
 version = "0.24.0"
 edition = "2024"
 
+[lib]
+name = "rosy"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rosy"
+path = "src/main.rs"
+
 [features]
 nightly-simd = []
 

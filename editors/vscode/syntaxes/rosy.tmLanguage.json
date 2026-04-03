@@ -1,0 +1,212 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "ROSY",
+  "scopeName": "source.rosy",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#constants" },
+    { "include": "#types" },
+    { "include": "#control-keywords" },
+    { "include": "#declaration-keywords" },
+    { "include": "#io-keywords" },
+    { "include": "#da-keywords" },
+    { "include": "#math-keywords" },
+    { "include": "#system-keywords" },
+    { "include": "#intrinsic-functions" },
+    { "include": "#assignment-operator" },
+    { "include": "#operators" },
+    { "include": "#numbers" },
+    { "include": "#punctuation" },
+    { "include": "#identifiers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.rosy",
+          "begin": "\\{",
+          "end": "\\}",
+          "patterns": [
+            {
+              "name": "comment.block.rosy",
+              "begin": "\\{",
+              "end": "\\}"
+            }
+          ]
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.rosy",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.rosy",
+              "match": "''"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.double.rosy",
+          "begin": "\"",
+          "end": "\""
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.rosy",
+          "match": "\\b(TRUE|FALSE)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "comment": "Type annotation in parentheses: (RE), (VE 2 3), etc.",
+          "match": "\\(\\s*(RE|ST|LO|CM|VE|DA|CD)\\b",
+          "captures": {
+            "1": { "name": "entity.name.type.rosy" }
+          }
+        }
+      ]
+    },
+    "control-keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.rosy",
+          "match": "\\b(BEGIN|END|IF|ELSEIF|ELSE|ENDIF|LOOP|ENDLOOP|PLOOP|ENDPLOOP|WHILE|ENDWHILE|BREAK|FIT|ENDFIT|NOT)\\b"
+        }
+      ]
+    },
+    "declaration-keywords": {
+      "patterns": [
+        {
+          "name": "keyword.declaration.rosy",
+          "match": "\\b(VARIABLE|PROCEDURE|ENDPROCEDURE|FUNCTION|ENDFUNCTION)\\b"
+        }
+      ]
+    },
+    "io-keywords": {
+      "patterns": [
+        {
+          "name": "keyword.other.io.rosy",
+          "match": "\\b(WRITE|WRITEB|READ|READB|OPENF|OPENFB|CLOSEF|WRITEM|READM)\\b"
+        }
+      ]
+    },
+    "da-keywords": {
+      "patterns": [
+        {
+          "name": "keyword.other.da.rosy",
+          "match": "\\b(OV|DAINI|DAPRV|DAREV|DANOT|DAEPS|DATRN|DASCL|DASGN|DADER|DAINT|DANORO|DANORS|DAPLU|DADIU|DADMU|DACLIW|DACQLC|DAREA|DAPEW|DAPEE|DAPEA|DAPEP|DAEST)\\b"
+        }
+      ]
+    },
+    "math-keywords": {
+      "patterns": [
+        {
+          "name": "keyword.other.math.rosy",
+          "match": "\\b(LINV|LDET|LEV|MBLOCK|MTREE|POLVAL|VEDOT|VEUNIT|VEZERO|VELSET|VELGET|LSLINE|RKCO)\\b"
+        }
+      ]
+    },
+    "system-keywords": {
+      "patterns": [
+        {
+          "name": "keyword.other.system.rosy",
+          "match": "\\b(QUIT|OS|SCRLEN|CPUSEC|PWTIME|RANSEED|RERAN|SLEEPM|ARGGET|SUBSTR|STCRE|RECST|PNPRO|IMUNIT|MEMDPV|MEMFRE)\\b"
+        }
+      ]
+    },
+    "intrinsic-functions": {
+      "patterns": [
+        {
+          "name": "support.function.builtin.rosy",
+          "match": "\\b(SIN|COS|TAN|ASIN|ACOS|ATAN|SINH|COSH|TANH|SQRT|SQR|EXP|LOG|ABS|NORM|CONS|INT|NINT|TYPE|REAL|IMAG|CMPLX|CONJ|VMAX|VMIN|LENGTH|TRIM|LTRIM|ISRT3|ISRT|ERF|WERF|VARMEM|VARPOI|LST|LCM|LCD|LRE|LLO|LVE|LDA|DA|CD|CM|ST|LO|RE|VE)\\b(?=\\s*\\()"
+        }
+      ]
+    },
+    "assignment-operator": {
+      "patterns": [
+        {
+          "name": "keyword.operator.assignment.rosy",
+          "match": ":="
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.rosy",
+          "match": "<=|>=|<>|!=|==|<|>|=|#"
+        },
+        {
+          "name": "keyword.operator.arithmetic.rosy",
+          "match": "\\+|-|\\*|/"
+        },
+        {
+          "name": "keyword.operator.concatenation.rosy",
+          "match": "&"
+        },
+        {
+          "name": "keyword.operator.extraction.rosy",
+          "match": "\\|"
+        },
+        {
+          "name": "keyword.operator.derivation.rosy",
+          "match": "%"
+        },
+        {
+          "name": "keyword.operator.power.rosy",
+          "match": "\\^"
+        },
+        {
+          "name": "keyword.operator.not.rosy",
+          "match": "!"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.rosy",
+          "match": "\\b\\d+\\.\\d+([eE][+-]?\\d+)?\\b"
+        },
+        {
+          "name": "constant.numeric.scientific.rosy",
+          "match": "\\b\\d+[eE][+-]?\\d+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.rosy",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.terminator.rosy",
+          "match": ";"
+        },
+        {
+          "name": "punctuation.separator.comma.rosy",
+          "match": ","
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "variable.other.rosy",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    }
+  }
+}

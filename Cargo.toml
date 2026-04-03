@@ -2,7 +2,7 @@
 resolver = "3"
 members = [
     "rosy",
-    "rosy_ide_tools/vscode_extension_generator"
+    "rosy_lsp",
 ]
 exclude = [ ".rosy_output", ".rosy_test_cache" ]
 

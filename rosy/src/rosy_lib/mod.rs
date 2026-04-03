@@ -88,13 +88,25 @@ pub enum RosyBaseType {
     DA,
     CD,
 }
+impl std::fmt::Display for RosyBaseType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RosyBaseType::RE => write!(f, "RE"),
+            RosyBaseType::ST => write!(f, "ST"),
+            RosyBaseType::LO => write!(f, "LO"),
+            RosyBaseType::CM => write!(f, "CM"),
+            RosyBaseType::VE => write!(f, "VE"),
+            RosyBaseType::DA => write!(f, "DA"),
+            RosyBaseType::CD => write!(f, "CD"),
+        }
+    }
+}
 impl std::fmt::Display for RosyType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.dimensions == 0 {
-            write!(f, "({:?})", self.base_type)
+            write!(f, "({})", self.base_type)
         } else {
-            let dims = "*".repeat(self.dimensions);
-            write!(f, "({:?} {dims})", self.base_type)
+            write!(f, "({} {}D)", self.base_type, self.dimensions)
         }
     }
 }

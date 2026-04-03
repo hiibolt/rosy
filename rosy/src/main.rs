@@ -1,30 +1,6 @@
-#![cfg_attr(feature = "nightly-simd", feature(portable_simd))]
-//! # Rosy
-//!
-#![doc = concat!("**Version:** `v", env!("CARGO_PKG_VERSION"), "` — Built `", env!("BUILD_TIMESTAMP"), "` — [Changelog](https://github.com/hiibolt/rosy/releases)")]
-//!
-//! A modern transpiler for the ROSY scientific programming language,
-//! designed for beam physics and differential algebra applications.
-//! ROSY programs are transpiled into self-contained, native Rust executables.
-//!
-//! ## Language Reference
-//! The official ROSY language reference begins in the [`program`] module.
-//!
-//! ## More Resources
-//! - **[Example programs](https://github.com/hiibolt/rosy/tree/master/examples)** on GitHub
-//! - **[Installation & usage](https://github.com/hiibolt/rosy)** in the README
-
-mod ast;
-mod embedded;
-mod program;
-mod resolve;
-#[allow(unused_imports, dead_code)]
-mod rosy_lib;
-mod syntax_config;
-mod transpile;
 mod update_check;
 
-use crate::{ast::FromRule, program::Program, transpile::*};
+use rosy::{ast::{self, FromRule}, embedded, program::Program, resolve, syntax_config, transpile::*};
 use anyhow::{Context, Result, anyhow, ensure};
 use clap::{Parser as ClapParser, Subcommand};
 use pest::Parser;
