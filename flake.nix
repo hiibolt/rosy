@@ -58,7 +58,7 @@
         devShells.default = pkgs.mkShell {
           inputsFrom = [ localRustBuild ];
           shellHook = ''
-            export PATH="$HOME/.bun/bin:$PATH"
+            export PATH="$HOME/.cargo/bin:$HOME/.bun/bin:$PATH"
           '';
         };
     });
