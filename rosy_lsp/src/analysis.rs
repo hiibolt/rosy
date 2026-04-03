@@ -174,11 +174,18 @@ pub fn analyze(source: &str) -> AnalysisResult {
     let resolver = match TypeResolver::resolve(&mut ast) {
         Ok((resolver, warnings)) => {
             for w in warnings {
-                // Warnings are plain strings — no structured location available
+                let position = w
+                    .location
+                    .as_ref()
+                    .map(|loc| Position::new(
+                        loc.line.saturating_sub(1) as u32,
+                        loc.col.saturating_sub(1) as u32,
+                    ))
+                    .unwrap_or(Position::new(0, 0));
                 result.diagnostics.push(Diagnostic {
-                    range: Range::new(Position::new(0, 0), Position::new(0, 0)),
+                    range: Range::new(position, position),
                     severity: Some(DiagnosticSeverity::WARNING),
-                    message: w,
+                    message: w.message,
                     source: Some("rosy".to_string()),
                     ..Default::default()
                 });

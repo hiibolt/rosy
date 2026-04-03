@@ -66,3 +66,29 @@ impl std::fmt::Display for RosyError {
 }
 
 impl std::error::Error for RosyError {}
+
+/// Extension trait for `anyhow::Result` to attach a `SourceLocation` to errors.
+///
+/// If the error chain doesn't already contain a `RosyError`, wraps it in one.
+/// If it already has one, the existing location is preserved.
+pub trait WithLocation<T> {
+    /// Attach a source location to this error, unless it already has one.
+    fn with_location(self, location: &SourceLocation) -> anyhow::Result<T>;
+}
+
+impl<T> WithLocation<T> for anyhow::Result<T> {
+    fn with_location(self, location: &SourceLocation) -> anyhow::Result<T> {
+        self.map_err(|e| {
+            // Don't double-wrap if there's already a RosyError with a location
+            if e.chain().any(|cause| {
+                cause
+                    .downcast_ref::<RosyError>()
+                    .is_some_and(|r| r.location.is_some())
+            }) {
+                return e;
+            }
+            // Wrap with location
+            RosyError::at(location.clone(), format!("{e}")).into()
+        })
+    }
+}

@@ -189,7 +189,7 @@ impl TypeResolver {
     /// Returns the resolver (with all resolved graph nodes) and a list of
     /// warning messages (e.g. unused variables). The caller can inspect
     /// `resolver.nodes` for resolved types, declaration locations, etc.
-    pub fn resolve(program: &mut Program) -> Result<(TypeResolver, Vec<String>)> {
+    pub fn resolve(program: &mut Program) -> Result<(TypeResolver, Vec<RosyError>)> {
         let mut resolver = TypeResolver::new();
         let mut ctx = ScopeContext::default();
 
@@ -361,7 +361,7 @@ impl TypeResolver {
     /// Process nodes whose dependencies are all resolved first, resolve them,
     /// then process their dependents, and so on. One pass — no iteration.
     /// Returns a list of warning messages for unused variables.
-    pub fn topological_resolve(&mut self) -> Result<Vec<String>> {
+    pub fn topological_resolve(&mut self) -> Result<Vec<RosyError>> {
         // Build reverse dependency map: slot → set of slots that depend on it
         let mut dependents: HashMap<TypeSlot, Vec<TypeSlot>> = HashMap::new();
         let mut in_degree: HashMap<TypeSlot, usize> = HashMap::new();
@@ -394,7 +394,7 @@ impl TypeResolver {
         }
 
         let mut resolved_count: usize = 0;
-        let mut warnings: Vec<String> = Vec::new();
+        let mut warnings: Vec<RosyError> = Vec::new();
         let mut warned_slots: HashSet<TypeSlot> = HashSet::new();
         while let Some(slot) = queue.pop_front() {
             // Resolve this node if not already resolved
@@ -410,15 +410,14 @@ impl TypeResolver {
 
                 if is_unused {
                     let node = self.nodes.get(&slot).unwrap();
-                    let loc_str = node
-                        .declared_at
-                        .as_ref()
-                        .map(|loc| format!(" ({})", loc))
-                        .unwrap_or_default();
-                    warnings.push(format!(
-                        "unused variable {}{} — no type could be inferred (never assigned a value)",
-                        slot, loc_str
-                    ));
+                    warnings.push(RosyError {
+                        message: format!(
+                            "unused variable {} — no type could be inferred (never assigned a value)",
+                            slot
+                        ),
+                        location: node.declared_at.clone(),
+                        severity: crate::errors::RosyErrorSeverity::Warning,
+                    });
                     warned_slots.insert(slot.clone());
                     resolved_count += 1;
                     continue;
@@ -462,7 +461,7 @@ impl TypeResolver {
     }
 
     /// Build a detailed error message for unresolved type slots.
-    fn build_resolution_error(&self, unresolved: &[&GraphNode]) -> Result<Vec<String>> {
+    fn build_resolution_error(&self, unresolved: &[&GraphNode]) -> Result<Vec<RosyError>> {
         // Partition into cycle nodes (have unresolved deps) vs no-info nodes
         let cycle_slots: Vec<&TypeSlot> = unresolved
             .iter()

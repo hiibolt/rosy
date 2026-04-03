@@ -154,7 +154,7 @@ fn rosy(
     let (_resolver, warnings) = resolve::TypeResolver::resolve(&mut ast).context("Failed to resolve types!")?;
     step_done(t);
     for w in &warnings {
-        eprintln!("{BOLD}{YELLOW}    warning{RESET}: {w}");
+        eprintln!("{BOLD}{YELLOW}    warning{RESET}: {}", w.message);
     }
 
     // --- Step 4: Transpilation ---
