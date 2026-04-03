@@ -11,7 +11,7 @@ impl zed::Extension for RosyExtension {
         &mut self,
         _language_server_id: &zed::LanguageServerId,
         worktree: &zed::Worktree,
-    ) -> Result<zed::Command, String> {
+    ) -> zed::Result<zed::Command> {
         let path = worktree
             .which("rosy")
             .ok_or_else(|| {
