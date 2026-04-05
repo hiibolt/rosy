@@ -1,4 +1,5 @@
 name = "Rosy"
+grammar = "rosy"
 path_suffixes = ["rosy", "fox"]
 line_comments = []
 block_comment = ["{", "}"]

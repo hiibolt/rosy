@@ -217,10 +217,10 @@ pub fn analyze(source: &str) -> AnalysisResult {
 
 /// Extract an inlay hint from a resolved graph node, if applicable.
 fn extract_inlay_hint(node: &GraphNode, hints: &mut Vec<InlayHintData>) {
-    // Only show hints for variable declarations
-    let TypeSlot::Variable(_, _) = &node.slot else {
+    // Don't show hints for explicitly annotated types — the user already wrote them
+    if matches!(node.rule, crate::resolve::ResolutionRule::Explicit(_)) {
         return;
-    };
+    }
 
     let Some(resolved_type) = &node.resolved else {
         return;
@@ -230,27 +230,68 @@ fn extract_inlay_hint(node: &GraphNode, hints: &mut Vec<InlayHintData>) {
         return;
     };
 
-    // If the type was inferred (not explicitly annotated), record where it came from.
-    let inferred_from = node.assigned_at.as_ref().map(|assigned_at| {
-        let reason = match &node.rule {
-            crate::resolve::ResolutionRule::Explicit(_) => "Explicitly annotated".to_string(),
-            crate::resolve::ResolutionRule::InferredFrom { reason, .. } => reason.clone(),
-            crate::resolve::ResolutionRule::Mirror { reason, .. } => reason.clone(),
-            crate::resolve::ResolutionRule::Unresolved => "Unresolved".to_string(),
-        };
-        InferredFromLocation {
-            line: assigned_at.line.saturating_sub(1) as u32,
-            col: assigned_at.col.saturating_sub(1) as u32,
-            reason,
+    let snippet = &declared_at.snippet;
+    let snippet_upper = snippet.to_uppercase();
+
+    // Determine what kind of slot this is, extract name, and compute position
+    let hint_col = match &node.slot {
+        TypeSlot::Variable(_, _name) => {
+            // Skip the implicit return variable inside function bodies —
+            // it duplicates the FunctionReturn slot's hint.
+            if snippet_upper.starts_with("FUNCTION") {
+                return;
+            }
+            // VARIABLE _here_ name — place after VARIABLE keyword
+            declared_at.col + "VARIABLE".len()
         }
-    });
+        TypeSlot::FunctionReturn(_, _) => {
+            // FUNCTION _here_ NAME — place right after FUNCTION keyword
+            declared_at.col + "FUNCTION".len()
+        }
+        TypeSlot::Argument(_, _, name) => {
+            // FUNCTION (RE) NAME arg1 _here_ — place after the arg name
+            if let Some(offset) = snippet_upper.find(&name.to_uppercase()) {
+                declared_at.col + offset + name.len()
+            } else {
+                return;
+            }
+        }
+    };
+
+    // Build inference info with a source location so the user can jump to
+    // exactly where the type was determined.
+    let (reason, loc) = match &node.rule {
+        crate::resolve::ResolutionRule::Explicit(_) => (None, None),
+        crate::resolve::ResolutionRule::InferredFrom { reason, .. } => {
+            (Some(reason.clone()), node.assigned_at.as_ref().or(node.declared_at.as_ref()))
+        }
+        crate::resolve::ResolutionRule::Mirror { reason, .. } => {
+            (Some(reason.clone()), node.assigned_at.as_ref().or(node.declared_at.as_ref()))
+        }
+        crate::resolve::ResolutionRule::Unresolved => {
+            (Some("could not be inferred".to_string()), node.declared_at.as_ref())
+        }
+    };
+
+    let inferred_from = match (reason, loc) {
+        (Some(reason), Some(loc)) => Some(InferredFromLocation {
+            line: loc.line.saturating_sub(1) as u32,
+            col: loc.col.saturating_sub(1) as u32,
+            reason: format!("{} (line {}, col {})", reason, loc.line, loc.col),
+        }),
+        (Some(reason), None) => Some(InferredFromLocation {
+            line: declared_at.line.saturating_sub(1) as u32,
+            col: declared_at.col.saturating_sub(1) as u32,
+            reason,
+        }),
+        _ => None,
+    };
 
     hints.push(InlayHintData {
-        // Position the hint right after the variable name
         // SourceLocation uses 1-based line/col, LSP uses 0-based
         position: Position::new(
             declared_at.line.saturating_sub(1) as u32,
-            declared_at.col.saturating_sub(1) as u32,
+            hint_col.saturating_sub(1) as u32,
         ),
         label: format!("{resolved_type}"),
         inferred_from,
@@ -495,4 +536,25 @@ pub fn rosy_keywords() -> Vec<CompletionItem> {
     }
 
     items
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn inlay_hints_skip_explicit_types() {
+        let source = "BEGIN;\n    FUNCTION (RE) COMPUTE x (RE) y (RE);\n        VARIABLE temp;\n        temp := x * y;\n        COMPUTE := temp + 10;\n    ENDFUNCTION;\n    PROCEDURE RUN;\n        VARIABLE is_true;\n        VARIABLE (LO) is_false;\n        is_true := TRUE;\n    ENDPROCEDURE;\n    RUN;\nEND;";
+        let result = analyze(source);
+        eprintln!("Hints:");
+        for h in &result.variable_types {
+            eprintln!("  line={} col={} label={:?}", h.position.line, h.position.character, h.label);
+        }
+        let labels: Vec<&str> = result.variable_types.iter().map(|h| h.label.as_str()).collect();
+        // temp (inferred RE) and is_true (inferred LO) should have hints
+        assert!(labels.contains(&"(RE)"), "temp should get an (RE) hint");
+        assert!(labels.contains(&"(LO)"), "is_true should get an (LO) hint");
+        // Explicitly typed variables should NOT have hints
+        assert_eq!(result.variable_types.len(), 2, "Only inferred types should produce hints, got: {:?}", labels);
+    }
 }

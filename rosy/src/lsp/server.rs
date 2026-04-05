@@ -121,6 +121,18 @@ impl LanguageServer for RosyLanguageServer {
         }
     }
 
+    async fn did_save(&self, params: DidSaveTextDocumentParams) {
+        // Re-analyze from disk on save if the client didn't include text
+        let uri = params.text_document.uri;
+        if let Some(text) = params.text {
+            self.on_change(uri, text).await;
+        } else if let Ok(path) = uri.to_file_path() {
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                self.on_change(uri, text).await;
+            }
+        }
+    }
+
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         self.documents
             .lock()
@@ -205,38 +217,25 @@ impl LanguageServer for RosyLanguageServer {
                     && h.position.line <= params.range.end.line
             })
             .map(|h| {
-                // Build the label as InlayHintLabelPart(s) for rich interaction.
-                let type_part = InlayHintLabelPart {
-                    value: format!(": {}", h.label),
-                    tooltip: Some(InlayHintLabelPartTooltip::MarkupContent(MarkupContent {
-                        kind: MarkupKind::Markdown,
-                        value: match &h.inferred_from {
-                            Some(loc) => format!(
-                                "**{}**\n\n{}\n\n*Click to jump to inference source*",
-                                h.label, loc.reason
-                            ),
-                            None => format!("**{}**", h.label),
-                        },
-                    })),
-                    // If we know where the type was inferred from, make it clickable
-                    location: h.inferred_from.as_ref().map(|loc| Location {
-                        uri: uri.clone(),
-                        range: Range::new(
-                            Position::new(loc.line, loc.col),
-                            Position::new(loc.line, loc.col),
-                        ),
-                    }),
-                    command: None,
+                // Double-click inserts the type annotation at the hint position
+                let edit = TextEdit {
+                    range: Range::new(h.position, h.position),
+                    new_text: format!(" {}", h.label),
                 };
 
                 InlayHint {
                     position: h.position,
-                    label: InlayHintLabel::LabelParts(vec![type_part]),
+                    label: InlayHintLabel::String(h.label.clone()),
                     kind: Some(InlayHintKind::TYPE),
-                    text_edits: None,
-                    tooltip: None, // tooltip is on the label part instead
-                    padding_left: Some(false),
-                    padding_right: Some(true),
+                    text_edits: Some(vec![edit]),
+                    tooltip: h.inferred_from.as_ref().map(|loc| {
+                        InlayHintTooltip::MarkupContent(MarkupContent {
+                            kind: MarkupKind::Markdown,
+                            value: format!("**{}** — {}", h.label, loc.reason),
+                        })
+                    }),
+                    padding_left: Some(true),
+                    padding_right: Some(false),
                     data: None,
                 }
             })

@@ -597,19 +597,19 @@ fn run_construct_tests(filter: Option<&str>, release: bool, parallel: usize) -> 
 // VS Code extension files — package.json, extension.js, and tmLanguage are
 // static (embedded from editors/vscode/). The language config is generated
 // from the grammar at build time so folding/indent keywords stay in sync.
-const VSCODE_PACKAGE_JSON: &str = include_str!("../../editors/vscode/package.json");
+const VSCODE_PACKAGE_JSON: &str = include_str!("../assets/editors/vscode/package.json");
 const VSCODE_LANG_CONFIG: &str = include_str!(concat!(env!("OUT_DIR"), "/vscode_language_configuration.json"));
-const VSCODE_EXTENSION_JS: &str = include_str!("../../editors/vscode/extension.js");
-const VSCODE_TM_GRAMMAR: &str = include_str!("../../editors/vscode/syntaxes/rosy.tmLanguage.json");
+const VSCODE_EXTENSION_JS: &str = include_str!("../assets/editors/vscode/extension.js");
+const VSCODE_TM_GRAMMAR: &str = include_str!("../assets/editors/vscode/syntaxes/rosy.tmLanguage.json");
 
 // Zed extension files — embedded at build time.
 // Unlike VS Code, Zed extensions need a WASM component, so we write the
 // full extension source directory and the user installs it as a dev extension.
-const ZED_EXTENSION_TOML: &str = include_str!("../../editors/zed/extension.toml");
-const ZED_CARGO_TOML: &str = include_str!("../../editors/zed/Cargo.toml");
-const ZED_LIB_RS: &str = include_str!("../../editors/zed/src/lib.rs");
-const ZED_CONFIG_TOML: &str = include_str!("../../editors/zed/languages/rosy/config.toml");
-const ZED_HIGHLIGHTS_SCM: &str = include_str!("../../editors/zed/languages/rosy/highlights.scm");
+const ZED_EXTENSION_TOML: &str = include_str!("../assets/editors/zed/extension.toml");
+const ZED_CARGO_TOML: &str = include_str!("../assets/editors/zed/Cargo.toml");
+const ZED_LIB_RS: &str = include_str!("../assets/editors/zed/src/lib.rs");
+const ZED_CONFIG_TOML: &str = include_str!("../assets/editors/zed/languages/rosy/config.toml");
+const ZED_HIGHLIGHTS_SCM: &str = include_str!(concat!(env!("OUT_DIR"), "/highlights.scm"));
 
 fn install_editor_extension(editor: &EditorTarget) -> Result<()> {
     match editor {
@@ -692,6 +692,15 @@ fn install_zed_extension() -> Result<()> {
     let done_verb = if action == "Updating" { "Updated" } else { "Wrote" };
     eprintln!("{BOLD}{GREEN}    {done_verb}{RESET} Rosy extension for Zed");
     eprintln!();
+    eprintln!("  {BOLD}Prerequisites:{RESET}");
+    eprintln!("    Zed compiles extensions to WASM using {BOLD}rustup{RESET}.");
+    eprintln!("    If you don't have rustup ({DIM}e.g. NixOS, distro-packaged Rust{RESET}):");
+    eprintln!("      {DIM}curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh{RESET}");
+    eprintln!("    Then set up the toolchain:");
+    eprintln!("      {DIM}rustup default nightly{RESET}");
+    eprintln!("      {DIM}rustup target add wasm32-wasip1{RESET}");
+    eprintln!("      {DIM}rustup component add rust-src{RESET}");
+    eprintln!();
     eprintln!("  {BOLD}To install:{RESET}");
     eprintln!("    1. Open Zed");
     eprintln!("    2. Open the command palette ({DIM}Cmd+Shift+P / Ctrl+Shift+P{RESET})");
@@ -700,6 +709,9 @@ fn install_zed_extension() -> Result<()> {
     eprintln!();
     eprintln!("  Zed will compile the extension and activate it. Open any");
     eprintln!("  {BOLD}.rosy{RESET} file to see diagnostics, completions, and type hints.");
+    eprintln!();
+    eprintln!("  To enable inlay type hints:");
+    eprintln!("    {DIM}Settings → Open Settings → Editor → Inlay Hints → Enabled → On{RESET}");
     eprintln!();
     eprintln!("  {DIM}Make sure `rosy` is in your PATH so the LSP server can start.{RESET}");
 

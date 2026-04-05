@@ -1,0 +1,77 @@
+name: Sync Tree-sitter Grammar
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'rosy/assets/rosy.pest'
+      - 'rosy/build.rs'
+
+jobs:
+  sync-grammar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout rosy
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action/setup@v1
+        with:
+          toolchain: nightly
+
+      - name: Build rosy (generates grammar.js + highlights.scm)
+        run: cargo build -p rosy --release
+
+      - name: Find build output directory
+        id: find-out
+        run: |
+          OUT_DIR=$(find target/release/build -name "grammar.js" -path "*/rosy-*" -exec dirname {} \;)
+          echo "out_dir=$OUT_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Install tree-sitter CLI
+        run: npm install -g tree-sitter-cli
+
+      - name: Checkout rosy-tree-sitter
+        uses: actions/checkout@v4
+        with:
+          repository: hiibolt/rosy-tree-sitter
+          token: ${{ secrets.TREE_SITTER_PAT }}
+          path: rosy-tree-sitter
+
+      - name: Update grammar and regenerate parser
+        run: |
+          cp "${{ steps.find-out.outputs.out_dir }}/grammar.js" rosy-tree-sitter/grammar.js
+          cp "${{ steps.find-out.outputs.out_dir }}/highlights.scm" rosy-tree-sitter/queries/highlights.scm
+          cd rosy-tree-sitter
+          tree-sitter generate
+
+      - name: Commit and push if changed
+        run: |
+          cd rosy-tree-sitter
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "chore: sync grammar from hiibolt/rosy@${GITHUB_SHA::8}
+
+          Auto-generated from rosy.pest by CI."
+          git push
+
+      - name: Update rev in extension.toml
+        run: |
+          cd rosy-tree-sitter
+          NEW_REV=$(git rev-parse HEAD)
+          cd ..
+          sed -i "s|^rev = \".*\"|rev = \"$NEW_REV\"|" rosy/assets/editors/zed/extension.toml
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add rosy/assets/editors/zed/extension.toml
+          if git diff --cached --quiet; then
+            echo "No rev change needed"
+            exit 0
+          fi
+          git commit -m "chore: update tree-sitter-rosy rev to ${NEW_REV::8}"
+          git push
