@@ -1,12 +1,12 @@
-# Rosy 🌹
+# Rosy
 
-A modern transpiler for the ROSY scientific programming language, designed for beam physics and differential algebra applications.
+A modern transpiler for the Rosy scientific programming language, designed for beam physics and differential algebra applications.
 
-Rosy transpiles ROSY source code into self-contained, native Rust executables — optimized native code with zero runtime dependencies.
+Rosy transpiles source code into self-contained, native Rust executables — optimized native code with zero runtime dependencies.
 
 ## Language Documentation
 
-The complete ROSY language reference — every operator, function, statement, and type — is in the **[Rustdoc documentation](https://hiibolt.github.io/rosy/)**.
+The complete Rosy language reference — every operator, function, statement, and type — is in the **[Rustdoc documentation](https://hiibolt.github.io/rosy/)**.
 
 ## Example
 
@@ -137,13 +137,9 @@ Programs using `PLOOP` require an MPI implementation and LLVM/Clang at compile t
 
 ## IDE Support
 
-Copy the `rosy-vscode-extension/` folder to your VSCode extensions directory (`~/.vscode/extensions/` on Linux/macOS) and reload. To regenerate after grammar changes: `cargo run --bin generate_vscode_extension`.
-
-## Differences from COSY INFINITY
-
-- `PLOOP` does not revert to `LOOP` behavior when `NP == 1`
-- `BREAK` statement for loop exit
-- String literals use single quotes: `'hello'`
+For setup instructions, run either:
+- `rosy setup zed`
+- `rosy setup vscode`
 
 ## License
 
