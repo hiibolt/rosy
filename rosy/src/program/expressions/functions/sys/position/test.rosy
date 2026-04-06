@@ -1,0 +1,9 @@
+BEGIN;
+    VARIABLE (RE) P;
+    P := POSITION('hello world', 'world');
+    WRITE 6 P;
+    P := POSITION('hello', 'h');
+    WRITE 6 P;
+    P := POSITION('hello', 'xyz');
+    WRITE 6 P;
+END;

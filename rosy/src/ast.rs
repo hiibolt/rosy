@@ -15,6 +15,8 @@
 //!
 //! | Priority | Operators |
 //! |----------|-----------|
+//! | 0 | `OR` |
+//! | 1 | `AND` |
 //! | 2 | `&` `=` `#` `<` `>` `<=` `>=` |
 //! | 3 | `+` `-` |
 //! | 4 | `*` `/` |
@@ -52,7 +54,11 @@ lazy_static::lazy_static! {
         // - Priority 5: Exponentiation (^) - right-associative
         // - Priority 6: Extraction (|), Derivation (%)
         PrattParser::new()
-            // Lowest precedence (Priority 2): concatenation, equality, not-equals, comparisons
+            // Lowest precedence (Priority 0): logical OR
+            .op(Op::infix(or_op, Left))
+            // Priority 1: logical AND (binds tighter than OR)
+            .op(Op::infix(and_op, Left))
+            // Priority 2: concatenation, equality, not-equals, comparisons
             .op(Op::infix(concat, Left) | Op::infix(eq, Left) | Op::infix(neq, Left)
                 | Op::infix(lt, Left) | Op::infix(gt, Left) | Op::infix(lte, Left) | Op::infix(gte, Left))
             // Priority 3: Addition and Subtraction

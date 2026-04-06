@@ -1,0 +1,14 @@
+BEGIN;
+PROCEDURE RUN;
+    VARIABLE R 1;
+    R := LO(1) OR LO(1);
+    WRITE 6 R;
+    R := LO(1) OR LO(0);
+    WRITE 6 R;
+    R := LO(0) OR LO(1);
+    WRITE 6 R;
+    R := LO(0) OR LO(0);
+    WRITE 6 R;
+ENDPROCEDURE;
+RUN;
+END;
