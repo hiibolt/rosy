@@ -1,8 +1,9 @@
-//! DA coefficient-level operations: DASCL, DASGN, DADER, DAINT, DANORO, DANORS.
+//! DA coefficient-level operations: DASCL, DASGN, DADER, DAINT, DANORO, DANORS,
+//! DAFSET, DAFILT, DARAN, DAGMD.
 
 use anyhow::{Result, Context, bail};
 
-use crate::rosy_lib::taylor::{DA, get_runtime};
+use crate::rosy_lib::taylor::{DA, get_runtime, get_filter_da, set_filter_da};
 use crate::rosy_lib::taylor::config::DERIV_INVALID;
 
 /// DASCL: Scale all coefficients of every DA element in the array by `scalar`.
@@ -164,5 +165,145 @@ pub fn rosy_danors(da: &mut Vec<DA>, threshold: f64) -> Result<()> {
             }
         }
     }
+    Ok(())
+}
+
+/// DAFSET: Set the DA filtering template used by DAFILT.
+///
+/// Pass `template = 0.0` (scalar 0) to disable filtering. Otherwise the
+/// single DA value is used as the template for all components.
+/// In Rosy, `template_da` is a `Vec<DA>` with at least one element;
+/// pass an empty vec to disable.
+pub fn rosy_dafset(template_da: Vec<DA>) -> Result<()> {
+    if template_da.is_empty() || (template_da.len() == 1 && template_da[0].is_zero()) {
+        set_filter_da(None)
+    } else {
+        set_filter_da(Some(template_da))
+    }
+}
+
+/// DAFILT: Filter `input` through the template set by DAFSET, writing to `result`.
+///
+/// For each monomial index, a coefficient is kept only if the corresponding
+/// monomial is nonzero in the template component (component 0 of the template
+/// is used as a universal mask).
+pub fn rosy_dafilt(input: &Vec<DA>, result: &mut Vec<DA>) -> Result<()> {
+    let filter = get_filter_da()?;
+
+    match filter {
+        None => {
+            // No filter set — copy input to result unchanged
+            for (r, src) in result.iter_mut().zip(input.iter()) {
+                *r = src.clone();
+            }
+        }
+        Some(template) => {
+            let mask = &template[0]; // use first template component as the monomial mask
+            for (r, src) in result.iter_mut().zip(input.iter()) {
+                // Keep only monomials that are nonzero in the mask
+                let mut new_da = DA::zero();
+                for &k in &src.nonzero {
+                    if mask.coeffs[k as usize].abs() > 0.0 {
+                        new_da.coeffs[k as usize] = src.coeffs[k as usize];
+                        new_da.nonzero.push(k);
+                    }
+                }
+                *r = new_da;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// DARAN: Fill every DA element in `da` with random coefficients in [-1, 1].
+///
+/// `sparsity` is the fraction of monomials that will be set nonzero
+/// (0.0 = all zero, 1.0 = all filled). Uses the global Rosy RNG.
+pub fn rosy_daran(da: &mut Vec<DA>, sparsity: f64) -> Result<()> {
+    let num_monomials = {
+        let rt = get_runtime().context("DARAN requires DA to be initialized (call DAINI first)")?;
+        rt.num_monomials
+    };
+
+    let sparsity = sparsity.clamp(0.0, 1.0);
+
+    for da_el in da.iter_mut() {
+        *da_el = DA::zero();
+        for k in 0..num_monomials {
+            if crate::rosy_lib::core::rng::rng_f64() < sparsity {
+                let val = crate::rosy_lib::core::rng::rng_f64_symmetric();
+                da_el.coeffs[k] = val;
+                da_el.nonzero.push(k as u32);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// DAGMD: Compute the Lie derivative ∇g · f (gradient of g dotted with vector field f).
+///
+/// `result = Σᵢ (∂g/∂xᵢ) * f[i]`
+///
+/// Arguments:
+/// - `g`: single-component DA (scalar field)
+/// - `f`: array of DAs (vector field, `dim` components)
+/// - `result`: single-component DA output
+/// - `dim`: number of components of f
+pub fn rosy_dagmd(g: &Vec<DA>, f: &Vec<DA>, result: &mut Vec<DA>, dim: usize) -> Result<()> {
+    let (epsilon, num_vars, deriv_targets, deriv_exponents, n) = {
+        let rt = get_runtime().context("DAGMD requires DA to be initialized (call DAINI first)")?;
+        let num_vars = rt.config.num_vars;
+        (
+            rt.config.epsilon,
+            num_vars,
+            rt.deriv_target.clone(),
+            rt.deriv_exponent.clone(),
+            rt.num_monomials,
+        )
+    };
+
+    if dim > num_vars {
+        bail!("DAGMD: dim ({}) exceeds number of DA variables ({})", dim, num_vars);
+    }
+    if f.len() < dim {
+        bail!("DAGMD: f array has {} elements but dim={}", f.len(), dim);
+    }
+
+    // g is a single-component DA; we compute ∂g/∂xᵢ for each i, multiply by f[i], accumulate
+    let g0 = g.get(0).ok_or_else(|| anyhow::anyhow!("DAGMD: g is empty"))?;
+
+    let mut acc = DA::zero();
+
+    for i in 0..dim {
+        // Compute ∂g/∂xᵢ (derivative w.r.t. variable i+1, 0-based: i)
+        let v = i;
+        let base = v * n;
+        let deriv_target_v = &deriv_targets[base..base + n];
+        let deriv_exp_v    = &deriv_exponents[base..base + n];
+
+        let mut dg_dxi = DA::zero();
+        for &k in &g0.nonzero {
+            let target = deriv_target_v[k as usize];
+            if target == DERIV_INVALID { continue; }
+            let exp = deriv_exp_v[k as usize] as f64;
+            let new_coeff = g0.coeffs[k as usize] * exp;
+            if new_coeff.abs() > epsilon {
+                dg_dxi.coeffs[target as usize] = new_coeff;
+                dg_dxi.nonzero.push(target);
+            }
+        }
+
+        // Multiply dg_dxi by f[i] and add to accumulator
+        let fi = &f[i];
+        let product = (&dg_dxi * fi).context("DAGMD: multiplication failed")?;
+        acc = (&acc + &product).context("DAGMD: addition failed")?;
+    }
+
+    if let Some(r) = result.get_mut(0) {
+        *r = acc;
+    } else {
+        result.push(acc);
+    }
+
     Ok(())
 }

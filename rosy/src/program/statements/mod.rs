@@ -128,6 +128,16 @@ pub use da::dadiu::DadiuStatement;
 pub use da::dadmu::DadmuStatement;
 pub use da::daeps::DaepsStatement;
 pub use da::daest::DaestStatement;
+pub use da::daepsm::DaepsmStatement;
+pub use da::epsmin::EpsminStatement;
+pub use da::dafset::DafsetStatement;
+pub use da::dafilt::DafiltStatement;
+pub use da::danotw::DanotwStatement;
+pub use da::daflo::DafloStatement;
+pub use da::cdflo::CdfloStatement;
+pub use da::dagmd::DagmdStatement;
+pub use da::daran::DaranStatement;
+pub use da::dacode::DacodeStatement;
 pub use da::daint::DaintStatement;
 pub use da::danoro::DanoroStatement;
 pub use da::danors::DanorsStatement;
@@ -257,6 +267,16 @@ pub enum StatementEnum {
     DaPea,
     DaPep,
     DaEst,
+    DaEpsm,
+    Epsmin,
+    DaFset,
+    DaFilt,
+    DaNotw,
+    DaFlo,
+    CdFlo,
+    DaGmd,
+    DaRan,
+    DaCode,
     Sleepm,
     Argget,
     Memdpv,
@@ -1005,6 +1025,106 @@ impl FromRule for Statement {
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaEst,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::daepsm => DaepsmStatement::from_rule(pair)
+                .context("...while building DAEPSM statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaEpsm,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::epsmin => EpsminStatement::from_rule(pair)
+                .context("...while building EPSMIN statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Epsmin,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::dafset => DafsetStatement::from_rule(pair)
+                .context("...while building DAFSET statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaFset,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::dafilt => DafiltStatement::from_rule(pair)
+                .context("...while building DAFILT statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaFilt,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::danotw => DanotwStatement::from_rule(pair)
+                .context("...while building DANOTW statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaNotw,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::daflo => DafloStatement::from_rule(pair)
+                .context("...while building DAFLO statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaFlo,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::cdflo => CdfloStatement::from_rule(pair)
+                .context("...while building CDFLO statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::CdFlo,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::dagmd => DagmdStatement::from_rule(pair)
+                .context("...while building DAGMD statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaGmd,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::daran => DaranStatement::from_rule(pair)
+                .context("...while building DARAN statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaRan,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::dacode => DacodeStatement::from_rule(pair)
+                .context("...while building DACODE statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaCode,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
