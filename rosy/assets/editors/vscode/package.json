@@ -19,7 +19,7 @@
       {
         "id": "rosy",
         "aliases": ["Rosy", "rosy"],
-        "extensions": [".rosy", ".fox"],
+        "extensions": [".rosy"],
         "configuration": "./language-configuration.json"
       }
     ],
