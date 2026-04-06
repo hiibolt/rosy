@@ -1,7 +1,7 @@
 //! DA coefficient-level operations: DASCL, DASGN, DADER, DAINT, DANORO, DANORS,
 //! DAFSET, DAFILT, DARAN, DAGMD, DACODE, DAFLO, CDFLO, DANOW, CDF2, CDNF, CDNFDA, CDNFDS.
 
-use anyhow::{Result, Context, bail};
+use anyhow::{Result, Context, bail, ensure};
 use num_complex::Complex64;
 
 use crate::rosy_lib::taylor::{DA, CD, get_runtime, get_filter_da, set_filter_da};
@@ -499,6 +499,261 @@ pub fn rosy_danow(da: &DA, weight: f64, result: &mut f64) -> Result<()> {
         if weighted > *result {
             *result = weighted;
         }
+    }
+
+    Ok(())
+}
+
+/// CDF2: Apply exp(:f2:) to a CD vector in Floquet variables.
+///
+/// For each monomial with exponent pairs (a_k, b_k) for conjugate variable pairs,
+/// multiplies the coefficient by exp(i * sum_k mu_k * (a_k - b_k))
+/// where mu_k are the phase advances (tunes).
+pub fn rosy_cdf2(
+    input: &Vec<CD>,
+    tune1: f64,
+    tune2: f64,
+    tune3: f64,
+    result: &mut Vec<CD>,
+) -> Result<()> {
+    let tunes = [tune1, tune2, tune3];
+    let rt = get_runtime().context("CDF2 requires DA to be initialized (call DAINI first)")?;
+    let num_vars = rt.config.num_vars;
+
+    let n_pairs = num_vars / 2;
+    ensure!(
+        n_pairs <= 3,
+        "CDF2: at most 3 conjugate pairs (6 variables) supported, got {} variables",
+        num_vars
+    );
+
+    for (idx, cd_in) in input.iter().enumerate() {
+        if idx >= result.len() {
+            break;
+        }
+        let mut cd_out = CD::zero();
+
+        for (monomial, coeff) in cd_in.coeffs_iter() {
+            // Compute net phase: sum_k mu_k * (e_{2k} - e_{2k+1})
+            let mut net_phase = 0.0;
+            for k in 0..n_pairs {
+                let e_pos = monomial.exponents[2 * k] as f64;
+                let e_neg = monomial.exponents[2 * k + 1] as f64;
+                net_phase += tunes[k] * (e_pos - e_neg);
+            }
+
+            // Multiply coefficient by exp(i * net_phase)
+            let rotation = Complex64::new(net_phase.cos(), net_phase.sin());
+            cd_out.set_coeff(monomial, coeff * rotation);
+        }
+
+        result[idx] = cd_out;
+    }
+
+    Ok(())
+}
+
+/// CDNF: Apply 1/(1-exp(:f2:)) to a CD vector — homological equation solver.
+///
+/// For each monomial, divides by the resonance denominator (1 - exp(i*net_phase)).
+/// Terms with small denominators (resonant terms) are zeroed out.
+pub fn rosy_cdnf(
+    input: &Vec<CD>,
+    tune1: f64,
+    tune2: f64,
+    tune3: f64,
+    resonances: &Vec<f64>,
+    res_dims: &Vec<f64>,
+    n_resonances: usize,
+    result: &mut Vec<CD>,
+) -> Result<()> {
+    let tunes = [tune1, tune2, tune3];
+    let rt = get_runtime().context("CDNF requires DA to be initialized (call DAINI first)")?;
+    let num_vars = rt.config.num_vars;
+    let n_pairs = num_vars / 2;
+    let epsilon = rt.config.epsilon;
+
+    for (idx, cd_in) in input.iter().enumerate() {
+        if idx >= result.len() {
+            break;
+        }
+        let mut cd_out = CD::zero();
+        // Which conjugate pair does this component belong to?
+        let comp_pair = idx / 2;
+        let comp_sign = if idx % 2 == 0 { 1.0 } else { -1.0 };
+
+        for (monomial, coeff) in cd_in.coeffs_iter() {
+            // Compute net phase: sum_k mu_k * (e_{2k} - e_{2k+1})
+            let mut net_phase = 0.0;
+            for k in 0..n_pairs {
+                let e_pos = monomial.exponents[2 * k] as f64;
+                let e_neg = monomial.exponents[2 * k + 1] as f64;
+                net_phase += tunes[k] * (e_pos - e_neg);
+            }
+
+            // The denominator for the j-th component:
+            // exp(i * net_phase) - exp(i * comp_sign * mu_j)
+            let comp_mu = if comp_pair < n_pairs { tunes[comp_pair] } else { 0.0 };
+            let eig_phase = comp_sign * comp_mu;
+
+            let numerator_phase = Complex64::new(net_phase.cos(), net_phase.sin());
+            let eigenvalue = Complex64::new(eig_phase.cos(), eig_phase.sin());
+            let denominator = numerator_phase - eigenvalue;
+
+            // Check for resonance: if denominator is too small, zero out
+            // Resonances are stored flat: each resonance is n_pairs entries long
+            let is_resonant = denominator.norm() < epsilon || {
+                let mut resonant = false;
+                let mut offset = 0usize;
+                for r in 0..n_resonances {
+                    let dim = if r < res_dims.len() { res_dims[r] as usize } else { n_pairs };
+                    let mut matches = true;
+                    for k in 0..dim.min(n_pairs) {
+                        let diff = monomial.exponents[2 * k] as i64
+                            - monomial.exponents[2 * k + 1] as i64;
+                        if offset + k < resonances.len() && diff != resonances[offset + k] as i64 {
+                            matches = false;
+                            break;
+                        }
+                    }
+                    if matches {
+                        resonant = true;
+                        break;
+                    }
+                    offset += dim;
+                }
+                resonant
+            };
+
+            if is_resonant {
+                // Resonant term — zero in the output (stays in the normal form)
+                continue;
+            }
+
+            let new_coeff = -coeff / denominator;
+            cd_out.set_coeff(monomial, new_coeff);
+        }
+
+        result[idx] = cd_out;
+    }
+
+    Ok(())
+}
+
+/// CDNFDA: Apply Cj operator for non-symplectic normal forms.
+///
+/// Like CDNF but eigenvalues have |lambda| != 1. Uses separate moduli and arguments.
+/// denominator = prod_k(lambda_k^{e_k}) - lambda_coord
+pub fn rosy_cdnfda(
+    input: &Vec<CD>,
+    moduli: &Vec<f64>,
+    arguments: &Vec<f64>,
+    coord: usize,
+    total: usize,
+    epsilon: f64,
+    result: &mut Vec<CD>,
+) -> Result<()> {
+    let rt = get_runtime().context("CDNFDA requires DA to be initialized (call DAINI first)")?;
+    let num_vars = rt.config.num_vars;
+
+    ensure!(
+        coord >= 1 && coord <= total,
+        "CDNFDA: coordinate number {} out of range 1..{}",
+        coord,
+        total
+    );
+
+    // Eigenvalue for the target coordinate
+    let coord_idx = coord - 1;
+    let lambda_coord = if coord_idx < moduli.len() && coord_idx < arguments.len() {
+        let r = moduli[coord_idx];
+        let theta = arguments[coord_idx];
+        Complex64::new(r * theta.cos(), r * theta.sin())
+    } else {
+        Complex64::new(1.0, 0.0)
+    };
+
+    for (idx, cd_in) in input.iter().enumerate() {
+        if idx >= result.len() {
+            break;
+        }
+        let mut cd_out = CD::zero();
+
+        for (monomial, coeff) in cd_in.coeffs_iter() {
+            // Compute product of eigenvalues raised to exponent powers
+            let mut prod = Complex64::new(1.0, 0.0);
+            for k in 0..total.min(num_vars).min(moduli.len()).min(arguments.len()) {
+                let exp = monomial.exponents[k] as f64;
+                if exp != 0.0 {
+                    let r = moduli[k];
+                    let theta = arguments[k];
+                    let lambda_k = Complex64::new(r * theta.cos(), r * theta.sin());
+                    prod *= lambda_k.powf(exp);
+                }
+            }
+
+            let denominator = prod - lambda_coord;
+
+            if denominator.norm() < epsilon {
+                continue; // Resonant — zero out
+            }
+
+            let new_coeff = -coeff / denominator;
+            cd_out.set_coeff(monomial, new_coeff);
+        }
+
+        result[idx] = cd_out;
+    }
+
+    Ok(())
+}
+
+/// CDNFDS: Apply Sj operator for spin normal forms.
+///
+/// Like CDNFDA but the target eigenvalue is lambda_spin = exp(i * spin_argument).
+pub fn rosy_cdnfds(
+    input: &Vec<CD>,
+    moduli: &Vec<f64>,
+    arguments: &Vec<f64>,
+    spin_arg: f64,
+    total: usize,
+    epsilon: f64,
+    result: &mut Vec<CD>,
+) -> Result<()> {
+    let rt = get_runtime().context("CDNFDS requires DA to be initialized (call DAINI first)")?;
+    let num_vars = rt.config.num_vars;
+
+    let lambda_spin = Complex64::new(spin_arg.cos(), spin_arg.sin());
+
+    for (idx, cd_in) in input.iter().enumerate() {
+        if idx >= result.len() {
+            break;
+        }
+        let mut cd_out = CD::zero();
+
+        for (monomial, coeff) in cd_in.coeffs_iter() {
+            let mut prod = Complex64::new(1.0, 0.0);
+            for k in 0..total.min(num_vars).min(moduli.len()).min(arguments.len()) {
+                let exp = monomial.exponents[k] as f64;
+                if exp != 0.0 {
+                    let r = moduli[k];
+                    let theta = arguments[k];
+                    let lambda_k = Complex64::new(r * theta.cos(), r * theta.sin());
+                    prod *= lambda_k.powf(exp);
+                }
+            }
+
+            let denominator = prod - lambda_spin;
+
+            if denominator.norm() < epsilon {
+                continue;
+            }
+
+            let new_coeff = -coeff / denominator;
+            cd_out.set_coeff(monomial, new_coeff);
+        }
+
+        result[idx] = cd_out;
     }
 
     Ok(())
