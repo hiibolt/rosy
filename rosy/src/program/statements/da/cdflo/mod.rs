@@ -1,18 +1,33 @@
-//! # CDFLO Statement (Complex DA Flow — Not Yet Implemented)
+//! # CDFLO Statement (Complex DA Flow)
 //!
 //! Same as DAFLO but with complex DA (CD) arguments.
-//! Computes the flow of x' = f(x) for time step 1 via iterated Lie series,
-//! where f and the result are complex DA vectors.
-//!
-//! **Note:** Requires a complex Lie series ODE solver. Planned future work.
+//! Computes the flow of x' = f(x) for time step 1 via iterated Lie series.
 //!
 //! ## Syntax
 //!
 //! ```text
 //! CDFLO rhs ic result dim;
 //! ```
+//!
+//! ## Rosy Example
+//! ```text
+#![doc = include_str!("test.rosy")]
+//! ```
+//! **Output**:
+//! ```text
+#![doc = include_str!("rosy_output.txt")]
+//! ```
+//! ## COSY INFINITY Example
+//! ```text
+#![doc = include_str!("test.fox")]
+//! ```
+//! **Output**:
+//! ```text
+#![doc = include_str!("cosy_output.txt")]
+//! ```
 
-use anyhow::{Error, Result, ensure};
+use anyhow::{Context, Error, Result, ensure};
+use std::collections::BTreeSet;
 
 use crate::{
     ast::*,
@@ -20,7 +35,7 @@ use crate::{
     resolve::{ScopeContext, TypeResolver},
     transpile::{
         InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, add_context_to_all,
     },
 };
 
@@ -43,20 +58,20 @@ impl FromRule for CdfloStatement {
 
         let mut inner = pair.into_inner();
 
-        let rhs = Expr::from_rule(inner.next().ok_or_else(|| anyhow::anyhow!("Missing rhs in CDFLO"))?)
-            .map_err(|e| e)?
+        let rhs = Expr::from_rule(inner.next().context("Missing rhs in CDFLO")?)
+            .context("Failed to build rhs expression in CDFLO")?
             .ok_or_else(|| anyhow::anyhow!("Expected rhs expression in CDFLO"))?;
 
-        let ic = Expr::from_rule(inner.next().ok_or_else(|| anyhow::anyhow!("Missing ic in CDFLO"))?)
-            .map_err(|e| e)?
+        let ic = Expr::from_rule(inner.next().context("Missing ic in CDFLO")?)
+            .context("Failed to build ic expression in CDFLO")?
             .ok_or_else(|| anyhow::anyhow!("Expected ic expression in CDFLO"))?;
 
-        let result = Expr::from_rule(inner.next().ok_or_else(|| anyhow::anyhow!("Missing result in CDFLO"))?)
-            .map_err(|e| e)?
+        let result = Expr::from_rule(inner.next().context("Missing result in CDFLO")?)
+            .context("Failed to build result expression in CDFLO")?
             .ok_or_else(|| anyhow::anyhow!("Expected result expression in CDFLO"))?;
 
-        let dim = Expr::from_rule(inner.next().ok_or_else(|| anyhow::anyhow!("Missing dim in CDFLO"))?)
-            .map_err(|e| e)?
+        let dim = Expr::from_rule(inner.next().context("Missing dim in CDFLO")?)
+            .context("Failed to build dim expression in CDFLO")?
             .ok_or_else(|| anyhow::anyhow!("Expected dim expression in CDFLO"))?;
 
         Ok(Some(CdfloStatement { rhs, ic, result, dim }))
@@ -92,13 +107,45 @@ impl TranspileableStatement for CdfloStatement {
 impl Transpile for CdfloStatement {
     fn transpile(
         &self,
-        _context: &mut TranspilationInputContext,
+        context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>> {
-        let serialization =
-            "anyhow::bail!(\"CDFLO is not yet implemented: requires a complex Lie series ODE flow solver\");".to_string();
+        let mut requested_variables = BTreeSet::new();
+
+        let rhs_output = self.rhs.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling rhs in CDFLO".to_string())
+        })?;
+        requested_variables.extend(rhs_output.requested_variables.iter().cloned());
+
+        let ic_output = self.ic.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling ic in CDFLO".to_string())
+        })?;
+        requested_variables.extend(ic_output.requested_variables.iter().cloned());
+
+        let result_output = self.result.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling result in CDFLO".to_string())
+        })?;
+        requested_variables.extend(result_output.requested_variables.iter().cloned());
+
+        let dim_output = self.dim.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling dim in CDFLO".to_string())
+        })?;
+        requested_variables.extend(dim_output.requested_variables.iter().cloned());
+
+        let result_ref = result_output
+            .as_ref()
+            .replace("&mut ", "")
+            .replace("&", "&mut ");
+
+        let serialization = format!(
+            "rosy_lib::core::da_ops::rosy_cdflo({}, {}, {result_ref}, {} as usize)?;",
+            rhs_output.as_ref(),
+            ic_output.as_ref(),
+            dim_output.as_value(),
+        );
 
         Ok(TranspilationOutput {
             serialization,
+            requested_variables,
             ..Default::default()
         })
     }

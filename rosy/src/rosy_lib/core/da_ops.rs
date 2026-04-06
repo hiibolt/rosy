@@ -1,9 +1,11 @@
 //! DA coefficient-level operations: DASCL, DASGN, DADER, DAINT, DANORO, DANORS,
-//! DAFSET, DAFILT, DARAN, DAGMD, DACODE.
+//! DAFSET, DAFILT, DARAN, DAGMD, DACODE, DAFLO, CDFLO.
 
 use anyhow::{Result, Context, bail};
+use num_complex::Complex64;
 
-use crate::rosy_lib::taylor::{DA, get_runtime, get_filter_da, set_filter_da};
+use crate::rosy_lib::taylor::{DA, CD, get_runtime, get_filter_da, set_filter_da};
+use crate::rosy_lib::taylor::da::{DA as GenericDA, DACoefficient};
 use crate::rosy_lib::taylor::config::DERIV_INVALID;
 
 /// DASCL: Scale all coefficients of every DA element in the array by `scalar`.
@@ -346,4 +348,140 @@ pub fn rosy_dacode(params: &Vec<f64>, size: usize, result: &mut Vec<Vec<f64>>) -
     }
 
     Ok(())
+}
+
+// ============================================================================
+// Generic Lie series flow (shared by DAFLO and CDFLO)
+// ============================================================================
+
+/// Compute the Lie derivative L_f(g) = ∇g · f = Σᵢ (∂g/∂xᵢ) · fᵢ
+/// for a single scalar DA `g` and vector field `f`.
+///
+/// Generic over coefficient type T (f64 or Complex64).
+fn lie_derivative_scalar<T: DACoefficient>(
+    g: &GenericDA<T>,
+    f: &[GenericDA<T>],
+    dim: usize,
+    epsilon: f64,
+    deriv_targets: &[u32],
+    deriv_exponents: &[u8],
+    n: usize,
+) -> Result<GenericDA<T>> {
+    let mut acc = GenericDA::<T>::zero();
+
+    for i in 0..dim {
+        let base = i * n;
+        let deriv_target_v = &deriv_targets[base..base + n];
+        let deriv_exp_v = &deriv_exponents[base..base + n];
+
+        // Compute ∂g/∂xᵢ
+        let mut dg_dxi = GenericDA::<T>::zero();
+        for &k in &g.nonzero {
+            let target = deriv_target_v[k as usize];
+            if target == DERIV_INVALID { continue; }
+            let exp = T::from_usize(deriv_exp_v[k as usize] as usize);
+            let new_coeff = g.coeffs[k as usize] * exp;
+            if new_coeff.abs() > epsilon {
+                dg_dxi.coeffs[target as usize] = new_coeff;
+                dg_dxi.nonzero.push(target);
+            }
+        }
+
+        // Multiply ∂g/∂xᵢ by f[i] and accumulate
+        let product = (&dg_dxi * &f[i]).context("Lie derivative: multiplication failed")?;
+        acc = (&acc + &product).context("Lie derivative: addition failed")?;
+    }
+
+    Ok(acc)
+}
+
+/// Generic Lie series flow: computes exp(L_f)(ic) for time step 1.
+///
+/// For each component i of the initial condition, iterates:
+///   term_0 = ic[i]
+///   term_k = (1/k) · L_f(term_{k-1})
+///   result[i] = Σ term_k
+///
+/// Converges to machine accuracy for polynomial vector fields;
+/// DA truncation guarantees termination for any smooth f.
+fn flow_impl<T: DACoefficient>(
+    rhs: &[GenericDA<T>],
+    ic: &[GenericDA<T>],
+    result: &mut Vec<GenericDA<T>>,
+    dim: usize,
+) -> Result<()> {
+    let (epsilon, num_vars, deriv_targets, deriv_exponents, n) = {
+        let rt = get_runtime().context("Flow requires DA to be initialized (call DAINI first)")?;
+        (
+            rt.config.epsilon,
+            rt.config.num_vars,
+            rt.deriv_target.clone(),
+            rt.deriv_exponent.clone(),
+            rt.num_monomials,
+        )
+    };
+
+    if dim > num_vars {
+        bail!("Flow: dim ({}) exceeds number of DA variables ({})", dim, num_vars);
+    }
+    if rhs.len() < dim {
+        bail!("Flow: rhs array has {} elements but dim={}", rhs.len(), dim);
+    }
+    if ic.len() < dim {
+        bail!("Flow: initial condition has {} elements but dim={}", ic.len(), dim);
+    }
+
+    const MAX_ITER: usize = 200;
+
+    for i in 0..dim {
+        let mut term = ic[i].clone();
+        let mut sum = term.clone();
+
+        for k in 1..=MAX_ITER {
+            // term_k = (1/k) · L_f(term_{k-1})
+            let lie = lie_derivative_scalar(
+                &term, &rhs[..dim], dim, epsilon,
+                &deriv_targets, &deriv_exponents, n,
+            )?;
+            let scale = T::one() / T::from_usize(k);
+            term = (&lie * scale).context("Flow: scaling failed")?;
+
+            // Check convergence: max |coefficient| in the new term
+            let term_norm: f64 = term.nonzero.iter()
+                .map(|&idx| term.coeffs[idx as usize].abs())
+                .fold(0.0f64, f64::max);
+
+            if term_norm < epsilon {
+                break;
+            }
+
+            sum = (&sum + &term).context("Flow: accumulation failed")?;
+        }
+
+        if let Some(r) = result.get_mut(i) {
+            *r = sum;
+        } else {
+            result.push(sum);
+        }
+    }
+
+    Ok(())
+}
+
+/// DAFLO: Compute the real DA flow of x' = f(x) for time step 1.
+///
+/// Arguments:
+/// - `rhs`: array of DAs representing the vector field f (dim components)
+/// - `ic`: initial condition DA array (dim components)
+/// - `result`: output DA array (dim components)
+/// - `dim`: dimension of the system
+pub fn rosy_daflo(rhs: &Vec<DA>, ic: &Vec<DA>, result: &mut Vec<DA>, dim: usize) -> Result<()> {
+    flow_impl(rhs, ic, result, dim)
+}
+
+/// CDFLO: Compute the complex DA flow of x' = f(x) for time step 1.
+///
+/// Same as DAFLO but with complex DA (CD) coefficients.
+pub fn rosy_cdflo(rhs: &Vec<CD>, ic: &Vec<CD>, result: &mut Vec<CD>, dim: usize) -> Result<()> {
+    flow_impl(rhs, ic, result, dim)
 }

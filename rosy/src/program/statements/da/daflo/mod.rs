@@ -1,18 +1,36 @@
-//! # DAFLO Statement (DA Flow — Not Yet Implemented)
+//! # DAFLO Statement (DA Flow)
 //!
 //! Computes the DA representation of the flow of x' = f(x) for time step 1
-//! to nearly machine accuracy via iterated Lie series.
+//! to nearly machine accuracy via iterated Lie series: exp(L_f)(ic).
 //!
-//! **Note:** Implementing DAFLO requires a Lie series solver for autonomous ODEs.
-//! This is algorithmically complex and is planned as future work.
+//! Arguments: `rhs` (array of DA right-hand sides), `ic` (initial condition),
+//! `result` (output), `dim` (dimension of f).
 //!
 //! ## Syntax
 //!
 //! ```text
 //! DAFLO rhs ic result dim;
 //! ```
+//!
+//! ## Rosy Example
+//! ```text
+#![doc = include_str!("test.rosy")]
+//! ```
+//! **Output**:
+//! ```text
+#![doc = include_str!("rosy_output.txt")]
+//! ```
+//! ## COSY INFINITY Example
+//! ```text
+#![doc = include_str!("test.fox")]
+//! ```
+//! **Output**:
+//! ```text
+#![doc = include_str!("cosy_output.txt")]
+//! ```
 
-use anyhow::{Error, Result, ensure};
+use anyhow::{Context, Error, Result, ensure};
+use std::collections::BTreeSet;
 
 use crate::{
     ast::*,
@@ -20,7 +38,7 @@ use crate::{
     resolve::{ScopeContext, TypeResolver},
     transpile::{
         InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, add_context_to_all,
     },
 };
 
@@ -43,20 +61,20 @@ impl FromRule for DafloStatement {
 
         let mut inner = pair.into_inner();
 
-        let rhs = Expr::from_rule(inner.next().ok_or_else(|| anyhow::anyhow!("Missing rhs in DAFLO"))?)
-            .map_err(|e| e)?
+        let rhs = Expr::from_rule(inner.next().context("Missing rhs in DAFLO")?)
+            .context("Failed to build rhs expression in DAFLO")?
             .ok_or_else(|| anyhow::anyhow!("Expected rhs expression in DAFLO"))?;
 
-        let ic = Expr::from_rule(inner.next().ok_or_else(|| anyhow::anyhow!("Missing ic in DAFLO"))?)
-            .map_err(|e| e)?
+        let ic = Expr::from_rule(inner.next().context("Missing ic in DAFLO")?)
+            .context("Failed to build ic expression in DAFLO")?
             .ok_or_else(|| anyhow::anyhow!("Expected ic expression in DAFLO"))?;
 
-        let result = Expr::from_rule(inner.next().ok_or_else(|| anyhow::anyhow!("Missing result in DAFLO"))?)
-            .map_err(|e| e)?
+        let result = Expr::from_rule(inner.next().context("Missing result in DAFLO")?)
+            .context("Failed to build result expression in DAFLO")?
             .ok_or_else(|| anyhow::anyhow!("Expected result expression in DAFLO"))?;
 
-        let dim = Expr::from_rule(inner.next().ok_or_else(|| anyhow::anyhow!("Missing dim in DAFLO"))?)
-            .map_err(|e| e)?
+        let dim = Expr::from_rule(inner.next().context("Missing dim in DAFLO")?)
+            .context("Failed to build dim expression in DAFLO")?
             .ok_or_else(|| anyhow::anyhow!("Expected dim expression in DAFLO"))?;
 
         Ok(Some(DafloStatement { rhs, ic, result, dim }))
@@ -92,13 +110,45 @@ impl TranspileableStatement for DafloStatement {
 impl Transpile for DafloStatement {
     fn transpile(
         &self,
-        _context: &mut TranspilationInputContext,
+        context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>> {
-        let serialization =
-            "anyhow::bail!(\"DAFLO is not yet implemented: requires a Lie series ODE flow solver\");".to_string();
+        let mut requested_variables = BTreeSet::new();
+
+        let rhs_output = self.rhs.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling rhs in DAFLO".to_string())
+        })?;
+        requested_variables.extend(rhs_output.requested_variables.iter().cloned());
+
+        let ic_output = self.ic.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling ic in DAFLO".to_string())
+        })?;
+        requested_variables.extend(ic_output.requested_variables.iter().cloned());
+
+        let result_output = self.result.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling result in DAFLO".to_string())
+        })?;
+        requested_variables.extend(result_output.requested_variables.iter().cloned());
+
+        let dim_output = self.dim.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling dim in DAFLO".to_string())
+        })?;
+        requested_variables.extend(dim_output.requested_variables.iter().cloned());
+
+        let result_ref = result_output
+            .as_ref()
+            .replace("&mut ", "")
+            .replace("&", "&mut ");
+
+        let serialization = format!(
+            "rosy_lib::core::da_ops::rosy_daflo({}, {}, {result_ref}, {} as usize)?;",
+            rhs_output.as_ref(),
+            ic_output.as_ref(),
+            dim_output.as_value(),
+        );
 
         Ok(TranspilationOutput {
             serialization,
+            requested_variables,
             ..Default::default()
         })
     }
