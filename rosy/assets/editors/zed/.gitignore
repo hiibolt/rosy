@@ -1,1 +1,4 @@
 target
+grammars
+languages/rosy/highlights.scm
+extension.wasm
