@@ -32,7 +32,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for computing the absolute value of ROSY data types.
+/// Trait for computing the absolute value of Rosy data types.
 pub trait RosyABS {
     type Output;
     fn rosy_abs(&self) -> anyhow::Result<Self::Output>;

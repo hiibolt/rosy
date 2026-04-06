@@ -1,0 +1,129 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Rosy",
+  "scopeName": "source.rosy",
+  "comment": "Keyword highlighting is handled by the LSP semantic token provider. This grammar covers only structural tokens (comments, strings, numbers, operators) as a fallback when the LSP is not running.",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#constants" },
+    { "include": "#assignment-operator" },
+    { "include": "#operators" },
+    { "include": "#numbers" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.rosy",
+          "begin": "\\{",
+          "end": "\\}",
+          "patterns": [
+            {
+              "name": "comment.block.rosy",
+              "begin": "\\{",
+              "end": "\\}"
+            }
+          ]
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.rosy",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.rosy",
+              "match": "''"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.double.rosy",
+          "begin": "\"",
+          "end": "\""
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.rosy",
+          "match": "\\b(TRUE|FALSE)\\b"
+        }
+      ]
+    },
+    "assignment-operator": {
+      "patterns": [
+        {
+          "name": "keyword.operator.assignment.rosy",
+          "match": ":="
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.rosy",
+          "match": "<=|>=|<>|!=|==|<|>|=|#"
+        },
+        {
+          "name": "keyword.operator.arithmetic.rosy",
+          "match": "\\+|-|\\*|/"
+        },
+        {
+          "name": "keyword.operator.concatenation.rosy",
+          "match": "&"
+        },
+        {
+          "name": "keyword.operator.extraction.rosy",
+          "match": "\\|"
+        },
+        {
+          "name": "keyword.operator.derivation.rosy",
+          "match": "%"
+        },
+        {
+          "name": "keyword.operator.power.rosy",
+          "match": "\\^"
+        },
+        {
+          "name": "keyword.operator.not.rosy",
+          "match": "!"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.rosy",
+          "match": "\\b\\d+\\.\\d+([eE][+-]?\\d+)?\\b"
+        },
+        {
+          "name": "constant.numeric.scientific.rosy",
+          "match": "\\b\\d+[eE][+-]?\\d+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.rosy",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.terminator.rosy",
+          "match": ";"
+        },
+        {
+          "name": "punctuation.separator.comma.rosy",
+          "match": ","
+        }
+      ]
+    }
+  }
+}

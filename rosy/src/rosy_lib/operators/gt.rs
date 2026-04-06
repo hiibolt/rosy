@@ -1,4 +1,4 @@
-//! Greater-than operator for ROSY types.
+//! Greater-than operator for Rosy types.
 //!
 //! This module provides the `RosyGt` trait and implementations for all
 //! supported type combinations. The compatibility rules are defined in the

@@ -16,7 +16,7 @@ pub fn get_return_type(input: &crate::rosy_lib::RosyType) -> Option<crate::rosy_
     }
 }
 
-/// Trait for removing leading spaces from ROSY string types.
+/// Trait for removing leading spaces from Rosy string types.
 pub trait RosyLTRIM {
     fn rosy_ltrim(&self) -> anyhow::Result<ST>;
 }

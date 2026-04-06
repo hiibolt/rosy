@@ -1,4 +1,4 @@
-//! Not-equals operator for ROSY types.
+//! Not-equals operator for Rosy types.
 //!
 //! This module provides the `RosyNeq` trait and implementations for all
 //! supported type combinations. The compatibility rules are defined in the
@@ -10,7 +10,7 @@
 //!
 //! # Examples
 //! 
-//! See `assets/operators/neq/neq.rosy` for ROSY examples and 
+//! See `assets/operators/neq/neq.rosy` for Rosy examples and 
 //! `assets/operators/neq/neq.fox` for equivalent COSY INFINITY code.
 
 use anyhow::Result;
@@ -23,7 +23,7 @@ use crate::rosy_lib::operators::{TypeRule, build_type_registry};
 /// This is the single source of truth for what type combinations are allowed.
 /// The build script (`build.rs`) parses this to generate:
 /// - Documentation table (`neq_table.md`)
-/// - ROSY test script (`neq.rosy`)
+/// - Rosy test script (`neq.rosy`)
 /// - COSY test script (`neq.fox`)
 /// - Integration tests
 pub const NEQ_REGISTRY: &[TypeRule] = &[

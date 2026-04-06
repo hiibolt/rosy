@@ -440,7 +440,7 @@ impl Transpile for FunctionStatement {
 
         // Serialize the entire function.
         // The Rust function name is prefixed with `__fn_` to avoid shadowing
-        // the implicit return variable (which uses the original ROSY name).
+        // the implicit return variable (which uses the original Rosy name).
         // This allows recursive calls like `FIB(N-1)` to resolve to the
         // function `__fn_FIB` rather than trying to index the local `FIB: f64`.
         let rust_fn_name = format!("__fn_{}", self.name);

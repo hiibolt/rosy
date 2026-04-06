@@ -135,7 +135,7 @@ Programs using `PLOOP` require an MPI implementation and LLVM/Clang at compile t
 - **macOS**: `brew install open-mpi llvm`
 - **NIU Metis**: `module load openmpi/openmpi-5.0.7-gcc-14.2.0-cuda-12.8`
 
-## IDE Support
+## Editor Support
 
 For setup instructions, run either:
 - `rosy setup zed`

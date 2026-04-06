@@ -1,6 +1,6 @@
-//! Greater-than-or-equal operator for ROSY types.
+//! Greater-than-or-equal operator for Rosy types.
 //!
-//! This is a ROSY extension not present in COSY INFINITY.
+//! This is a Rosy extension not present in COSY INFINITY.
 //!
 //! This module provides the `RosyGte` trait and implementations for all
 //! supported type combinations. The compatibility rules are defined in the

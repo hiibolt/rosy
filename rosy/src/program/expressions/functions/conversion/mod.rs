@@ -1,6 +1,6 @@
 //! # Type Conversion Functions
 //!
-//! Convert values between ROSY base types.
+//! Convert values between Rosy base types.
 //!
 //! - **[`re_convert`]** — `RE(expr)` — convert to real
 //! - **[`string_convert`]** — `ST(expr)` — convert to string

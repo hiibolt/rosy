@@ -40,7 +40,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for computing the natural logarithm of ROSY data types.
+/// Trait for computing the natural logarithm of Rosy data types.
 pub trait RosyLOG {
     type Output;
     fn rosy_log(&self) -> anyhow::Result<Self::Output>;

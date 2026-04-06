@@ -39,7 +39,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for converting ROSY data types to real (RE).
+/// Trait for converting Rosy data types to real (RE).
 pub trait RosyREConvert {
     fn rosy_re_convert(&self) -> anyhow::Result<RE>;
 }

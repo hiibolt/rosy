@@ -1,4 +1,4 @@
-//! Multiplication operator for ROSY types.
+//! Multiplication operator for Rosy types.
 //!
 //! This module provides the `RosyMult` trait and implementations for all
 //! supported type combinations. The compatibility rules are defined in the
@@ -10,7 +10,7 @@
 //!
 //! # Examples
 //! 
-//! See `assets/operators/mult/mult.rosy` for ROSY examples and 
+//! See `assets/operators/mult/mult.rosy` for Rosy examples and 
 //! `assets/operators/mult/mult.fox` for equivalent COSY INFINITY code.
 
 use anyhow::Result;
@@ -23,7 +23,7 @@ use crate::rosy_lib::operators::{TypeRule, build_type_registry};
 /// This is the single source of truth for what type combinations are allowed.
 /// The build script (`build.rs`) parses this to generate:
 /// - Documentation table (`mult_table.md`)
-/// - ROSY test script (`mult.rosy`)
+/// - Rosy test script (`mult.rosy`)
 /// - COSY test script (`mult.fox`)
 /// - Integration tests
 pub const MULT_REGISTRY: &[TypeRule] = &[

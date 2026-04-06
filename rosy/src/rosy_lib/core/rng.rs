@@ -1,7 +1,7 @@
 //! Global seeded random number generator.
 //!
 //! Provides a single, program-wide `StdRng` initialized with seed `0` by default.
-//! All randomness in ROSY (RERAN, FIT optimizer, etc.) draws from this RNG,
+//! All randomness in Rosy (RERAN, FIT optimizer, etc.) draws from this RNG,
 //! ensuring reproducible results across runs.
 //!
 //! Use [`set_rng_seed`] (the `RANSEED` statement) to change the seed at runtime.

@@ -1,7 +1,7 @@
 //! FIT statement implementation.
 //!
 //! ## Syntax
-//! ```
+//! ```text
 //! FIT var1 var2 ...; <statements> ENDFIT eps max algo obj1 obj2 ...;
 //! ```
 //!

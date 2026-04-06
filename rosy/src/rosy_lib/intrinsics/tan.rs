@@ -35,7 +35,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for computing the tangent of ROSY data types.
+/// Trait for computing the tangent of Rosy data types.
 pub trait RosyTAN {
     type Output;
     fn rosy_tan(&self) -> anyhow::Result<Self::Output>;

@@ -36,7 +36,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for computing x^(-3/2) of ROSY data types.
+/// Trait for computing x^(-3/2) of Rosy data types.
 pub trait RosyISRT3 {
     type Output;
     fn rosy_isrt3(&self) -> anyhow::Result<Self::Output>;

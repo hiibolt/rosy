@@ -16,7 +16,7 @@ pub fn get_return_type(input: &crate::rosy_lib::RosyType) -> Option<crate::rosy_
     }
 }
 
-/// Trait for removing trailing spaces from ROSY string types.
+/// Trait for removing trailing spaces from Rosy string types.
 pub trait RosyTRIM {
     fn rosy_trim(&self) -> anyhow::Result<ST>;
 }

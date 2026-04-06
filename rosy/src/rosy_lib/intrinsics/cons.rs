@@ -39,7 +39,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for extracting the constant part of ROSY data types.
+/// Trait for extracting the constant part of Rosy data types.
 pub trait RosyCONS {
     type Output;
     fn rosy_cons(&self) -> anyhow::Result<Self::Output>;

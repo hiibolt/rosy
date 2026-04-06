@@ -1,6 +1,6 @@
 //! # Statements
 //!
-//! Everything in ROSY that *does* something — declarations, control flow, I/O,
+//! Everything in Rosy that *does* something — declarations, control flow, I/O,
 //! and more.
 //!
 //! ## Looking for something?
@@ -145,6 +145,7 @@ pub use da::mtree::MtreeStatement;
 
 use crate::{
     ast::{FromRule, Rule},
+    errors::WithLocation,
     resolve::*,
     transpile::*,
 };
@@ -303,6 +304,7 @@ impl FromRule for Statement {
         match pair.as_rule() {
             Rule::daini => DAInitStatement::from_rule(pair)
                 .context("...while building DA initialization statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DAInit,
@@ -312,6 +314,7 @@ impl FromRule for Statement {
                 }),
             Rule::daprv => DaprvStatement::from_rule(pair)
                 .context("...while building DAPRV statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaPrv,
@@ -321,6 +324,7 @@ impl FromRule for Statement {
                 }),
             Rule::darev => DarevStatement::from_rule(pair)
                 .context("...while building DAREV statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaRev,
@@ -330,6 +334,7 @@ impl FromRule for Statement {
                 }),
             Rule::var_decl => VarDeclStatement::from_rule(pair)
                 .context("...while building variable declaration!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::VarDecl,
@@ -339,6 +344,7 @@ impl FromRule for Statement {
                 }),
             Rule::write => WriteStatement::from_rule(pair)
                 .context("...while building write statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Write,
@@ -357,6 +363,7 @@ impl FromRule for Statement {
                 }),
             Rule::read => ReadStatement::from_rule(pair)
                 .context("...while building read statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Read,
@@ -366,6 +373,7 @@ impl FromRule for Statement {
                 }),
             Rule::writeb => WritebStatement::from_rule(pair)
                 .context("...while building WRITEB statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Writeb,
@@ -375,6 +383,7 @@ impl FromRule for Statement {
                 }),
             Rule::readb => ReadbStatement::from_rule(pair)
                 .context("...while building READB statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Readb,
@@ -384,6 +393,7 @@ impl FromRule for Statement {
                 }),
             Rule::openf => OpenfStatement::from_rule(pair)
                 .context("...while building OPENF statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Openf,
@@ -393,6 +403,7 @@ impl FromRule for Statement {
                 }),
             Rule::openfb => OpenfbStatement::from_rule(pair)
                 .context("...while building OPENFB statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Openfb,
@@ -402,6 +413,7 @@ impl FromRule for Statement {
                 }),
             Rule::closef => ClosefStatement::from_rule(pair)
                 .context("...while building CLOSEF statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Closef,
@@ -429,6 +441,7 @@ impl FromRule for Statement {
                 }),
             Rule::assignment => AssignStatement::from_rule(pair)
                 .context("...while building assignment statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Assign,
@@ -438,6 +451,7 @@ impl FromRule for Statement {
                 }),
             Rule::r#loop => LoopStatement::from_rule(pair)
                 .context("...while building loop statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Loop,
@@ -447,6 +461,7 @@ impl FromRule for Statement {
                 }),
             Rule::while_loop => WhileStatement::from_rule(pair)
                 .context("...while building while statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::WhileLoop,
@@ -456,6 +471,7 @@ impl FromRule for Statement {
                 }),
             Rule::ploop => PLoopStatement::from_rule(pair)
                 .context("...while building ploop statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::PLoop,
@@ -465,6 +481,7 @@ impl FromRule for Statement {
                 }),
             Rule::procedure => ProcedureStatement::from_rule(pair)
                 .context("...while building procedure declaration!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Procedure,
@@ -474,6 +491,7 @@ impl FromRule for Statement {
                 }),
             Rule::procedure_call => ProcedureCallStatement::from_rule(pair)
                 .context("...while building procedure call!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::ProcedureCall,
@@ -483,6 +501,7 @@ impl FromRule for Statement {
                 }),
             Rule::function => FunctionStatement::from_rule(pair)
                 .context("...while building function declaration!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Function,
@@ -492,6 +511,7 @@ impl FromRule for Statement {
                 }),
             Rule::function_call => FunctionCallStatement::from_rule(pair)
                 .context("...while building function call!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::FunctionCall,
@@ -501,6 +521,7 @@ impl FromRule for Statement {
                 }),
             Rule::if_statement => IfStatement::from_rule(pair)
                 .context("...while building if statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::If,
@@ -510,6 +531,7 @@ impl FromRule for Statement {
                 }),
             Rule::break_statement => BreakStatement::from_rule(pair)
                 .context("...while building break statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Break,
@@ -519,6 +541,7 @@ impl FromRule for Statement {
                 }),
             Rule::fit_statement => FitStatement::from_rule(pair)
                 .context("...while building FIT statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Fit,
@@ -529,6 +552,7 @@ impl FromRule for Statement {
 
             Rule::scrlen => ScrlenStatement::from_rule(pair)
                 .context("...while building SCRLEN statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Scrlen,
@@ -538,6 +562,7 @@ impl FromRule for Statement {
                 }),
             Rule::cpusec => CpusecStatement::from_rule(pair)
                 .context("...while building CPUSEC statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Cpusec,
@@ -547,6 +572,7 @@ impl FromRule for Statement {
                 }),
             Rule::quit => QuitStatement::from_rule(pair)
                 .context("...while building QUIT statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Quit,
@@ -556,6 +582,7 @@ impl FromRule for Statement {
                 }),
             Rule::os_call => OsCallStatement::from_rule(pair)
                 .context("...while building OS statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::OsCall,
@@ -565,6 +592,7 @@ impl FromRule for Statement {
                 }),
             Rule::danot => DanotStatement::from_rule(pair)
                 .context("...while building DANOT statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaNot,
@@ -574,6 +602,7 @@ impl FromRule for Statement {
                 }),
             Rule::daeps => DaepsStatement::from_rule(pair)
                 .context("...while building DAEPS statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaEps,
@@ -583,6 +612,7 @@ impl FromRule for Statement {
                 }),
             Rule::datrn => DatrnStatement::from_rule(pair)
                 .context("...while building DATRN statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaTrn,
@@ -592,6 +622,7 @@ impl FromRule for Statement {
                 }),
             Rule::linv => LinvStatement::from_rule(pair)
                 .context("...while building LINV statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Linv,
@@ -601,6 +632,7 @@ impl FromRule for Statement {
                 }),
             Rule::ldet => LdetStatement::from_rule(pair)
                 .context("...while building LDET statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Ldet,
@@ -610,6 +642,7 @@ impl FromRule for Statement {
                 }),
             Rule::substr => SubstrStatement::from_rule(pair)
                 .context("...while building SUBSTR statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Substr,
@@ -619,6 +652,7 @@ impl FromRule for Statement {
                 }),
             Rule::velset => VelsetStatement::from_rule(pair)
                 .context("...while building VELSET statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Velset,
@@ -628,6 +662,7 @@ impl FromRule for Statement {
                 }),
             Rule::velget => VelgetStatement::from_rule(pair)
                 .context("...while building VELGET statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Velget,
@@ -646,6 +681,7 @@ impl FromRule for Statement {
                 }),
             Rule::polval => PolvalStatement::from_rule(pair)
                 .context("...while building POLVAL statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Polval,
@@ -655,6 +691,7 @@ impl FromRule for Statement {
                 }),
             Rule::vedot => VedotStatement::from_rule(pair)
                 .context("...while building VEDOT statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Vedot,
@@ -664,6 +701,7 @@ impl FromRule for Statement {
                 }),
             Rule::veunit => VeunitStatement::from_rule(pair)
                 .context("...while building VEUNIT statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Veunit,
@@ -673,6 +711,7 @@ impl FromRule for Statement {
                 }),
             Rule::vezero => VezeroStatement::from_rule(pair)
                 .context("...while building VEZERO statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Vezero,
@@ -682,6 +721,7 @@ impl FromRule for Statement {
                 }),
             Rule::stcre => StcreStatement::from_rule(pair)
                 .context("...while building STCRE statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Stcre,
@@ -691,6 +731,7 @@ impl FromRule for Statement {
                 }),
             Rule::recst => RecstStatement::from_rule(pair)
                 .context("...while building RECST statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Recst,
@@ -700,6 +741,7 @@ impl FromRule for Statement {
                 }),
             Rule::reran => ReranStatement::from_rule(pair)
                 .context("...while building RERAN statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Reran,
@@ -709,6 +751,7 @@ impl FromRule for Statement {
                 }),
             Rule::ranseed => RanseedStatement::from_rule(pair)
                 .context("...while building RANSEED statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Ranseed,
@@ -718,6 +761,7 @@ impl FromRule for Statement {
                 }),
             Rule::pwtime => PwtimeStatement::from_rule(pair)
                 .context("...while building PWTIME statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Pwtime,
@@ -727,6 +771,7 @@ impl FromRule for Statement {
                 }),
             Rule::pnpro => PnproStatement::from_rule(pair)
                 .context("...while building PNPRO statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Pnpro,
@@ -736,6 +781,7 @@ impl FromRule for Statement {
                 }),
             Rule::imunit => ImunitStatement::from_rule(pair)
                 .context("...while building IMUNIT statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Imunit,
@@ -745,6 +791,7 @@ impl FromRule for Statement {
                 }),
             Rule::lev => LevStatement::from_rule(pair)
                 .context("...while building LEV statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Lev,
@@ -754,6 +801,7 @@ impl FromRule for Statement {
                 }),
             Rule::mblock => MblockStatement::from_rule(pair)
                 .context("...while building MBLOCK statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Mblock,
@@ -763,6 +811,7 @@ impl FromRule for Statement {
                 }),
             Rule::mtree => MtreeStatement::from_rule(pair)
                 .context("...while building MTREE statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Mtree,
@@ -772,6 +821,7 @@ impl FromRule for Statement {
                 }),
             Rule::lsline => LslineStatement::from_rule(pair)
                 .context("...while building LSLINE statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Lsline,
@@ -781,6 +831,7 @@ impl FromRule for Statement {
                 }),
             Rule::rkco => RkcoStatement::from_rule(pair)
                 .context("...while building RKCO statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Rkco,
@@ -790,6 +841,7 @@ impl FromRule for Statement {
                 }),
             Rule::dascl => DasclStatement::from_rule(pair)
                 .context("...while building DASCL statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaScl,
@@ -799,6 +851,7 @@ impl FromRule for Statement {
                 }),
             Rule::dasgn => DasgnStatement::from_rule(pair)
                 .context("...while building DASGN statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaSgn,
@@ -808,6 +861,7 @@ impl FromRule for Statement {
                 }),
             Rule::dader => DaderStatement::from_rule(pair)
                 .context("...while building DADER statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaDer,
@@ -817,6 +871,7 @@ impl FromRule for Statement {
                 }),
             Rule::daint => DaintStatement::from_rule(pair)
                 .context("...while building DAINT statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaInt,
@@ -826,6 +881,7 @@ impl FromRule for Statement {
                 }),
             Rule::danoro => DanoroStatement::from_rule(pair)
                 .context("...while building DANORO statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaNoro,
@@ -835,6 +891,7 @@ impl FromRule for Statement {
                 }),
             Rule::danors => DanorsStatement::from_rule(pair)
                 .context("...while building DANORS statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaNors,
@@ -844,6 +901,7 @@ impl FromRule for Statement {
                 }),
             Rule::daplu => DapluStatement::from_rule(pair)
                 .context("...while building DAPLU statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaPlu,
@@ -853,6 +911,7 @@ impl FromRule for Statement {
                 }),
             Rule::dadiu => DadiuStatement::from_rule(pair)
                 .context("...while building DADIU statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaDiu,
@@ -862,6 +921,7 @@ impl FromRule for Statement {
                 }),
             Rule::dadmu => DadmuStatement::from_rule(pair)
                 .context("...while building DADMU statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaDmu,
@@ -871,6 +931,7 @@ impl FromRule for Statement {
                 }),
             Rule::dacliw => DacliwStatement::from_rule(pair)
                 .context("...while building DACLIW statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaCliw,
@@ -880,6 +941,7 @@ impl FromRule for Statement {
                 }),
             Rule::dacqlc => DacqlcStatement::from_rule(pair)
                 .context("...while building DACQLC statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaCqlc,
@@ -889,6 +951,7 @@ impl FromRule for Statement {
                 }),
             Rule::darea => DareaStatement::from_rule(pair)
                 .context("...while building DAREA statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaArea,
@@ -898,6 +961,7 @@ impl FromRule for Statement {
                 }),
             Rule::dapew => DapewStatement::from_rule(pair)
                 .context("...while building DAPEW statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaPew,
@@ -907,6 +971,7 @@ impl FromRule for Statement {
                 }),
             Rule::dapee => DapeeStatement::from_rule(pair)
                 .context("...while building DAPEE statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaPee,
@@ -916,6 +981,7 @@ impl FromRule for Statement {
                 }),
             Rule::dapea => DapeaStatement::from_rule(pair)
                 .context("...while building DAPEA statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaPea,
@@ -925,6 +991,7 @@ impl FromRule for Statement {
                 }),
             Rule::dapep => DapepStatement::from_rule(pair)
                 .context("...while building DAPEP statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaPep,
@@ -934,6 +1001,7 @@ impl FromRule for Statement {
                 }),
             Rule::daest => DaestStatement::from_rule(pair)
                 .context("...while building DAEST statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaEst,
@@ -944,6 +1012,7 @@ impl FromRule for Statement {
 
             Rule::sleepm => SleepmStatement::from_rule(pair)
                 .context("...while building SLEEPM statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Sleepm,
@@ -953,6 +1022,7 @@ impl FromRule for Statement {
                 }),
             Rule::argget => ArggetStatement::from_rule(pair)
                 .context("...while building ARGGET statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Argget,
@@ -962,6 +1032,7 @@ impl FromRule for Statement {
                 }),
             Rule::memdpv => MemdpvStatement::from_rule(pair)
                 .context("...while building MEMDPV statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Memdpv,
@@ -971,6 +1042,7 @@ impl FromRule for Statement {
                 }),
             Rule::memfre => MemfreStatement::from_rule(pair)
                 .context("...while building MEMFRE statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Memfre,
@@ -1017,6 +1089,7 @@ impl FromRule for Statement {
 
             Rule::readm => ReadmStatement::from_rule(pair)
                 .context("...while building READM statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Readm,
@@ -1026,6 +1099,7 @@ impl FromRule for Statement {
                 }),
             Rule::writem => WritemStatement::from_rule(pair)
                 .context("...while building WRITEM statement!")
+                .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Writem,

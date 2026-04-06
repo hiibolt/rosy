@@ -24,7 +24,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for rounding ROSY data types to the nearest integer.
+/// Trait for rounding Rosy data types to the nearest integer.
 pub trait RosyNINT {
     type Output;
     fn rosy_nint(&self) -> anyhow::Result<Self::Output>;

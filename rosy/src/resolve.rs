@@ -12,6 +12,7 @@
 //! 3. Topologically sort (Kahn's algorithm) and resolve from leaves inward
 //! 4. Report cycles as errors
 
+use crate::errors::RosyError;
 use crate::program::Program;
 use crate::program::expressions::*;
 use crate::program::statements::*;
@@ -185,8 +186,10 @@ impl TypeResolver {
     // ─── Public entry point ─────────────────────────────────────────────
 
     /// Run type resolution on a program. Mutates the AST in place.
-    /// Returns a list of warning messages (e.g. unused variables).
-    pub fn resolve(program: &mut Program) -> Result<Vec<String>> {
+    /// Returns the resolver (with all resolved graph nodes) and a list of
+    /// warning messages (e.g. unused variables). The caller can inspect
+    /// `resolver.nodes` for resolved types, declaration locations, etc.
+    pub fn resolve(program: &mut Program) -> Result<(TypeResolver, Vec<RosyError>)> {
         let mut resolver = TypeResolver::new();
         let mut ctx = ScopeContext::default();
 
@@ -199,7 +202,7 @@ impl TypeResolver {
         // Phase 3: Apply resolved types back to the AST
         resolver.apply_to_ast(&mut program.statements, &[])?;
 
-        Ok(warnings)
+        Ok((resolver, warnings))
     }
 
     // ─── Graph Infrastructure ───────────────────────────────────────────
@@ -358,7 +361,7 @@ impl TypeResolver {
     /// Process nodes whose dependencies are all resolved first, resolve them,
     /// then process their dependents, and so on. One pass — no iteration.
     /// Returns a list of warning messages for unused variables.
-    pub fn topological_resolve(&mut self) -> Result<Vec<String>> {
+    pub fn topological_resolve(&mut self) -> Result<Vec<RosyError>> {
         // Build reverse dependency map: slot → set of slots that depend on it
         let mut dependents: HashMap<TypeSlot, Vec<TypeSlot>> = HashMap::new();
         let mut in_degree: HashMap<TypeSlot, usize> = HashMap::new();
@@ -391,7 +394,7 @@ impl TypeResolver {
         }
 
         let mut resolved_count: usize = 0;
-        let mut warnings: Vec<String> = Vec::new();
+        let mut warnings: Vec<RosyError> = Vec::new();
         let mut warned_slots: HashSet<TypeSlot> = HashSet::new();
         while let Some(slot) = queue.pop_front() {
             // Resolve this node if not already resolved
@@ -407,15 +410,14 @@ impl TypeResolver {
 
                 if is_unused {
                     let node = self.nodes.get(&slot).unwrap();
-                    let loc_str = node
-                        .declared_at
-                        .as_ref()
-                        .map(|loc| format!(" ({})", loc))
-                        .unwrap_or_default();
-                    warnings.push(format!(
-                        "unused variable {}{} — no type could be inferred (never assigned a value)",
-                        slot, loc_str
-                    ));
+                    warnings.push(RosyError {
+                        message: format!(
+                            "unused variable {} — no type could be inferred (never assigned a value)",
+                            slot
+                        ),
+                        location: node.declared_at.clone(),
+                        severity: crate::errors::RosyErrorSeverity::Warning,
+                    });
                     warned_slots.insert(slot.clone());
                     resolved_count += 1;
                     continue;
@@ -459,7 +461,7 @@ impl TypeResolver {
     }
 
     /// Build a detailed error message for unresolved type slots.
-    fn build_resolution_error(&self, unresolved: &[&GraphNode]) -> Result<Vec<String>> {
+    fn build_resolution_error(&self, unresolved: &[&GraphNode]) -> Result<Vec<RosyError>> {
         // Partition into cycle nodes (have unresolved deps) vs no-info nodes
         let cycle_slots: Vec<&TypeSlot> = unresolved
             .iter()
@@ -576,7 +578,17 @@ impl TypeResolver {
         msg.push_str("\n│  known type, or is part of a cycle, it cannot be resolved.");
         msg.push_str("\n│");
         msg.push_str("\n╰──────────────────────────────────────────────────────────");
-        Err(anyhow!("{}", msg))
+        // Use the location of the first unresolvable slot for diagnostic placement
+        let first_loc = no_info_slots
+            .iter()
+            .chain(cycle_slots.iter())
+            .filter_map(|s| self.nodes.get(s)?.declared_at.clone())
+            .next();
+        Err(RosyError {
+            message: msg,
+            location: first_loc,
+            severity: crate::errors::RosyErrorSeverity::Error,
+        }.into())
     }
 
     /// Extract the human-readable reason from a resolution rule, if available.
@@ -606,15 +618,17 @@ impl TypeResolver {
             ResolutionRule::Explicit(t) => t,
             ResolutionRule::InferredFrom { recipe, reason } => {
                 self.evaluate_recipe(&recipe).map_err(|e| {
-                    let mut ctx = format!("while resolving {}", slot);
-                    if let Some(loc) = &assigned_at {
-                        ctx.push_str(&format!("\n  📍 Assigned at: {}", loc));
-                    }
-                    if let Some(loc) = &declared_at {
-                        ctx.push_str(&format!("\n  📍 Declared at: {}", loc));
-                    }
-                    ctx.push_str(&format!("\n  ({})", reason));
-                    e.context(ctx)
+                    let msg = format!(
+                        "while resolving {}: {}\n  ({})",
+                        slot, e, reason
+                    );
+                    // Prefer assigned_at (the source of inference), fall back to declared_at
+                    let loc = assigned_at.clone().or_else(|| declared_at.clone());
+                    anyhow::Error::from(RosyError {
+                        message: msg,
+                        location: loc,
+                        severity: crate::errors::RosyErrorSeverity::Error,
+                    })
                 })?
             }
             ResolutionRule::Mirror { source, .. } => self
@@ -629,14 +643,15 @@ impl TypeResolver {
                     )
                 })?,
             ResolutionRule::Unresolved => {
-                let mut msg = format!("No type could be determined for {}", slot);
-                if let Some(loc) = &node.declared_at {
-                    msg.push_str(&format!("\n  📍 Declared at: {}", loc));
-                }
-                msg.push_str(
-                    "\n  💡 Add an explicit type annotation or assign a value with a known type.",
+                let msg = format!(
+                    "No type could be determined for {}\n  💡 Add an explicit type annotation or assign a value with a known type.",
+                    slot
                 );
-                return Err(anyhow!("{}", msg));
+                return Err(RosyError {
+                    message: msg,
+                    location: node.declared_at.clone(),
+                    severity: crate::errors::RosyErrorSeverity::Error,
+                }.into());
             }
         };
 

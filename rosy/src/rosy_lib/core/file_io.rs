@@ -1,4 +1,4 @@
-//! File I/O runtime support for ROSY.
+//! File I/O runtime support for Rosy.
 //!
 //! Provides a file handle registry that maps COSY-style unit numbers
 //! to Rust file handles. Supports both ASCII and binary I/O modes.
@@ -315,12 +315,12 @@ pub fn rosy_readb_from_unit(unit: u64) -> Result<Vec<u8>> {
     Ok(data)
 }
 
-/// Trait for serializing ROSY types to binary.
+/// Trait for serializing Rosy types to binary.
 pub trait RosyToBinary {
     fn to_binary(&self) -> Vec<u8>;
 }
 
-/// Trait for deserializing ROSY types from binary.
+/// Trait for deserializing Rosy types from binary.
 pub trait RosyFromBinary: Sized {
     fn from_binary(data: &[u8]) -> Result<Self>;
 }

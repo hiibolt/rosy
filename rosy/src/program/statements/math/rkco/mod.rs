@@ -17,11 +17,11 @@
 //! - `a2` — coupling matrix rows 8..13, flattened (57 values)
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
 
@@ -35,9 +35,9 @@ use crate::{
     },
     resolve::{ScopeContext, TypeResolver},
     transpile::{
-        add_context_to_all, InferenceEdgeResult, Transpile, TranspilationInputContext,
-        TranspilationOutput, TranspileableStatement, TypeHydrationResult,
-        TypeslotDeclarationResult, ValueKind,
+        InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, ValueKind,
+        add_context_to_all,
     },
 };
 
@@ -129,29 +129,34 @@ impl Transpile for RkcoStatement {
     ) -> Result<TranspilationOutput, Vec<Error>> {
         let mut requested_variables = BTreeSet::new();
 
-        let c_output = self.c_var.transpile(context).map_err(|e| {
-            add_context_to_all(e, "...while transpiling c in RKCO".to_string())
-        })?;
+        let c_output = self
+            .c_var
+            .transpile(context)
+            .map_err(|e| add_context_to_all(e, "...while transpiling c in RKCO".to_string()))?;
         requested_variables.extend(c_output.requested_variables.clone());
 
-        let b_output = self.b_var.transpile(context).map_err(|e| {
-            add_context_to_all(e, "...while transpiling b in RKCO".to_string())
-        })?;
+        let b_output = self
+            .b_var
+            .transpile(context)
+            .map_err(|e| add_context_to_all(e, "...while transpiling b in RKCO".to_string()))?;
         requested_variables.extend(b_output.requested_variables.clone());
 
-        let e_output = self.e_var.transpile(context).map_err(|e| {
-            add_context_to_all(e, "...while transpiling e in RKCO".to_string())
-        })?;
+        let e_output = self
+            .e_var
+            .transpile(context)
+            .map_err(|e| add_context_to_all(e, "...while transpiling e in RKCO".to_string()))?;
         requested_variables.extend(e_output.requested_variables.clone());
 
-        let a1_output = self.a1_var.transpile(context).map_err(|e| {
-            add_context_to_all(e, "...while transpiling a1 in RKCO".to_string())
-        })?;
+        let a1_output = self
+            .a1_var
+            .transpile(context)
+            .map_err(|e| add_context_to_all(e, "...while transpiling a1 in RKCO".to_string()))?;
         requested_variables.extend(a1_output.requested_variables.clone());
 
-        let a2_output = self.a2_var.transpile(context).map_err(|e| {
-            add_context_to_all(e, "...while transpiling a2 in RKCO".to_string())
-        })?;
+        let a2_output = self
+            .a2_var
+            .transpile(context)
+            .map_err(|e| add_context_to_all(e, "...while transpiling a2 in RKCO".to_string()))?;
         requested_variables.extend(a2_output.requested_variables.clone());
 
         fn make_lvalue(ser: &str, value_kind: ValueKind, rhs: &str) -> String {
@@ -164,11 +169,19 @@ impl Transpile for RkcoStatement {
             }
         }
 
-        let c_assign  = make_lvalue(&c_output.serialization,  c_output.value_kind,  "rosy_rkco_c");
-        let b_assign  = make_lvalue(&b_output.serialization,  b_output.value_kind,  "rosy_rkco_b");
-        let e_assign  = make_lvalue(&e_output.serialization,  e_output.value_kind,  "rosy_rkco_e");
-        let a1_assign = make_lvalue(&a1_output.serialization, a1_output.value_kind, "rosy_rkco_a1");
-        let a2_assign = make_lvalue(&a2_output.serialization, a2_output.value_kind, "rosy_rkco_a2");
+        let c_assign = make_lvalue(&c_output.serialization, c_output.value_kind, "rosy_rkco_c");
+        let b_assign = make_lvalue(&b_output.serialization, b_output.value_kind, "rosy_rkco_b");
+        let e_assign = make_lvalue(&e_output.serialization, e_output.value_kind, "rosy_rkco_e");
+        let a1_assign = make_lvalue(
+            &a1_output.serialization,
+            a1_output.value_kind,
+            "rosy_rkco_a1",
+        );
+        let a2_assign = make_lvalue(
+            &a2_output.serialization,
+            a2_output.value_kind,
+            "rosy_rkco_a2",
+        );
 
         let serialization = format!(
             "{{ let (rosy_rkco_c, rosy_rkco_b, rosy_rkco_e, rosy_rkco_a1, rosy_rkco_a2) = rosy_lib::core::rkco::rosy_rkco()?; {c_assign}; {b_assign}; {e_assign}; {a1_assign}; {a2_assign}; }}"

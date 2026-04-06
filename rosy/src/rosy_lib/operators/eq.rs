@@ -1,4 +1,4 @@
-//! Equality operator for ROSY types.
+//! Equality operator for Rosy types.
 //!
 //! This module provides the `RosyEq` trait and implementations for all
 //! supported type combinations. The compatibility rules are defined in the
@@ -10,7 +10,7 @@
 //!
 //! # Examples
 //! 
-//! See `assets/operators/eq/eq.rosy` for ROSY examples and 
+//! See `assets/operators/eq/eq.rosy` for Rosy examples and 
 //! `assets/operators/eq/eq.fox` for equivalent COSY INFINITY code.
 
 use anyhow::Result;
@@ -23,7 +23,7 @@ use crate::rosy_lib::operators::{TypeRule, build_type_registry};
 /// This is the single source of truth for what type combinations are allowed.
 /// The build script (`build.rs`) parses this to generate:
 /// - Documentation table (`eq_table.md`)
-/// - ROSY test script (`eq.rosy`)
+/// - Rosy test script (`eq.rosy`)
 /// - COSY test script (`eq.fox`)
 /// - Integration tests
 pub const EQ_REGISTRY: &[TypeRule] = &[

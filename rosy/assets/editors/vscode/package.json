@@ -1,0 +1,34 @@
+{
+  "name": "rosy-language-support",
+  "displayName": "Rosy Language Support",
+  "description": "Syntax highlighting and language server support for the Rosy programming language",
+  "version": "0.1.0",
+  "publisher": "hiibolt",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:rosy"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "rosy",
+        "aliases": ["Rosy", "rosy"],
+        "extensions": [".rosy"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "rosy",
+        "scopeName": "source.rosy",
+        "path": "./syntaxes/rosy.tmLanguage.json"
+      }
+    ]
+  }
+}

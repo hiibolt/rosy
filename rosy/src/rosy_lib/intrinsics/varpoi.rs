@@ -48,7 +48,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for getting the pointer address of ROSY data types.
+/// Trait for getting the pointer address of Rosy data types.
 pub trait RosyVARPOI {
     fn rosy_varpoi(&self) -> RE;
 }

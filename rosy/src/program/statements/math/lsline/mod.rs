@@ -15,11 +15,11 @@
 //! - `b` — variable that receives the intercept (RE)
 //!
 //! ## Rosy Example
-//! ```
+//! ```text
 #![doc = include_str!("test.rosy")]
 //! ```
 //! **Output**:
-//! ```
+//! ```text
 #![doc = include_str!("rosy_output.txt")]
 //! ```
 
@@ -29,14 +29,14 @@ use std::collections::BTreeSet;
 use crate::{
     ast::*,
     program::{
-        expressions::{core::variable_identifier::VariableIdentifier, Expr},
+        expressions::{Expr, core::variable_identifier::VariableIdentifier},
         statements::SourceLocation,
     },
     resolve::{ScopeContext, TypeResolver},
     transpile::{
-        add_context_to_all, InferenceEdgeResult, Transpile, TranspilationInputContext,
-        TranspilationOutput, TranspileableStatement, TypeHydrationResult,
-        TypeslotDeclarationResult, ValueKind,
+        InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, ValueKind,
+        add_context_to_all,
     },
 };
 
@@ -75,12 +75,16 @@ impl FromRule for LslineStatement {
             .context("Failed to build n expression in LSLINE")?
             .ok_or_else(|| anyhow::anyhow!("Expected n expression in LSLINE"))?;
 
-        let a_pair = inner.next().context("Missing a output variable in LSLINE!")?;
+        let a_pair = inner
+            .next()
+            .context("Missing a output variable in LSLINE!")?;
         let a_var = VariableIdentifier::from_rule(a_pair)
             .context("Failed to build a variable identifier in LSLINE")?
             .ok_or_else(|| anyhow::anyhow!("Expected a variable identifier in LSLINE"))?;
 
-        let b_pair = inner.next().context("Missing b output variable in LSLINE!")?;
+        let b_pair = inner
+            .next()
+            .context("Missing b output variable in LSLINE!")?;
         let b_var = VariableIdentifier::from_rule(b_pair)
             .context("Failed to build b variable identifier in LSLINE")?
             .ok_or_else(|| anyhow::anyhow!("Expected b variable identifier in LSLINE"))?;
@@ -147,12 +151,18 @@ impl Transpile for LslineStatement {
         requested_variables.extend(n_output.requested_variables.iter().cloned());
 
         let a_output = self.a_var.transpile(context).map_err(|e| {
-            add_context_to_all(e, "...while transpiling a output variable in LSLINE".to_string())
+            add_context_to_all(
+                e,
+                "...while transpiling a output variable in LSLINE".to_string(),
+            )
         })?;
         requested_variables.extend(a_output.requested_variables.clone());
 
         let b_output = self.b_var.transpile(context).map_err(|e| {
-            add_context_to_all(e, "...while transpiling b output variable in LSLINE".to_string())
+            add_context_to_all(
+                e,
+                "...while transpiling b output variable in LSLINE".to_string(),
+            )
         })?;
         requested_variables.extend(b_output.requested_variables.clone());
 
@@ -166,8 +176,16 @@ impl Transpile for LslineStatement {
             }
         }
 
-        let a_assign = make_lvalue(&a_output.serialization, a_output.value_kind, "rosy_lsline_a");
-        let b_assign = make_lvalue(&b_output.serialization, b_output.value_kind, "rosy_lsline_b");
+        let a_assign = make_lvalue(
+            &a_output.serialization,
+            a_output.value_kind,
+            "rosy_lsline_a",
+        );
+        let b_assign = make_lvalue(
+            &b_output.serialization,
+            b_output.value_kind,
+            "rosy_lsline_b",
+        );
 
         let serialization = format!(
             "{{ let (rosy_lsline_a, rosy_lsline_b) = rosy_lib::core::lsline::rosy_lsline({x}, {y}, {n} as usize)?; {a_assign}; {b_assign}; }}",

@@ -30,7 +30,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for computing the real error function of ROSY data types.
+/// Trait for computing the real error function of Rosy data types.
 pub trait RosyERF {
     type Output;
     fn rosy_erf(&self) -> anyhow::Result<Self::Output>;

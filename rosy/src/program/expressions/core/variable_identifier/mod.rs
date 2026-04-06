@@ -1,6 +1,6 @@
 //! # Variable Identifier
 //!
-//! Parsed representation of a ROSY identifier with optional parenthesized
+//! Parsed representation of a Rosy identifier with optional parenthesized
 //! arguments and/or bracket indices.
 //!
 //! ## Syntax Forms

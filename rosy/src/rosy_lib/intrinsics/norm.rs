@@ -33,7 +33,7 @@ pub fn get_return_type(input: &RosyType) -> Option<RosyType> {
     registry.get(input).copied()
 }
 
-/// Trait for computing the norm of ROSY data types.
+/// Trait for computing the norm of Rosy data types.
 pub trait RosyNORM {
     type Output;
     fn rosy_norm(&self) -> anyhow::Result<Self::Output>;
