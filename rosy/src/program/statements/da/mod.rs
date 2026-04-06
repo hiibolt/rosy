@@ -82,5 +82,6 @@ pub mod danotw;
 pub mod daflo;
 pub mod cdflo;
 pub mod dagmd;
+pub mod danow;
 pub mod daran;
 pub mod dacode;

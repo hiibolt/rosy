@@ -136,6 +136,7 @@ pub use da::danotw::DanotwStatement;
 pub use da::daflo::DafloStatement;
 pub use da::cdflo::CdfloStatement;
 pub use da::dagmd::DagmdStatement;
+pub use da::danow::DanowStatement;
 pub use da::daran::DaranStatement;
 pub use da::dacode::DacodeStatement;
 pub use da::daint::DaintStatement;
@@ -275,6 +276,7 @@ pub enum StatementEnum {
     DaFlo,
     CdFlo,
     DaGmd,
+    DaNow,
     DaRan,
     DaCode,
     Sleepm,
@@ -1105,6 +1107,16 @@ impl FromRule for Statement {
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaGmd,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::danow => DanowStatement::from_rule(pair)
+                .context("...while building DANOW statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaNow,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })

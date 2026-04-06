@@ -1,5 +1,5 @@
 //! DA coefficient-level operations: DASCL, DASGN, DADER, DAINT, DANORO, DANORS,
-//! DAFSET, DAFILT, DARAN, DAGMD, DACODE, DAFLO, CDFLO.
+//! DAFSET, DAFILT, DARAN, DAGMD, DACODE, DAFLO, CDFLO, DANOW, CDF2, CDNF, CDNFDA, CDNFDS.
 
 use anyhow::{Result, Context, bail};
 use num_complex::Complex64;
@@ -484,4 +484,22 @@ pub fn rosy_daflo(rhs: &Vec<DA>, ic: &Vec<DA>, result: &mut Vec<DA>, dim: usize)
 /// Same as DAFLO but with complex DA (CD) coefficients.
 pub fn rosy_cdflo(rhs: &Vec<CD>, ic: &Vec<CD>, result: &mut Vec<CD>, dim: usize) -> Result<()> {
     flow_impl(rhs, ic, result, dim)
+}
+
+/// DANOW: Compute the order-weighted max norm of a DA variable.
+///
+/// For each monomial of order k with coefficient c, computes |c| * weight^k.
+/// Returns the maximum over all monomials.
+pub fn rosy_danow(da: &DA, weight: f64, result: &mut f64) -> Result<()> {
+    *result = 0.0;
+
+    for (monomial, coeff) in da.coeffs_iter() {
+        let order = monomial.total_order as f64;
+        let weighted = coeff.abs() * weight.powf(order);
+        if weighted > *result {
+            *result = weighted;
+        }
+    }
+
+    Ok(())
 }
