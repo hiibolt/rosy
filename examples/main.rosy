@@ -1,11 +1,11 @@
 BEGIN;
     {Function to add two numbers}
-    FUNCTION ADD_TWO a (RE) b;
+    FUNCTION (RE) ADD_TWO a (RE) b (RE);
         ADD_TWO := a + b;
     ENDFUNCTION;
 
     {Function to multiply and add}
-    FUNCTION COMPUTE x y;
+    FUNCTION COMPUTE x y (RE);
         VARIABLE temp;
         temp := x * y;
         COMPUTE := temp + 10;
@@ -14,7 +14,7 @@ BEGIN;
     {Procedure demonstrating conditionals}
     PROCEDURE CONDITIONAL_DEMO;
         VARIABLE is_true;
-        VARIABLE (LO) is_false;
+        VARIABLE is_false;
 
         is_true := TRUE;
         is_false := FALSE;
