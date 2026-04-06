@@ -1,5 +1,5 @@
 //! DA coefficient-level operations: DASCL, DASGN, DADER, DAINT, DANORO, DANORS,
-//! DAFSET, DAFILT, DARAN, DAGMD.
+//! DAFSET, DAFILT, DARAN, DAGMD, DACODE.
 
 use anyhow::{Result, Context, bail};
 
@@ -303,6 +303,46 @@ pub fn rosy_dagmd(g: &Vec<DA>, f: &Vec<DA>, result: &mut Vec<DA>, dim: usize) ->
         *r = acc;
     } else {
         result.push(acc);
+    }
+
+    Ok(())
+}
+
+/// DACODE: Decode monomial indices into exponent arrays.
+///
+/// For each monomial index m (0-based internally, 1-based in ROSY), writes the
+/// exponent vector into `result[m]`. The `params` vector should contain at least
+/// `[order, num_vars]` for validation against the current DAINI setup.
+///
+/// `result` is a 2D RE array: `result[m][v]` = exponent of variable v+1 in monomial m.
+pub fn rosy_dacode(params: &Vec<f64>, size: usize, result: &mut Vec<Vec<f64>>) -> Result<()> {
+    let (num_monomials, num_vars, monomial_list) = {
+        let rt = get_runtime().context("DACODE requires DA to be initialized (call DAINI first)")?;
+        (rt.num_monomials, rt.config.num_vars, rt.monomial_list.clone())
+    };
+
+    // Validate params against current setup
+    if params.len() >= 2 {
+        let p_order = params[0] as u32;
+        let p_vars = params[1] as usize;
+        let rt = get_runtime()?;
+        if p_order != rt.config.max_order {
+            bail!("DACODE: params order ({}) does not match current DA order ({})", p_order, rt.config.max_order);
+        }
+        if p_vars != num_vars {
+            bail!("DACODE: params num_vars ({}) does not match current DA num_vars ({})", p_vars, num_vars);
+        }
+    }
+
+    let count = size.min(num_monomials).min(result.len());
+
+    for m in 0..count {
+        let mono = &monomial_list[m];
+        let inner = &mut result[m];
+        let vlen = inner.len().min(num_vars);
+        for v in 0..vlen {
+            inner[v] = mono.exponents[v] as f64;
+        }
     }
 
     Ok(())

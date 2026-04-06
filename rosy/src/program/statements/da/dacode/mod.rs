@@ -1,21 +1,36 @@
-//! # DACODE Statement (DA Monomial Decode — Not Yet Implemented)
+//! # DACODE Statement (DA Monomial Decode)
 //!
 //! Decodes the DA internal monomial numbers to exponent arrays.
-//! The first argument is a DA parameter vector (as returned by WRITEM),
-//! the second is the array length, and the result is an array where the
-//! M-th element contains the exponents of the M-th monomial.
-//!
-//! **Note:** This procedure exposes COSY's internal monomial numbering scheme.
-//! Rosy uses graded lexicographic order which may differ from COSY's internal
-//! ordering. Full compatibility requires reconciling the two numbering systems.
+//! The first argument is a parameter vector `[order, num_vars]` (validated against
+//! the current DAINI setup). The second argument is the array length. The third
+//! argument is a 2D RE array where the M-th row receives the exponents of the
+//! M-th monomial (in graded lexicographic order).
 //!
 //! ## Syntax
 //!
 //! ```text
 //! DACODE params size result;
 //! ```
+//!
+//! ## Rosy Example
+//! ```text
+#![doc = include_str!("test.rosy")]
+//! ```
+//! **Output**:
+//! ```text
+#![doc = include_str!("rosy_output.txt")]
+//! ```
+//! ## COSY INFINITY Example
+//! ```text
+#![doc = include_str!("test.fox")]
+//! ```
+//! **Output**:
+//! ```text
+#![doc = include_str!("cosy_output.txt")]
+//! ```
 
-use anyhow::{Error, Result, ensure};
+use anyhow::{Context, Error, Result, ensure};
+use std::collections::BTreeSet;
 
 use crate::{
     ast::*,
@@ -23,7 +38,7 @@ use crate::{
     resolve::{ScopeContext, TypeResolver},
     transpile::{
         InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, add_context_to_all,
     },
 };
 
@@ -45,16 +60,16 @@ impl FromRule for DacodeStatement {
 
         let mut inner = pair.into_inner();
 
-        let params = Expr::from_rule(inner.next().ok_or_else(|| anyhow::anyhow!("Missing params in DACODE"))?)
-            .map_err(|e| e)?
+        let params = Expr::from_rule(inner.next().context("Missing params in DACODE")?)
+            .context("Failed to build params expression in DACODE")?
             .ok_or_else(|| anyhow::anyhow!("Expected params expression in DACODE"))?;
 
-        let size = Expr::from_rule(inner.next().ok_or_else(|| anyhow::anyhow!("Missing size in DACODE"))?)
-            .map_err(|e| e)?
+        let size = Expr::from_rule(inner.next().context("Missing size in DACODE")?)
+            .context("Failed to build size expression in DACODE")?
             .ok_or_else(|| anyhow::anyhow!("Expected size expression in DACODE"))?;
 
-        let result = Expr::from_rule(inner.next().ok_or_else(|| anyhow::anyhow!("Missing result in DACODE"))?)
-            .map_err(|e| e)?
+        let result = Expr::from_rule(inner.next().context("Missing result in DACODE")?)
+            .context("Failed to build result expression in DACODE")?
             .ok_or_else(|| anyhow::anyhow!("Expected result expression in DACODE"))?;
 
         Ok(Some(DacodeStatement { params, size, result }))
@@ -90,13 +105,39 @@ impl TranspileableStatement for DacodeStatement {
 impl Transpile for DacodeStatement {
     fn transpile(
         &self,
-        _context: &mut TranspilationInputContext,
+        context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>> {
-        let serialization =
-            "anyhow::bail!(\"DACODE is not yet implemented: requires reconciling COSY internal monomial numbering with Rosy graded-lex ordering\");".to_string();
+        let mut requested_variables = BTreeSet::new();
+
+        let params_output = self.params.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling params in DACODE".to_string())
+        })?;
+        requested_variables.extend(params_output.requested_variables.iter().cloned());
+
+        let size_output = self.size.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling size in DACODE".to_string())
+        })?;
+        requested_variables.extend(size_output.requested_variables.iter().cloned());
+
+        let result_output = self.result.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling result in DACODE".to_string())
+        })?;
+        requested_variables.extend(result_output.requested_variables.iter().cloned());
+
+        let result_ref = result_output
+            .as_ref()
+            .replace("&mut ", "")
+            .replace("&", "&mut ");
+
+        let serialization = format!(
+            "rosy_lib::core::da_ops::rosy_dacode({}, {} as usize, {result_ref})?;",
+            params_output.as_ref(),
+            size_output.as_value(),
+        );
 
         Ok(TranspilationOutput {
             serialization,
+            requested_variables,
             ..Default::default()
         })
     }
