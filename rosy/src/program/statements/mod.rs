@@ -136,6 +136,11 @@ pub use da::danotw::DanotwStatement;
 pub use da::daflo::DafloStatement;
 pub use da::cdflo::CdfloStatement;
 pub use da::dagmd::DagmdStatement;
+pub use da::danow::DanowStatement;
+pub use da::cdf2::Cdf2Statement;
+pub use da::cdnf::CdnfStatement;
+pub use da::cdnfda::CdnfdaStatement;
+pub use da::cdnfds::CdnfdsStatement;
 pub use da::daran::DaranStatement;
 pub use da::dacode::DacodeStatement;
 pub use da::daint::DaintStatement;
@@ -275,6 +280,11 @@ pub enum StatementEnum {
     DaFlo,
     CdFlo,
     DaGmd,
+    DaNow,
+    Cdf2,
+    Cdnf,
+    Cdnfda,
+    Cdnfds,
     DaRan,
     DaCode,
     Sleepm,
@@ -1105,6 +1115,56 @@ impl FromRule for Statement {
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::DaGmd,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::danow => DanowStatement::from_rule(pair)
+                .context("...while building DANOW statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::DaNow,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::cdf2 => Cdf2Statement::from_rule(pair)
+                .context("...while building CDF2 statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Cdf2,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::cdnf => CdnfStatement::from_rule(pair)
+                .context("...while building CDNF statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Cdnf,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::cdnfda => CdnfdaStatement::from_rule(pair)
+                .context("...while building CDNFDA statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Cdnfda,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::cdnfds => CdnfdsStatement::from_rule(pair)
+                .context("...while building CDNFDS statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Cdnfds,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })

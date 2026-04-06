@@ -10,13 +10,13 @@ statement   = _{
   | daini
   | daprv
   | darev
-  | write
   | writeb
+  | write
   | reads
-  | read
   | readb
-  | openf
+  | read
   | openfb
+  | openf
   | closef
   | rewf
   | backf
@@ -66,6 +66,11 @@ statement   = _{
   | daflo
   | cdflo
   | dagmd
+  | danow
+  | cdf2
+  | cdnfds
+  | cdnfda
+  | cdnf
   | daran
   | dacode
   | linv
@@ -105,15 +110,15 @@ begin = { ^"BEGIN" ~ semicolon }
 end = { ^"END" ~ semicolon }
 
 /// WRITE
-write = { ^"WRITE" ~ unit ~ expr+ ~ semicolon }
+writeb = { ^"WRITEB" ~ expr ~ expr+ ~ semicolon }
+write = { ^"WRITE" ~ expr ~ expr+ ~ semicolon }
 reads = { ^"READS" ~ expr ~ variable_identifier ~ semicolon }
-read = { ^"READ" ~ unit ~ variable_identifier ~ semicolon }
-writeb = { ^"WRITEB" ~ unit ~ expr+ ~ semicolon }
-readb = { ^"READB" ~ unit ~ variable_identifier ~ semicolon }
+readb = { ^"READB" ~ expr ~ variable_identifier ~ semicolon }
+read = { ^"READ" ~ expr ~ variable_identifier ~ semicolon }
 
 /// FILE I/O
-openf = { ^"OPENF" ~ expr ~ expr ~ expr ~ semicolon }
 openfb = { ^"OPENFB" ~ expr ~ expr ~ expr ~ semicolon }
+openf = { ^"OPENF" ~ expr ~ expr ~ expr ~ semicolon }
 closef = { ^"CLOSEF" ~ expr ~ semicolon }
 rewf = { ^"REWF" ~ expr ~ semicolon }
 backf = { ^"BACKF" ~ expr ~ semicolon }
@@ -127,7 +132,7 @@ memory_size = { expr }
 
 /// Keywords - define all reserved words (must be followed by a non-identifier character)
 keyword = @{ keyword_raw ~ !(ASCII_ALPHANUMERIC | "_") }
-keyword_raw = { ^"ENDPROCEDURE" | ^"ENDFUNCTION" | ^"ENDWHILE" | ^"ENDLOOP" | ^"ENDPLOOP" | ^"ENDFIT" | ^"ENDIF" | ^"ELSEIF" | ^"ELSE" | ^"BEGIN" | ^"END" | ^"WRITEB" | ^"WRITE" | ^"READS" | ^"READB" | ^"READ" | ^"VARIABLE" | ^"PROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"WHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"DANOTW" | ^"DANOT" | ^"DAEPSM" | ^"DAEPS" | ^"DATRN" | ^"DASCL" | ^"DASGN" | ^"DADER" | ^"DAINT" | ^"DANORO" | ^"DANORS" | ^"DAREA" | ^"DAPEW" | ^"DAPEE" | ^"DAPEA" | ^"DAPEP" | ^"DAEST" | ^"DAPLU" | ^"DADIU" | ^"DADMU" | ^"DACLIW" | ^"DACQLC" | ^"EPSMIN" | ^"DAFSET" | ^"DAFILT" | ^"DAFLO" | ^"CDFLO" | ^"DAGMD" | ^"DARAN" | ^"DACODE" | ^"LENGTH" | ^"SINH" | ^"SIN" | ^"COSH" | ^"COS" | ^"ASIN" | ^"ACOS" | ^"ATAN" | ^"TANH" | ^"SQRT" | ^"SQR" | ^"VMAX" | ^"VMIN" | ^"ABS" | ^"NORM" | ^"CONS" | ^"INTPOL" | ^"INT" | ^"NINT" | ^"TYPE" | ^"REAL" | ^"IMAG" | ^"TRIM" | ^"LTRIM" | ^"ISRT3" | ^"ISRT" | ^"CMPLX" | ^"CONJ" | ^"LST" | ^"LCM" | ^"LCD" | ^"LRE" | ^"LLO" | ^"LVE" | ^"LDA" | ^"LOG" | ^"BREAK" | ^"QUIT" | ^"SCRLEN" | ^"CPUSEC" | ^"OS" | ^"LINV" | ^"LDET" | ^"SUBSTR" | ^"VELSET" | ^"VELGET" | ^"INTPOL" | ^"POLVAL" | ^"VEDOT" | ^"VEUNIT" | ^"VEZERO" | ^"STCRE" | ^"RECST" | ^"RERAN" | ^"PWTIME" | ^"PNPRO" | ^"IMUNIT" | ^"LEV" | ^"MBLOCK" | ^"MTREE" | ^"LSLINE" | ^"RKCO" | ^"WRITEM" | ^"READM" | ^"ERF" | ^"WERF" | ^"FIT" | ^"OPENFB" | ^"OPENF" | ^"CLOSEF" | ^"REWF" | ^"BACKF" | ^"FUNCTION" | ^"LOOP" | ^"PLOOP" | ^"VARMEM" | ^"VARPOI" | ^"SLEEPM" | ^"ARGGET" | ^"MEMDPV" | ^"MEMFRE" | ^"MEMALL" | ^"MEMWRT" | ^"LTRUE" | ^"LFALSE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
+keyword_raw = { ^"ENDPROCEDURE" | ^"ENDFUNCTION" | ^"ENDWHILE" | ^"ENDLOOP" | ^"ENDPLOOP" | ^"ENDFIT" | ^"ENDIF" | ^"ELSEIF" | ^"ELSE" | ^"BEGIN" | ^"END" | ^"WRITEB" | ^"WRITE" | ^"READS" | ^"READB" | ^"READ" | ^"VARIABLE" | ^"PROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"WHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"DANOTW" | ^"DANOT" | ^"DAEPSM" | ^"DAEPS" | ^"DATRN" | ^"DASCL" | ^"DASGN" | ^"DADER" | ^"DAINT" | ^"DANORO" | ^"DANORS" | ^"DAREA" | ^"DAPEW" | ^"DAPEE" | ^"DAPEA" | ^"DAPEP" | ^"DAEST" | ^"DAPLU" | ^"DADIU" | ^"DADMU" | ^"DACLIW" | ^"DACQLC" | ^"EPSMIN" | ^"DAFSET" | ^"DAFILT" | ^"DAFLO" | ^"CDFLO" | ^"DAGMD" | ^"DANOW" | ^"CDF2" | ^"CDNFDS" | ^"CDNFDA" | ^"CDNF" | ^"DARAN" | ^"DACODE" | ^"LENGTH" | ^"SINH" | ^"SIN" | ^"COSH" | ^"COS" | ^"ASIN" | ^"ACOS" | ^"ATAN" | ^"TANH" | ^"SQRT" | ^"SQR" | ^"VMAX" | ^"VMIN" | ^"ABS" | ^"NORM" | ^"CONS" | ^"INTPOL" | ^"INT" | ^"NINT" | ^"TYPE" | ^"REAL" | ^"IMAG" | ^"TRIM" | ^"LTRIM" | ^"ISRT3" | ^"ISRT" | ^"CMPLX" | ^"CONJ" | ^"LST" | ^"LCM" | ^"LCD" | ^"LRE" | ^"LLO" | ^"LVE" | ^"LDA" | ^"LOG" | ^"BREAK" | ^"QUIT" | ^"SCRLEN" | ^"CPUSEC" | ^"OS" | ^"LINV" | ^"LDET" | ^"SUBSTR" | ^"VELSET" | ^"VELGET" | ^"INTPOL" | ^"POLVAL" | ^"VEDOT" | ^"VEUNIT" | ^"VEZERO" | ^"STCRE" | ^"RECST" | ^"RERAN" | ^"PWTIME" | ^"PNPRO" | ^"IMUNIT" | ^"LEV" | ^"MBLOCK" | ^"MTREE" | ^"LSLINE" | ^"RKCO" | ^"WRITEM" | ^"READM" | ^"ERF" | ^"WERF" | ^"FIT" | ^"OPENFB" | ^"OPENF" | ^"CLOSEF" | ^"REWF" | ^"BACKF" | ^"FUNCTION" | ^"LOOP" | ^"PLOOP" | ^"VARMEM" | ^"VARPOI" | ^"SLEEPM" | ^"ARGGET" | ^"MEMDPV" | ^"MEMFRE" | ^"MEMALL" | ^"MEMWRT" | ^"LTRUE" | ^"LFALSE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" }
 
 /// [ IF / ELSEIF / ELSE / ENDIF ]
 if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
@@ -284,7 +289,8 @@ endif = { ^"ENDIF" ~ semicolon }
 
 /// [ INTRINSIC PROCEDURES ]
   /// [ DA ]
-  daini = { ^"DAINI" ~ expr ~ expr ~ expr? ~ expr? ~ semicolon }
+  daini = { ^"DAINI" ~ expr ~ expr ~ (expr ~ (daini_nm_zero | expr))? ~ semicolon }
+  daini_nm_zero = @{ "0" ~ !(ASCII_ALPHANUMERIC | "_" | ".") }
   daprv = { ^"DAPRV" ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   darev = { ^"DAREV" ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   danot = { ^"DANOT" ~ expr ~ semicolon }
@@ -315,7 +321,12 @@ endif = { ^"ENDIF" ~ semicolon }
   daflo  = { ^"DAFLO"  ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   cdflo  = { ^"CDFLO"  ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   dagmd  = { ^"DAGMD"  ~ expr ~ expr ~ expr ~ expr ~ semicolon }
-  daran  = { ^"DARAN"  ~ expr ~ expr ~ semicolon }
+  danow   = { ^"DANOW"   ~ expr ~ expr ~ expr ~ semicolon }
+  cdf2    = { ^"CDF2"    ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  cdnfds  = { ^"CDNFDS"  ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  cdnfda  = { ^"CDNFDA"  ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  cdnf    = { ^"CDNF"    ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  daran   = { ^"DARAN"   ~ expr ~ expr ~ semicolon }
   dacode = { ^"DACODE" ~ expr ~ expr ~ expr ~ semicolon }
   /// [ CORE ]
   scrlen = { ^"SCRLEN" ~ expr ~ semicolon }

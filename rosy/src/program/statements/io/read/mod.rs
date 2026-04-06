@@ -31,19 +31,21 @@ use std::collections::BTreeSet;
 use crate::{
     ast::*,
     program::{
-        expressions::core::variable_identifier::VariableIdentifier, statements::SourceLocation,
+        expressions::{Expr, core::variable_identifier::VariableIdentifier},
+        statements::SourceLocation,
     },
     resolve::{ScopeContext, TypeResolver},
     transpile::{
         InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
         TranspileableExpr, TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult,
+        add_context_to_all,
     },
 };
 
 /// AST node for the `READ unit variable;` statement.
 #[derive(Debug)]
 pub struct ReadStatement {
-    pub unit: u8,
+    pub unit: Expr,
     pub identifier: VariableIdentifier,
 }
 
@@ -57,12 +59,12 @@ impl FromRule for ReadStatement {
 
         let mut inner = pair.into_inner();
 
-        let unit = inner
+        let unit_pair = inner
             .next()
-            .context("Missing first token `unit`!")?
-            .as_str()
-            .parse::<u8>()
-            .context("Failed to parse `unit` as u8 in `read` statement!")?;
+            .context("Missing unit expression in `read` statement!")?;
+        let unit = Expr::from_rule(unit_pair)
+            .context("Failed to build unit expression in `read` statement!")?
+            .ok_or_else(|| anyhow::anyhow!("Expected unit expression in `read` statement"))?;
 
         let identifier = VariableIdentifier::from_rule(
             inner
@@ -148,30 +150,27 @@ impl Transpile for ReadStatement {
         // Serialize the variable type
         let serialized_variable_type = variable_type.as_rust_type();
 
-        // Emulate the checking of the unit
-        let serialization = match self.unit {
-            5 => {
-                // Read from stdin
-                format!(
-                    "{} = rosy_lib::intrinsics::from_st::from_stdin::<{}>().context(\"Failed to READ into {}\")?;",
-                    serialized_variable_identifier, serialized_variable_type, self.identifier.name
-                )
-            }
-            unit => {
-                // Read from file unit
-                format!(
-                    "{{\n\
-                        let __rosy_read_str = rosy_lib::core::file_io::rosy_read_from_unit({unit})?;\n\
-                        {dest} = <{typ} as rosy_lib::intrinsics::from_st::RosyFromST>::rosy_from_st(__rosy_read_str)\n\
-                            .context(\"Failed to parse value from file unit {unit} into {name}\")?;\n\
-                    }}",
-                    unit = unit,
-                    dest = serialized_variable_identifier,
-                    typ = serialized_variable_type,
-                    name = self.identifier.name,
-                )
-            }
-        };
+        // Transpile unit expression
+        let unit_output = self.unit.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling unit expression in READ".to_string())
+        })?;
+        requested_variables.extend(unit_output.requested_variables.iter().cloned());
+
+        // Runtime dispatch on unit value
+        let serialization = format!(
+            "{{ let __rosy_unit = ({}).round() as i64; \
+            if __rosy_unit == 5 {{ \
+                {dest} = rosy_lib::intrinsics::from_st::from_stdin::<{typ}>().context(\"Failed to READ into {name}\")?; \
+            }} else {{ \
+                let __rosy_read_str = rosy_lib::core::file_io::rosy_read_from_unit(__rosy_unit as u64)?; \
+                {dest} = <{typ} as rosy_lib::intrinsics::from_st::RosyFromST>::rosy_from_st(__rosy_read_str)\
+                    .context(\"Failed to parse value from file unit into {name}\")?; \
+            }} }}",
+            unit_output.as_value(),
+            dest = serialized_variable_identifier,
+            typ = serialized_variable_type,
+            name = self.identifier.name,
+        );
         if errors.is_empty() {
             Ok(TranspilationOutput {
                 serialization,
