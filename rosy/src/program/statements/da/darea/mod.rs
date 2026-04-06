@@ -135,9 +135,7 @@ impl Transpile for DareaStatement {
             "rosy_lib::core::dapew::rosy_darea({} as u64, {}, {} as usize)?;",
             unit_output.as_value(),
             da_var_output
-                .as_ref()
-                .replace("&mut ", "")
-                .replace("&", "&mut "),
+                .as_mut_ref(),
             num_vars_output.as_value(),
         );
 

@@ -117,7 +117,7 @@ impl Transpile for CdnfdsStatement {
         let result_o = self.result.transpile(context).map_err(|e| add_context_to_all(e, "...while transpiling result in CDNFDS".to_string()))?;
         requested_variables.extend(result_o.requested_variables.iter().cloned());
 
-        let result_ref = result_o.as_ref().replace("&mut ", "").replace("&", "&mut ");
+        let result_ref = result_o.as_mut_ref();
 
         let serialization = format!(
             "rosy_lib::core::da_ops::rosy_cdnfds({}, {}, {}, {}, {} as usize, {}, {})?;",

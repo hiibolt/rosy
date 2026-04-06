@@ -142,9 +142,7 @@ impl Transpile for DacliwStatement {
             da_output.as_ref(),
             n_output.as_value(),
             linear_output
-                .as_ref()
-                .replace("&mut ", "")
-                .replace("&", "&mut "),
+                .as_mut_ref(),
         );
 
         Ok(TranspilationOutput {

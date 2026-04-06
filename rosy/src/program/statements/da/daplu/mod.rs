@@ -152,9 +152,7 @@ impl Transpile for DapluStatement {
             var_idx_output.as_value(),
             c_output.as_value(),
             result_output
-                .as_ref()
-                .replace("&mut ", "")
-                .replace("&", "&mut "),
+                .as_mut_ref(),
         );
 
         Ok(TranspilationOutput {

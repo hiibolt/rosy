@@ -185,9 +185,7 @@ impl Transpile for DatrnStatement {
             m1_output.as_value(),
             m2_output.as_value(),
             out_output
-                .as_ref()
-                .replace("&mut ", "")
-                .replace("&", "&mut "),
+                .as_mut_ref(),
         );
 
         Ok(TranspilationOutput {

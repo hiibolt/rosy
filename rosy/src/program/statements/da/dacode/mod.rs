@@ -125,9 +125,7 @@ impl Transpile for DacodeStatement {
         requested_variables.extend(result_output.requested_variables.iter().cloned());
 
         let result_ref = result_output
-            .as_ref()
-            .replace("&mut ", "")
-            .replace("&", "&mut ");
+            .as_mut_ref();
 
         let serialization = format!(
             "rosy_lib::core::da_ops::rosy_dacode({}, {} as usize, {result_ref})?;",

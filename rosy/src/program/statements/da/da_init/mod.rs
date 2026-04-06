@@ -212,10 +212,9 @@ impl Transpile for DAInitStatement {
                     .collect::<Vec<_>>()
             })?;
             requested_variables.extend(nm_o.requested_variables.iter().cloned());
-            let nm_ref = nm_o.as_ref().replace("&mut ", "").replace("&", "&mut ");
             serialization.push_str(&format!(
                 "\n\t\t{} = __daini_nm as f64;",
-                nm_ref.trim_start_matches("&mut ")
+                nm_o.as_value()
             ));
         }
 

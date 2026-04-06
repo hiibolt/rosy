@@ -125,9 +125,7 @@ impl Transpile for DaderStatement {
         requested_variables.extend(index_output.requested_variables.iter().cloned());
 
         let da_mut = da_output
-            .as_ref()
-            .replace("&mut ", "")
-            .replace("&", "&mut ");
+            .as_mut_ref();
 
         let serialization = format!(
             "rosy_lib::core::da_ops::rosy_dader({}, {} as usize)?;",

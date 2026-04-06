@@ -135,9 +135,7 @@ impl Transpile for DafloStatement {
         requested_variables.extend(dim_output.requested_variables.iter().cloned());
 
         let result_ref = result_output
-            .as_ref()
-            .replace("&mut ", "")
-            .replace("&", "&mut ");
+            .as_mut_ref();
 
         let serialization = format!(
             "rosy_lib::core::da_ops::rosy_daflo({}, {}, {result_ref}, {} as usize)?;",

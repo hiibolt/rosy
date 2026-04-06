@@ -117,10 +117,7 @@ impl Transpile for DafiltStatement {
         })?;
         requested_variables.extend(result_output.requested_variables.iter().cloned());
 
-        let result_ref = result_output
-            .as_ref()
-            .replace("&mut ", "")
-            .replace("&", "&mut ");
+        let result_ref = result_output.as_mut_ref();
 
         let serialization = format!(
             "rosy_lib::core::da_ops::rosy_dafilt({}, {result_ref})?;",

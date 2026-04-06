@@ -149,9 +149,7 @@ impl Transpile for DapepStatement {
             id_output.as_value(),
             m_output.as_value(),
             result_output
-                .as_ref()
-                .replace("&mut ", "")
-                .replace("&", "&mut "),
+                .as_mut_ref(),
         );
 
         Ok(TranspilationOutput {

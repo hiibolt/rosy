@@ -138,9 +138,7 @@ impl Transpile for DadiuStatement {
             var_idx_output.as_value(),
             da_in_output.as_ref(),
             result_output
-                .as_ref()
-                .replace("&mut ", "")
-                .replace("&", "&mut "),
+                .as_mut_ref(),
         );
 
         Ok(TranspilationOutput {
