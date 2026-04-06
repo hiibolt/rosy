@@ -1,4 +1,5 @@
 BEGIN;
+
     {Function to add two numbers}
     FUNCTION (RE) ADD_TWO a (RE) b (RE);
         ADD_TWO := a + b;
@@ -8,6 +9,10 @@ BEGIN;
     FUNCTION COMPUTE x y (RE);
         VARIABLE temp;
         temp := x * y;
+
+
+
+        temp := FALSE;
         COMPUTE := temp + 10;
     ENDFUNCTION;
 

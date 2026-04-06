@@ -235,11 +235,18 @@ fn rosy(
         .stdin(std::process::Stdio::null())
         .status()
         .context("Failed to spawn cargo build process")?;
-    ensure!(
-        status.success(),
-        "Compilation failed with exit code: {:?}",
-        status.code()
-    );
+    if !status.success() {
+        eprintln!();
+        eprintln!("{BOLD}{RED}  error:{RESET} The generated Rust code failed to compile.");
+        eprintln!();
+        eprintln!("  This is a bug in the Rosy transpiler, not in your code.");
+        eprintln!("  Please report it at: {BOLD}https://github.com/hiibolt/rosy/issues{RESET}");
+        eprintln!("  Include your {BOLD}.rosy{RESET} file and the error output above.");
+        anyhow::bail!(
+            "Internal transpiler error: generated code failed to compile (exit code {:?})",
+            status.code()
+        );
+    }
 
     let build_profile = if release { "release" } else { "debug" };
     let binary_path = rosy_output_path.join(format!("target/{}/rosy_output", build_profile));

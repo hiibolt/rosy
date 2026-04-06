@@ -1,13 +1,14 @@
 //! Bridges the rosy transpiler's parser and type resolver into LSP-friendly data.
 //!
-//! Runs the real rosy pipeline (parse → AST → type resolution) on a document
-//! and extracts diagnostics, resolved types, and symbol locations.
+//! Runs the real rosy pipeline (parse → AST → type resolution → transpilation)
+//! on a document and extracts diagnostics, resolved types, and symbol locations.
 
 use crate::{
     ast::{CosyParser, FromRule, Rule},
     errors::RosyError,
     program::Program,
     resolve::{GraphNode, TypeResolver, TypeSlot},
+    transpile::{Transpile, TranspilationInputContext},
 };
 use pest::Parser;
 use tower_lsp::lsp_types::*;
@@ -97,19 +98,32 @@ pub struct InferredFromLocation {
 ///
 /// Walks the error chain looking for a RosyError with a SourceLocation.
 /// Returns a 0-based LSP Position if found, otherwise None.
+/// Extract the clean error message from the innermost RosyError in the chain.
+fn extract_message_from_anyhow(error: &anyhow::Error) -> String {
+    let mut best_msg = None;
+    for cause in error.chain() {
+        if let Some(rosy_err) = cause.downcast_ref::<RosyError>() {
+            best_msg = Some(rosy_err.message.clone());
+        }
+    }
+    best_msg.unwrap_or_else(|| format!("{}", error.root_cause()))
+}
+
 fn extract_location_from_anyhow(error: &anyhow::Error) -> Option<Position> {
-    // Walk the error chain looking for a RosyError
+    // Walk the error chain looking for the most specific (innermost) RosyError
+    // with a source location. Inner errors are more precise than outer wrappers.
+    let mut best = None;
     for cause in error.chain() {
         if let Some(rosy_err) = cause.downcast_ref::<RosyError>() {
             if let Some(loc) = &rosy_err.location {
-                return Some(Position::new(
+                best = Some(Position::new(
                     loc.line.saturating_sub(1) as u32,
                     loc.col.saturating_sub(1) as u32,
                 ));
             }
         }
     }
-    None
+    best
 }
 
 /// Analyze a Rosy source document, returning diagnostics and type information.
@@ -209,6 +223,28 @@ pub fn analyze(source: &str) -> AnalysisResult {
     if let Some(resolver) = resolver {
         for (_slot, node) in &resolver.nodes {
             extract_inlay_hint(node, &mut result.variable_types);
+        }
+    }
+
+    // Step 5: Transpilation — catches type mismatches, invalid operations,
+    // and other errors that only surface when generating Rust code.
+    match ast.transpile(&mut TranspilationInputContext::default()) {
+        Ok(_) => {}
+        Err(errors) => {
+            for err in &errors {
+                let position =
+                    extract_location_from_anyhow(err).unwrap_or(Position::new(0, 0));
+                // Extract the clean message from the innermost RosyError,
+                // falling back to root_cause Display if no RosyError found.
+                let message = extract_message_from_anyhow(err);
+                result.diagnostics.push(Diagnostic {
+                    range: Range::new(position, position),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    message,
+                    source: Some("rosy".to_string()),
+                    ..Default::default()
+                });
+            }
         }
     }
 
