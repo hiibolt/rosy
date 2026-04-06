@@ -8,7 +8,7 @@ repository = "https://github.com/hiibolt/rosy"
 
 [grammars.rosy]
 repository = "https://github.com/hiibolt/rosy-tree-sitter"
-rev = "a9b3e1f8a2ba3f0beb0885ba868b5539192ef660"
+rev = "635ea235765b3492e49435d33abf19fc402a19cc"
 
 [language_servers.rosy-lsp]
 name = "Rosy LSP"
