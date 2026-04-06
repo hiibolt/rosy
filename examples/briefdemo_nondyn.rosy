@@ -12,18 +12,18 @@ BEGIN ;
 VARIABLE NO ; VARIABLE NV ; VARIABLE LX ;
 
 PROCEDURE RUN ;
-   VARIABLE NM ;
    VARIABLE A ; VARIABLE B ;
 
    PROCEDURE COSYST ; WRITE 6 ' ' '** COSY STrings **' ' ' ;
       VARIABLE (ST) X1 ; VARIABLE (ST) X2 ;
       X1 := 'Hello World!' ;
+
       {Extraction and concatenation}
       X2 := X1|(7&8) ; X2 := X2&(X1|7)&(X1|LENGTH(X1)) ;
       WRITE 6 X2&' '&X1 ;
       WRITE 6 ' ' ;
       WRITE 6 'The above string was crafted by manipulating ''Hello World!''.' ;
-      ENDPROCEDURE ;
+    ENDPROCEDURE ;
 
    PROCEDURE COSYLO ; WRITE 6 ' ' '** COSY LOgicals **' ' ' ;
       VARIABLE (LO) X1 ; VARIABLE (LO) X2 ;
@@ -31,7 +31,7 @@ PROCEDURE RUN ;
       X2 := LO(0) ;
       WRITE 6 '('&ST(X1)&')*('&ST(X2)&') is '&ST(X1*X2) ;
       WRITE 6 '('&ST(X1)&')+('&ST(X2)&') is '&ST(X1+X2) ;
-      ENDPROCEDURE ;
+    ENDPROCEDURE ;
 
    PROCEDURE COSYCM ; WRITE 6 ' ' '** COSY CoMplex numbers **' ' ' ;
       VARIABLE (CM) IM ; VARIABLE (CM) X1 ;
@@ -42,7 +42,7 @@ PROCEDURE RUN ;
       WRITE 6 ' ' ;
       WRITE 6 'Extracting the real      part of X1: '&ST(X1|1) ;
       WRITE 6 'Extracting the imaginary part of X1: '&ST(X1|2) ;
-      ENDPROCEDURE ;
+    ENDPROCEDURE ;
 
    PROCEDURE COSYVE ; WRITE 6 ' ' '** COSY VEctors **' ' ' ;
       VARIABLE (VE) X1 ; VARIABLE (VE) X2 ;
@@ -53,7 +53,7 @@ PROCEDURE RUN ;
       WRITE 6 ' ' ;
       WRITE 6 'Extracting the component  3      from X2:' X2|3 ;
       WRITE 6 'Extracting the components 2 to 4 from X2:' X2|(2&4) ;
-      ENDPROCEDURE ;
+    ENDPROCEDURE ;
 
    PROCEDURE COSYDA ; WRITE 6 ' ' '** COSY DA''s **' ' ' ;
       VARIABLE (DA) X1 ; VARIABLE (DA) X2 ; VARIABLE (DA) X3 ;
@@ -67,18 +67,18 @@ PROCEDURE RUN ;
       WRITE 6 'Integral   of X3 w.r.t. the 1st variable' X1 ;
       X2 := X1%1 ;
       WRITE 6 'Derivative of it w.r.t. the 1st variable' X2 ;
-      ENDPROCEDURE ;
+    ENDPROCEDURE ;
 
    PROCEDURE COSYCD ; WRITE 6 ' ' '** COSY Complex DA''s **' ' ' ;
       WRITE 6 'CD(1), the 1-st identity, is' CD(1) ;
-      ENDPROCEDURE ;
+    ENDPROCEDURE ;
 
    A := 2 ; B := 3 ; WRITE 6 ' ' 'A='&ST(A)&'  B='&ST(B) ' ' ;
 
    COSYST ; COSYLO ; COSYCM ; COSYVE ;
    DAINI NO NV 0 NM ; COSYDA ; COSYCD ;
 
-   ENDPROCEDURE ;
+ENDPROCEDURE ;
 
 NO := 3 ; NV := 2 ;
 LX := VMAX( LST(80) & LCD(NO&NV) ) ;
