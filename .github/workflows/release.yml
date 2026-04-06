@@ -53,6 +53,9 @@ jobs:
           - target: aarch64-apple-darwin
             os: macos-latest
             artifact: rosy-macos-aarch64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact: rosy-windows-x86_64.exe
 
     runs-on: ${{ matrix.os }}
 
@@ -68,10 +71,17 @@ jobs:
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }} -p rosy
 
-      - name: Package binary
+      - name: Package binary (Unix)
+        if: runner.os != 'Windows'
         run: |
           mkdir -p dist
           cp target/${{ matrix.target }}/release/rosy dist/${{ matrix.artifact }}
+
+      - name: Package binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item "target/${{ matrix.target }}/release/rosy.exe" "dist/${{ matrix.artifact }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
