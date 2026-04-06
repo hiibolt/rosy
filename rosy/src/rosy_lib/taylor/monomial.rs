@@ -83,9 +83,13 @@ impl Monomial {
 
 /// Enumerate all monomials up to a given order with a given number of variables,
 /// sorted in graded lexicographic order.
-pub fn enumerate_monomials(max_order: u32, num_vars: u32) -> Vec<Monomial> {
+///
+/// When `weights` is `Some`, exponents for variable `v` step in multiples of
+/// `weights[v]` and the order budget is consumed by `weights[v]` per step.
+/// Internal exponents are stored as `weight * actual_exponent`.
+pub fn enumerate_monomials(max_order: u32, num_vars: u32, weights: Option<&[u32]>) -> Vec<Monomial> {
     let mut result = Vec::new();
-    enumerate_monomials_recursive(max_order, num_vars as usize, 0, &mut [0u8; MAX_VARS], &mut result);
+    enumerate_monomials_recursive(max_order, num_vars as usize, 0, weights, &mut [0u8; MAX_VARS], &mut result);
     result.sort();
     result
 }
@@ -94,6 +98,7 @@ fn enumerate_monomials_recursive(
     remaining_order: u32,
     num_vars: usize,
     var_idx: usize,
+    weights: Option<&[u32]>,
     current: &mut [u8; MAX_VARS],
     result: &mut Vec<Monomial>,
 ) {
@@ -101,15 +106,19 @@ fn enumerate_monomials_recursive(
         result.push(Monomial::new(*current));
         return;
     }
-    for exp in 0..=remaining_order as u8 {
-        current[var_idx] = exp;
+    let step = weights.map_or(1u32, |w| w[var_idx]);
+    let mut cost = 0u32;
+    while cost <= remaining_order {
+        current[var_idx] = cost as u8; // internal exponent = weight * actual_exponent = cost
         enumerate_monomials_recursive(
-            remaining_order - exp as u32,
+            remaining_order - cost,
             num_vars,
             var_idx + 1,
+            weights,
             current,
             result,
         );
+        cost += step;
     }
     current[var_idx] = 0;
 }

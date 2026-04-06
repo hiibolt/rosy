@@ -94,6 +94,32 @@ impl std::ops::Deref for RuntimeRef {
 
 static TAYLOR_RUNTIME: RwLock<Option<TaylorRuntime>> = RwLock::new(None);
 
+/// Weight vector set by DANOTW. Each element is the "cost" of one power of the
+/// corresponding variable. `None` means unweighted (all weights = 1).
+/// Consumed and cleared by the next `init_taylor()` call.
+static WEIGHT_VECTOR: RwLock<Option<Vec<u32>>> = RwLock::new(None);
+
+/// Set the per-variable weight vector (called by DANOTW transpiled code).
+/// Weights must all be ≥ 1.
+pub fn set_weight_vector(weights: Vec<u32>) -> Result<()> {
+    for (i, &w) in weights.iter().enumerate() {
+        if w < 1 {
+            anyhow::bail!("DANOTW: weight for variable {} is {} — weights must be positive integers ≥ 1", i + 1, w);
+        }
+    }
+    let mut guard = WEIGHT_VECTOR.write()
+        .map_err(|e| anyhow::anyhow!("Failed to acquire weight vector lock: {}", e))?;
+    *guard = Some(weights);
+    Ok(())
+}
+
+/// Take and clear the weight vector (consumed by init_taylor).
+fn take_weight_vector() -> Result<Option<Vec<u32>>> {
+    let mut guard = WEIGHT_VECTOR.write()
+        .map_err(|e| anyhow::anyhow!("Failed to acquire weight vector lock: {}", e))?;
+    Ok(guard.take())
+}
+
 /// Filter template set by DAFSET. Each element corresponds to one component of the DA array.
 /// A monomial is kept by DAFILT only if the corresponding coefficient in this template is nonzero.
 /// `None` means filtering is disabled.
@@ -134,8 +160,13 @@ pub fn init_taylor(max_order: u32, num_vars: usize) -> Result<()> {
 
     let config = TaylorConfig::new(max_order, num_vars, DEFAULT_EPSILON)?;
 
+    // Consume the weight vector (set by DANOTW, if any)
+    let weights = take_weight_vector()?;
+    // Trim to num_vars (extra weights ignored per spec)
+    let weights: Option<Vec<u32>> = weights.map(|w| w.into_iter().take(num_vars).collect());
+
     // Build monomial list in graded lexicographic order
-    let monomial_list = enumerate_monomials(max_order, num_vars as u32);
+    let monomial_list = enumerate_monomials(max_order, num_vars as u32, weights.as_deref());
     let num_monomials = monomial_list.len();
 
     // Build reverse index: Monomial → flat index
@@ -148,13 +179,17 @@ pub fn init_taylor(max_order: u32, num_vars: usize) -> Result<()> {
     let monomial_orders: Vec<u8> = monomial_list.iter().map(|m| m.total_order).collect();
 
     // Build variable index lookup
+    // With weights, variable v has internal exponent w_v (not 1)
     let mut variable_indices = [0u32; MAX_VARS];
     for v in 0..num_vars {
-        let mono = Monomial::variable(v);
+        let w = weights.as_ref().map_or(1u8, |ws| ws[v] as u8);
+        let mut exponents = [0u8; MAX_VARS];
+        exponents[v] = w;
+        let mono = Monomial::new(exponents);
         variable_indices[v] = *monomial_index.get(&mono)
             .unwrap_or_else(|| panic!(
-                "BUG: variable monomial x{} missing from enumeration (order={}, nvars={})",
-                v + 1, max_order, num_vars
+                "BUG: variable monomial x{} (weight={}) missing from enumeration (order={}, nvars={})",
+                v + 1, w, max_order, num_vars
             ));
     }
 

@@ -1,19 +1,34 @@
-//! # DANOTW Statement (DA Weighted Order — Not Yet Implemented)
+//! # DANOTW Statement (DA Weighted Order)
 //!
-//! Sets the weighted order factor of each independent variable for DA and CD.
-//! Must be called before DAINI. This affects how the "total order" constraint
-//! is computed during monomial enumeration.
-//!
-//! **Note:** Full support requires rearchitecting the monomial enumeration in
-//! `init_taylor` to accept per-variable weight factors. This is planned work.
+//! Sets per-variable weight factors for DA and CD monomial ordering.
+//! Must be called before DAINI. The next `DAINI` call enumerates monomials
+//! where `Σ wᵢ·eᵢ ≤ max_order`, then clears the weight vector.
 //!
 //! ## Syntax
 //!
 //! ```text
 //! DANOTW weights size;
 //! ```
+//!
+//! ## Rosy Example
+//! ```text
+#![doc = include_str!("test.rosy")]
+//! ```
+//! **Output**:
+//! ```text
+#![doc = include_str!("rosy_output.txt")]
+//! ```
+//! ## COSY INFINITY Example
+//! ```text
+#![doc = include_str!("test.fox")]
+//! ```
+//! **Output**:
+//! ```text
+#![doc = include_str!("cosy_output.txt")]
+//! ```
 
 use anyhow::{Error, Result, ensure};
+use std::collections::BTreeSet;
 
 use crate::{
     ast::*,
@@ -21,7 +36,7 @@ use crate::{
     resolve::{ScopeContext, TypeResolver},
     transpile::{
         InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult,
+        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, add_context_to_all,
     },
 };
 
@@ -83,13 +98,29 @@ impl TranspileableStatement for DanotwStatement {
 impl Transpile for DanotwStatement {
     fn transpile(
         &self,
-        _context: &mut TranspilationInputContext,
+        context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>> {
-        let serialization =
-            "anyhow::bail!(\"DANOTW is not yet implemented: weighted monomial ordering requires rearchitecting init_taylor\");".to_string();
+        let mut requested_variables = BTreeSet::new();
+
+        let weights_output = self.weights.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling weights in DANOTW".to_string())
+        })?;
+        requested_variables.extend(weights_output.requested_variables.iter().cloned());
+
+        let size_output = self.size.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling size in DANOTW".to_string())
+        })?;
+        requested_variables.extend(size_output.requested_variables.iter().cloned());
+
+        let serialization = format!(
+            "{{\n\t\t\tlet __danotw_weights = {weights};\n\t\t\tlet __danotw_size = {size} as usize;\n\t\t\tlet __danotw_vec: Vec<u32> = __danotw_weights.iter().take(__danotw_size).map(|&v| v as u32).collect();\n\t\t\ttaylor::set_weight_vector(__danotw_vec)?;\n\t\t}}",
+            weights = weights_output.as_value(),
+            size = size_output.as_value(),
+        );
 
         Ok(TranspilationOutput {
             serialization,
+            requested_variables,
             ..Default::default()
         })
     }
