@@ -4,6 +4,11 @@ PROCEDURE RUN;
     X := 42;
     X := X + 8;
     WRITE 6 X;
+
+    { Test: 2D indexed assignment with explicit type }
+    VARIABLE M 3 3;
+    M(1)(1) := 99;
+    WRITE 6 M(1)(1);
 ENDPROCEDURE;
 RUN;
 END;

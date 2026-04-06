@@ -105,9 +105,7 @@ impl Transpile for DasgnStatement {
         })?;
 
         let da_mut = da_output
-            .as_ref()
-            .replace("&mut ", "")
-            .replace("&", "&mut ");
+            .as_mut_ref();
 
         let serialization = format!("rosy_lib::core::da_ops::rosy_dasgn({})?;", da_mut,);
 

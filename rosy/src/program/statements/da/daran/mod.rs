@@ -114,9 +114,7 @@ impl Transpile for DaranStatement {
         requested_variables.extend(sparsity_output.requested_variables.iter().cloned());
 
         let da_ref = da_var_output
-            .as_ref()
-            .replace("&mut ", "")
-            .replace("&", "&mut ");
+            .as_mut_ref();
 
         let serialization = format!(
             "rosy_lib::core::da_ops::rosy_daran({da_ref}, {} as f64)?;",

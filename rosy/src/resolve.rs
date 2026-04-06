@@ -123,6 +123,10 @@ pub enum ExprRecipe {
     RealFn(Box<ExprRecipe>),
     /// IMAG intrinsic — result depends on input type (RE/CM->RE, DA->DA).
     ImagFn(Box<ExprRecipe>),
+    /// Wraps a recipe and adds dimensions to the result type.
+    /// Used when inferring a variable's type from an indexed assignment:
+    /// e.g., `X[0, 1] := 2` means the RHS is RE, but X should be (RE 2D).
+    WithDimensions(Box<ExprRecipe>, usize),
     /// Expression whose type couldn't be determined statically.
     Unknown,
 }
@@ -678,6 +682,11 @@ impl TypeResolver {
                     base.base_type,
                     base.dimensions.saturating_sub(*num_indices),
                 ))
+            }
+            ExprRecipe::WithDimensions(inner, extra_dims) => {
+                let mut t = self.evaluate_recipe(inner)?;
+                t.dimensions += extra_dims;
+                Ok(t)
             }
             ExprRecipe::BinaryOp { op, left, right } => {
                 let left_type = self.evaluate_recipe(left)?;

@@ -402,6 +402,14 @@ impl TranspileableStatement for AssignStatement {
             // Remove self-reference from deps if present — the variable's
             // type is being established by this very assignment
             deps.remove(&var_slot);
+            // Account for indexing on the LHS: X[I, J] := expr means
+            // the variable is a 2D array of whatever the RHS type is.
+            let num_indices = self.identifier.num_index_dimensions();
+            let recipe = if num_indices > 0 {
+                ExprRecipe::WithDimensions(Box::new(recipe), num_indices)
+            } else {
+                recipe
+            };
             node.rule = ResolutionRule::InferredFrom {
                 recipe,
                 reason: "inferred from assignment".to_string(),

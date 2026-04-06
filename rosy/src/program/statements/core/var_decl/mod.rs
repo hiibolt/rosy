@@ -55,7 +55,7 @@ impl VariableDeclarationData {
     pub fn require_type(&self) -> Result<RosyType, Error> {
         self.r#type.ok_or_else(|| {
             anyhow!(
-                "Type inference is not yet supported - please specify the type for '{}'",
+                "Could not infer a type for '{}' - please specify the type explicitly",
                 self.name
             )
         })
@@ -83,7 +83,18 @@ impl Transpile for VariableDeclarationData {
         let mut requested_variables = BTreeSet::new();
         let mut errors = Vec::new();
         let serialization = if self.dimension_exprs.is_empty() {
-            base_value
+            // No explicit dimension expressions, but the resolved type may
+            // still have dimensions (e.g. inferred from `X(I)(J) := expr`).
+            // Wrap the base value in empty vecs for each inferred dimension.
+            if resolved_type.dimensions > 0 {
+                let mut result = base_value;
+                for _ in 0..resolved_type.dimensions {
+                    result = format!("vec![{}; 0]", result);
+                }
+                result
+            } else {
+                base_value
+            }
         } else {
             let mut result = base_value;
             for dim in self.dimension_exprs.iter().rev() {
