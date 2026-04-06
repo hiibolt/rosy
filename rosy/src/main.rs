@@ -1,6 +1,6 @@
 mod update_check;
 
-use rosy::{ast::{self, FromRule}, embedded, program::Program, resolve, syntax_config, transpile::*};
+use rosy::{ast::{self, FromRule}, embedded, preprocess, program::Program, resolve, syntax_config, transpile::*};
 use anyhow::{Context, Result, anyhow, ensure};
 use clap::{Parser as ClapParser, Subcommand};
 use pest::Parser;
@@ -143,23 +143,31 @@ fn rosy(
     eprintln!("{BOLD}        Rosy{RESET} v{}", env!("CARGO_PKG_VERSION"));
     eprintln!("{BOLD}  Transpiling{RESET} {filename} ({profile_label})");
 
-    // --- Step 1: Parse ---
-    step(1, 5, "Parsing");
+    // --- Step 0: Preprocess (resolve INCLUDEs) ---
+    step(1, 6, "Preprocessing");
     let t = Instant::now();
-    let script = std::fs::read_to_string(script_path).with_context(|| {
+    let raw_script = std::fs::read_to_string(script_path).with_context(|| {
         format!(
             "Failed to read script file from `{}`!",
             script_path.display()
         )
     })?;
-    let program = ast::CosyParser::parse(ast::Rule::program, &script)
+    let preprocessed = preprocess::preprocess(&raw_script, Some(script_path))
+        .context("Failed during preprocessing!")?;
+    let script = &preprocessed.text;
+    step_done(t);
+
+    // --- Step 1: Parse ---
+    step(2, 6, "Parsing");
+    let t = Instant::now();
+    let program = ast::CosyParser::parse(ast::Rule::program, script)
         .context("Couldn't parse!")?
         .next()
         .context("Expected a program")?;
     step_done(t);
 
     // --- Step 2: AST Generation ---
-    step(2, 5, "Building AST");
+    step(3, 6, "Building AST");
     let t = Instant::now();
     let mut ast = Program::from_rule(program)
         .context("Failed to build AST!")?
@@ -167,7 +175,7 @@ fn rosy(
     step_done(t);
 
     // --- Step 3: Type Resolution ---
-    step(3, 5, "Resolving types");
+    step(4, 6, "Resolving types");
     let t = Instant::now();
     let (_resolver, warnings) = resolve::TypeResolver::resolve(&mut ast).context("Failed to resolve types!")?;
     step_done(t);
@@ -176,7 +184,7 @@ fn rosy(
     }
 
     // --- Step 4: Transpilation ---
-    step(4, 5, "Generating Rust code");
+    step(5, 6, "Generating Rust code");
     let t = Instant::now();
     let TranspilationOutput { serialization, .. } = ast
         .transpile(&mut TranspilationInputContext::default())
@@ -223,7 +231,7 @@ fn rosy(
     step_done(t);
 
     // --- Step 5: Compilation (piped to user's terminal) ---
-    eprintln!("{BOLD}{CYAN}[5/5]{RESET} Compiling generated Rust code...");
+    eprintln!("{BOLD}{CYAN}[6/6]{RESET} Compiling generated Rust code...");
     let mut cargo_args = vec!["build", "--bin", "rosy_output", "--color", "always"];
     if release {
         cargo_args.push("--release");

@@ -127,12 +127,31 @@ fn extract_location_from_anyhow(error: &anyhow::Error) -> Option<Position> {
 }
 
 /// Analyze a Rosy source document, returning diagnostics and type information.
-pub fn analyze(source: &str) -> AnalysisResult {
+///
+/// `source_path` is used to resolve INCLUDE directives. Pass `None` for
+/// unsaved buffers (INCLUDEs with relative paths will produce diagnostics).
+pub fn analyze(source: &str, source_path: Option<&std::path::Path>) -> AnalysisResult {
     let mut result = AnalysisResult::default();
 
     // Semantic tokens are produced by scanning the source text directly,
     // so they work even when the parse fails (partial highlighting).
     result.semantic_tokens = tokenize_source(source);
+
+    // Step 0: Preprocess (resolve INCLUDEs)
+    let preprocessed = match crate::preprocess::preprocess(source, source_path) {
+        Ok(p) => p,
+        Err(e) => {
+            result.diagnostics.push(Diagnostic {
+                range: Range::new(Position::new(0, 0), Position::new(0, 0)),
+                severity: Some(DiagnosticSeverity::ERROR),
+                message: format!("Preprocessing failed: {e}"),
+                source: Some("rosy".to_string()),
+                ..Default::default()
+            });
+            return result;
+        }
+    };
+    let source = &preprocessed.text;
 
     // Step 1: Parse
     let pairs = match CosyParser::parse(Rule::program, source) {
@@ -581,7 +600,7 @@ mod tests {
     #[test]
     fn inlay_hints_skip_explicit_types() {
         let source = "BEGIN;\n    FUNCTION (RE) COMPUTE x (RE) y (RE);\n        VARIABLE temp;\n        temp := x * y;\n        COMPUTE := temp + 10;\n    ENDFUNCTION;\n    PROCEDURE RUN;\n        VARIABLE is_true;\n        VARIABLE (LO) is_false;\n        is_true := TRUE;\n    ENDPROCEDURE;\n    RUN;\nEND;";
-        let result = analyze(source);
+        let result = analyze(source, None);
         eprintln!("Hints:");
         for h in &result.variable_types {
             eprintln!("  line={} col={} label={:?}", h.position.line, h.position.character, h.label);
