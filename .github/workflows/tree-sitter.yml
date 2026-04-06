@@ -7,6 +7,9 @@ on:
       - 'rosy/assets/rosy.pest'
       - 'rosy/build.rs'
 
+permissions:
+  contents: write
+
 jobs:
   sync-grammar:
     runs-on: ubuntu-latest
