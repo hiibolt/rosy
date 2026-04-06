@@ -1,0 +1,4 @@
+BEGIN;
+    SAVE 'testfile';
+    WRITE 6 'save ok';
+END;

@@ -81,6 +81,7 @@ pub use io::writem::WritemStatement;
 pub use io::rewf::RewfStatement;
 pub use io::backf::BackfStatement;
 pub use io::reads::ReadsStatement;
+pub use io::save::SaveStatement;
 
 pub use math::fit::FitStatement;
 pub use math::intpol::IntpolStatement;
@@ -301,6 +302,7 @@ pub enum StatementEnum {
     Backf,
     Reads,
     Intpol,
+    Save,
 }
 impl TranspileableStatement for Statement {
     fn register_typeslot_declaration(
@@ -696,6 +698,16 @@ impl FromRule for Statement {
                 .map(|opt| {
                     opt.map(|stmt| Statement {
                         enum_variant: StatementEnum::Velget,
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::save_stmt => SaveStatement::from_rule(pair)
+                .context("...while building SAVE statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        enum_variant: StatementEnum::Save,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })

@@ -14,6 +14,7 @@
 //! - **[`pwtime`]** — `PWTIME var;` — wall-clock elapsed time
 //! - **[`os_call`]** — `OS cmd;` — execute a shell command
 //! - **[`velget`]** — `VELGET unit var;` — read a vector from a file
+//! - **[`save`]** — `SAVE name;` — save compiled code (no-op, COSY compat)
 
 pub mod closef;
 pub mod cpusec;
@@ -31,3 +32,4 @@ pub mod writem;
 pub mod rewf;
 pub mod backf;
 pub mod reads;
+pub mod save;
