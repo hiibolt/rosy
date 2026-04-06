@@ -94,6 +94,26 @@ impl std::ops::Deref for RuntimeRef {
 
 static TAYLOR_RUNTIME: RwLock<Option<TaylorRuntime>> = RwLock::new(None);
 
+/// Filter template set by DAFSET. Each element corresponds to one component of the DA array.
+/// A monomial is kept by DAFILT only if the corresponding coefficient in this template is nonzero.
+/// `None` means filtering is disabled.
+pub static FILTER_DA: RwLock<Option<Vec<super::da::DA<f64>>>> = RwLock::new(None);
+
+/// Set the DAFILT template (DAFSET). Pass `None` to disable filtering.
+pub fn set_filter_da(template: Option<Vec<super::da::DA<f64>>>) -> Result<()> {
+    let mut guard = FILTER_DA.write()
+        .map_err(|e| anyhow::anyhow!("Failed to acquire filter lock: {}", e))?;
+    *guard = template;
+    Ok(())
+}
+
+/// Get a snapshot of the current filter template (cloned).
+pub fn get_filter_da() -> Result<Option<Vec<super::da::DA<f64>>>> {
+    let guard = FILTER_DA.read()
+        .map_err(|e| anyhow::anyhow!("Failed to acquire filter lock: {}", e))?;
+    Ok(guard.clone())
+}
+
 /// Initialize the Taylor series system and precompute runtime tables.
 ///
 /// Must be called before any DA/CD operations. Builds:

@@ -11,7 +11,13 @@ fn sci(x: f64) -> (f64, i32) {
     } else {
         let exp = (-x.log10()).floor() as i32;
         let base = x * 10f64.powi(exp);
-        (base, -exp)
+        // For exact powers of 10 (e.g. 1e-10), base rounds to exactly 1.0.
+        // Normalize to [0.1, 1) by shifting down one more decade.
+        if base >= 1.0 {
+            (base / 10.0, -(exp - 1))
+        } else {
+            (base, -exp)
+        }
     }
 }
 fn display_re (
