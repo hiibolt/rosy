@@ -9,10 +9,6 @@ BEGIN;
     FUNCTION COMPUTE x y (RE);
         VARIABLE temp;
         temp := x * y;
-
-
-
-        temp := FALSE;
         COMPUTE := temp + 10;
     ENDFUNCTION;
 
