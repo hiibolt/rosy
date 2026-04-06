@@ -9,7 +9,7 @@ pub mod da;
 pub mod horner;
 
 pub use monomial::{Monomial, enumerate_monomials};
-pub use config::{TaylorConfig, TaylorRuntime, init_taylor, cleanup_taylor, get_config, get_runtime, set_epsilon, set_truncation_order, set_filter_da, get_filter_da};
+pub use config::{TaylorConfig, TaylorRuntime, init_taylor, cleanup_taylor, get_config, get_runtime, set_epsilon, set_truncation_order, set_filter_da, get_filter_da, set_weight_vector};
 pub use da::DACoefficient;
 pub use horner::FixedMultiplier;
 
