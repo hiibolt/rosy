@@ -41,7 +41,8 @@ impl RosyLanguageServer {
 
     /// Run analysis on a document and publish diagnostics.
     async fn on_change(&self, uri: Url, text: String) {
-        let result = analysis::analyze(&text);
+        let path = uri.to_file_path().ok();
+        let result = analysis::analyze(&text, path.as_deref());
 
         let diagnostics = result.diagnostics.clone();
 
