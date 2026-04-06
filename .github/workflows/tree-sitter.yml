@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout rosy
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@nightly
@@ -30,7 +30,7 @@ jobs:
         run: npm install -g tree-sitter-cli
 
       - name: Checkout rosy-tree-sitter
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: hiibolt/rosy-tree-sitter
           token: ${{ secrets.TREE_SITTER_PAT }}
