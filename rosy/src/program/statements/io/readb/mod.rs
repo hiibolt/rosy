@@ -31,20 +31,21 @@ use std::collections::BTreeSet;
 use crate::{
     ast::*,
     program::{
-        expressions::core::variable_identifier::VariableIdentifier, statements::SourceLocation,
+        expressions::{Expr, core::variable_identifier::VariableIdentifier},
+        statements::SourceLocation,
     },
     resolve::{ScopeContext, TypeResolver},
     transpile::{
         InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
         TranspileableExpr, TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult,
+        add_context_to_all,
     },
 };
 
 /// AST node for `READB unit variable;`.
-/// READB unit variable_identifier ;
 #[derive(Debug)]
 pub struct ReadbStatement {
-    pub unit: u8,
+    pub unit: Expr,
     pub identifier: VariableIdentifier,
 }
 
@@ -58,12 +59,12 @@ impl FromRule for ReadbStatement {
 
         let mut inner = pair.into_inner();
 
-        let unit = inner
+        let unit_pair = inner
             .next()
-            .context("Missing first token `unit`!")?
-            .as_str()
-            .parse::<u8>()
-            .context("Failed to parse `unit` as u8 in `readb` statement!")?;
+            .context("Missing unit expression in `readb` statement!")?;
+        let unit = Expr::from_rule(unit_pair)
+            .context("Failed to build unit expression in `readb` statement!")?
+            .ok_or_else(|| anyhow::anyhow!("Expected unit expression in `readb` statement"))?;
 
         let identifier = VariableIdentifier::from_rule(
             inner
@@ -140,9 +141,15 @@ impl Transpile for ReadbStatement {
 
         let serialized_variable_type = variable_type.as_rust_type();
 
+        // Transpile unit expression
+        let unit_output = self.unit.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling unit expression in READB".to_string())
+        })?;
+        requested_variables.extend(unit_output.requested_variables.iter().cloned());
+
         let serialization = format!(
-            "{{\n\tlet _readb_data = rosy_lib::core::file_io::rosy_readb_from_unit({})?;\n\t{} = <{} as rosy_lib::core::file_io::RosyFromBinary>::from_binary(&_readb_data)?;\n}}",
-            self.unit, serialized_variable_identifier, serialized_variable_type,
+            "{{\n\tlet __rosy_unit = ({}).round() as u64;\n\tlet _readb_data = rosy_lib::core::file_io::rosy_readb_from_unit(__rosy_unit)?;\n\t{} = <{} as rosy_lib::core::file_io::RosyFromBinary>::from_binary(&_readb_data)?;\n}}",
+            unit_output.as_value(), serialized_variable_identifier, serialized_variable_type,
         );
 
         if errors.is_empty() {

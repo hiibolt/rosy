@@ -42,7 +42,7 @@ use crate::{
 /// WRITEB unit expr+ ;
 #[derive(Debug)]
 pub struct WritebStatement {
-    pub unit: u8,
+    pub unit: Expr,
     pub exprs: Vec<Expr>,
 }
 
@@ -56,12 +56,12 @@ impl FromRule for WritebStatement {
 
         let mut inner = pair.into_inner();
 
-        let unit = inner
+        let unit_pair = inner
             .next()
-            .context("Missing first token `unit`!")?
-            .as_str()
-            .parse::<u8>()
-            .context("Failed to parse `unit` as u8 in `writeb` statement!")?;
+            .context("Missing unit expression in `writeb` statement!")?;
+        let unit = Expr::from_rule(unit_pair)
+            .context("Failed to build unit expression in `writeb` statement!")?
+            .ok_or_else(|| anyhow::anyhow!("Expected unit expression in `writeb` statement"))?;
 
         let exprs = {
             let mut exprs = Vec::new();
@@ -111,8 +111,18 @@ impl Transpile for WritebStatement {
         &self,
         context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>> {
-        let mut serialized_stmts = Vec::new();
         let mut requested_variables = BTreeSet::new();
+
+        let unit_output = self.unit.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling unit expression in WRITEB".to_string())
+        })?;
+        requested_variables.extend(unit_output.requested_variables.iter().cloned());
+
+        let mut serialized_stmts = Vec::new();
+        serialized_stmts.push(format!(
+            "let __rosy_unit = ({}).round() as u64;",
+            unit_output.as_value()
+        ));
 
         for expr in &self.exprs {
             let output = expr.transpile(context).map_err(|err_vec| {
@@ -127,16 +137,14 @@ impl Transpile for WritebStatement {
 
             requested_variables.extend(output.requested_variables.iter().cloned());
 
-            // Use RosyToBinary trait to convert to bytes, then write
             serialized_stmts.push(format!(
-                "rosy_lib::core::file_io::rosy_writeb_to_unit({}, &rosy_lib::core::file_io::RosyToBinary::to_binary({}))?;",
-                self.unit,
+                "rosy_lib::core::file_io::rosy_writeb_to_unit(__rosy_unit, &rosy_lib::core::file_io::RosyToBinary::to_binary({}))?;",
                 output.as_ref()
             ));
         }
 
         Ok(TranspilationOutput {
-            serialization: serialized_stmts.join("\n"),
+            serialization: format!("{{ {} }}", serialized_stmts.join("\n")),
             requested_variables,
             ..Default::default()
         })

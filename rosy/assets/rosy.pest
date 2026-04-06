@@ -10,13 +10,13 @@ statement   = _{
   | daini
   | daprv
   | darev
-  | write
   | writeb
+  | write
   | reads
-  | read
   | readb
-  | openf
+  | read
   | openfb
+  | openf
   | closef
   | rewf
   | backf
@@ -110,15 +110,15 @@ begin = { ^"BEGIN" ~ semicolon }
 end = { ^"END" ~ semicolon }
 
 /// WRITE
-write = { ^"WRITE" ~ unit ~ expr+ ~ semicolon }
+writeb = { ^"WRITEB" ~ expr ~ expr+ ~ semicolon }
+write = { ^"WRITE" ~ expr ~ expr+ ~ semicolon }
 reads = { ^"READS" ~ expr ~ variable_identifier ~ semicolon }
-read = { ^"READ" ~ unit ~ variable_identifier ~ semicolon }
-writeb = { ^"WRITEB" ~ unit ~ expr+ ~ semicolon }
-readb = { ^"READB" ~ unit ~ variable_identifier ~ semicolon }
+readb = { ^"READB" ~ expr ~ variable_identifier ~ semicolon }
+read = { ^"READ" ~ expr ~ variable_identifier ~ semicolon }
 
 /// FILE I/O
-openf = { ^"OPENF" ~ expr ~ expr ~ expr ~ semicolon }
 openfb = { ^"OPENFB" ~ expr ~ expr ~ expr ~ semicolon }
+openf = { ^"OPENF" ~ expr ~ expr ~ expr ~ semicolon }
 closef = { ^"CLOSEF" ~ expr ~ semicolon }
 rewf = { ^"REWF" ~ expr ~ semicolon }
 backf = { ^"BACKF" ~ expr ~ semicolon }
@@ -289,7 +289,8 @@ endif = { ^"ENDIF" ~ semicolon }
 
 /// [ INTRINSIC PROCEDURES ]
   /// [ DA ]
-  daini = { ^"DAINI" ~ expr ~ expr ~ expr? ~ expr? ~ semicolon }
+  daini = { ^"DAINI" ~ expr ~ expr ~ (expr ~ (daini_nm_zero | expr))? ~ semicolon }
+  daini_nm_zero = @{ "0" ~ !(ASCII_ALPHANUMERIC | "_" | ".") }
   daprv = { ^"DAPRV" ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   darev = { ^"DAREV" ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   danot = { ^"DANOT" ~ expr ~ semicolon }

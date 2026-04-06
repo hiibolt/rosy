@@ -6,7 +6,7 @@
 //! `set_truncation_order()`.
 
 use std::sync::RwLock;
-use anyhow::{Result, bail};
+use anyhow::{Result, Context, bail};
 use rustc_hash::FxHashMap;
 
 use super::{DEFAULT_EPSILON, MAX_VARS, Monomial, monomial::enumerate_monomials};
@@ -150,7 +150,7 @@ pub fn get_filter_da() -> Result<Option<Vec<super::da::DA<f64>>>> {
 /// # Arguments
 /// * `max_order` - Maximum order of Taylor expansions
 /// * `num_vars` - Number of variables (≤ MAX_VARS)
-pub fn init_taylor(max_order: u32, num_vars: usize) -> Result<()> {
+pub fn init_taylor(max_order: u32, num_vars: usize) -> Result<usize> {
     let mut guard = TAYLOR_RUNTIME.write()
         .map_err(|e| anyhow::anyhow!("Failed to acquire runtime lock: {}", e))?;
 
@@ -267,6 +267,24 @@ pub fn init_taylor(max_order: u32, num_vars: usize) -> Result<()> {
         integ_target,
     });
 
+    Ok(num_monomials)
+}
+
+/// Print the DA addressing arrays (monomial index → exponents mapping).
+///
+/// This is the Rosy equivalent of COSY's DAINI debug dump (3rd argument nonzero).
+/// For each monomial index, prints the exponents in a tabular format.
+pub fn dump_addressing_arrays() -> Result<()> {
+    let rt = get_runtime().context("Cannot dump addressing arrays: DA not initialized")?;
+    eprintln!("    ARRAY SETUP DONE, BEGIN PRINTING");
+    eprintln!("    {:>6}  {:>6}  EXPONENTS", "INDEX", "ORDER");
+    for (i, mono) in rt.monomial_list.iter().enumerate() {
+        let exps: Vec<String> = mono.exponents[..rt.config.num_vars]
+            .iter()
+            .map(|e| format!("{}", e))
+            .collect();
+        eprintln!("    {:>6}  {:>6}  {}", i + 1, mono.total_order, exps.join(" "));
+    }
     Ok(())
 }
 

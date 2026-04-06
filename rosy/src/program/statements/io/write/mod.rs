@@ -49,7 +49,7 @@ use crate::{
 /// AST node for the `WRITE unit expr+;` statement.
 #[derive(Debug)]
 pub struct WriteStatement {
-    pub unit: u8,
+    pub unit: Expr,
     pub exprs: Vec<Expr>,
 }
 
@@ -63,12 +63,12 @@ impl FromRule for WriteStatement {
 
         let mut inner = pair.into_inner();
 
-        let unit = inner
+        let unit_pair = inner
             .next()
-            .context("Missing first token `unit`!")?
-            .as_str()
-            .parse::<u8>()
-            .context("Failed to parse `unit` as u8 in `write` statement!")?;
+            .context("Missing unit expression in `write` statement!")?;
+        let unit = Expr::from_rule(unit_pair)
+            .context("Failed to build unit expression in `write` statement!")?
+            .ok_or_else(|| anyhow::anyhow!("Expected unit expression in `write` statement"))?;
 
         let exprs = {
             let mut exprs = Vec::new();
@@ -104,7 +104,14 @@ impl TranspileableStatement for WriteStatement {
         ctx: &mut ScopeContext,
         _source_location: SourceLocation,
     ) -> InferenceEdgeResult {
-        // Discover function call sites within all write expressions
+        // Discover function call sites within unit and all write expressions
+        if let Err(e) = resolver.discover_expr_function_calls(&self.unit, ctx) {
+            return InferenceEdgeResult::HasEdges {
+                result: Err(e.context(
+                    "...while discovering function call dependencies in WRITE unit expression",
+                )),
+            };
+        }
         for expr in &self.exprs {
             if let Err(e) = resolver.discover_expr_function_calls(expr, ctx) {
                 return InferenceEdgeResult::HasEdges {
@@ -130,8 +137,15 @@ impl Transpile for WriteStatement {
         &self,
         context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>> {
-        let mut serialized_exprs = Vec::new();
         let mut requested_variables = BTreeSet::new();
+
+        // Transpile the unit expression
+        let unit_output = self.unit.transpile(context).map_err(|e| {
+            add_context_to_all(e, "...while transpiling unit expression in WRITE".to_string())
+        })?;
+        requested_variables.extend(unit_output.requested_variables.iter().cloned());
+
+        let mut serialized_exprs = Vec::new();
         for expr in &self.exprs {
             let TranspilationOutput {
                 serialization: serialized_expr,
@@ -151,40 +165,27 @@ impl Transpile for WriteStatement {
             requested_variables.extend(expr_requested_variables);
         }
 
-        // Emulate the checking of the unit
-        match self.unit {
-            6 => {
-                // Write to stdout
-                let serialization = format!(
-                    "println!(\"{}\", {});",
-                    serialized_exprs
-                        .iter()
-                        .map(|_| "{}")
-                        .collect::<Vec<&str>>()
-                        .join(""),
-                    serialized_exprs.join(", ")
-                );
-                Ok(TranspilationOutput {
-                    serialization,
-                    requested_variables,
-                    ..Default::default()
-                })
-            }
-            unit => {
-                // Write to file unit
-                let mut stmts = Vec::new();
-                for expr_ser in &serialized_exprs {
-                    stmts.push(format!(
-                        "rosy_lib::core::file_io::rosy_write_to_unit({}, &format!(\"{{}}\", {}))?;",
-                        unit, expr_ser
-                    ));
-                }
-                Ok(TranspilationOutput {
-                    serialization: stmts.join("\n"),
-                    requested_variables,
-                    ..Default::default()
-                })
-            }
-        }
+        // Runtime dispatch on unit value
+        let fmt_placeholders = serialized_exprs
+            .iter()
+            .map(|_| "{}")
+            .collect::<Vec<&str>>()
+            .join("");
+        let fmt_args = serialized_exprs.join(", ");
+
+        let serialization = format!(
+            "{{ let __rosy_unit = ({}).round() as i64; \
+            if __rosy_unit == 6 {{ println!(\"{fmt}\", {args}); }} \
+            else {{ rosy_lib::core::file_io::rosy_write_to_unit(__rosy_unit as u64, &format!(\"{fmt}\", {args}))?; }} }}",
+            unit_output.as_value(),
+            fmt = fmt_placeholders,
+            args = fmt_args,
+        );
+
+        Ok(TranspilationOutput {
+            serialization,
+            requested_variables,
+            ..Default::default()
+        })
     }
 }
