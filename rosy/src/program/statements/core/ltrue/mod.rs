@@ -1,13 +1,11 @@
-//! # MEMFRE Statement
+//! # LTRUE Statement
 //!
-//! Returns the total amount of COSY memory that is currently still available.
-//! In Rosy (Rust), there is no COSY memory pool — Rust's allocator manages memory
-//! automatically, so this always returns `f64::MAX` to indicate effectively unlimited memory.
+//! Returns the logical value true, assigning `true` to the given LO variable.
 //!
 //! ## Syntax
 //!
 //! ```text
-//! MEMFRE v;
+//! LTRUE v;
 //! ```
 //!
 //! ## Rosy Example
@@ -36,15 +34,15 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct MemfreStatement {
+pub struct LtrueStatement {
     pub identifier: VariableIdentifier,
 }
 
-impl FromRule for MemfreStatement {
+impl FromRule for LtrueStatement {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
         ensure!(
-            pair.as_rule() == Rule::memfre,
-            "Expected `memfre` rule when building MEMFRE statement, found: {:?}",
+            pair.as_rule() == Rule::ltrue,
+            "Expected `ltrue` rule when building LTRUE statement, found: {:?}",
             pair.as_rule()
         );
 
@@ -52,16 +50,16 @@ impl FromRule for MemfreStatement {
 
         let expr_pair = inner
             .next()
-            .context("Missing variable expression in MEMFRE!")?;
+            .context("Missing variable expression in LTRUE!")?;
         let identifier = VariableIdentifier::from_rule(expr_pair)
-            .context("Failed to build variable identifier in MEMFRE")?
-            .ok_or_else(|| anyhow::anyhow!("Expected variable identifier in MEMFRE"))?;
+            .context("Failed to build variable identifier in LTRUE")?
+            .ok_or_else(|| anyhow::anyhow!("Expected variable identifier in LTRUE"))?;
 
-        Ok(Some(MemfreStatement { identifier }))
+        Ok(Some(LtrueStatement { identifier }))
     }
 }
 
-impl TranspileableStatement for MemfreStatement {
+impl TranspileableStatement for LtrueStatement {
     fn register_typeslot_declaration(
         &self,
         _resolver: &mut TypeResolver,
@@ -87,7 +85,7 @@ impl TranspileableStatement for MemfreStatement {
     }
 }
 
-impl Transpile for MemfreStatement {
+impl Transpile for LtrueStatement {
     fn transpile(
         &self,
         context: &mut TranspilationInputContext,
@@ -95,7 +93,7 @@ impl Transpile for MemfreStatement {
         let mut requested_variables = BTreeSet::new();
 
         let output = self.identifier.transpile(context).map_err(|e| {
-            add_context_to_all(e, "...while transpiling identifier in MEMFRE".to_string())
+            add_context_to_all(e, "...while transpiling identifier in LTRUE".to_string())
         })?;
         requested_variables.extend(output.requested_variables.clone());
 
@@ -118,12 +116,7 @@ impl Transpile for MemfreStatement {
             }
         };
 
-        // Approximate "available budget" as isize::MAX minus current physical usage.
-        // Falls back to f64::MAX if the platform does not support the query.
-        let serialization = format!(
-            "{}{} = rosy_memfre();",
-            dereference, output.serialization
-        );
+        let serialization = format!("{}{} = true;", dereference, output.serialization);
 
         Ok(TranspilationOutput {
             serialization,

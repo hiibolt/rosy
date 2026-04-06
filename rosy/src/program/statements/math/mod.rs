@@ -13,6 +13,7 @@
 //! - **[`vezero`]** — `VEZERO arr n thresh;` — zero components past threshold
 
 pub mod fit;
+pub mod intpol;
 pub mod ldet;
 pub mod lev;
 pub mod linv;
