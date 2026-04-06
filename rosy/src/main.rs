@@ -249,7 +249,8 @@ fn rosy(
     }
 
     let build_profile = if release { "release" } else { "debug" };
-    let binary_path = rosy_output_path.join(format!("target/{}/rosy_output", build_profile));
+    let binary_name = if cfg!(windows) { "rosy_output.exe" } else { "rosy_output" };
+    let binary_path = rosy_output_path.join(format!("target/{}/{}", build_profile, binary_name));
 
     let total_ms = total_start.elapsed().as_millis();
     eprintln!(
@@ -630,15 +631,7 @@ fn install_vscode_extension() -> Result<()> {
         .or_else(|_| std::env::var("USERPROFILE"))
         .context("Could not determine home directory (neither HOME nor USERPROFILE is set)")?;
 
-    // VS Code extensions directory varies by platform
-    let extensions_dir = if cfg!(target_os = "macos") {
-        PathBuf::from(&home).join(".vscode/extensions")
-    } else if cfg!(target_os = "windows") {
-        PathBuf::from(&home).join(".vscode/extensions")
-    } else {
-        // Linux
-        PathBuf::from(&home).join(".vscode/extensions")
-    };
+    let extensions_dir = PathBuf::from(&home).join(".vscode/extensions");
 
     let ext_dir = extensions_dir.join("rosy-language-support");
     let syntaxes_dir = ext_dir.join("syntaxes");
@@ -789,13 +782,16 @@ fn main() -> Result<()> {
             optimized,
             cosy_syntax,
         } => {
-            let name = output.clone().unwrap_or_else(|| {
+            let mut name = output.clone().unwrap_or_else(|| {
                 source
                     .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("rosy_output")
                     .to_string()
             });
+            if cfg!(windows) && !name.ends_with(".exe") {
+                name.push_str(".exe");
+            }
             (
                 source.clone(),
                 output_dir.clone(),

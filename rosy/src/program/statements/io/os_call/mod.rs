@@ -103,7 +103,7 @@ impl Transpile for OsCallStatement {
         requested_variables.extend(cmd_output.requested_variables.iter().cloned());
 
         let serialization = format!(
-            "{{\n    let __os_cmd: String = ({}).to_string();\n    std::process::Command::new(\"sh\").arg(\"-c\").arg(&__os_cmd).status().ok();\n}}",
+            "{{\n    let __os_cmd: String = ({}).to_string();\n    if cfg!(windows) {{\n        std::process::Command::new(\"cmd\").args(&[\"/C\", &__os_cmd]).status().ok();\n    }} else {{\n        std::process::Command::new(\"sh\").args(&[\"-c\", &__os_cmd]).status().ok();\n    }}\n}}",
             cmd_output.as_ref(),
         );
 
