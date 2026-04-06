@@ -1,8 +1,8 @@
-# Rosy 🌹
+# Rosy
 
 A modern transpiler for the Rosy scientific programming language, designed for beam physics and differential algebra applications.
 
-Rosy transpiles Rosy source code into self-contained, native Rust executables — optimized native code with zero runtime dependencies.
+Rosy transpiles source code into self-contained, native Rust executables — optimized native code with zero runtime dependencies.
 
 ## Language Documentation
 
@@ -137,20 +137,9 @@ Programs using `PLOOP` require an MPI implementation and LLVM/Clang at compile t
 
 ## Editor Support
 
-Rosy includes a built-in language server (LSP) with diagnostics, completions, hover documentation, inlay type hints, and syntax highlighting. Install for your editor with:
-
-```bash
-rosy setup vscode   # VS Code
-rosy setup zed      # Zed
-```
-
-The LSP runs as `rosy lsp` — the same binary, no separate install. All features update automatically when you rebuild Rosy; adding a new language construct requires zero editor tooling changes.
-
-## Differences from COSY INFINITY
-
-- `PLOOP` does not revert to `LOOP` behavior when `NP == 1`
-- `BREAK` statement for loop exit
-- String literals use single quotes: `'hello'`
+For setup instructions, run either:
+- `rosy setup zed`
+- `rosy setup vscode`
 
 ## License
 
