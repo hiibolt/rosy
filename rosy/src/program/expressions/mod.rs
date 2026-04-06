@@ -10,6 +10,7 @@
 //! | Use `+`, `-`, `*`, `/` | **[`operators::arithmetic`]** |
 //! | Compare with `=`, `<`, `>`, etc. | **[`operators::comparison`]** |
 //! | Use `&` (concat), `\|` (extract), `%` (derive) | **[`operators::collection`]** |
+//! | Use `AND`, `OR` | **[`operators::logical`]** |
 //! | Use `NOT` or unary `-` | **[`operators::unary`]** |
 //! | Call `SIN`, `COS`, `TAN`, ... | **[`functions::math::trig`]** |
 //! | Call `EXP`, `LOG`, `SQRT`, `SQR`, `^` | **[`functions::math::exponential`]** |
@@ -18,7 +19,7 @@
 //! | Call `VMIN`, `VMAX` | **[`functions::math::vector`]** |
 //! | Call `TYPE`, `ISRT`, `ISRT3` | **[`functions::math::query`]** |
 //! | Convert types with `ST()`, `CM()`, `RE()`, `LO()`, `VE()` | **[`functions::conversion`]** |
-//! | Use `LENGTH`, `TRIM`, `LTRIM` | **[`functions::sys`]** |
+//! | Use `LENGTH`, `TRIM`, `LTRIM`, `POSITION` | **[`functions::sys`]** |
 //! | Write a literal number, string, or boolean | **[`types`]** |
 //! | Construct `DA(n)` or `CD(n)` | **[`types::da`]**, **[`types::cd`]** |
 //!
@@ -104,8 +105,11 @@ use crate::program::expressions::operators::unary::neg::NegExpr;
 use crate::program::expressions::operators::collection::concat::ConcatExpr;
 use crate::program::expressions::operators::collection::extract::ExtractExpr;
 use crate::program::expressions::operators::collection::derive::DeriveExpr;
+use crate::program::expressions::operators::logical::and_op::AndExpr;
+use crate::program::expressions::operators::logical::or_op::OrExpr;
 
 use crate::program::expressions::functions::sys::length::LengthExpr;
+use crate::program::expressions::functions::sys::position::PositionExpr;
 use crate::program::expressions::functions::math::special::erf::ErfExpr;
 use crate::program::expressions::functions::math::special::werf::WerfExpr;
 
@@ -196,6 +200,9 @@ pub enum ExprEnum {
     Varpoi,
     Erf,
     Werf,
+    And,
+    Or,
+    Position,
 }
 
 impl FromRule for Expr {
@@ -333,6 +340,14 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::CD,
                         inner: Box::new(cd_expr.ok_or_else(|| anyhow::anyhow!("Expected CDExpr"))?),
+                        source_location: loc.clone(),
+                    })
+                },
+                Rule::position => {
+                    let position_expr = PositionExpr::from_rule(primary)?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Position,
+                        inner: Box::new(position_expr.ok_or_else(|| anyhow::anyhow!("Expected PositionExpr"))?),
                         source_location: loc.clone(),
                     })
                 },
@@ -853,6 +868,28 @@ impl FromRule for Expr {
                     Ok(Expr {
                         enum_variant: ExprEnum::Gte,
                         inner: Box::new(GteExpr {
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        })
+                    , source_location: op_loc.clone() })
+                },
+                Rule::and_op => {
+                    let left = left.context("...while transpiling left-hand side of `AND` expression")?;
+                    let right = right.context("...while transpiling right-hand side of `AND` expression")?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::And,
+                        inner: Box::new(AndExpr {
+                            left: Box::new(left),
+                            right: Box::new(right),
+                        })
+                    , source_location: op_loc.clone() })
+                },
+                Rule::or_op => {
+                    let left = left.context("...while transpiling left-hand side of `OR` expression")?;
+                    let right = right.context("...while transpiling right-hand side of `OR` expression")?;
+                    Ok(Expr {
+                        enum_variant: ExprEnum::Or,
+                        inner: Box::new(OrExpr {
                             left: Box::new(left),
                             right: Box::new(right),
                         })

@@ -12,6 +12,8 @@ pub mod gt;
 pub mod lte;
 pub mod gte;
 pub mod not;
+pub mod and;
+pub mod or;
 
 pub use add::RosyAdd;
 pub use sub::RosySub;
@@ -27,6 +29,8 @@ pub use gt::RosyGt;
 pub use lte::RosyLte;
 pub use gte::RosyGte;
 pub use not::RosyNot;
+pub use and::RosyAnd;
+pub use or::RosyOr;
 
 use std::collections::HashMap;
 use crate::rosy_lib::{RosyType, RosyBaseType};

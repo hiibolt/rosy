@@ -40,6 +40,7 @@ pub mod varmem;
 pub mod varpoi;
 pub mod erf;
 pub mod werf;
+pub mod position;
 
 pub use cm::RosyCM;
 pub use st::RosyST;
@@ -83,6 +84,7 @@ pub use varmem::RosyVARMEM;
 pub use varpoi::RosyVARPOI;
 pub use erf::RosyERF;
 pub use werf::RosyWERF;
+pub use position::RosyPOSITION;
 
 /// Represents a parsed intrinsic type rule from the source code.
 #[derive(Debug, Clone)]

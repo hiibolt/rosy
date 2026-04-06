@@ -4,6 +4,7 @@
 //!
 //! - **[`arithmetic`]** — `+`, `-`, `*`, `/`
 //! - **[`comparison`]** — `=`, `<>`, `<`, `>`, `<=`, `>=`
+//! - **[`logical`]** — `AND`, `OR`
 //! - **[`unary`]** — `-x` (negation), `NOT x`
 //! - **[`collection`]** — `&` (concatenate), `|` (extract), `%` (DA derivative)
 //!
@@ -17,3 +18,4 @@ pub mod arithmetic;
 pub mod comparison;
 pub mod unary;
 pub mod collection;
+pub mod logical;

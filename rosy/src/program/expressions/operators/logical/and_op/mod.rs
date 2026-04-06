@@ -1,0 +1,133 @@
+//! # Logical AND Operator (`AND`)
+//!
+//! Tests logical conjunction of two boolean values. Returns `LO`.
+//!
+//! ## Syntax
+//!
+//! ```text
+//! expr AND expr
+//! ```
+//!
+//! ## Type Compatibility
+//!
+//! | Left | Right | Result | Comment |
+//! |------|-------|--------|---------|
+//! | LO | LO | LO | Short-circuit logical AND |
+
+use std::collections::BTreeSet;
+use std::collections::HashSet;
+
+use crate::ast::{FromRule, Rule};
+use crate::program::expressions::Expr;
+use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
+use crate::rosy_lib::RosyType;
+use crate::transpile::{ConcatExtensionResult, ExprFunctionCallResult, TranspileableExpr};
+use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, ValueKind};
+use anyhow::{Error, Result, anyhow};
+
+/// AST node for the logical AND operator.
+#[derive(Debug, PartialEq)]
+pub struct AndExpr {
+    pub left: Box<Expr>,
+    pub right: Box<Expr>,
+}
+
+impl FromRule for AndExpr {
+    fn from_rule(_pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
+        anyhow::bail!("AndExpr should be created by infix parser, not FromRule")
+    }
+}
+impl TranspileableExpr for AndExpr {
+    fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
+        crate::rosy_lib::operators::and::get_return_type(
+            &self.left.type_of(context)?,
+            &self.right.type_of(context)?,
+        )
+        .ok_or(anyhow::anyhow!(
+            "Cannot apply AND to types '{}' and '{}'!",
+            self.left.type_of(context)?,
+            self.right.type_of(context)?
+        ))
+    }
+    fn discover_expr_function_calls(
+        &self,
+        resolver: &mut TypeResolver,
+        ctx: &ScopeContext,
+    ) -> ExprFunctionCallResult {
+        if let Err(e) = resolver.discover_expr_function_calls(&self.left, ctx) {
+            return ExprFunctionCallResult::HasFunctionCalls { result: Err(e) };
+        }
+        ExprFunctionCallResult::HasFunctionCalls {
+            result: resolver.discover_expr_function_calls(&self.right, ctx),
+        }
+    }
+    fn build_expr_recipe(
+        &self,
+        _resolver: &TypeResolver,
+        _ctx: &ScopeContext,
+        _deps: &mut HashSet<TypeSlot>,
+    ) -> ExprRecipe {
+        ExprRecipe::Literal(RosyType::LO())
+    }
+    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
+        ConcatExtensionResult::NotAConcatExpr
+    }
+}
+impl Transpile for AndExpr {
+    fn transpile(
+        &self,
+        context: &mut TranspilationInputContext,
+    ) -> Result<TranspilationOutput, Vec<Error>> {
+        let left_type = self.left.type_of(context).map_err(|e| vec![e])?;
+        let right_type = self.right.type_of(context).map_err(|e| vec![e])?;
+        if crate::rosy_lib::operators::and::get_return_type(&left_type, &right_type).is_none() {
+            return Err(vec![anyhow!(
+                "Cannot apply AND to types '{}' and '{}'!",
+                left_type,
+                right_type
+            )]);
+        }
+
+        let mut errors = Vec::new();
+        let mut requested_variables = BTreeSet::new();
+
+        let left_output = match self.left.transpile(context) {
+            Ok(output) => output,
+            Err(mut e) => {
+                for err in e.drain(..) {
+                    errors.push(err.context("...while transpiling left-hand side of AND"));
+                }
+                TranspilationOutput::default()
+            }
+        };
+        requested_variables.extend(left_output.requested_variables.iter().cloned());
+
+        let right_output = match self.right.transpile(context) {
+            Ok(output) => output,
+            Err(mut e) => {
+                for err in e.drain(..) {
+                    errors.push(err.context("...while transpiling right-hand side of AND"));
+                }
+                TranspilationOutput::default()
+            }
+        };
+        requested_variables.extend(right_output.requested_variables.iter().cloned());
+
+        // Use short-circuit && for LO AND LO
+        let serialization = format!(
+            "({} && {})",
+            left_output.as_value(),
+            right_output.as_value()
+        );
+
+        if errors.is_empty() {
+            Ok(TranspilationOutput {
+                serialization,
+                requested_variables,
+                value_kind: ValueKind::Owned,
+            })
+        } else {
+            Err(errors)
+        }
+    }
+}
