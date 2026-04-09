@@ -41,7 +41,7 @@ use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
 use crate::transpile::{
-    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
     Transpile, TranspileableExpr, ValueKind,
 };
 use anyhow::{Context as AnyhowContext, Error, Result};
@@ -50,7 +50,7 @@ use std::collections::HashSet;
 /// LVE(n) — Vector memory size estimator (COSY compatibility).
 /// Returns `n` as RE. A vector of n components takes n units of allocation.
 /// Rosy doesn't need memory management, but returns a value for backwards compatibility.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct LveExpr {
     pub expr: Box<Expr>,
 }
@@ -110,8 +110,5 @@ impl TranspileableExpr for LveExpr {
         _deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe {
         ExprRecipe::Literal(RosyType::RE())
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }

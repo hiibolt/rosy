@@ -39,14 +39,14 @@ use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
 use crate::transpile::{
-    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
     Transpile, TranspileableExpr, ValueKind,
 };
 use anyhow::{Context as AnyhowContext, Error, Result};
 use std::collections::HashSet;
 
 /// AST node for the `IMAG(expr)` intrinsic function.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct ImagFnExpr {
     pub expr: Box<Expr>,
 }
@@ -118,8 +118,5 @@ impl TranspileableExpr for ImagFnExpr {
     ) -> ExprRecipe {
         let inner = resolver.build_expr_recipe(&self.expr, ctx, deps);
         ExprRecipe::ImagFn(Box::new(inner))
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }

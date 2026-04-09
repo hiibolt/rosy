@@ -1,13 +1,11 @@
 //! # Concatenation Operator (`&`)
 //!
 //! Concatenates scalars and vectors into larger vectors, or strings together.
-//! Multiple `&` operators in a row are flattened into a single `ConcatExpr`
-//! with multiple terms for efficient code generation.
 //!
 //! ## Syntax
 //!
 //! ```text
-//! expr & expr & ...
+//! expr & expr
 //! ```
 //!
 //! ## Type Compatibility
@@ -40,63 +38,55 @@
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
-use crate::rosy_lib::{RosyBaseType, RosyType};
+use crate::rosy_lib::RosyType;
 use crate::transpile::{
-    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
     Transpile, TranspileableExpr, ValueKind,
 };
-use anyhow::{Context, Error, Result, anyhow};
+use anyhow::{Context, Error, Result};
 use std::collections::BTreeSet;
 use std::collections::HashSet;
 
 /// AST node for the concatenation operator (`&`).
-///
-/// Unlike other binary operators, concatenation flattens chains:
-/// `a & b & c` becomes `ConcatExpr { terms: [a, b, c] }` rather than nested nodes.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct ConcatExpr {
-    pub terms: Vec<Expr>,
+    pub left: Box<Expr>,
+    pub right: Box<Expr>,
 }
 
 impl FromRule for ConcatExpr {
     fn from_rule(_pair: pest::iterators::Pair<Rule>) -> Result<Option<Self>> {
-        // ConcatExpr is created by the infix parser, not directly from a rule
         anyhow::bail!("ConcatExpr should be created by infix parser, not FromRule")
     }
 }
 impl TranspileableExpr for ConcatExpr {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
-        let mut r#type = self
-            .terms
-            .last()
-            .ok_or(anyhow::anyhow!("Cannot concatenate zero terms!"))?
+        let left_type = self
+            .left
             .type_of(context)
-            .context("...while determining type of last term in concatenation")?;
+            .context("...while determining type of left side of concatenation")?;
+        let right_type = self
+            .right
+            .type_of(context)
+            .context("...while determining type of right side of concatenation")?;
 
-        for term_expr in self.terms.iter().rev().skip(1) {
-            let term_type = term_expr
-                .type_of(context)
-                .context("...while determining type of term in concatenation")?;
-
-            r#type = crate::rosy_lib::operators::concat::get_return_type(&r#type, &term_type)
-                .ok_or(anyhow::anyhow!(
-                    "Cannot concatenate types '{}' and '{}' together!",
-                    r#type,
-                    term_type
-                ))?;
-        }
-
-        Ok(r#type)
+        crate::rosy_lib::operators::concat::get_return_type(&left_type, &right_type)
+            .ok_or(anyhow::anyhow!(
+                "Cannot concatenate types '{}' and '{}' together!",
+                left_type,
+                right_type
+            ))
     }
     fn discover_expr_function_calls(
         &self,
         resolver: &mut TypeResolver,
         ctx: &ScopeContext,
     ) -> ExprFunctionCallResult {
-        for term in &self.terms {
-            if let Err(e) = resolver.discover_expr_function_calls(term, ctx) {
-                return ExprFunctionCallResult::HasFunctionCalls { result: Err(e) };
-            }
+        if let Err(e) = resolver.discover_expr_function_calls(&self.left, ctx) {
+            return ExprFunctionCallResult::HasFunctionCalls { result: Err(e) };
+        }
+        if let Err(e) = resolver.discover_expr_function_calls(&self.right, ctx) {
+            return ExprFunctionCallResult::HasFunctionCalls { result: Err(e) };
         }
         ExprFunctionCallResult::HasFunctionCalls { result: Ok(()) }
     }
@@ -106,16 +96,9 @@ impl TranspileableExpr for ConcatExpr {
         ctx: &ScopeContext,
         deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe {
-        let recipes: Vec<ExprRecipe> = self
-            .terms
-            .iter()
-            .map(|t| resolver.build_expr_recipe(t, ctx, deps))
-            .collect();
-        ExprRecipe::Concat(recipes)
-    }
-    fn extend_concat(&mut self, right: Expr) -> ConcatExtensionResult {
-        self.terms.push(right);
-        ConcatExtensionResult::Extended
+        let left = resolver.build_expr_recipe(&self.left, ctx, deps);
+        let right = resolver.build_expr_recipe(&self.right, ctx, deps);
+        ExprRecipe::Concat(Box::new(left), Box::new(right))
     }
 }
 impl Transpile for ConcatExpr {
@@ -123,149 +106,32 @@ impl Transpile for ConcatExpr {
         &self,
         context: &mut TranspilationInputContext,
     ) -> Result<TranspilationOutput, Vec<Error>> {
-        // First, do a type check
+        // Type check
         let _ = self
             .type_of(context)
             .map_err(|e| vec![e.context("...while verifying types of concatenation expression")])?;
 
-        // Check if all terms are the same scalar type for direct emission
-        let term_types: Vec<_> = self
-            .terms
-            .iter()
-            .map(|t| t.type_of(context))
-            .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| vec![e])?;
+        let left_output = self.left.transpile(context)
+            .map_err(|errs| errs.into_iter()
+                .map(|e| e.context("...while transpiling left side of concatenation"))
+                .collect::<Vec<_>>())?;
+        let right_output = self.right.transpile(context)
+            .map_err(|errs| errs.into_iter()
+                .map(|e| e.context("...while transpiling right side of concatenation"))
+                .collect::<Vec<_>>())?;
 
-        let all_re_scalar = term_types
-            .iter()
-            .all(|t| t.base_type == RosyBaseType::RE && t.dimensions == 0);
-        let all_st_scalar = term_types
-            .iter()
-            .all(|t| t.base_type == RosyBaseType::ST && t.dimensions == 0);
-
-        // Direct vec![...] emission for all-RE terms (avoids N-1 intermediate allocations)
-        if all_re_scalar {
-            let mut parts = Vec::new();
-            let mut requested_variables = BTreeSet::new();
-            let mut errors = Vec::new();
-            for (i, term) in self.terms.iter().enumerate() {
-                match term.transpile(context) {
-                    Ok(output) => {
-                        requested_variables.extend(output.requested_variables.iter().cloned());
-                        parts.push(output.as_value());
-                    }
-                    Err(mut e) => {
-                        for err in e.drain(..) {
-                            errors.push(err.context(format!(
-                                "...while transpiling term {} of concatenation",
-                                i + 1
-                            )));
-                        }
-                    }
-                }
-            }
-            return if errors.is_empty() {
-                Ok(TranspilationOutput {
-                    serialization: format!("vec![{}]", parts.join(", ")),
-                    requested_variables,
-                    value_kind: ValueKind::Owned,
-                })
-            } else {
-                Err(errors)
-            };
-        }
-
-        // Direct format!(...) emission for all-ST terms (single allocation)
-        if all_st_scalar {
-            let mut parts = Vec::new();
-            let mut requested_variables = BTreeSet::new();
-            let mut errors = Vec::new();
-            for (i, term) in self.terms.iter().enumerate() {
-                match term.transpile(context) {
-                    Ok(output) => {
-                        requested_variables.extend(output.requested_variables.iter().cloned());
-                        parts.push(output.as_ref());
-                    }
-                    Err(mut e) => {
-                        for err in e.drain(..) {
-                            errors.push(err.context(format!(
-                                "...while transpiling term {} of concatenation",
-                                i + 1
-                            )));
-                        }
-                    }
-                }
-            }
-            return if errors.is_empty() {
-                Ok(TranspilationOutput {
-                    serialization: format!(
-                        "format!(\"{}\"{})",
-                        "{}".repeat(parts.len()),
-                        parts.iter().map(|p| format!(", {p}")).collect::<String>()
-                    ),
-                    requested_variables,
-                    value_kind: ValueKind::Owned,
-                })
-            } else {
-                Err(errors)
-            };
-        }
-
-        // General case: accumulator-based chaining via RosyConcat trait
         let mut requested_variables = BTreeSet::new();
-        let mut errors = Vec::new();
+        requested_variables.extend(left_output.requested_variables.iter().cloned());
+        requested_variables.extend(right_output.requested_variables.iter().cloned());
 
-        let first_term = self.terms.get(0).ok_or(vec![anyhow!(
-            "Concatenation expression must have at least one term!"
-        )])?;
-        let mut accumulator = match first_term.transpile(context) {
-            Ok(output) => {
-                requested_variables.extend(output.requested_variables.iter().cloned());
-                output
-            }
-            Err(mut e) => {
-                for err in e.drain(..) {
-                    errors.push(err.context("...while transpiling first term of concatenation"));
-                }
-                TranspilationOutput::default()
-            }
-        };
-
-        for (i, term) in self.terms.iter().skip(1).enumerate() {
-            let term_output = match term.transpile(context) {
-                Ok(output) => {
-                    requested_variables.extend(output.requested_variables.iter().cloned());
-                    output
-                }
-                Err(mut vec_err) => {
-                    for err in vec_err.drain(..) {
-                        errors.push(err.context(format!(
-                            "...while transpiling term {} of concatenation",
-                            i + 2
-                        )));
-                    }
-                    TranspilationOutput::default()
-                }
-            };
-            accumulator = TranspilationOutput {
-                serialization: format!(
-                    "RosyConcat::rosy_concat({}, {})?",
-                    accumulator.as_ref(),
-                    term_output.as_ref()
-                ),
-                requested_variables: BTreeSet::new(),
-                value_kind: ValueKind::Owned,
-            };
-        }
-
-        if errors.is_empty() {
-            Ok(TranspilationOutput {
-                serialization: accumulator.serialization,
-                requested_variables,
-                value_kind: ValueKind::Owned,
-            })
-        } else {
-            Err(errors)
-        }
+        Ok(TranspilationOutput {
+            serialization: format!(
+                "RosyConcat::rosy_concat({}, {})?",
+                left_output.as_ref(),
+                right_output.as_ref()
+            ),
+            requested_variables,
+            value_kind: ValueKind::Owned,
+        })
     }
 }

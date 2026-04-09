@@ -33,12 +33,11 @@ use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use anyhow::{Error, Result};
 use std::collections::{BTreeSet, HashSet};
 
-use crate::program::expressions::Expr;
 use crate::{
     ast::{FromRule, Rule},
     rosy_lib::RosyType,
     transpile::{
-        ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext,
+        ExprFunctionCallResult, TranspilationInputContext,
         TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
     },
 };
@@ -79,9 +78,6 @@ impl TranspileableExpr for String {
         _deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe {
         ExprRecipe::Literal(RosyType::ST())
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }
 impl Transpile for String {

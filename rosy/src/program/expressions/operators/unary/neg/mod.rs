@@ -37,14 +37,14 @@ use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
 use crate::transpile::{
-    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
     Transpile, TranspileableExpr, ValueKind,
 };
 use anyhow::{Error, Result, anyhow};
 
 /// Unary negation expression: `-expr`
 /// Transpiled as `0 - expr` using the existing subtraction operator.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct NegExpr {
     pub operand: Box<Expr>,
 }
@@ -87,9 +87,6 @@ impl TranspileableExpr for NegExpr {
         deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe {
         resolver.build_expr_recipe(&self.operand, ctx, deps)
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }
 

@@ -37,7 +37,7 @@ use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
 use crate::transpile::{
-    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
     Transpile, TranspileableExpr, ValueKind,
 };
 use anyhow::{Context as AnyhowContext, Error, Result};
@@ -45,7 +45,7 @@ use std::collections::HashSet;
 
 /// LCM(n) — Complex memory size estimator (COSY compatibility).
 /// Returns `2*n` as RE. Rosy doesn't need memory management.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct LcmExpr {
     pub expr: Box<Expr>,
 }
@@ -105,8 +105,5 @@ impl TranspileableExpr for LcmExpr {
         _deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe {
         ExprRecipe::Literal(RosyType::RE())
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }

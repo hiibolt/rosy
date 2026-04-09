@@ -38,13 +38,13 @@ use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use crate::transpile::{ConcatExtensionResult, ExprFunctionCallResult, TranspileableExpr};
+use crate::transpile::{ExprFunctionCallResult, TranspileableExpr};
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, ValueKind};
 use anyhow::{Error, Result, anyhow};
 
 /// Logical NOT expression (unary operator).
 /// Supports both `!x` and `NOT x` syntax.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct NotExpr {
     pub operand: Box<Expr>,
 }
@@ -79,9 +79,6 @@ impl TranspileableExpr for NotExpr {
         _deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe {
         ExprRecipe::Literal(RosyType::LO())
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }
 impl Transpile for NotExpr {

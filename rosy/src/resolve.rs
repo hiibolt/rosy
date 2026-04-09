@@ -115,8 +115,8 @@ pub enum ExprRecipe {
         left: Box<ExprRecipe>,
         right: Box<ExprRecipe>,
     },
-    /// An n-ary concat of sub-recipes.
-    Concat(Vec<ExprRecipe>),
+    /// A binary concat of two sub-recipes.
+    Concat(Box<ExprRecipe>, Box<ExprRecipe>),
     /// Any type-preserving intrinsic (sin, cos, tan, exp, log, sqrt, etc.) — output type equals input type.
     TypePreserving(Box<ExprRecipe>),
     /// REAL intrinsic — result depends on input type (RE/CM->RE, DA->DA).
@@ -725,18 +725,11 @@ impl TypeResolver {
                     )
                 })
             }
-            ExprRecipe::Concat(recipes) => {
-                let mut iter = recipes.iter();
-                let first = iter
-                    .next()
-                    .ok_or_else(|| anyhow!("Empty concat expression"))?;
-                let mut result = self.evaluate_recipe(first)?;
-                for r in iter {
-                    let t = self.evaluate_recipe(r)?;
-                    result = crate::rosy_lib::operators::concat::get_return_type(&result, &t)
-                        .ok_or_else(|| anyhow!("No concat rule for {} & {}", result, t))?;
-                }
-                Ok(result)
+            ExprRecipe::Concat(left, right) => {
+                let left_type = self.evaluate_recipe(left)?;
+                let right_type = self.evaluate_recipe(right)?;
+                crate::rosy_lib::operators::concat::get_return_type(&left_type, &right_type)
+                    .ok_or_else(|| anyhow!("No concat rule for {} & {}", left_type, right_type))
             }
             ExprRecipe::TypePreserving(inner) => self.evaluate_recipe(inner),
             ExprRecipe::RealFn(inner) => {

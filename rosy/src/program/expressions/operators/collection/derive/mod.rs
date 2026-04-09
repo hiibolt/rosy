@@ -37,7 +37,7 @@ use crate::program::expressions::Expr;
 use crate::resolve::{BinaryOpKind, ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
 use crate::transpile::{
-    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
     Transpile, TranspileableExpr, ValueKind,
 };
 use anyhow::{Context as AnyhowContext, Error, Result};
@@ -45,7 +45,7 @@ use std::collections::{BTreeSet, HashSet};
 
 /// DA%n = partial derivative w.r.t. variable n (positive n)
 /// DA%(-n) = anti-derivative (integral) w.r.t. variable n (negative n)
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct DeriveExpr {
     pub object: Box<Expr>,
     pub index: Box<Expr>,
@@ -119,8 +119,5 @@ impl TranspileableExpr for DeriveExpr {
             left: Box::new(left),
             right: Box::new(right),
         }
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }

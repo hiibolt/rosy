@@ -39,14 +39,14 @@ use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
 use crate::transpile::{
-    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
     Transpile, TranspileableExpr, ValueKind,
 };
 use anyhow::{Context as AnyhowContext, Error, Result};
 use std::collections::HashSet;
 
 /// AST node for the `CMPLX(expr)` intrinsic function.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct CmplxExpr {
     pub expr: Box<Expr>,
 }
@@ -116,8 +116,5 @@ impl TranspileableExpr for CmplxExpr {
         // CMPLX has non-uniform output types (RE/CM->CM, DA/CD->CD).
         // Defer to type_of() which calls get_return_type().
         ExprRecipe::Unknown
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }

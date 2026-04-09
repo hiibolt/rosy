@@ -121,7 +121,6 @@ impl FromRule for FunctionStatement {
 
         let body = {
             let mut statements = vec![Statement {
-                enum_variant: StatementEnum::VarDecl,
                 inner: Box::new(VarDeclStatement {
                     data: VariableDeclarationData {
                         name: name.clone(),

@@ -46,7 +46,7 @@ use super::variable_identifier::VariableIdentifier;
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::rosy_lib::RosyType;
-use crate::transpile::{ConcatExtensionResult, ExprFunctionCallResult, TranspileableExpr};
+use crate::transpile::{ExprFunctionCallResult, TranspileableExpr};
 use crate::transpile::{
     TranspilationInputContext, TranspilationOutput, Transpile, ValueKind, VariableScope,
 };
@@ -66,7 +66,7 @@ pub enum VarExprKind {
     FunctionCall,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct VarExpr {
     pub identifier: VariableIdentifier,
 }
@@ -303,9 +303,6 @@ impl TranspileableExpr for VarExpr {
         } else {
             ExprRecipe::Unknown
         }
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }
 impl Transpile for VarExpr {

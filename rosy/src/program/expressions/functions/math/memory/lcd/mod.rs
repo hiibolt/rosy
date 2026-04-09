@@ -38,7 +38,7 @@ use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
 use crate::transpile::{
-    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
     Transpile, TranspileableExpr, ValueKind,
 };
 use anyhow::{Context as AnyhowContext, Error, Result};
@@ -47,7 +47,7 @@ use std::collections::HashSet;
 /// LCD(ve) — DA memory size estimator (COSY compatibility).
 /// Takes a VE with (order & num_vars) and returns estimated DA memory size.
 /// Rosy doesn't need memory management, but returns a reasonable value.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct LcdExpr {
     pub expr: Box<Expr>,
 }
@@ -107,8 +107,5 @@ impl TranspileableExpr for LcdExpr {
         _deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe {
         ExprRecipe::Literal(RosyType::RE())
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }

@@ -55,13 +55,13 @@ use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::resolve::{BinaryOpKind, ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use crate::transpile::{ConcatExtensionResult, ExprFunctionCallResult, TranspileableExpr};
+use crate::transpile::{ExprFunctionCallResult, TranspileableExpr};
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, ValueKind};
 use anyhow::{Error, Result, anyhow};
 use std::collections::{BTreeSet, HashSet};
 
 /// AST node for the binary multiplication operator (`*`).
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct MultExpr {
     pub left: Box<Expr>,
     pub right: Box<Expr>,
@@ -110,9 +110,6 @@ impl TranspileableExpr for MultExpr {
             left: Box::new(left),
             right: Box::new(right),
         }
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }
 impl Transpile for MultExpr {

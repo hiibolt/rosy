@@ -212,109 +212,8 @@ impl SourceLocation {
 
 #[derive(Debug)]
 pub struct Statement {
-    pub enum_variant: StatementEnum,
     pub inner: Box<dyn TranspileableStatement>,
     pub source_location: SourceLocation,
-}
-#[derive(Debug)]
-pub enum StatementEnum {
-    DAInit,
-    DaPrv,
-    DaRev,
-    VarDecl,
-    Write,
-    Writeb,
-    Read,
-    Readb,
-    Openf,
-    Openfb,
-    Closef,
-    Assign,
-    Procedure,
-    ProcedureCall,
-    Function,
-    FunctionCall,
-    Loop,
-    WhileLoop,
-    PLoop,
-    If,
-    Break,
-    Fit,
-    Cpusec,
-    DaEps,
-    DaNot,
-    DaTrn,
-    Ldet,
-    Linv,
-    OsCall,
-    Polval,
-    Quit,
-    Scrlen,
-    Substr,
-    Velget,
-    Velset,
-    Vedot,
-    Veunit,
-    Vezero,
-    Stcre,
-    Recst,
-    Ranseed,
-    Reran,
-    Pwtime,
-    Pnpro,
-    Imunit,
-    Lev,
-    Lsline,
-    Mblock,
-    Mtree,
-    Rkco,
-    DaScl,
-    DaSgn,
-    DaDer,
-    DaInt,
-    DaNoro,
-    DaNors,
-    DaPlu,
-    DaDiu,
-    DaDmu,
-    DaCliw,
-    DaCqlc,
-    DaArea,
-    DaPew,
-    DaPee,
-    DaPea,
-    DaPep,
-    DaEst,
-    DaEpsm,
-    Epsmin,
-    DaFset,
-    DaFilt,
-    DaNotw,
-    DaFlo,
-    CdFlo,
-    DaGmd,
-    DaNow,
-    Cdf2,
-    Cdnf,
-    Cdnfda,
-    Cdnfds,
-    DaRan,
-    DaCode,
-    Sleepm,
-    Argget,
-    Memdpv,
-    Memfre,
-    Memall,
-    Memwrt,
-    Ltrue,
-    Lfalse,
-    Readm,
-    Writem,
-    Rewf,
-    Backf,
-    Reads,
-    Intpol,
-    Save,
 }
 impl TranspileableStatement for Statement {
     fn register_typeslot_declaration(
@@ -351,7 +250,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DAInit,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -361,7 +259,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaPrv,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -371,7 +268,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaRev,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -381,7 +277,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::VarDecl,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -391,7 +286,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Write,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -400,7 +294,6 @@ impl FromRule for Statement {
                 .context("...while building READS statement!")
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Reads,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -410,7 +303,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Read,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -420,7 +312,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Writeb,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -430,7 +321,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Readb,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -440,7 +330,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Openf,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -450,7 +339,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Openfb,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -460,7 +348,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Closef,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -469,7 +356,6 @@ impl FromRule for Statement {
                 .context("...while building REWF statement!")
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Rewf,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -478,7 +364,6 @@ impl FromRule for Statement {
                 .context("...while building BACKF statement!")
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Backf,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -488,7 +373,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Assign,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -498,7 +382,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Loop,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -508,7 +391,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::WhileLoop,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -518,7 +400,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::PLoop,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -528,7 +409,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Procedure,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -538,7 +418,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::ProcedureCall,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -548,7 +427,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Function,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -558,7 +436,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::FunctionCall,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -568,7 +445,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::If,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -578,7 +454,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Break,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -588,7 +463,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Fit,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -599,7 +473,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Scrlen,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -609,7 +482,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Cpusec,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -619,7 +491,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Quit,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -629,7 +500,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::OsCall,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -639,7 +509,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaNot,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -649,7 +518,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaEps,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -659,7 +527,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaTrn,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -669,7 +536,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Linv,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -679,7 +545,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Ldet,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -689,7 +554,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Substr,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -699,7 +563,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Velset,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -709,7 +572,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Velget,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -719,7 +581,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Save,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -728,7 +589,6 @@ impl FromRule for Statement {
                 .context("...while building INTPOL statement!")
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Intpol,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -738,7 +598,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Polval,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -748,7 +607,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Vedot,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -758,7 +616,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Veunit,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -768,7 +625,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Vezero,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -778,7 +634,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Stcre,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -788,7 +643,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Recst,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -798,7 +652,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Reran,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -808,7 +661,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Ranseed,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -818,7 +670,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Pwtime,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -828,7 +679,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Pnpro,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -838,7 +688,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Imunit,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -848,7 +697,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Lev,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -858,7 +706,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Mblock,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -868,7 +715,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Mtree,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -878,7 +724,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Lsline,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -888,7 +733,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Rkco,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -898,7 +742,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaScl,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -908,7 +751,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaSgn,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -918,7 +760,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaDer,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -928,7 +769,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaInt,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -938,7 +778,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaNoro,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -948,7 +787,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaNors,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -958,7 +796,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaPlu,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -968,7 +805,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaDiu,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -978,7 +814,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaDmu,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -988,7 +823,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaCliw,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -998,7 +832,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaCqlc,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1008,7 +841,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaArea,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1018,7 +850,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaPew,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1028,7 +859,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaPee,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1038,7 +868,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaPea,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1048,7 +877,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaPep,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1058,7 +886,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaEst,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1068,7 +895,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaEpsm,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1078,7 +904,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Epsmin,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1088,7 +913,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaFset,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1098,7 +922,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaFilt,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1108,7 +931,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaNotw,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1118,7 +940,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaFlo,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1128,7 +949,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::CdFlo,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1138,7 +958,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaGmd,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1148,7 +967,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaNow,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1158,7 +976,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Cdf2,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1168,7 +985,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Cdnf,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1178,7 +994,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Cdnfda,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1188,7 +1003,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Cdnfds,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1198,7 +1012,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaRan,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1208,7 +1021,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::DaCode,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1219,7 +1031,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Sleepm,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1229,7 +1040,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Argget,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1239,7 +1049,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Memdpv,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1249,7 +1058,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Memfre,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1258,7 +1066,6 @@ impl FromRule for Statement {
                 .context("...while building MEMALL statement!")
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Memall,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1267,7 +1074,6 @@ impl FromRule for Statement {
                 .context("...while building MEMWRT statement!")
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Memwrt,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1276,7 +1082,6 @@ impl FromRule for Statement {
                 .context("...while building LTRUE statement!")
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Ltrue,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1285,7 +1090,6 @@ impl FromRule for Statement {
                 .context("...while building LFALSE statement!")
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Lfalse,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1296,7 +1100,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Readm,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
@@ -1306,7 +1109,6 @@ impl FromRule for Statement {
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {
-                        enum_variant: StatementEnum::Writem,
                         inner: Box::new(stmt),
                         source_location: loc.clone(),
                     })
