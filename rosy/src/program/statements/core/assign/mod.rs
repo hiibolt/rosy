@@ -143,11 +143,7 @@ impl TranspileableStatement for AssignStatement {
                 let num_indices = self.identifier.num_index_dimensions();
                 explicit_type.dimensions = explicit_type.dimensions.saturating_sub(num_indices);
                 if let Ok(new_type) = resolver.evaluate_recipe(&recipe) {
-                    // Allow RE→VE coercion: assigning a scalar RE to a VE
-                    // variable resets it to a single-element vector (COSY compat).
-                    let is_re_to_ve_coercion =
-                        explicit_type == RosyType::VE() && new_type == RosyType::RE();
-                    if new_type != explicit_type && !is_re_to_ve_coercion {
+                    if new_type != explicit_type {
                         let scope_str = if ctx.scope_path.is_empty() {
                             "global scope".to_string()
                         } else {
@@ -163,8 +159,27 @@ impl TranspileableStatement for AssignStatement {
                         let ve_hint = {
                             let re = RosyType::RE();
                             let ve = RosyType::VE();
-                            if (explicit_type == ve && new_type == re)
-                                || (explicit_type == re && new_type == ve)
+                            if explicit_type == ve && new_type == re {
+                                if crate::syntax_config::is_cosy_syntax() {
+                                    format!(
+                                        "\n│\n\
+                                         │  📖 In COSY, RE values were implicitly upcast to VE.\n\
+                                         │     In Rosy, use an explicit conversion instead:\n\
+                                         │     • Wrap the value:            {} := VE(<expr>);\n\
+                                         │     • Build via concatenation:   {} := 0 & 1 & 2;",
+                                        var_name, var_name
+                                    )
+                                } else {
+                                    format!(
+                                        "\n│\n\
+                                         │  📖 To assign a scalar to a VE variable, wrap it explicitly:\n\
+                                         │     • Wrap the value:            {} := VE(<expr>);\n\
+                                         │     • Build via concatenation:   {} := 0 & 1 & 2;",
+                                        var_name, var_name
+                                    )
+                                }
+                            } else if (explicit_type == re && new_type == ve)
+                                || (explicit_type == ve && new_type == re)
                             {
                                 if crate::syntax_config::is_cosy_syntax() {
                                     format!(
@@ -316,32 +331,6 @@ impl TranspileableStatement for AssignStatement {
 
                 if let (Ok(old_type), Ok(new_type)) = (old_type_result, new_type_result) {
                     if old_type != new_type {
-                        // RE ↔ VE coercion: if one is RE and the other is VE,
-                        // upgrade to VE. This supports COSY's dynamic typing
-                        // pattern where a variable is initialized as a scalar
-                        // (Y:=1) and then grown into a vector (Y:=Y&I).
-                        let re = RosyType::RE();
-                        let ve = RosyType::VE();
-                        if (old_type == re && new_type == ve) || (old_type == ve && new_type == re)
-                        {
-                            tracing::debug!(
-                                "RE↔VE coercion for '{}': upgrading to VE (RE assignments will wrap in vec![])",
-                                var_name
-                            );
-                            // Use a literal VE recipe — we already know the
-                            // result type. Using the self-referential recipe
-                            // (e.g. Concat(Y, I)) would create a circular
-                            // dependency that can't be resolved.
-                            if let Some(node) = resolver.nodes.get_mut(&var_slot) {
-                                node.rule = ResolutionRule::InferredFrom {
-                                    recipe: ExprRecipe::Literal(RosyType::VE()),
-                                    reason: "inferred from assignment (RE→VE upgrade)".to_string(),
-                                };
-                                node.depends_on.clear();
-                            }
-                            return InferenceEdgeResult::HasEdges { result: Ok(()) };
-                        }
-
                         let scope_str = if ctx.scope_path.is_empty() {
                             "global scope".to_string()
                         } else {
@@ -355,6 +344,33 @@ impl TranspileableStatement for AssignStatement {
                             .unwrap_or_default();
                         let second_assign_hint =
                             format!("\n│  📍 Then assigned at:   {}", source_location);
+                        // Migration hint for RE→VE pattern
+                        let ve_hint = {
+                            let re = RosyType::RE();
+                            let ve = RosyType::VE();
+                            if old_type == re && new_type == ve {
+                                if crate::syntax_config::is_cosy_syntax() {
+                                    format!(
+                                        "\n│\n\
+                                         │  📖 In COSY, RE values were implicitly upcast to VE.\n\
+                                         │     In Rosy, make the first assignment a VE explicitly:\n\
+                                         │     • Wrap the value:            {} := VE(<expr>);\n\
+                                         │     • Build via concatenation:   {} := 0 & 1 & 2;",
+                                        var_name, var_name
+                                    )
+                                } else {
+                                    format!(
+                                        "\n│\n\
+                                         │  📖 To make '{}' a VE, ensure the first assignment is a VE:\n\
+                                         │     • Wrap the value:            {} := VE(<expr>);\n\
+                                         │     • Build via concatenation:   {} := 0 & 1 & 2;",
+                                        var_name, var_name, var_name
+                                    )
+                                }
+                            } else {
+                                String::new()
+                            }
+                        };
                         let msg = format!(
                                 "\n╭─ Type Conflict ──────────────────────────────────────────\n\
                                 │\n\
@@ -367,7 +383,7 @@ impl TranspileableStatement for AssignStatement {
                                 │  💡 Either:\n\
                                 │     • Add an explicit type:  VARIABLE ({:?}) {} ;\n\
                                 │     • Split into separate variables: {}_{:?}  and  {}_{:?}\n\
-                                │\n\
+                                │{}\n\
                                 ╰──────────────────────────────────────────────────────────",
                                 var_name,
                                 scope_str,
@@ -381,6 +397,7 @@ impl TranspileableStatement for AssignStatement {
                                 old_type.base_type,
                                 var_name,
                                 new_type.base_type,
+                                ve_hint,
                         );
                         return InferenceEdgeResult::HasEdges {
                             result: Err(RosyError::at(source_location.clone(), msg).into()),
@@ -508,14 +525,7 @@ impl Transpile for AssignStatement {
         let value_type = value.type_of(context).map_err(|e| {
             vec![e.context("...while determining type of value expression for assignment")]
         })?;
-        // Check for RE→VE coercion: if variable is VE and value is RE,
-        // we'll wrap the value in vec![...] to create a one-element vector.
-        // This supports COSY's dynamic typing pattern (e.g. Y:=1; Y:=Y&I;).
-        let needs_re_to_ve_coercion = variable_type.base_type == RosyBaseType::VE
-            && variable_type.dimensions == 0
-            && value_type == RosyType::RE();
-
-        if variable_type != value_type && !needs_re_to_ve_coercion {
+        if variable_type != value_type {
             return Err(vec![anyhow!(
                 "Cannot assign value of type '{}' to variable '{}' of type '{}'!",
                 value_type,
@@ -558,13 +568,7 @@ impl Transpile for AssignStatement {
         };
         requested_variables.extend(value_output.requested_variables.iter().cloned());
 
-        // If RE→VE coercion is needed, wrap the value in vec![...]
-        // RE is Copy, so as_value() gives the plain f64 value.
-        let serialized_value = if needs_re_to_ve_coercion {
-            format!("vec![{}]", value_output.as_value())
-        } else {
-            value_output.as_owned(&variable_type)
-        };
+        let serialized_value = value_output.as_owned(&variable_type);
 
         // Serialize the entire assignment
         let var_scope = context
