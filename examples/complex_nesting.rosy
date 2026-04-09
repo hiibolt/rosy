@@ -1,0 +1,339 @@
+BEGIN;
+
+{ ================================================================== }
+{ Stress test for the type resolver: nested functions, loops,        }
+{ cross-scope inference, default RE, multi-dim arrays, and more.     }
+{ ================================================================== }
+
+{ --- 1. Default RE: variables declared without type or assignment -- }
+VARIABLE GHOST;
+WRITE 6 "Ghost (default RE): " ST(GHOST);
+
+{ --- 2. Functions returning inferred types ----------------------- }
+FUNCTION DOUBLE x;
+    DOUBLE := x * 2;
+ENDFUNCTION;
+
+FUNCTION NEGATE x;
+    NEGATE := 0 - x;
+ENDFUNCTION;
+
+{ --- 3. Chained function calls in expressions -------------------- }
+FUNCTION QUAD x;
+    QUAD := DOUBLE(DOUBLE(x));
+ENDFUNCTION;
+
+{ --- 4. Function calling another function with inferred arg types - }
+FUNCTION ADD_NEG a b;
+    ADD_NEG := a + NEGATE(b);
+ENDFUNCTION;
+
+{ --- 5. Mutually-dependent type inference through call chains ----- }
+FUNCTION TRANSFORM val;
+    VARIABLE step1;
+    VARIABLE step2;
+    step1 := DOUBLE(val);
+    step2 := ADD_NEG(step1, val);
+    TRANSFORM := step2;
+ENDFUNCTION;
+
+{ --- 6. Function with VE return type (inferred from concat) ------- }
+FUNCTION MAKE_VEC a b c;
+    MAKE_VEC := a & b & c;
+ENDFUNCTION;
+
+{ --- 7. Procedure with nested loops and inferred loop vars -------- }
+PROCEDURE NESTED_LOOPS;
+    VARIABLE (RE) total;
+    total := 0;
+
+    LOOP i 1 3;
+        LOOP j 1 3;
+            total := total + i * j;
+        ENDLOOP;
+    ENDLOOP;
+
+    WRITE 6 "Nested loop total (expected 36): " ST(total);
+ENDPROCEDURE;
+
+{ --- 8. Procedure with while loop and boolean inference ----------- }
+PROCEDURE WHILE_TEST;
+    VARIABLE counter;
+    VARIABLE (LO) keep_going;
+
+    counter := 0;
+    keep_going := TRUE;
+
+    WHILE keep_going;
+        counter := counter + 1;
+        IF counter > 4;
+            keep_going := FALSE;
+        ENDIF;
+    ENDWHILE;
+
+    WRITE 6 "While loop counter (expected 5): " ST(counter);
+ENDPROCEDURE;
+
+{ --- 9. Function with indexed assignment (infers array type) ------ }
+PROCEDURE ARRAY_BUILDER;
+    VARIABLE (RE 5) arr;
+
+    LOOP i 1 5;
+        arr[i] := i * 10;
+    ENDLOOP;
+
+    WRITE 6 "arr[1] (expected 10): " ST(arr[1]);
+    WRITE 6 "arr[5] (expected 50): " ST(arr[5]);
+ENDPROCEDURE;
+
+{ --- 10. 2D array with nested indexed assignment ------------------- }
+PROCEDURE MATRIX_BUILDER;
+    VARIABLE (RE 3 3) mat;
+
+    LOOP r 1 3;
+        LOOP c 1 3;
+            mat[r, c] := r * 10 + c;
+        ENDLOOP;
+    ENDLOOP;
+
+    WRITE 6 "mat[1,1] (expected 11): " ST(mat[1, 1]);
+    WRITE 6 "mat[2,3] (expected 23): " ST(mat[2, 3]);
+    WRITE 6 "mat[3,3] (expected 33): " ST(mat[3, 3]);
+ENDPROCEDURE;
+
+{ --- 11. Function called inside loop with accumulator ------------- }
+PROCEDURE FUNC_IN_LOOP;
+    VARIABLE (RE) accum;
+    accum := 0;
+
+    LOOP k 1 5;
+        accum := accum + DOUBLE(k);
+    ENDLOOP;
+
+    WRITE 6 "Sum of DOUBLE(1..5) (expected 30): " ST(accum);
+ENDPROCEDURE;
+
+{ --- 12. Nested function calls inside conditional branches -------- }
+PROCEDURE CONDITIONAL_FUNCS;
+    VARIABLE result;
+    VARIABLE (LO) flag;
+
+    flag := TRUE;
+
+    IF flag;
+        result := QUAD(3);
+    ELSE;
+        result := NEGATE(3);
+    ENDIF;
+
+    WRITE 6 "Conditional result (expected 12): " ST(result);
+ENDPROCEDURE;
+
+{ --- 13. Deep call chain: A calls B calls C calls D --------------- }
+FUNCTION STEP_D x;
+    STEP_D := x + 1;
+ENDFUNCTION;
+
+FUNCTION STEP_C x;
+    STEP_C := STEP_D(x) * 2;
+ENDFUNCTION;
+
+FUNCTION STEP_B x;
+    STEP_B := STEP_C(x) + 100;
+ENDFUNCTION;
+
+FUNCTION STEP_A x;
+    STEP_A := STEP_B(x) - 50;
+ENDFUNCTION;
+
+{ --- 14. Vector operations: build, extract, length ---------------- }
+PROCEDURE VEC_OPS;
+    VARIABLE (VE) v;
+    VARIABLE elem;
+    VARIABLE len;
+
+    v := 10 & 20 & 30 & 40 & 50;
+    elem := v|3;
+    len := LENGTH(v);
+
+    WRITE 6 "v|3 (expected 30): " ST(elem);
+    WRITE 6 "LENGTH(v) (expected 5): " ST(len);
+ENDPROCEDURE;
+
+{ --- 15. Function with multiple inferred args of different types -- }
+FUNCTION MIXED_ARGS x (RE) flag (LO);
+    IF flag;
+        MIXED_ARGS := x * 2;
+    ELSE;
+        MIXED_ARGS := x;
+    ENDIF;
+ENDFUNCTION;
+
+{ --- 16. Procedure calling function with literal args ------------- }
+PROCEDURE LITERAL_CALL_TEST;
+    VARIABLE a;
+    VARIABLE b;
+
+    a := MIXED_ARGS(7, TRUE);
+    b := MIXED_ARGS(7, FALSE);
+
+    WRITE 6 "MIXED_ARGS(7, TRUE) (expected 14): " ST(a);
+    WRITE 6 "MIXED_ARGS(7, FALSE) (expected 7): " ST(b);
+ENDPROCEDURE;
+
+{ --- 17. Unused declared variables (should default to RE) --------- }
+PROCEDURE UNUSED_VARS;
+    VARIABLE NEVER_ASSIGNED;
+    VARIABLE ALSO_UNUSED;
+
+    WRITE 6 "NEVER_ASSIGNED (expected 0): " ST(NEVER_ASSIGNED);
+    WRITE 6 "ALSO_UNUSED (expected 0): " ST(ALSO_UNUSED);
+ENDPROCEDURE;
+
+{ --- 18. Complex expression with many operators ------------------- }
+PROCEDURE COMPLEX_EXPR;
+    VARIABLE x;
+    VARIABLE y;
+    VARIABLE z;
+
+    x := 2;
+    y := 3;
+    z := (x + y) * (x - y) + x^2 / y;
+
+    WRITE 6 "Complex expr (expected -3.667): " ST(z);
+ENDPROCEDURE;
+
+{ --- 19. Nested procedures calling functions ---------------------- }
+PROCEDURE OUTER;
+    VARIABLE val;
+    val := STEP_A(5);
+    WRITE 6 "STEP_A(5) (expected 62): " ST(val);
+
+    PROCEDURE INNER;
+        VARIABLE inner_val;
+        inner_val := TRANSFORM(3);
+        WRITE 6 "TRANSFORM(3) from INNER (expected 3): " ST(inner_val);
+    ENDPROCEDURE;
+
+    INNER;
+ENDPROCEDURE;
+
+{ --- 20. String type inference ------------------------------------ }
+PROCEDURE STRING_TEST;
+    VARIABLE (ST) greeting;
+    VARIABLE msg;
+
+    greeting := "Hello";
+    msg := greeting;
+
+    WRITE 6 "String test: " msg;
+ENDPROCEDURE;
+
+{ --- 21. Loop with break ------------------------------------------ }
+PROCEDURE BREAK_TEST;
+    VARIABLE (RE) found;
+    found := 0;
+
+    LOOP i 1 100;
+        IF i > 7;
+            found := i;
+            BREAK;
+        ENDIF;
+    ENDLOOP;
+
+    WRITE 6 "Break at (expected 8): " ST(found);
+ENDPROCEDURE;
+
+{ --- 22. VE built from function results --------------------------- }
+PROCEDURE VEC_FROM_FUNCS;
+    VARIABLE (VE) v;
+
+    v := DOUBLE(1) & DOUBLE(2) & DOUBLE(3);
+
+    WRITE 6 "VE from funcs (expected 2 4 6): " ST(v);
+ENDPROCEDURE;
+
+{ ================================================================== }
+{ Main entry: run all stress tests                                    }
+{ ================================================================== }
+PROCEDURE RUN;
+    WRITE 6 "=== Complex Nesting Stress Test ===";
+    WRITE 6 "";
+
+    WRITE 6 "--- Chained functions ---";
+    WRITE 6 "QUAD(5) (expected 20): " ST(QUAD(5));
+    WRITE 6 "ADD_NEG(10, 3) (expected 7): " ST(ADD_NEG(10, 3));
+    WRITE 6 "TRANSFORM(3) (expected 3): " ST(TRANSFORM(3));
+    WRITE 6 "";
+
+    WRITE 6 "--- VE from function ---";
+    VARIABLE (VE) vec_result;
+    vec_result := MAKE_VEC(1, 2, 3);
+    WRITE 6 "MAKE_VEC(1,2,3): " ST(vec_result);
+    WRITE 6 "";
+
+    WRITE 6 "--- Deep call chain ---";
+    WRITE 6 "STEP_A(5) (expected 62): " ST(STEP_A(5));
+    WRITE 6 "";
+
+    WRITE 6 "--- Nested loops ---";
+    NESTED_LOOPS;
+    WRITE 6 "";
+
+    WRITE 6 "--- While loop ---";
+    WHILE_TEST;
+    WRITE 6 "";
+
+    WRITE 6 "--- Array builder ---";
+    ARRAY_BUILDER;
+    WRITE 6 "";
+
+    WRITE 6 "--- Matrix builder ---";
+    MATRIX_BUILDER;
+    WRITE 6 "";
+
+    WRITE 6 "--- Function in loop ---";
+    FUNC_IN_LOOP;
+    WRITE 6 "";
+
+    WRITE 6 "--- Conditional functions ---";
+    CONDITIONAL_FUNCS;
+    WRITE 6 "";
+
+    WRITE 6 "--- Vector operations ---";
+    VEC_OPS;
+    WRITE 6 "";
+
+    WRITE 6 "--- Literal call test ---";
+    LITERAL_CALL_TEST;
+    WRITE 6 "";
+
+    WRITE 6 "--- Unused vars (default RE) ---";
+    UNUSED_VARS;
+    WRITE 6 "";
+
+    WRITE 6 "--- Complex expression ---";
+    COMPLEX_EXPR;
+    WRITE 6 "";
+
+    WRITE 6 "--- Nested procedures ---";
+    OUTER;
+    WRITE 6 "";
+
+    WRITE 6 "--- String test ---";
+    STRING_TEST;
+    WRITE 6 "";
+
+    WRITE 6 "--- Break test ---";
+    BREAK_TEST;
+    WRITE 6 "";
+
+    WRITE 6 "--- VE from function results ---";
+    VEC_FROM_FUNCS;
+    WRITE 6 "";
+
+    WRITE 6 "=== All stress tests complete ===";
+ENDPROCEDURE;
+
+RUN;
+END;

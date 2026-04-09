@@ -398,7 +398,7 @@ impl TypeResolver {
         }
 
         let mut resolved_count: usize = 0;
-        let mut warnings: Vec<RosyError> = Vec::new();
+        let warnings: Vec<RosyError> = Vec::new();
         let mut warned_slots: HashSet<TypeSlot> = HashSet::new();
         while let Some(slot) = queue.pop_front() {
             // Resolve this node if not already resolved
@@ -413,15 +413,11 @@ impl TypeResolver {
                 };
 
                 if is_unused {
-                    let node = self.nodes.get(&slot).unwrap();
-                    warnings.push(RosyError {
-                        message: format!(
-                            "unused variable {} — no type could be inferred (never assigned a value)",
-                            slot
-                        ),
-                        location: node.declared_at.clone(),
-                        severity: crate::errors::RosyErrorSeverity::Warning,
-                    });
+                    // Default unresolved variables to RE (standard COSY behavior)
+                    let node = self.nodes.get_mut(&slot).unwrap();
+                    let default_type = RosyType::RE();
+                    node.resolved = Some(default_type.clone());
+                    node.rule = ResolutionRule::Explicit(default_type);
                     warned_slots.insert(slot.clone());
                     resolved_count += 1;
                     continue;
