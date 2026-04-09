@@ -11,9 +11,11 @@ BEGIN;
     PROCEDURE PRINTSEVENNUMS;
         VARIABLE (VE) X;
         VARIABLE (VE) Y;
+        VARIABLE Z;
         Y := Y & 8;
         X := (0 + 1) & 2 & 3 & 4 & 5 & 6 & 7 & Y;
         WRITE 6 ST(X);
+        WRITE 6 ST(Z) ' <- Defaults to RE';
     ENDPROCEDURE;
 
     {Procedure to print a complex number}
@@ -32,7 +34,7 @@ BEGIN;
         X := 3;
         Y := 4;
         WRITE 6 "Summation of 3 and 4: " ST(ADDTWONUMS(X,Y));
-        
+
         PRINTSEVENNUMS;
         PRINTACOMPLEXNUM;
 
@@ -40,7 +42,7 @@ BEGIN;
             WRITE 6 ST(I);
         ENDLOOP;
     ENDPROCEDURE;
-    
+
     {Call the main procedure}
     RUN;
 END;

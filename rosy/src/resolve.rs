@@ -417,7 +417,10 @@ impl TypeResolver {
                     let node = self.nodes.get_mut(&slot).unwrap();
                     let default_type = RosyType::RE();
                     node.resolved = Some(default_type.clone());
-                    node.rule = ResolutionRule::Explicit(default_type);
+                    node.rule = ResolutionRule::InferredFrom {
+                        recipe: ExprRecipe::Literal(default_type),
+                        reason: "untyped variables default to RE".to_string(),
+                    };
                     warned_slots.insert(slot.clone());
                     resolved_count += 1;
                     continue;
