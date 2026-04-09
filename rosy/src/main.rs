@@ -1,6 +1,6 @@
 mod update_check;
 
-use rosy::{ast::{self, FromRule}, embedded, preprocess, program::Program, resolve, syntax_config, transpile::*};
+use rosy::{ast, embedded, program::Program, resolve, syntax_config, transpile::*};
 use anyhow::{Context, Result, anyhow, ensure};
 use clap::{Parser as ClapParser, Subcommand};
 use pest::Parser;
@@ -143,8 +143,8 @@ fn rosy(
     eprintln!("{BOLD}        Rosy{RESET} v{}", env!("CARGO_PKG_VERSION"));
     eprintln!("{BOLD}  Transpiling{RESET} {filename} ({profile_label})");
 
-    // --- Step 0: Preprocess (resolve INCLUDEs) ---
-    step(1, 6, "Preprocessing");
+    // --- Step 0: Read source ---
+    step(1, 6, "Reading");
     let t = Instant::now();
     let raw_script = std::fs::read_to_string(script_path).with_context(|| {
         format!(
@@ -152,24 +152,25 @@ fn rosy(
             script_path.display()
         )
     })?;
-    let preprocessed = preprocess::preprocess(&raw_script, Some(script_path))
-        .context("Failed during preprocessing!")?;
-    let script = &preprocessed.text;
     step_done(t);
 
     // --- Step 1: Parse ---
     step(2, 6, "Parsing");
     let t = Instant::now();
-    let program = ast::CosyParser::parse(ast::Rule::program, script)
+    let program = ast::CosyParser::parse(ast::Rule::program, &raw_script)
         .context("Couldn't parse!")?
         .next()
         .context("Expected a program")?;
     step_done(t);
 
-    // --- Step 2: AST Generation ---
+    // --- Step 2: AST Generation (resolves INCLUDEs at the AST level) ---
     step(3, 6, "Building AST");
     let t = Instant::now();
-    let mut ast = Program::from_rule(program)
+    let mut ast = Program::from_rule_with_includes(
+        program,
+        Some(script_path),
+        &mut std::collections::HashSet::new(),
+    )
         .context("Failed to build AST!")?
         .context("Expected a program")?;
     step_done(t);

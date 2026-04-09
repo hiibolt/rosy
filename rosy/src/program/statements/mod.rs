@@ -175,10 +175,16 @@ pub struct SourceLocation {
     pub col: usize,
     /// A short snippet of the source text (first line, truncated).
     pub snippet: String,
+    /// The file this location came from (`None` for the root/main file).
+    pub file: Option<std::path::PathBuf>,
 }
 impl std::fmt::Display for SourceLocation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "line {}, col {}: {}", self.line, self.col, self.snippet)
+        if let Some(ref path) = self.file {
+            write!(f, "{}:{}:{}: {}", path.display(), self.line, self.col, self.snippet)
+        } else {
+            write!(f, "line {}, col {}: {}", self.line, self.col, self.snippet)
+        }
     }
 }
 impl SourceLocation {
@@ -194,7 +200,13 @@ impl SourceLocation {
         } else {
             first_line.to_string()
         };
-        SourceLocation { line, col, snippet }
+        SourceLocation { line, col, snippet, file: None }
+    }
+
+    /// Set the originating file path on this location.
+    pub fn with_file(mut self, path: std::path::PathBuf) -> Self {
+        self.file = Some(path);
+        self
     }
 }
 

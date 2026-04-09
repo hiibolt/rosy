@@ -101,7 +101,11 @@ statement   = _{
   | ltrue
   | lfalse
   | lsline
-  | rkco }
+  | rkco
+  | include_stmt }
+
+/// INCLUDE
+include_stmt = { ^"INCLUDE" ~ string ~ semicolon }
 
 /// BREAK
 break_statement = { ^"BREAK" ~ semicolon }

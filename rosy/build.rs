@@ -439,6 +439,18 @@ fn generate_hover_file(
         )
         .unwrap();
     }
+    // Manual entry for INCLUDE — it has no statement module since it's
+    // resolved during AST construction, not as a runtime Statement variant.
+    writeln!(
+        f,
+        "    (\"INCLUDE\", \"INCLUDE — File Inclusion\", \
+         \"Includes another ROSY source file at this point in the program. \
+         The included file must be a complete BEGIN/END program. \
+         Its statements are spliced into the including program at the INCLUDE site.\\n\\n\
+         ```\\nINCLUDE 'helpers.rosy';\\n```\", \
+         \"\", true),"
+    )
+    .unwrap();
     writeln!(f, "];").unwrap();
 
     writeln!(f).unwrap();

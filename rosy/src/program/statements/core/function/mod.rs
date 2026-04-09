@@ -133,6 +133,7 @@ impl FromRule for FunctionStatement {
                     line: 0,
                     col: 0,
                     snippet: format!("(implicit return variable for FUNCTION {})", name),
+                    file: None,
                 },
             }];
 

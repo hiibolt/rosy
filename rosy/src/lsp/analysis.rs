@@ -4,7 +4,7 @@
 //! on a document and extracts diagnostics, resolved types, and symbol locations.
 
 use crate::{
-    ast::{CosyParser, FromRule, Rule},
+    ast::{CosyParser, Rule},
     errors::RosyError,
     program::Program,
     resolve::{GraphNode, TypeResolver, TypeSlot},
@@ -137,22 +137,6 @@ pub fn analyze(source: &str, source_path: Option<&std::path::Path>) -> AnalysisR
     // so they work even when the parse fails (partial highlighting).
     result.semantic_tokens = tokenize_source(source);
 
-    // Step 0: Preprocess (resolve INCLUDEs)
-    let preprocessed = match crate::preprocess::preprocess(source, source_path) {
-        Ok(p) => p,
-        Err(e) => {
-            result.diagnostics.push(Diagnostic {
-                range: Range::new(Position::new(0, 0), Position::new(0, 0)),
-                severity: Some(DiagnosticSeverity::ERROR),
-                message: format!("Preprocessing failed: {e}"),
-                source: Some("rosy".to_string()),
-                ..Default::default()
-            });
-            return result;
-        }
-    };
-    let source = &preprocessed.text;
-
     // Step 1: Parse
     let pairs = match CosyParser::parse(Rule::program, source) {
         Ok(pairs) => pairs,
@@ -176,8 +160,12 @@ pub fn analyze(source: &str, source_path: Option<&std::path::Path>) -> AnalysisR
         }
     };
 
-    // Step 2: Build AST
-    let mut ast = match Program::from_rule(program_pair) {
+    // Step 2: Build AST (resolves INCLUDEs at the AST level)
+    let mut ast = match Program::from_rule_with_includes(
+        program_pair,
+        source_path,
+        &mut std::collections::HashSet::new(),
+    ) {
         Ok(Some(ast)) => ast,
         Ok(None) => {
             result.diagnostics.push(Diagnostic {
