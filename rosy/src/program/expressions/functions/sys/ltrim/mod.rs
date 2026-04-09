@@ -36,14 +36,14 @@ use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
 use crate::transpile::{
-    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
     Transpile, TranspileableExpr, ValueKind,
 };
 use anyhow::{Context as AnyhowContext, Error, Result};
 use std::collections::HashSet;
 
 /// AST node for the `LTRIM(expr)` function.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct LtrimExpr {
     pub expr: Box<Expr>,
 }
@@ -111,8 +111,5 @@ impl TranspileableExpr for LtrimExpr {
         _deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe {
         ExprRecipe::Literal(RosyType::ST())
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }

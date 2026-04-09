@@ -32,7 +32,7 @@ use crate::{
     ast::{FromRule, Rule},
     program::expressions::Expr,
     transpile::{
-        ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext,
+        ExprFunctionCallResult, TranspilationInputContext,
         TranspilationOutput, Transpile, TranspileableExpr, ValueKind,
     },
 };
@@ -40,7 +40,7 @@ use anyhow::{Context, Error};
 use std::collections::HashSet;
 
 /// AST node for the `CD(n)` constructor expression.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct CDExpr {
     pub index: Box<Expr>,
 }
@@ -82,9 +82,6 @@ impl TranspileableExpr for CDExpr {
         _deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe {
         ExprRecipe::Literal(RosyType::CD())
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }
 impl Transpile for CDExpr {

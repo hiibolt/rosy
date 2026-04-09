@@ -37,13 +37,13 @@ use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
-use crate::transpile::{ConcatExtensionResult, ExprFunctionCallResult, TranspileableExpr};
+use crate::transpile::{ExprFunctionCallResult, TranspileableExpr};
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, ValueKind};
 use anyhow::{Context, Error, Result};
 use std::collections::HashSet;
 
 /// AST node for the `VE(expr)` type conversion function.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct VeConvertExpr {
     pub expr: Box<Expr>,
 }
@@ -94,9 +94,6 @@ impl TranspileableExpr for VeConvertExpr {
         _deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe {
         ExprRecipe::Literal(RosyType::VE())
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }
 

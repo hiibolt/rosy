@@ -44,7 +44,7 @@ use anyhow::{Context, Error, Result, ensure};
 use std::collections::HashSet;
 
 /// A parsed identifier with optional parenthesized arguments and bracket indices.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct VariableIdentifier {
     pub name: String,
     /// Each paren group `(expr, ...)` is a `Vec<Expr>`.
@@ -189,9 +189,6 @@ impl TranspileableExpr for VariableIdentifier {
         } else {
             ExprRecipe::Unknown
         }
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }
 

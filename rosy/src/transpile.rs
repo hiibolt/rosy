@@ -22,7 +22,7 @@
 //! breadcrumbs for error diagnostics.
 
 use crate::{
-    program::{expressions::Expr, statements::SourceLocation},
+    program::statements::SourceLocation,
     resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot},
     rosy_lib::RosyType,
 };
@@ -47,11 +47,6 @@ pub enum TypeHydrationResult {
 pub enum ExprFunctionCallResult {
     HasFunctionCalls { result: Result<()> },
     NoFunctionCalls,
-}
-
-pub enum ConcatExtensionResult {
-    Extended,
-    NotAConcatExpr,
 }
 
 pub trait TranspileableStatement: Transpile + Send + Sync {
@@ -86,7 +81,6 @@ pub trait TranspileableExpr: Transpile + Send + Sync {
         ctx: &ScopeContext,
         deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe;
-    fn extend_concat(&mut self, right: Expr) -> ConcatExtensionResult;
 }
 pub trait Transpile: std::fmt::Debug {
     fn transpile(

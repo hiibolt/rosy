@@ -39,14 +39,14 @@ use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::RosyType;
 use crate::transpile::{
-    ConcatExtensionResult, ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
+    ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
     Transpile, TranspileableExpr, ValueKind,
 };
 use anyhow::{Context as AnyhowContext, Error, Result};
 use std::collections::HashSet;
 
 /// AST node for the `COSH(expr)` intrinsic function.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct CoshExpr {
     pub expr: Box<Expr>,
 }
@@ -120,8 +120,5 @@ impl TranspileableExpr for CoshExpr {
         deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe {
         ExprRecipe::TypePreserving(Box::new(resolver.build_expr_recipe(&self.expr, ctx, deps)))
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }

@@ -41,12 +41,12 @@ use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::rosy_lib::RosyType;
-use crate::transpile::{ConcatExtensionResult, ExprFunctionCallResult, TranspileableExpr};
+use crate::transpile::{ExprFunctionCallResult, TranspileableExpr};
 use crate::transpile::{TranspilationInputContext, TranspilationOutput, Transpile, ValueKind};
 use anyhow::{Error, Result, anyhow};
 
 /// AST node for the not-equal operator (`<>`).
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct NeqExpr {
     pub left: Box<Expr>,
     pub right: Box<Expr>,
@@ -89,9 +89,6 @@ impl TranspileableExpr for NeqExpr {
         _deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe {
         ExprRecipe::Literal(RosyType::LO())
-    }
-    fn extend_concat(&mut self, _right: Expr) -> ConcatExtensionResult {
-        ConcatExtensionResult::NotAConcatExpr
     }
 }
 impl Transpile for NeqExpr {
