@@ -10,9 +10,9 @@ BEGIN;
     {Procedure to print seven numbers}
     PROCEDURE PRINTSEVENNUMS;
         VARIABLE (VE) X;
-        VARIABLE (VE) Y;
+        VARIABLE Y;
         VARIABLE Z;
-        Y := Y & 8;
+        Y := VE(8);
         X := (0 + 1) & 2 & 3 & 4 & 5 & 6 & 7 & Y;
         WRITE 6 ST(X);
         WRITE 6 ST(Z) ' <- Defaults to RE';

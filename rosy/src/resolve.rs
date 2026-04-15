@@ -17,7 +17,9 @@ use crate::program::Program;
 use crate::program::expressions::*;
 use crate::program::statements::*;
 use crate::rosy_lib::RosyType;
-use crate::transpile::{ExprFunctionCallResult, InferenceEdgeResult, TypeHydrationResult, TypeslotDeclarationResult};
+use crate::transpile::{
+    ExprFunctionCallResult, InferenceEdgeResult, TypeHydrationResult, TypeslotDeclarationResult,
+};
 use anyhow::{Result, anyhow};
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -129,6 +131,23 @@ pub enum ExprRecipe {
     WithDimensions(Box<ExprRecipe>, usize),
     /// Expression whose type couldn't be determined statically.
     Unknown,
+}
+
+impl ExprRecipe {
+    /// Returns true if this recipe references the given type slot.
+    pub fn references_slot(&self, target: &TypeSlot) -> bool {
+        match self {
+            ExprRecipe::Literal(_) | ExprRecipe::Unknown => false,
+            ExprRecipe::Variable(s) | ExprRecipe::IndexedVariable(s, _) => s == target,
+            ExprRecipe::BinaryOp { left, right, .. } | ExprRecipe::Concat(left, right) => {
+                left.references_slot(target) || right.references_slot(target)
+            }
+            ExprRecipe::TypePreserving(inner)
+            | ExprRecipe::RealFn(inner)
+            | ExprRecipe::ImagFn(inner)
+            | ExprRecipe::WithDimensions(inner, _) => inner.references_slot(target),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -591,7 +610,8 @@ impl TypeResolver {
             message: msg,
             location: first_loc,
             severity: crate::errors::RosyErrorSeverity::Error,
-        }.into())
+        }
+        .into())
     }
 
     /// Extract the human-readable reason from a resolution rule, if available.
@@ -620,9 +640,15 @@ impl TypeResolver {
         let resolved_type = match rule {
             ResolutionRule::Explicit(t) => t,
             ResolutionRule::InferredFrom { recipe, reason } => {
+                let self_referential = recipe.references_slot(slot);
                 self.evaluate_recipe(&recipe).map_err(|e| {
+                    let hint = if self_referential {
+                        "\n\n\thint: this variable's type depends on itself — use an explicit type cast (e.g. VE(8))"
+                    } else {
+                        ""
+                    };
                     let msg = format!(
-                        "while resolving {}: {}\n  ({})",
+                        "while resolving {}: {}\n\t({}){hint}",
                         slot, e, reason
                     );
                     // Prefer assigned_at (the source of inference), fall back to declared_at
@@ -654,7 +680,8 @@ impl TypeResolver {
                     message: msg,
                     location: node.declared_at.clone(),
                     severity: crate::errors::RosyErrorSeverity::Error,
-                }.into());
+                }
+                .into());
             }
         };
 
