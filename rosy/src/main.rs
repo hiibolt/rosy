@@ -646,14 +646,29 @@ fn install_vscode_extension() -> Result<()> {
 
     let extensions_dir = PathBuf::from(&home).join(".vscode/extensions");
 
-    // Clean up old extension directory from before the naming fix
-    let old_ext_dir = extensions_dir.join("rosy-language-support");
-    if old_ext_dir.exists() {
-        eprintln!("{DIM}  Removing old extension at {}{RESET}", old_ext_dir.display());
-        let _ = fs::remove_dir_all(&old_ext_dir);
+    // Clean up old extension directories from before the naming fix
+    for old_name in ["rosy-language-support", "hiibolt.rosy-language-support"] {
+        let old_ext_dir = extensions_dir.join(old_name);
+        if old_ext_dir.exists() {
+            eprintln!("{DIM}  Removing old extension at {}{RESET}", old_ext_dir.display());
+            let _ = fs::remove_dir_all(&old_ext_dir);
+        }
     }
 
-    let ext_dir = extensions_dir.join("hiibolt.rosy-language-support");
+    // Also clean up any previous versioned installs (hiibolt.rosy-language-support-*)
+    if let Ok(entries) = fs::read_dir(&extensions_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with("hiibolt.rosy-language-support-") {
+                eprintln!("{DIM}  Removing old extension at {}{RESET}", entry.path().display());
+                let _ = fs::remove_dir_all(entry.path());
+            }
+        }
+    }
+
+    let ext_version = env!("CARGO_PKG_VERSION");
+    let ext_dir = extensions_dir.join(format!("hiibolt.rosy-language-support-{ext_version}"));
     let syntaxes_dir = ext_dir.join("syntaxes");
 
     let action = if ext_dir.exists() { "Updating" } else { "Installing" };
@@ -663,10 +678,56 @@ fn install_vscode_extension() -> Result<()> {
     fs::create_dir_all(&syntaxes_dir)
         .context("Failed to create extension directory")?;
 
-    write(ext_dir.join("package.json"), VSCODE_PACKAGE_JSON)?;
+    // Inject the transpiler version into package.json so it matches the folder name
+    let package_json = VSCODE_PACKAGE_JSON.replace(
+        "\"version\": \"0.0.0-injected\"",
+        &format!("\"version\": \"{}\"", ext_version),
+    );
+    write(ext_dir.join("package.json"), package_json)?;
     write(ext_dir.join("language-configuration.json"), VSCODE_LANG_CONFIG)?;
     write(ext_dir.join("extension.js"), VSCODE_EXTENSION_JS)?;
     write(syntaxes_dir.join("rosy.tmLanguage.json"), VSCODE_TM_GRAMMAR)?;
+
+    // Register the extension in VS Code's extensions.json registry
+    let registry_path = extensions_dir.join("extensions.json");
+    let mut registry: Vec<serde_json::Value> = if registry_path.exists() {
+        let contents = fs::read_to_string(&registry_path)
+            .context("Failed to read extensions.json")?;
+        serde_json::from_str(&contents).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    // Remove any existing rosy entries
+    registry.retain(|entry| {
+        entry.get("identifier")
+            .and_then(|id| id.get("id"))
+            .and_then(|id| id.as_str())
+            != Some("hiibolt.rosy-language-support")
+    });
+
+    let relative_location = format!("hiibolt.rosy-language-support-{ext_version}");
+    registry.push(serde_json::json!({
+        "identifier": { "id": "hiibolt.rosy-language-support" },
+        "version": ext_version,
+        "location": {
+            "$mid": 1,
+            "path": ext_dir.to_string_lossy(),
+            "scheme": "file"
+        },
+        "relativeLocation": relative_location,
+        "metadata": {
+            "installedTimestamp": std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            "source": "rosy-setup"
+        }
+    }));
+
+    let registry_json = serde_json::to_string_pretty(&registry)
+        .context("Failed to serialize extensions.json")?;
+    write(&registry_path, registry_json)?;
 
     let done_verb = if action == "Updating" { "Updated" } else { "Installed" };
     eprintln!("{BOLD}{GREEN}    {done_verb}{RESET} Rosy Language Support for VS Code");

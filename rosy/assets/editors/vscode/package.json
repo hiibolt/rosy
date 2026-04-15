@@ -2,7 +2,7 @@
   "name": "rosy-language-support",
   "displayName": "Rosy Language Support",
   "description": "Syntax highlighting and language server support for the Rosy programming language",
-  "version": "0.1.0",
+  "version": "0.0.0-injected",
   "publisher": "hiibolt",
   "engines": {
     "vscode": "^1.74.0"
