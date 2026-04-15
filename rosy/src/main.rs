@@ -104,7 +104,11 @@ enum Commands {
     },
 
     /// Start the Language Server Protocol (LSP) server on stdin/stdout
-    Lsp,
+    Lsp {
+        /// Accepted for compatibility with editors that inject --stdio (e.g. VS Code)
+        #[arg(long, hide = true)]
+        stdio: bool,
+    },
 
     /// Install editor extensions for Rosy language support
     Setup {
@@ -642,7 +646,14 @@ fn install_vscode_extension() -> Result<()> {
 
     let extensions_dir = PathBuf::from(&home).join(".vscode/extensions");
 
-    let ext_dir = extensions_dir.join("rosy-language-support");
+    // Clean up old extension directory from before the naming fix
+    let old_ext_dir = extensions_dir.join("rosy-language-support");
+    if old_ext_dir.exists() {
+        eprintln!("{DIM}  Removing old extension at {}{RESET}", old_ext_dir.display());
+        let _ = fs::remove_dir_all(&old_ext_dir);
+    }
+
+    let ext_dir = extensions_dir.join("hiibolt.rosy-language-support");
     let syntaxes_dir = ext_dir.join("syntaxes");
 
     let action = if ext_dir.exists() { "Updating" } else { "Installing" };
@@ -743,7 +754,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Handle LSP command — launch language server on stdin/stdout
-    if matches!(&cli.command, Commands::Lsp) {
+    if matches!(&cli.command, Commands::Lsp { .. }) {
         update_handle.finish();
         let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
         rt.block_on(rosy::lsp::run());
@@ -810,7 +821,7 @@ fn main() -> Result<()> {
                 Some(name),
             )
         }
-        Commands::Test { .. } | Commands::Lsp | Commands::Setup { .. } => unreachable!(),
+        Commands::Test { .. } | Commands::Lsp { .. } | Commands::Setup { .. } => unreachable!(),
     };
 
     syntax_config::set_cosy_syntax(cosy_syntax);
@@ -839,7 +850,7 @@ fn main() -> Result<()> {
                 .context("Failed to copy binary to current directory")?;
             eprintln!("  Binary written to {BOLD}{}{RESET}", destination.display());
         }
-        Commands::Test { .. } | Commands::Lsp | Commands::Setup { .. } => unreachable!(),
+        Commands::Test { .. } | Commands::Lsp { .. } | Commands::Setup { .. } => unreachable!(),
     }
 
     Ok(())

@@ -14,6 +14,12 @@
     "onLanguage:rosy"
   ],
   "main": "./extension.js",
+  "scripts": {
+    "build": "bun build src/extension.js --outfile extension.js --target node --external vscode --format cjs"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
   "contributes": {
     "languages": [
       {
@@ -29,6 +35,16 @@
         "scopeName": "source.rosy",
         "path": "./syntaxes/rosy.tmLanguage.json"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Rosy",
+      "properties": {
+        "rosy.lspPath": {
+          "type": "string",
+          "default": "rosy",
+          "description": "Path to the rosy binary (supports ~/). Falls back to PATH lookup."
+        }
+      }
+    }
   }
 }
