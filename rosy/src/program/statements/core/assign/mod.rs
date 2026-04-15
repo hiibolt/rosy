@@ -261,8 +261,18 @@ impl TranspileableStatement for AssignStatement {
                 // fail because Y isn't resolved yet. In that case,
                 // temporarily resolve Y to the old type so we can
                 // evaluate what the new assignment produces.
+                //
+                // Account for LHS indexing: MAP1(2) := expr means the
+                // recipe should be wrapped with WithDimensions, just like
+                // the first assignment does at the bottom of this function.
+                let num_indices = self.identifier.num_index_dimensions();
+                let dimensioned_recipe = if num_indices > 0 {
+                    ExprRecipe::WithDimensions(Box::new(recipe.clone()), num_indices)
+                } else {
+                    recipe.clone()
+                };
                 let mut old_type_result = resolver.evaluate_recipe(old_recipe);
-                let mut new_type_result = resolver.evaluate_recipe(&recipe);
+                let mut new_type_result = resolver.evaluate_recipe(&dimensioned_recipe);
 
                 // If the old recipe can't be evaluated yet (e.g. X:=10.5*J
                 // where J has a known recipe but isn't resolved), try
@@ -301,7 +311,7 @@ impl TranspileableStatement for AssignStatement {
 
                     if !temp_leaf_slots.is_empty() {
                         old_type_result = resolver.evaluate_recipe(old_recipe);
-                        new_type_result = resolver.evaluate_recipe(&recipe);
+                        new_type_result = resolver.evaluate_recipe(&dimensioned_recipe);
                     }
                 }
 
@@ -314,7 +324,7 @@ impl TranspileableStatement for AssignStatement {
                         if let Some(node) = resolver.nodes.get_mut(&var_slot) {
                             node.resolved = Some(old_type.clone());
                         }
-                        new_type_result = resolver.evaluate_recipe(&recipe);
+                        new_type_result = resolver.evaluate_recipe(&dimensioned_recipe);
                         // Undo the temporary resolution
                         if let Some(node) = resolver.nodes.get_mut(&var_slot) {
                             node.resolved = None;
@@ -498,8 +508,8 @@ impl Transpile for AssignStatement {
                 .variables
                 .get(&self.identifier.name)
                 .ok_or(vec![anyhow::anyhow!(
-                    "Variable '{}' is not defined in this scope!",
-                    self.identifier.name
+                    "Variable '{}' is not defined in this scope!{}",
+                    self.identifier.name, context.variable_hint(&self.identifier.name)
                 )])?
                 .scope
             {
@@ -575,8 +585,8 @@ impl Transpile for AssignStatement {
             .variables
             .get(&self.identifier.name)
             .ok_or(vec![anyhow::anyhow!(
-                "Variable '{}' is not defined in this scope!",
-                self.identifier.name
+                "Variable '{}' is not defined in this scope!{}",
+                self.identifier.name, context.variable_hint(&self.identifier.name)
             )])?
             .scope
             .clone();

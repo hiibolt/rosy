@@ -34,9 +34,11 @@ use crate::{
     ast::*,
     program::{expressions::Expr, statements::SourceLocation},
     resolve::{ScopeContext, TypeResolver},
+    rosy_lib::RosyBaseType,
     transpile::{
         InferenceEdgeResult, TranspilationInputContext, TranspilationOutput, Transpile,
-        TranspileableStatement, TypeHydrationResult, TypeslotDeclarationResult, add_context_to_all,
+        TranspileableExpr, TranspileableStatement, TypeHydrationResult,
+        TypeslotDeclarationResult, add_context_to_all,
     },
 };
 
@@ -181,12 +183,34 @@ impl Transpile for PolvalStatement {
         // already starts with `&`. Replace the leading `&` with `&mut `.
         let r_mut = r_out.as_ref().replacen('&', "&mut ", 1);
 
+        // Dispatch based on whether A is a scalar VE or a batch (VE ND) array
+        let a_type = self
+            .a_expr
+            .type_of(context)
+            .map_err(|e| vec![e.context("...while determining type of A in POLVAL")])?;
+
+        let polval_fn = if a_type.base_type == RosyBaseType::VE && a_type.dimensions > 0 {
+            "rosy_polval_ve"
+        } else {
+            "rosy_polval_re"
+        };
+
+        // If A and R alias the same variable, clone A to avoid borrow conflict.
+        // This matches COSY's in-place POLVAL behavior.
+        let a_ref = a_out.as_ref();
+        let a_arg = if a_ref.trim_start_matches('&') == r_mut.trim_start_matches("&mut ") {
+            format!("&{}.clone()", a_ref.trim_start_matches('&'))
+        } else {
+            a_ref
+        };
+
         let serialization = format!(
-            "rosy_lib::core::polval::rosy_polval_re({}, {}, {} as usize, {}, {} as usize, {}, {} as usize)?;",
+            "rosy_lib::core::polval::{}({}, {}, {} as usize, {}, {} as usize, {}, {} as usize)?;",
+            polval_fn,
             l_out.as_value(),
             p_out.as_ref(),
             np_out.as_value(),
-            a_out.as_ref(),
+            a_arg,
             na_out.as_value(),
             r_mut,
             nr_out.as_value(),

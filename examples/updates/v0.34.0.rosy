@@ -1,0 +1,155 @@
+BEGIN;
+
+{ ============================================================ }
+{ v0.34.0 — QA Feedback Fixes & DA/CD Concat Support           }
+{ ============================================================ }
+
+
+{ ------------------------------------------------------------ }
+{ 1. DA Concatenation (NEW)                                     }
+{    DA values can now be concatenated with & to build vectors  }
+{    of Taylor series, just like RE & RE builds VE.             }
+{ ------------------------------------------------------------ }
+PROCEDURE TEST_DA_CONCAT;
+    VARIABLE (DA) X;
+    VARIABLE (DA) Y;
+    VARIABLE (DA) Z;
+    VARIABLE COORD;
+
+    X := DA(1);
+    Y := DA(2);
+    Z := DA(3);
+
+    { DA & DA => (DA 1D) — two DAs into a DA vector }
+    COORD := X & Y;
+
+    { (DA 1D) & DA => (DA 1D) — append DA to DA vector }
+    COORD := COORD & Z;
+
+    WRITE 6 '--- DA Concat ---';
+    WRITE 6 'COORD(1) = DA(1):';
+    WRITE 6 ST(COORD(1));
+    WRITE 6 'COORD(2) = DA(2):';
+    WRITE 6 ST(COORD(2));
+    WRITE 6 'COORD(3) = DA(3):';
+    WRITE 6 ST(COORD(3));
+ENDPROCEDURE;
+
+
+{ ------------------------------------------------------------ }
+{ 2. Indexed Array Assignment Fix (#78)                         }
+{    Multiple indexed assignments no longer produce false type  }
+{    conflicts. Previously MAP(2) := ... would fail if MAP(1)   }
+{    was assigned first.                                        }
+{ ------------------------------------------------------------ }
+PROCEDURE TEST_INDEXED_ARRAY;
+    VARIABLE (RE 2) MAP;
+
+    { Both assignments now resolve without false type conflict }
+    MAP(1) := 1.0;
+    MAP(2) := 2.0;
+
+    WRITE 6 '--- Indexed Array Fix ---';
+    WRITE 6 'MAP(1)=' ST(MAP(1));
+    WRITE 6 'MAP(2)=' ST(MAP(2));
+ENDPROCEDURE;
+
+
+{ ------------------------------------------------------------ }
+{ 3. Unused Functions with Untyped Params (#79)                 }
+{    Functions that are defined but never called no longer fail  }
+{    when their parameters lack explicit types. Untyped params  }
+{    default to RE, matching COSY behavior.                     }
+{ ------------------------------------------------------------ }
+FUNCTION (RE) UNUSED_FUNC X Y;
+    UNUSED_FUNC := X + Y;
+ENDFUNCTION;
+
+PROCEDURE TEST_UNUSED_FUNC;
+    WRITE 6 '--- Unused Function Fix ---';
+    WRITE 6 'Program compiled despite UNUSED_FUNC never being called.';
+ENDPROCEDURE;
+
+
+{ ------------------------------------------------------------ }
+{ 4. Self-Referential Type Inference Hint                       }
+{    When a variable's type depends on itself (e.g. Y := Y & 8) }
+{    the error now suggests using an explicit type cast.        }
+{                                                               }
+{    Uncomment the section below to see the hint:               }
+{ ------------------------------------------------------------ }
+PROCEDURE TEST_SELF_REF_HINT;
+    WRITE 6 '--- Self-Referential Hint ---';
+    WRITE 6 'Uncomment the block below to see the improved error.';
+
+    { UNCOMMENT TO SEE HINT:
+    VARIABLE Y;
+    Y := Y & 8;
+    }
+ENDPROCEDURE;
+
+
+{ ------------------------------------------------------------ }
+{ 5. Case-Sensitivity "Did You Mean?" Hints                     }
+{    Undeclared variables, functions, and procedures now show    }
+{    a suggestion if a case-insensitive match exists in scope.  }
+{                                                               }
+{    Uncomment each section below to see the hints:             }
+{ ------------------------------------------------------------ }
+PROCEDURE TEST_CASE_HINTS;
+    VARIABLE GAMMA0;
+    GAMMA0 := 2.065789;
+
+    WRITE 6 '--- Case Sensitivity Hints ---';
+    WRITE 6 'Uncomment any block below to see hints.';
+
+    { UNCOMMENT TO SEE VARIABLE HINT:
+    VARIABLE K0;
+    K0 := gamma0 - 1;
+    }
+
+    { UNCOMMENT TO SEE PROCEDURE HINT:
+    test_da_concat;
+    }
+
+    { UNCOMMENT TO SEE FUNCTION HINT:
+    VARIABLE R;
+    R := unused_func(1, 2);
+    }
+ENDPROCEDURE;
+
+
+{ ------------------------------------------------------------ }
+{ 6. Error Messages Now in Source Order (#80)                   }
+{    When multiple type errors occur, they are reported in the  }
+{    order they appear in the source file, not in dependency    }
+{    graph traversal order.                                     }
+{                                                               }
+{    Uncomment the section below to verify ordering:            }
+{ ------------------------------------------------------------ }
+PROCEDURE TEST_ERROR_ORDER;
+    WRITE 6 '--- Error Ordering ---';
+    WRITE 6 'Uncomment the block below to see ordered errors.';
+
+    { UNCOMMENT TO SEE ORDERED ERRORS:
+    VARIABLE A;
+    VARIABLE B;
+    VARIABLE C;
+    }
+ENDPROCEDURE;
+
+
+{ ------------------------------------------------------------ }
+{ Run all demonstrations                                        }
+{ ------------------------------------------------------------ }
+PROCEDURE RUN;
+    TEST_DA_CONCAT;
+    TEST_INDEXED_ARRAY;
+    TEST_UNUSED_FUNC;
+    TEST_SELF_REF_HINT;
+    TEST_CASE_HINTS;
+    TEST_ERROR_ORDER;
+ENDPROCEDURE;
+RUN;
+
+END;

@@ -115,6 +115,6 @@ impl TranspileableExpr for CmplxExpr {
     ) -> ExprRecipe {
         // CMPLX has non-uniform output types (RE/CM->CM, DA/CD->CD).
         // Defer to type_of() which calls get_return_type().
-        ExprRecipe::Unknown
+        ExprRecipe::Unknown(None)
     }
 }

@@ -56,6 +56,19 @@ use std::collections::HashSet;
 
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 
+/// Find a case-insensitive match among known names and return a hint string.
+fn find_case_similar<'a>(name: &str, candidates: impl Iterator<Item = &'a String>) -> String {
+    let name_upper = name.to_uppercase();
+    let matches: Vec<&String> = candidates
+        .filter(|c| c.to_uppercase() == name_upper && *c != name)
+        .collect();
+    if matches.is_empty() {
+        String::new()
+    } else {
+        format!(" (did you mean '{}'? Rosy is case-sensitive)", matches[0])
+    }
+}
+
 /// What a `variable_identifier` AST node actually represents,
 /// determined at transpile time via the decision tree.
 #[derive(Debug)]
@@ -189,7 +202,8 @@ impl TranspileableExpr for VarExpr {
                     .functions
                     .get(&self.identifier.name)
                     .ok_or_else(|| {
-                        anyhow::anyhow!("Function '{}' not found", self.identifier.name)
+                        anyhow::anyhow!("Function '{}' not found{}", self.identifier.name,
+                        TranspilationInputContext::case_hint(&self.identifier.name, context.functions.keys()))
                     })?;
                 Ok(func_ctx.return_type.clone())
             }
@@ -290,7 +304,8 @@ impl TranspileableExpr for VarExpr {
                 deps.insert(ret_slot.clone());
                 ExprRecipe::Variable(ret_slot.clone())
             } else {
-                ExprRecipe::Unknown
+                let hint = find_case_similar(&ident.name, ctx.functions.keys());
+                ExprRecipe::Unknown(Some(format!("undeclared function '{}'{}",  ident.name, hint)))
             }
         } else if let Some(slot) = ctx.variables.get(&ident.name) {
             deps.insert(slot.clone());
@@ -301,7 +316,8 @@ impl TranspileableExpr for VarExpr {
                 ExprRecipe::Variable(slot.clone())
             }
         } else {
-            ExprRecipe::Unknown
+            let hint = find_case_similar(&ident.name, ctx.variables.keys());
+            ExprRecipe::Unknown(Some(format!("undeclared variable '{}'{}",  ident.name, hint)))
         }
     }
 }
@@ -336,8 +352,9 @@ impl Transpile for VarExpr {
                         .variables
                         .get(&self.identifier.name)
                         .ok_or(vec![anyhow::anyhow!(
-                            "Variable '{}' is not defined in this scope!",
-                            self.identifier.name
+                            "Variable '{}' is not defined in this scope!{}",
+                            self.identifier.name,
+                            context.variable_hint(&self.identifier.name)
                         )])?;
                 let var_type = var_data.data.r#type.clone();
 
@@ -378,9 +395,10 @@ pub fn function_call_transpile_helper(
     let func_context = match context.functions.get(name) {
         Some(ctx) => ctx,
         None => {
+            let hint = TranspilationInputContext::case_hint(name, context.functions.keys());
             return Err(vec![anyhow!(
-                "Function '{}' is not defined in this scope, can't transpile function call!",
-                name
+                "Function '{}' is not defined in this scope!{}",
+                name, hint
             )]);
         }
     }

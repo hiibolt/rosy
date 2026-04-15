@@ -15,7 +15,7 @@
 
 use anyhow::Result;
 use crate::rosy_lib::RosyType;
-use crate::rosy_lib::{RE, ST, VE};
+use crate::rosy_lib::{RE, ST, VE, DA, CD};
 use crate::rosy_lib::operators::{TypeRule, build_type_registry};
 
 /// Type compatibility registry for concatenation operator.
@@ -36,6 +36,16 @@ pub const CONCAT_REGISTRY: &[TypeRule] = &[
     TypeRule::with_comment("ST", "ST", "ST", "'He'", "'ya!'", "Concatenate two Strings"),
     TypeRule::with_comment("VE", "RE", "VE", "1&2", "3", "Append a Real to the right of a Vector"),
     TypeRule::with_comment("VE", "VE", "VE", "1&2", "3&4", "Concatenate two Vectors"),
+    // DA concatenation — builds vectors of Taylor series (phase-space maps)
+    TypeRule::with_comment("DA", "DA", "DA1", "DA(1)", "DA(2)", "Concatenate two DAs to a DA vector"),
+    TypeRule::with_comment("DA", "DA1", "DA1", "DA(1)", "DA(1)&DA(2)", "Prepend a DA to the left of a DA vector"),
+    TypeRule::with_comment("DA1", "DA", "DA1", "DA(1)&DA(2)", "DA(3)", "Append a DA to the right of a DA vector"),
+    TypeRule::with_comment("DA1", "DA1", "DA1", "DA(1)&DA(2)", "DA(3)&DA(4)", "Concatenate two DA vectors"),
+    // CD concatenation — builds vectors of complex Taylor series
+    TypeRule::with_comment("CD", "CD", "CD1", "CD(1)", "CD(2)", "Concatenate two CDs to a CD vector"),
+    TypeRule::with_comment("CD", "CD1", "CD1", "CD(1)", "CD(1)&CD(2)", "Prepend a CD to the left of a CD vector"),
+    TypeRule::with_comment("CD1", "CD", "CD1", "CD(1)&CD(2)", "CD(3)", "Append a CD to the right of a CD vector"),
+    TypeRule::with_comment("CD1", "CD1", "CD1", "CD(1)&CD(2)", "CD(3)&CD(4)", "Concatenate two CD vectors"),
     // GR & GR => GR is in COSY but GR type not implemented in Rosy yet
 ];
 
@@ -89,6 +99,82 @@ impl RosyConcat<&RE> for &VE {
 impl RosyConcat<&VE> for &VE {
     type Output = VE;
     fn rosy_concat(self, other: &VE) -> Result<Self::Output> {
+        let mut result = self.clone();
+        result.extend_from_slice(other);
+        Ok(result)
+    }
+}
+
+// DA & DA => Vec<DA>
+impl RosyConcat<&DA> for &DA {
+    type Output = Vec<DA>;
+    fn rosy_concat(self, other: &DA) -> Result<Self::Output> {
+        Ok(vec![self.clone(), other.clone()])
+    }
+}
+
+// DA & Vec<DA> => Vec<DA>
+impl RosyConcat<&Vec<DA>> for &DA {
+    type Output = Vec<DA>;
+    fn rosy_concat(self, other: &Vec<DA>) -> Result<Self::Output> {
+        let mut result = vec![self.clone()];
+        result.extend_from_slice(other);
+        Ok(result)
+    }
+}
+
+// Vec<DA> & DA => Vec<DA>
+impl RosyConcat<&DA> for &Vec<DA> {
+    type Output = Vec<DA>;
+    fn rosy_concat(self, other: &DA) -> Result<Self::Output> {
+        let mut result = self.clone();
+        result.push(other.clone());
+        Ok(result)
+    }
+}
+
+// Vec<DA> & Vec<DA> => Vec<DA>
+impl RosyConcat<&Vec<DA>> for &Vec<DA> {
+    type Output = Vec<DA>;
+    fn rosy_concat(self, other: &Vec<DA>) -> Result<Self::Output> {
+        let mut result = self.clone();
+        result.extend_from_slice(other);
+        Ok(result)
+    }
+}
+
+// CD & CD => Vec<CD>
+impl RosyConcat<&CD> for &CD {
+    type Output = Vec<CD>;
+    fn rosy_concat(self, other: &CD) -> Result<Self::Output> {
+        Ok(vec![self.clone(), other.clone()])
+    }
+}
+
+// CD & Vec<CD> => Vec<CD>
+impl RosyConcat<&Vec<CD>> for &CD {
+    type Output = Vec<CD>;
+    fn rosy_concat(self, other: &Vec<CD>) -> Result<Self::Output> {
+        let mut result = vec![self.clone()];
+        result.extend_from_slice(other);
+        Ok(result)
+    }
+}
+
+// Vec<CD> & CD => Vec<CD>
+impl RosyConcat<&CD> for &Vec<CD> {
+    type Output = Vec<CD>;
+    fn rosy_concat(self, other: &CD) -> Result<Self::Output> {
+        let mut result = self.clone();
+        result.push(other.clone());
+        Ok(result)
+    }
+}
+
+// Vec<CD> & Vec<CD> => Vec<CD>
+impl RosyConcat<&Vec<CD>> for &Vec<CD> {
+    type Output = Vec<CD>;
+    fn rosy_concat(self, other: &Vec<CD>) -> Result<Self::Output> {
         let mut result = self.clone();
         result.extend_from_slice(other);
         Ok(result)

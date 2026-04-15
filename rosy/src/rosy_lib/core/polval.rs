@@ -54,6 +54,65 @@ pub fn rosy_polval_re(
     Ok(())
 }
 
+/// Batch-evaluate NP polynomials at multiple particles simultaneously.
+///
+/// Each element of `a_array` is a VE (Vec<f64>) of particle values for one
+/// coordinate axis. For example, `a_array[0]` holds x-values for all particles,
+/// `a_array[1]` holds px-values, etc.
+///
+/// Results are written the same way: `r_array[i]` will hold the i-th result
+/// component for all particles.
+pub fn rosy_polval_ve(
+    _l: f64,
+    p_array: &[DA],
+    np: usize,
+    a_array: &[Vec<f64>],
+    na: usize,
+    r_array: &mut Vec<Vec<f64>>,
+    nr: usize,
+) -> Result<()> {
+    if np < nr {
+        bail!("POLVAL: NP ({}) must be >= NR ({})", np, nr);
+    }
+    if a_array.len() < na {
+        bail!(
+            "POLVAL: argument array has {} elements but NA={}",
+            a_array.len(),
+            na
+        );
+    }
+
+    // Determine number of particles from the first argument vector
+    let num_particles = if na > 0 { a_array[0].len() } else { 0 };
+
+    // Ensure result vector has enough slots
+    while r_array.len() < nr {
+        r_array.push(Vec::new());
+    }
+
+    // Temporary buffer for one particle's coordinates
+    let mut point = vec![0.0_f64; na];
+
+    for i in 0..nr {
+        if i >= p_array.len() {
+            bail!("POLVAL: polynomial array too short at index {}", i);
+        }
+
+        // Resize result vector for this component
+        r_array[i].resize(num_particles, 0.0);
+
+        // Evaluate polynomial at each particle
+        for j in 0..num_particles {
+            for k in 0..na {
+                point[k] = a_array[k][j];
+            }
+            r_array[i][j] = evaluate_da_at_re(&p_array[i], &point, na)?;
+        }
+    }
+
+    Ok(())
+}
+
 /// Evaluate a single DA polynomial at the given real-valued point.
 ///
 /// For each monomial c * x1^e1 * x2^e2 * ... we substitute the values from

@@ -124,6 +124,6 @@ impl TranspileableExpr for NormExpr {
     ) -> ExprRecipe {
         // NORM has non-uniform type mapping (DA->RE, VE->VE), so we cannot
         // represent it with a type-preserving recipe.
-        ExprRecipe::Unknown
+        ExprRecipe::Unknown(None)
     }
 }

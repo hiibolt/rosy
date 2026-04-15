@@ -114,9 +114,10 @@ impl Transpile for ProcedureCallStatement {
         let proc_context = match context.procedures.get(&self.name) {
             Some(ctx) => ctx,
             None => {
+                let hint = context.procedure_hint(&self.name);
                 return Err(vec![anyhow!(
-                    "procedure '{}' is not defined in this scope, can't transpile procedure call!",
-                    self.name
+                    "procedure '{}' is not defined in this scope!{}",
+                    self.name, hint
                 )]);
             }
         }

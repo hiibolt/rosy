@@ -132,8 +132,8 @@ impl FromRule for VariableIdentifier {
 impl TranspileableExpr for VariableIdentifier {
     fn type_of(&self, context: &TranspilationInputContext) -> Result<RosyType> {
         let var_data = context.variables.get(&self.name).ok_or(anyhow::anyhow!(
-            "Variable '{}' is not defined in this scope!",
-            self.name
+            "Variable '{}' is not defined in this scope!{}",
+            self.name, context.variable_hint(&self.name)
         ))?;
 
         let num_indices = self.num_index_dimensions();
@@ -187,7 +187,12 @@ impl TranspileableExpr for VariableIdentifier {
                 ExprRecipe::Variable(slot.clone())
             }
         } else {
-            ExprRecipe::Unknown
+            let name_upper = self.name.to_uppercase();
+            let hint = ctx.variables.keys()
+                .find(|c| c.to_uppercase() == name_upper && *c != &self.name)
+                .map(|c| format!(" (did you mean '{}'? Rosy is case-sensitive)", c))
+                .unwrap_or_default();
+            ExprRecipe::Unknown(Some(format!("undeclared variable '{}'{}",  self.name, hint)))
         }
     }
 }
@@ -255,8 +260,8 @@ impl Transpile for VariableIdentifier {
                 .variables
                 .get(&self.name)
                 .ok_or(vec![anyhow::anyhow!(
-                    "Variable '{}' is not defined in this scope!",
-                    self.name
+                    "Variable '{}' is not defined in this scope!{}",
+                    self.name, context.variable_hint(&self.name)
                 )])?
                 .scope
         {

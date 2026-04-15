@@ -126,6 +126,6 @@ impl TranspileableExpr for ConsExpr {
     ) -> ExprRecipe {
         // CONS has non-uniform type mapping (VE->RE, DA->RE, RE->RE, CM->CM),
         // so we cannot represent it with a type-preserving recipe.
-        ExprRecipe::Unknown
+        ExprRecipe::Unknown(None)
     }
 }

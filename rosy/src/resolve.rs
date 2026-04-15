@@ -130,14 +130,15 @@ pub enum ExprRecipe {
     /// e.g., `X[0, 1] := 2` means the RHS is RE, but X should be (RE 2D).
     WithDimensions(Box<ExprRecipe>, usize),
     /// Expression whose type couldn't be determined statically.
-    Unknown,
+    /// The optional string provides context (e.g. undeclared variable name).
+    Unknown(Option<String>),
 }
 
 impl ExprRecipe {
     /// Returns true if this recipe references the given type slot.
     pub fn references_slot(&self, target: &TypeSlot) -> bool {
         match self {
-            ExprRecipe::Literal(_) | ExprRecipe::Unknown => false,
+            ExprRecipe::Literal(_) | ExprRecipe::Unknown(_) => false,
             ExprRecipe::Variable(s) | ExprRecipe::IndexedVariable(s, _) => s == target,
             ExprRecipe::BinaryOp { left, right, .. } | ExprRecipe::Concat(left, right) => {
                 left.references_slot(target) || right.references_slot(target)
@@ -427,12 +428,15 @@ impl TypeResolver {
                     let node = self.nodes.get(&slot);
                     node.map_or(false, |n| {
                         matches!(n.rule, ResolutionRule::Unresolved)
-                            && matches!(n.slot, TypeSlot::Variable(..))
+                            && matches!(
+                                n.slot,
+                                TypeSlot::Variable(..) | TypeSlot::Argument(..)
+                            )
                     })
                 };
 
                 if is_unused {
-                    // Default unresolved variables to RE (standard COSY behavior)
+                    // Default unresolved variables and arguments to RE (standard COSY behavior)
                     let node = self.nodes.get_mut(&slot).unwrap();
                     let default_type = RosyType::RE();
                     node.resolved = Some(default_type.clone());
@@ -495,7 +499,7 @@ impl TypeResolver {
             .map(|n| &n.slot)
             .collect();
 
-        let no_info_slots: Vec<&TypeSlot> = unresolved
+        let mut no_info_slots: Vec<&TypeSlot> = unresolved
             .iter()
             .filter(|n| {
                 !n.depends_on
@@ -504,6 +508,17 @@ impl TypeResolver {
             })
             .map(|n| &n.slot)
             .collect();
+        // Sort by source location so errors appear in source order
+        no_info_slots.sort_by(|a, b| {
+            let loc_a = self.nodes.get(a).and_then(|n| n.declared_at.as_ref());
+            let loc_b = self.nodes.get(b).and_then(|n| n.declared_at.as_ref());
+            match (loc_a, loc_b) {
+                (Some(a), Some(b)) => a.line.cmp(&b.line).then(a.col.cmp(&b.col)),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => std::cmp::Ordering::Equal,
+            }
+        });
 
         let total = unresolved.len();
         let mut msg = format!(
@@ -772,7 +787,10 @@ impl TypeResolver {
                 crate::rosy_lib::intrinsics::imag_fn::get_return_type(&input_type)
                     .ok_or_else(|| anyhow!("No IMAG rule for {}", input_type))
             }
-            ExprRecipe::Unknown => Err(anyhow!("Cannot evaluate unknown expression recipe")),
+            ExprRecipe::Unknown(reason) => {
+                let detail = reason.as_deref().unwrap_or("expression type could not be determined statically");
+                Err(anyhow!("{}", detail))
+            }
         }
     }
 

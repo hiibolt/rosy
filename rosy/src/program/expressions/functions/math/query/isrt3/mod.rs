@@ -112,6 +112,6 @@ impl TranspileableExpr for Isrt3Expr {
         _ctx: &ScopeContext,
         _deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe {
-        ExprRecipe::Unknown
+        ExprRecipe::Unknown(None)
     }
 }

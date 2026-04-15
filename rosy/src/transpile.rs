@@ -123,6 +123,34 @@ pub struct TranspilationInputContext {
     pub procedures: HashMap<String, TranspilationInputProcedureContext>,
     pub in_loop: bool,
 }
+
+impl TranspilationInputContext {
+    /// Find a case-insensitive match for `name` among the given candidates.
+    /// Returns a hint string like " (did you mean 'FOO'? Rosy is case-sensitive)" or empty.
+    pub fn case_hint<'a>(name: &str, mut candidates: impl Iterator<Item = &'a String>) -> String {
+        let name_upper = name.to_uppercase();
+        candidates
+            .find(|c| c.to_uppercase() == name_upper && *c != name)
+            .map(|c| format!(" (did you mean '{}'? Rosy is case-sensitive)", c))
+            .unwrap_or_default()
+    }
+
+    /// Hint for an undeclared variable name.
+    pub fn variable_hint(&self, name: &str) -> String {
+        Self::case_hint(name, self.variables.keys())
+    }
+
+    /// Hint for an undeclared procedure name.
+    pub fn procedure_hint(&self, name: &str) -> String {
+        Self::case_hint(name, self.procedures.keys())
+    }
+
+    /// Hint for an undeclared function name.
+    pub fn function_hint(&self, name: &str) -> String {
+        Self::case_hint(name, self.functions.keys())
+    }
+}
+
 /// Whether an expression produces an owned value or a reference.
 ///
 /// This drives how consumers wrap the expression:

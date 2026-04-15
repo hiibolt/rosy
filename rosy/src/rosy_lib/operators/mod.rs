@@ -81,6 +81,19 @@ impl TypeRule {
 /// This is used by operator registries to convert type rule strings
 /// into actual RosyType instances for runtime lookups.
 pub fn type_from_str(s: &str) -> RosyType {
+    // Support dimensioned types like "DA1" → (DA 1D), "DA2" → (DA 2D)
+    if s.len() >= 3 {
+        if let Some(dim_str) = s.strip_prefix("DA") {
+            if let Ok(dims) = dim_str.parse::<usize>() {
+                return RosyType::new(RosyBaseType::DA, dims);
+            }
+        }
+        if let Some(dim_str) = s.strip_prefix("CD") {
+            if let Ok(dims) = dim_str.parse::<usize>() {
+                return RosyType::new(RosyBaseType::CD, dims);
+            }
+        }
+    }
     match s {
         "RE" => RosyType::new(RosyBaseType::RE, 0),
         "ST" => RosyType::new(RosyBaseType::ST, 0),
