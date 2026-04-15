@@ -12,6 +12,12 @@
 use anyhow::{Result, bail};
 use crate::rosy_lib::taylor::DA;
 
+#[cfg(feature = "nightly-simd")]
+use std::simd::prelude::*;
+
+#[cfg(feature = "nightly-simd")]
+const LANES: usize = 4;
+
 /// Evaluate NP polynomials (stored in `p_array` as DA vectors) at the NA real
 /// arguments in `a_array`, writing NR results into `r_array`.
 ///
@@ -62,6 +68,8 @@ pub fn rosy_polval_re(
 ///
 /// Results are written the same way: `r_array[i]` will hold the i-th result
 /// component for all particles.
+///
+/// With `nightly-simd`: processes 4 particles per monomial using f64x4 SIMD.
 pub fn rosy_polval_ve(
     _l: f64,
     p_array: &[DA],
@@ -82,35 +90,143 @@ pub fn rosy_polval_ve(
         );
     }
 
-    // Determine number of particles from the first argument vector
     let num_particles = if na > 0 { a_array[0].len() } else { 0 };
 
-    // Ensure result vector has enough slots
     while r_array.len() < nr {
         r_array.push(Vec::new());
     }
-
-    // Temporary buffer for one particle's coordinates
-    let mut point = vec![0.0_f64; na];
 
     for i in 0..nr {
         if i >= p_array.len() {
             bail!("POLVAL: polynomial array too short at index {}", i);
         }
-
-        // Resize result vector for this component
         r_array[i].resize(num_particles, 0.0);
-
-        // Evaluate polynomial at each particle
-        for j in 0..num_particles {
-            for k in 0..na {
-                point[k] = a_array[k][j];
-            }
-            r_array[i][j] = evaluate_da_at_re(&p_array[i], &point, na)?;
-        }
+        evaluate_poly_batch(&p_array[i], a_array, na, num_particles, &mut r_array[i]);
     }
 
     Ok(())
+}
+
+/// Evaluate a single DA polynomial at all particles, writing results into `out`.
+///
+/// Iterates monomials once, processing particles in SIMD chunks of 4.
+#[inline]
+fn evaluate_poly_batch(
+    poly: &DA,
+    a_array: &[Vec<f64>],
+    na: usize,
+    num_particles: usize,
+    out: &mut [f64],
+) {
+    // Zero the output
+    out.iter_mut().for_each(|v| *v = 0.0);
+
+    for (monomial, coeff) in poly.coeffs_iter().into_iter() {
+        let exponents = &monomial.exponents;
+
+        // Collect active variables (non-zero exponents) for this monomial
+        let mut active_vars: [(usize, u8); 6] = [(0, 0); 6];
+        let mut num_active = 0;
+        for (var_idx, &exp) in exponents.iter().enumerate() {
+            if exp != 0 && var_idx < na {
+                active_vars[num_active] = (var_idx, exp);
+                num_active += 1;
+                if num_active >= 6 { break; }
+            }
+        }
+
+        // Constant monomial (no variables) — just add coefficient to all particles
+        if num_active == 0 {
+            for j in 0..num_particles {
+                out[j] += coeff;
+            }
+            continue;
+        }
+
+        #[cfg(feature = "nightly-simd")]
+        {
+            let chunks = num_particles / LANES;
+            let coeff_v = Simd::<f64, LANES>::splat(coeff);
+
+            for c in 0..chunks {
+                let base = c * LANES;
+                let mut term = coeff_v;
+
+                for a in 0..num_active {
+                    let (var_idx, exp) = active_vars[a];
+                    let vals = Simd::<f64, LANES>::from_slice(&a_array[var_idx][base..]);
+                    term *= simd_powi(vals, exp);
+                }
+
+                let current = Simd::<f64, LANES>::from_slice(&out[base..]);
+                (current + term).copy_to_slice(&mut out[base..base + LANES]);
+            }
+
+            // Scalar remainder
+            for j in (chunks * LANES)..num_particles {
+                let mut term = coeff;
+                for a in 0..num_active {
+                    let (var_idx, exp) = active_vars[a];
+                    term *= scalar_powi(a_array[var_idx][j], exp);
+                }
+                out[j] += term;
+            }
+        }
+
+        #[cfg(not(feature = "nightly-simd"))]
+        {
+            for j in 0..num_particles {
+                let mut term = coeff;
+                for a in 0..num_active {
+                    let (var_idx, exp) = active_vars[a];
+                    term *= scalar_powi(a_array[var_idx][j], exp);
+                }
+                out[j] += term;
+            }
+        }
+    }
+}
+
+/// SIMD power: compute vals^exp for small exponents via repeated multiply.
+#[cfg(feature = "nightly-simd")]
+#[inline(always)]
+fn simd_powi(vals: Simd<f64, LANES>, exp: u8) -> Simd<f64, LANES> {
+    match exp {
+        0 => Simd::<f64, LANES>::splat(1.0),
+        1 => vals,
+        2 => vals * vals,
+        3 => vals * vals * vals,
+        4 => { let v2 = vals * vals; v2 * v2 }
+        5 => { let v2 = vals * vals; v2 * v2 * vals }
+        6 => { let v2 = vals * vals; v2 * v2 * v2 }
+        _ => {
+            // General case via repeated squaring
+            let mut result = Simd::<f64, LANES>::splat(1.0);
+            let mut base = vals;
+            let mut e = exp;
+            while e > 0 {
+                if e & 1 == 1 { result *= base; }
+                base *= base;
+                e >>= 1;
+            }
+            result
+        }
+    }
+}
+
+/// Scalar power for small exponents.
+#[inline(always)]
+fn scalar_powi(val: f64, exp: u8) -> f64 {
+    match exp {
+        0 => 1.0,
+        1 => val,
+        2 => val * val,
+        3 => val * val * val,
+        4 => { let v2 = val * val; v2 * v2 }
+        5 => { let v2 = val * val; v2 * v2 * val }
+        6 => { let v2 = val * val; v2 * v2 * v2 }
+        _ => val.powi(exp as i32),
+    }
 }
 
 /// Evaluate a single DA polynomial at the given real-valued point.

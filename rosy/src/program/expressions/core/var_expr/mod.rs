@@ -320,6 +320,13 @@ impl TranspileableExpr for VarExpr {
             ExprRecipe::Unknown(Some(format!("undeclared variable '{}'{}",  ident.name, hint)))
         }
     }
+    fn as_bare_variable_name(&self) -> Option<&str> {
+        if self.identifier.paren_groups.is_empty() && self.identifier.bracket_indices.is_empty() {
+            Some(&self.identifier.name)
+        } else {
+            None
+        }
+    }
 }
 impl Transpile for VarExpr {
     fn transpile(

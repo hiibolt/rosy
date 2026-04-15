@@ -81,6 +81,21 @@ pub trait TranspileableExpr: Transpile + Send + Sync {
         ctx: &ScopeContext,
         deps: &mut HashSet<TypeSlot>,
     ) -> ExprRecipe;
+    /// Returns Some(name) if this expression is a bare variable reference (no indices).
+    /// Used by optimizations that detect self-referential patterns like `X := X & val`.
+    fn as_bare_variable_name(&self) -> Option<&str> {
+        None
+    }
+    /// Optimization: if this expression is `target_var & expr`, return code
+    /// that appends in-place (push/extend) instead of clone + concat + assign.
+    /// Returns None if the optimization doesn't apply (default).
+    fn try_inplace_append(
+        &self,
+        _target_var: &str,
+        _context: &mut TranspilationInputContext,
+    ) -> Option<Result<TranspilationOutput, Vec<Error>>> {
+        None
+    }
 }
 pub trait Transpile: std::fmt::Debug {
     fn transpile(

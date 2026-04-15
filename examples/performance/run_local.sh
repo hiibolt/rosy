@@ -18,6 +18,7 @@ ROSY_BIN="${ROSY_BIN:-rosy}"
 COSY_BIN="${COSY_BIN:-}"
 BENCHMARK_FILTER=""
 TIER_FILTER=""
+OPTIMIZED=false
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 T4_TIMEOUT=30
 
@@ -28,8 +29,9 @@ while [[ $# -gt 0 ]]; do
         --cosy)       COSY_BIN="$2"; shift 2 ;;
         --benchmark)  BENCHMARK_FILTER="$2"; shift 2 ;;
         --tier)       TIER_FILTER="$2"; shift 2 ;;
+        --optimized)  OPTIMIZED=true; shift ;;
         -h|--help)
-            echo "Usage: $0 [--rosy PATH] [--cosy PATH] [--benchmark NUM] [--tier 1-4]"
+            echo "Usage: $0 [--rosy PATH] [--cosy PATH] [--benchmark NUM] [--tier 1-4] [--optimized]"
             exit 0 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
@@ -69,6 +71,11 @@ fi
 echo "  Date:  $(date)"
 echo "  Host:  $(hostname)"
 echo "  T4 timeout: ${T4_TIMEOUT}s"
+if $OPTIMIZED; then
+    echo "  Mode:  optimized (nightly SIMD + fat LTO)"
+else
+    echo "  Mode:  release"
+fi
 echo ""
 
 # ── Build Directory (outside workspace to avoid Cargo conflicts) ──────────────
@@ -125,7 +132,9 @@ for dir in "$SCRIPT_DIR"/non_mpi/*/; do
         printf "  [%d] %s %s...\r" "$NUM_TESTS" "$name" "$tier_label" >&2
 
         # ── Build Rosy ────────────────────────────────────────────────
-        if ! "$ROSY_BIN" build "$rosy_file" --release -d "$BUILD_DIR" -o "$dir/bench_rosy_t${tier}" 2>/dev/null; then
+        BUILD_FLAGS="--release"
+        if $OPTIMIZED; then BUILD_FLAGS="--optimized"; fi
+        if ! "$ROSY_BIN" build "$rosy_file" $BUILD_FLAGS -d "$BUILD_DIR" -o "$dir/bench_rosy_t${tier}" 2>/dev/null; then
             printf "\r%80s\r" "" >&2
             printf "%-28s %-4s %11s\n" "$name" "$tier_label" "BUILD FAIL"
             continue

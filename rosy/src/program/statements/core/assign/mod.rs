@@ -544,6 +544,13 @@ impl Transpile for AssignStatement {
             )]);
         }
 
+        // Optimization: detect `X := X & expr` and generate in-place append
+        if self.identifier.num_index_dimensions() == 0 {
+            if let Some(result) = value.inner.try_inplace_append(&self.identifier.name, context) {
+                return result;
+            }
+        }
+
         let mut requested_variables = BTreeSet::new();
         let mut errors = Vec::new();
 

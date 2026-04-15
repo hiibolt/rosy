@@ -8,7 +8,7 @@ Rosy compiles ROSY source to native Rust executables. COSY interprets FOX script
 
 | Suite | Rosy | COSY | Winner |
 |---|---|---|---|
-| Non-MPI (16 benchmarks, T4) | 44.0s | 101.1s | Rosy **2.3x** |
+| Non-MPI (17 benchmarks, T4) | 48.4s | 116.3s | Rosy **2.4x** |
 | MPI (10 benchmarks, 20 nodes) | 13.3s | 71.4s | Rosy **5.4x** |
 
 ---
@@ -39,6 +39,7 @@ Best Rosy time from any mode, best COSY time from any mode.
 | 15 | DA High-Order Multiply | 16 | 27 | Rosy **1.7x** |
 | 16 | DA Bending Magnet | 173 | 135 | COSY 1.3x |
 | 17 | DA Aberration | 48 | 63 | Rosy **1.3x** |
+| 18 | POLVAL Map Eval | 580 | 1,977 | Rosy **3.4x** |
 
 ### T4 — Stress Tests
 
@@ -61,9 +62,10 @@ Best Rosy time from any mode, best COSY time from any mode.
 | 15 | DA High-Order Multiply | 26 | 92 | Rosy **3.5x** |
 | 16 | DA Bending Magnet | 833 | 703 | COSY 1.2x |
 | 17 | DA Aberration | 195 | 249 | Rosy **1.3x** |
-| | **TOTAL** | **44,053** | **101,068** | Rosy **2.3x** |
+| 18 | POLVAL Map Eval | 4,371 | 15,194 | Rosy **3.5x** |
+| | **TOTAL** | **48,424** | **116,262** | Rosy **2.4x** |
 
-**Scorecard (T4):** Rosy wins 12, COSY wins 3, tie 1 (bench 09 excluded — COSY lacks recursive functions)
+**Scorecard (T4):** Rosy wins 13, COSY wins 3, tie 1 (bench 09 excluded — COSY lacks recursive functions)
 
 ---
 
@@ -127,6 +129,7 @@ initialization overhead (~300ms) as a confounding factor.
 | Math functions (SIN, COS, EXP) | **2–5x** | Inlined transcendentals, no dispatch |
 | Simplex optimization | **5–6x** | Tight compiled iteration |
 | Vector operations | **2–4x** | Native Vec operations vs interpreted |
+| POLVAL map evaluation | **3.5x** | SIMD batch eval + in-place vector append |
 
 ### COSY dominates: high-order DA
 

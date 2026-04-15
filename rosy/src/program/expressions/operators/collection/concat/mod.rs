@@ -38,7 +38,7 @@
 use crate::ast::{FromRule, Rule};
 use crate::program::expressions::Expr;
 use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
-use crate::rosy_lib::RosyType;
+use crate::rosy_lib::{RosyBaseType, RosyType};
 use crate::transpile::{
     ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
     Transpile, TranspileableExpr, ValueKind,
@@ -99,6 +99,68 @@ impl TranspileableExpr for ConcatExpr {
         let left = resolver.build_expr_recipe(&self.left, ctx, deps);
         let right = resolver.build_expr_recipe(&self.right, ctx, deps);
         ExprRecipe::Concat(Box::new(left), Box::new(right))
+    }
+    fn try_inplace_append(
+        &self,
+        target_var: &str,
+        context: &mut TranspilationInputContext,
+    ) -> Option<Result<TranspilationOutput, Vec<Error>>> {
+        // Check if left operand is a bare variable matching the assignment target
+        let left_name = self.left.inner.as_bare_variable_name()?;
+        if left_name != target_var {
+            return None;
+        }
+
+        // Determine the concat pattern from types
+        let left_type = self.left.type_of(context).ok()?;
+        let right_type = self.right.type_of(context).ok()?;
+
+        // Determine the append operation
+        let is_push = match (left_type.base_type, left_type.dimensions, right_type.base_type, right_type.dimensions) {
+            // VE & RE → push (f64 is Copy, no clone needed)
+            (RosyBaseType::VE, 0, RosyBaseType::RE, 0) => true,
+            // VE & VE → extend
+            (RosyBaseType::VE, 0, RosyBaseType::VE, 0) => false,
+            // (DA N) & DA → push (DA needs clone)
+            (RosyBaseType::DA, d, RosyBaseType::DA, 0) if d > 0 => true,
+            // (DA N) & (DA N) → extend
+            (RosyBaseType::DA, d1, RosyBaseType::DA, d2) if d1 > 0 && d2 > 0 => false,
+            // (CD N) & CD → push
+            (RosyBaseType::CD, d, RosyBaseType::CD, 0) if d > 0 => true,
+            // (CD N) & (CD N) → extend
+            (RosyBaseType::CD, d1, RosyBaseType::CD, d2) if d1 > 0 && d2 > 0 => false,
+            // Not an append pattern we can optimize
+            _ => return None,
+        };
+
+        // Transpile the right operand
+        let right_output = match self.right.transpile(context) {
+            Ok(out) => out,
+            Err(e) => return Some(Err(e)),
+        };
+
+        let mut requested_variables = BTreeSet::new();
+        requested_variables.extend(right_output.requested_variables.iter().cloned());
+
+        let needs_clone = matches!(right_type.base_type, RosyBaseType::DA | RosyBaseType::CD);
+
+        let code = if is_push {
+            let val = right_output.as_value();
+            if needs_clone {
+                format!("{{ let __v = {val}.clone(); {target_var}.push(__v); }}")
+            } else {
+                format!("{{ let __v = {val}; {target_var}.push(__v); }}")
+            }
+        } else {
+            let val_ref = right_output.as_ref();
+            format!("{{ let __v: Vec<_> = ({val_ref}).to_vec(); {target_var}.extend_from_slice(&__v); }}")
+        };
+
+        Some(Ok(TranspilationOutput {
+            serialization: code,
+            requested_variables,
+            ..Default::default()
+        }))
     }
 }
 impl Transpile for ConcatExpr {
