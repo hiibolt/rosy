@@ -1,20 +1,19 @@
 //! DA coefficient-level operations: DASCL, DASGN, DADER, DAINT, DANORO, DANORS,
 //! DAFSET, DAFILT, DARAN, DAGMD, DACODE, DAFLO, CDFLO, DANOW, CDF2, CDNF, CDNFDA, CDNFDS.
 
-use anyhow::{Result, Context, bail, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use num_complex::Complex64;
 
-use crate::rosy_lib::taylor::{DA, CD, get_runtime, get_filter_da, set_filter_da};
-use crate::rosy_lib::taylor::da::{DA as GenericDA, DACoefficient};
 use crate::rosy_lib::taylor::config::DERIV_INVALID;
+use crate::rosy_lib::taylor::da::{DA as GenericDA, DACoefficient};
+use crate::rosy_lib::taylor::{CD, DA, get_filter_da, get_runtime, set_filter_da};
 
 /// DASCL: Scale all coefficients of every DA element in the array by `scalar`.
 ///
 /// Equivalent to `da[i] *= scalar` for all terms i.
 pub fn rosy_dascl(da: &mut Vec<DA>, scalar: f64) -> Result<()> {
     for da_el in da.iter_mut() {
-        *da_el = (&*da_el * scalar)
-            .context("DASCL: failed to scale DA element")?;
+        *da_el = (&*da_el * scalar).context("DASCL: failed to scale DA element")?;
     }
     Ok(())
 }
@@ -39,19 +38,25 @@ pub fn rosy_dader(da: &mut Vec<DA>, var_index: usize) -> Result<()> {
         let rt = get_runtime().context("DADER requires DA to be initialized (call DAINI first)")?;
         let num_vars = rt.config.num_vars;
         if var_index == 0 || var_index > num_vars {
-            bail!("DADER: variable index {} out of range [1, {}]", var_index, num_vars);
+            bail!(
+                "DADER: variable index {} out of range [1, {}]",
+                var_index,
+                num_vars
+            );
         }
         let v = var_index - 1;
         let n = rt.num_monomials;
         let base = v * n;
         let deriv_target_v = rt.deriv_target[base..base + n].to_vec();
-        let deriv_exp_v    = rt.deriv_exponent[base..base + n].to_vec();
+        let deriv_exp_v = rt.deriv_exponent[base..base + n].to_vec();
         (rt.config.epsilon, num_vars, deriv_target_v, deriv_exp_v)
     };
 
     for da_el in da.iter_mut() {
         // Snapshot: (flat_index, coefficient)
-        let source: Vec<(usize, f64)> = da_el.nonzero.iter()
+        let source: Vec<(usize, f64)> = da_el
+            .nonzero
+            .iter()
             .map(|&k| (k as usize, da_el.coeffs[k as usize]))
             .collect();
 
@@ -87,19 +92,25 @@ pub fn rosy_daint(da: &mut Vec<DA>, var_index: usize) -> Result<()> {
         let rt = get_runtime().context("DAINT requires DA to be initialized (call DAINI first)")?;
         let num_vars = rt.config.num_vars;
         if var_index == 0 || var_index > num_vars {
-            bail!("DAINT: variable index {} out of range [1, {}]", var_index, num_vars);
+            bail!(
+                "DAINT: variable index {} out of range [1, {}]",
+                var_index,
+                num_vars
+            );
         }
         let v = var_index - 1;
         let n = rt.num_monomials;
         let base = v * n;
         let integ_target_v = rt.integ_target[base..base + n].to_vec();
         // deriv_exp_v[t] = exponent of v in monomial t = (e_v_in_source + 1)
-        let deriv_exp_v    = rt.deriv_exponent[base..base + n].to_vec();
+        let deriv_exp_v = rt.deriv_exponent[base..base + n].to_vec();
         (rt.config.epsilon, num_vars, integ_target_v, deriv_exp_v)
     };
 
     for da_el in da.iter_mut() {
-        let source: Vec<(usize, f64)> = da_el.nonzero.iter()
+        let source: Vec<(usize, f64)> = da_el
+            .nonzero
+            .iter()
             .map(|&k| (k as usize, da_el.coeffs[k as usize]))
             .collect();
 
@@ -131,7 +142,8 @@ pub fn rosy_daint(da: &mut Vec<DA>, var_index: usize) -> Result<()> {
 /// Keeps only terms whose total monomial order is even (0, 2, 4, …).
 pub fn rosy_danoro(da: &mut Vec<DA>) -> Result<()> {
     let monomial_orders = {
-        let rt = get_runtime().context("DANORO requires DA to be initialized (call DAINI first)")?;
+        let rt =
+            get_runtime().context("DANORO requires DA to be initialized (call DAINI first)")?;
         rt.monomial_orders.clone()
     };
 
@@ -265,14 +277,20 @@ pub fn rosy_dagmd(g: &Vec<DA>, f: &Vec<DA>, result: &mut Vec<DA>, dim: usize) ->
     };
 
     if dim > num_vars {
-        bail!("DAGMD: dim ({}) exceeds number of DA variables ({})", dim, num_vars);
+        bail!(
+            "DAGMD: dim ({}) exceeds number of DA variables ({})",
+            dim,
+            num_vars
+        );
     }
     if f.len() < dim {
         bail!("DAGMD: f array has {} elements but dim={}", f.len(), dim);
     }
 
     // g is a single-component DA; we compute ∂g/∂xᵢ for each i, multiply by f[i], accumulate
-    let g0 = g.get(0).ok_or_else(|| anyhow::anyhow!("DAGMD: g is empty"))?;
+    let g0 = g
+        .get(0)
+        .ok_or_else(|| anyhow::anyhow!("DAGMD: g is empty"))?;
 
     let mut acc = DA::zero();
 
@@ -281,12 +299,14 @@ pub fn rosy_dagmd(g: &Vec<DA>, f: &Vec<DA>, result: &mut Vec<DA>, dim: usize) ->
         let v = i;
         let base = v * n;
         let deriv_target_v = &deriv_targets[base..base + n];
-        let deriv_exp_v    = &deriv_exponents[base..base + n];
+        let deriv_exp_v = &deriv_exponents[base..base + n];
 
         let mut dg_dxi = DA::zero();
         for &k in &g0.nonzero {
             let target = deriv_target_v[k as usize];
-            if target == DERIV_INVALID { continue; }
+            if target == DERIV_INVALID {
+                continue;
+            }
             let exp = deriv_exp_v[k as usize] as f64;
             let new_coeff = g0.coeffs[k as usize] * exp;
             if new_coeff.abs() > epsilon {
@@ -319,8 +339,13 @@ pub fn rosy_dagmd(g: &Vec<DA>, f: &Vec<DA>, result: &mut Vec<DA>, dim: usize) ->
 /// `result` is a 2D RE array: `result[m][v]` = exponent of variable v+1 in monomial m.
 pub fn rosy_dacode(params: &Vec<f64>, size: usize, result: &mut Vec<Vec<f64>>) -> Result<()> {
     let (num_monomials, num_vars, monomial_list) = {
-        let rt = get_runtime().context("DACODE requires DA to be initialized (call DAINI first)")?;
-        (rt.num_monomials, rt.config.num_vars, rt.monomial_list.clone())
+        let rt =
+            get_runtime().context("DACODE requires DA to be initialized (call DAINI first)")?;
+        (
+            rt.num_monomials,
+            rt.config.num_vars,
+            rt.monomial_list.clone(),
+        )
     };
 
     // Validate params against current setup
@@ -329,10 +354,18 @@ pub fn rosy_dacode(params: &Vec<f64>, size: usize, result: &mut Vec<Vec<f64>>) -
         let p_vars = params[1] as usize;
         let rt = get_runtime()?;
         if p_order != rt.config.max_order {
-            bail!("DACODE: params order ({}) does not match current DA order ({})", p_order, rt.config.max_order);
+            bail!(
+                "DACODE: params order ({}) does not match current DA order ({})",
+                p_order,
+                rt.config.max_order
+            );
         }
         if p_vars != num_vars {
-            bail!("DACODE: params num_vars ({}) does not match current DA num_vars ({})", p_vars, num_vars);
+            bail!(
+                "DACODE: params num_vars ({}) does not match current DA num_vars ({})",
+                p_vars,
+                num_vars
+            );
         }
     }
 
@@ -378,7 +411,9 @@ fn lie_derivative_scalar<T: DACoefficient>(
         let mut dg_dxi = GenericDA::<T>::zero();
         for &k in &g.nonzero {
             let target = deriv_target_v[k as usize];
-            if target == DERIV_INVALID { continue; }
+            if target == DERIV_INVALID {
+                continue;
+            }
             let exp = T::from_usize(deriv_exp_v[k as usize] as usize);
             let new_coeff = g.coeffs[k as usize] * exp;
             if new_coeff.abs() > epsilon {
@@ -398,9 +433,9 @@ fn lie_derivative_scalar<T: DACoefficient>(
 /// Generic Lie series flow: computes exp(L_f)(ic) for time step 1.
 ///
 /// For each component i of the initial condition, iterates:
-///   term_0 = ic[i]
+///   term_0 = ic\[i\]
 ///   term_k = (1/k) · L_f(term_{k-1})
-///   result[i] = Σ term_k
+///   result\[i\] = Σ term_k
 ///
 /// Converges to machine accuracy for polynomial vector fields;
 /// DA truncation guarantees termination for any smooth f.
@@ -422,13 +457,21 @@ fn flow_impl<T: DACoefficient>(
     };
 
     if dim > num_vars {
-        bail!("Flow: dim ({}) exceeds number of DA variables ({})", dim, num_vars);
+        bail!(
+            "Flow: dim ({}) exceeds number of DA variables ({})",
+            dim,
+            num_vars
+        );
     }
     if rhs.len() < dim {
         bail!("Flow: rhs array has {} elements but dim={}", rhs.len(), dim);
     }
     if ic.len() < dim {
-        bail!("Flow: initial condition has {} elements but dim={}", ic.len(), dim);
+        bail!(
+            "Flow: initial condition has {} elements but dim={}",
+            ic.len(),
+            dim
+        );
     }
 
     const MAX_ITER: usize = 200;
@@ -440,14 +483,21 @@ fn flow_impl<T: DACoefficient>(
         for k in 1..=MAX_ITER {
             // term_k = (1/k) · L_f(term_{k-1})
             let lie = lie_derivative_scalar(
-                &term, &rhs[..dim], dim, epsilon,
-                &deriv_targets, &deriv_exponents, n,
+                &term,
+                &rhs[..dim],
+                dim,
+                epsilon,
+                &deriv_targets,
+                &deriv_exponents,
+                n,
             )?;
             let scale = T::one() / T::from_usize(k);
             term = (&lie * scale).context("Flow: scaling failed")?;
 
             // Check convergence: max |coefficient| in the new term
-            let term_norm: f64 = term.nonzero.iter()
+            let term_norm: f64 = term
+                .nonzero
+                .iter()
                 .map(|&idx| term.coeffs[idx as usize].abs())
                 .fold(0.0f64, f64::max);
 
@@ -593,7 +643,11 @@ pub fn rosy_cdnf(
 
             // The denominator for the j-th component:
             // exp(i * net_phase) - exp(i * comp_sign * mu_j)
-            let comp_mu = if comp_pair < n_pairs { tunes[comp_pair] } else { 0.0 };
+            let comp_mu = if comp_pair < n_pairs {
+                tunes[comp_pair]
+            } else {
+                0.0
+            };
             let eig_phase = comp_sign * comp_mu;
 
             let numerator_phase = Complex64::new(net_phase.cos(), net_phase.sin());
@@ -606,11 +660,15 @@ pub fn rosy_cdnf(
                 let mut resonant = false;
                 let mut offset = 0usize;
                 for r in 0..n_resonances {
-                    let dim = if r < res_dims.len() { res_dims[r] as usize } else { n_pairs };
+                    let dim = if r < res_dims.len() {
+                        res_dims[r] as usize
+                    } else {
+                        n_pairs
+                    };
                     let mut matches = true;
                     for k in 0..dim.min(n_pairs) {
-                        let diff = monomial.exponents[2 * k] as i64
-                            - monomial.exponents[2 * k + 1] as i64;
+                        let diff =
+                            monomial.exponents[2 * k] as i64 - monomial.exponents[2 * k + 1] as i64;
                         if offset + k < resonances.len() && diff != resonances[offset + k] as i64 {
                             matches = false;
                             break;

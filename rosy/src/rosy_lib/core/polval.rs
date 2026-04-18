@@ -9,8 +9,8 @@
 //! The current implementation supports RE (f64) arguments (plain polynomial evaluation)
 //! and returns an error for other argument types at runtime.
 
-use anyhow::{Result, bail};
 use crate::rosy_lib::taylor::DA;
+use anyhow::{Result, bail};
 
 #[cfg(feature = "nightly-simd")]
 use std::simd::prelude::*;
@@ -39,10 +39,7 @@ pub fn rosy_polval_re(
     nr: usize,
 ) -> Result<()> {
     if np < nr {
-        bail!(
-            "POLVAL: NP ({}) must be >= NR ({})",
-            np, nr
-        );
+        bail!("POLVAL: NP ({}) must be >= NR ({})", np, nr);
     }
 
     // Ensure result vector is large enough
@@ -62,11 +59,11 @@ pub fn rosy_polval_re(
 
 /// Batch-evaluate NP polynomials at multiple particles simultaneously.
 ///
-/// Each element of `a_array` is a VE (Vec<f64>) of particle values for one
-/// coordinate axis. For example, `a_array[0]` holds x-values for all particles,
-/// `a_array[1]` holds px-values, etc.
+/// Each element of `a_array` is a VE (`Vec<f64>`) of particle values for one
+/// coordinate axis. For example, `a_array\[0\]` holds x-values for all particles,
+/// `a_array\[1\]` holds px-values, etc.
 ///
-/// Results are written the same way: `r_array[i]` will hold the i-th result
+/// Results are written the same way: `r_array\[i\]` will hold the i-th result
 /// component for all particles.
 ///
 /// With `nightly-simd`: processes 4 particles per monomial using f64x4 SIMD.
@@ -131,7 +128,9 @@ fn evaluate_poly_batch(
             if exp != 0 && var_idx < na {
                 active_vars[num_active] = (var_idx, exp);
                 num_active += 1;
-                if num_active >= 6 { break; }
+                if num_active >= 6 {
+                    break;
+                }
             }
         }
 
@@ -196,16 +195,27 @@ fn simd_powi(vals: Simd<f64, LANES>, exp: u8) -> Simd<f64, LANES> {
         1 => vals,
         2 => vals * vals,
         3 => vals * vals * vals,
-        4 => { let v2 = vals * vals; v2 * v2 }
-        5 => { let v2 = vals * vals; v2 * v2 * vals }
-        6 => { let v2 = vals * vals; v2 * v2 * v2 }
+        4 => {
+            let v2 = vals * vals;
+            v2 * v2
+        }
+        5 => {
+            let v2 = vals * vals;
+            v2 * v2 * vals
+        }
+        6 => {
+            let v2 = vals * vals;
+            v2 * v2 * v2
+        }
         _ => {
             // General case via repeated squaring
             let mut result = Simd::<f64, LANES>::splat(1.0);
             let mut base = vals;
             let mut e = exp;
             while e > 0 {
-                if e & 1 == 1 { result *= base; }
+                if e & 1 == 1 {
+                    result *= base;
+                }
                 base *= base;
                 e >>= 1;
             }
@@ -222,9 +232,18 @@ fn scalar_powi(val: f64, exp: u8) -> f64 {
         1 => val,
         2 => val * val,
         3 => val * val * val,
-        4 => { let v2 = val * val; v2 * v2 }
-        5 => { let v2 = val * val; v2 * v2 * val }
-        6 => { let v2 = val * val; v2 * v2 * v2 }
+        4 => {
+            let v2 = val * val;
+            v2 * v2
+        }
+        5 => {
+            let v2 = val * val;
+            v2 * v2 * val
+        }
+        6 => {
+            let v2 = val * val;
+            v2 * v2 * v2
+        }
         _ => val.powi(exp as i32),
     }
 }
@@ -234,11 +253,7 @@ fn scalar_powi(val: f64, exp: u8) -> f64 {
 /// For each monomial c * x1^e1 * x2^e2 * ... we substitute the values from
 /// `args` (1-based variable indices mapped to 0-based slice positions) and
 /// sum all contributions.
-fn evaluate_da_at_re(
-    poly: &DA,
-    args: &[f64],
-    na: usize,
-) -> Result<f64> {
+fn evaluate_da_at_re(poly: &DA, args: &[f64], na: usize) -> Result<f64> {
     let mut result = 0.0_f64;
 
     for (monomial, coeff) in poly.coeffs_iter().into_iter() {
