@@ -35,10 +35,10 @@ fn ensure_registry() {
 /// - `unit`: unit number (integer)
 /// - `filename`: path to the file
 /// - `status`: Fortran-style status string:
-///   - `'unknown'`: create if doesn't exist, truncate if does
+///   - `'unknown'`: read+write; open existing as-is, or create empty if it doesn't exist
 ///   - `'old'`: open existing file for reading
-///   - `'new'`: create new file, error if exists
-///   - `'replace'`: create or replace file
+///   - `'new'`: create new file for writing, error if it already exists
+///   - `'replace'`: create or truncate, then open for writing
 pub fn rosy_openf(unit: f64, filename: &str, status: &str) -> Result<()> {
     open_file_impl(unit, filename, status, false)
 }
@@ -62,15 +62,37 @@ fn open_file_impl(unit: f64, filename: &str, status: &str, is_binary: bool) -> R
     }
 
     match status_lower.as_str() {
-        "unknown" | "replace" => {
-            // Create or truncate for writing
+        "unknown" => {
+            // Fortran-style 'UNKNOWN': open for read+write. Existing file
+            // contents are preserved (no truncation); a new file is created
+            // empty if needed. The reader and writer share the same OS file
+            // offset via `try_clone`.
+            let file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(filename)
+                .with_context(|| format!("Failed to open file '{}' (unit {})", filename, unit_num))?;
+
+            let read_handle = file.try_clone()
+                .with_context(|| format!("Failed to clone file handle for '{}' (unit {})", filename, unit_num))?;
+
+            registry.insert(unit_num, FileHandle {
+                reader: Some(BufReader::new(read_handle)),
+                writer: Some(BufWriter::new(file)),
+                path: filename.to_string(),
+                is_binary,
+            });
+        }
+        "replace" => {
+            // Always create or truncate, then open for writing.
             let file = OpenOptions::new()
                 .write(true)
                 .create(true)
                 .truncate(true)
                 .open(filename)
                 .with_context(|| format!("Failed to open file '{}' for writing (unit {})", filename, unit_num))?;
-            
+
             registry.insert(unit_num, FileHandle {
                 reader: None,
                 writer: Some(BufWriter::new(file)),
@@ -82,7 +104,7 @@ fn open_file_impl(unit: f64, filename: &str, status: &str, is_binary: bool) -> R
             // Open existing for reading
             let file = File::open(filename)
                 .with_context(|| format!("Failed to open existing file '{}' for reading (unit {})", filename, unit_num))?;
-            
+
             registry.insert(unit_num, FileHandle {
                 reader: Some(BufReader::new(file)),
                 writer: None,
@@ -96,7 +118,7 @@ fn open_file_impl(unit: f64, filename: &str, status: &str, is_binary: bool) -> R
                 .create_new(true)
                 .open(filename)
                 .with_context(|| format!("Failed to create new file '{}' (unit {}). File may already exist.", filename, unit_num))?;
-            
+
             registry.insert(unit_num, FileHandle {
                 reader: None,
                 writer: Some(BufWriter::new(file)),
