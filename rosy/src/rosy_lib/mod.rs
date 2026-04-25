@@ -54,16 +54,24 @@ pub fn rosy_get<'a, T, C: AsRef<[T]>>(container: &'a C, one_based: f64, var_name
     })
 }
 
-/// Mutable 1-based index. Returns `&mut T`.
-/// Same rounding and bounds checking as [`rosy_get`].
+/// Mutable 1-based index for assignment. Returns `&mut T`.
+///
+/// Unlike the read-side [`rosy_get`], this auto-grows the vector to fit
+/// the requested 1-based index, padding new slots with `T::default()`.
+/// This matches COSY semantics where `VARIABLE FOO ;` followed by
+/// `FOO(1) := X` allocates slot 1 lazily.
+///
+/// Indices ≤ 0 still panic — those are programmer errors, not omissions.
 #[inline(always)]
-pub fn rosy_get_mut<'a, T, C: AsMut<[T]>>(container: &'a mut C, one_based: f64, var_name: &str) -> &'a mut T {
-    let slice = container.as_mut();
-    let len = slice.len();
+pub fn rosy_get_mut<'a, T: Default>(container: &'a mut Vec<T>, one_based: f64, var_name: &str) -> &'a mut T {
     let idx = one_based.round() as usize;
-    slice.get_mut(idx.wrapping_sub(1)).unwrap_or_else(|| {
-        panic!("Index {} into '{}' is out of bounds (1-{})", idx, var_name, len)
-    })
+    if idx == 0 {
+        panic!("Index 0 into '{}' is out of bounds — Rosy uses 1-based indexing", var_name);
+    }
+    if idx > container.len() {
+        container.resize_with(idx, T::default);
+    }
+    &mut container[idx - 1]
 }
 
 pub type RE = f64;

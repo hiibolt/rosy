@@ -211,6 +211,14 @@ impl<T: DACoefficient> PartialEq for DA<T> {
 // Basic methods
 // ============================================================================
 
+// Default delegates to zero(); requires the Taylor runtime to be initialized
+// (i.e., DAINI must have been called) before any DA value is constructed.
+impl<T: DACoefficient> Default for DA<T> {
+    fn default() -> Self {
+        Self::zero()
+    }
+}
+
 impl<T: DACoefficient> DA<T> {
     pub fn zero() -> Self {
         let rt = get_runtime().expect("Taylor system not initialized (call OV first)");

@@ -310,24 +310,28 @@ impl Transpile for VarDeclStatement {
             ))]
         })?;
 
-        // Insert the declaration, but check it doesn't already exist
-        if matches!(
-            context.variables.insert(
-                self.data.name.clone(),
-                ScopedVariableData {
-                    scope: VariableScope::Local,
-                    data: VariableData {
-                        name: self.data.name.clone(),
-                        r#type: resolved_type.clone()
-                    }
-                }
-            ),
-            Some(_)
-        ) {
-            return Err(vec![anyhow!(
-                "Variable '{}' is already defined in this scope!",
-                self.data.name
-            )]);
+        // Insert the declaration. A previous entry whose scope is `Higher`
+        // came from an enclosing function/procedure — shadowing it locally
+        // is allowed, just like in most lexically-scoped languages. A
+        // previous `Local` or `Arg` entry is a true re-declaration in this
+        // very scope and is still rejected.
+        let previous = context.variables.insert(
+            self.data.name.clone(),
+            ScopedVariableData {
+                scope: VariableScope::Local,
+                data: VariableData {
+                    name: self.data.name.clone(),
+                    r#type: resolved_type.clone(),
+                },
+            },
+        );
+        if let Some(prev) = previous {
+            if prev.scope != VariableScope::Higher {
+                return Err(vec![anyhow!(
+                    "Variable '{}' is already defined in this scope!",
+                    self.data.name
+                )]);
+            }
         }
 
         let data_output = self.data.transpile(context)?;
