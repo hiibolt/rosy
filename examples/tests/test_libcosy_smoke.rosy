@@ -135,6 +135,38 @@ WRITE 6 '  NV    = ' NV    '   [expect 2]';
 WRITE 6 '  LOV   = ' LOV   '   [expect 1 — the OV-was-called flag]';
 WRITE 6 '  PI    = ' PI    '   [expect ~3.14159 — DEF was called by OV]';
 
+{ M4 minimal: exercise the simple map savers + WABS.
+  These calls drive ROSY type inference for the untyped DA-array params. }
+VARIABLE (DA 8)   M_SAVE;
+VARIABLE (DA 8)   M_OTHER;
+VARIABLE (DA 3 3) SPIN_SAVE;
+VARIABLE (DA 3 3) SPIN_OTHER;
+VARIABLE (RE)     WABS_RESULT;
+VARIABLE (VE)     WEIGHTS;
+
+{ Seed MAP[1] / MAP[2] with non-trivial DAs so SM has something to copy. }
+MAP[1] := DA(1) + 2*DA(2);
+MAP[2] := 3*DA(1) - DA(2);
+
+SM M_SAVE;
+WRITE 6 'SM-saved MAP[1]:';
+WRITE 6 M_SAVE[1];
+WRITE 6 'SM-saved MAP[2]:';
+WRITE 6 M_SAVE[2];
+
+SNM M_SAVE M_OTHER;
+WRITE 6 'SNM-copied M_SAVE -> M_OTHER, M_OTHER[1]:';
+WRITE 6 M_OTHER[1];
+
+{ Spin map savers: SPNR is zero by default; copy round-trip exercises the loops. }
+SSM SPIN_SAVE;
+SSNM SPIN_SAVE SPIN_OTHER;
+WRITE 6 'SSM/SSNM round-trip OK (no print — output is the all-zero default).';
+
+{ WABS: COSY order-weighted norm. WAF is the global weight scalar. }
+WABS_RESULT := WABS(MAP[1], 0.1);
+WRITE 6 'WABS(MAP[1], 0.1) = ' WABS_RESULT '   [order-weighted norm]';
+
 { M2: exercise helpers/numerics.rosy }
 M0 := 1.00727646688;     { proton mass in u, used by VELC via globals }
 AMUMEV := 931.494;

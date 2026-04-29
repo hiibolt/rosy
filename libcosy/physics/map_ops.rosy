@@ -1,0 +1,59 @@
+{ ============================================================================
+  libcosy/physics/map_ops.rosy — Map save / apply / print primitives
+
+  Initial port of the simple savers from cosy.fox L637-650. The full
+  map-ops surface (ME / MEP / MA / PB / LEXP / SM / SNM / SSM / SSNM /
+  AM / ANM / PM / PSM / WM / PNM / WNM / DMAP / DSMAP / CATR / TRCA /
+  COCR / CRCO / RM / RNM / PT / PA / FM / MR / MT / UPDATEMAP / LOCTRA /
+  LOCSET / BDEP / EDEP / MCM / ECM / BM / RCT / RET / RETF / COSY2TR /
+  POTI / RR / AR / UPDATE) ports incrementally — each procedure has its
+  own subset of dependencies (UPDATE alone runs ~100 lines with five
+  nested helpers, LOCTRA needs LINV, AM chains into UPDATE, MR needs
+  MI from linear_algebra). The simple savers below are the foundation
+  every other map operation builds on.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- Save the momentary MAP into M (cosy.fox L637-638) ------------------
+  Copies the active map's first TWOND DA components into M. M is an
+  untyped DA-array param; ROSY's inference picks up the dimension from
+  the call site (typically `(DA 8)` to match the global MAP).           }
+PROCEDURE SM M;
+  VARIABLE (RE) I;
+  LOOP I 1 TWOND;
+    M[I] := MAP[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- Save the map N into M (cosy.fox L640-641) -------------------------- }
+PROCEDURE SNM N M;
+  VARIABLE (RE) I;
+  LOOP I 1 TWOND;
+    M[I] := N[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- Save the momentary spin map (SPNR 3x3) into M (cosy.fox L643-645) -- }
+PROCEDURE SSM M;
+  VARIABLE (RE) I; VARIABLE (RE) J;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      M[I, J] := SPNR[I, J];
+    ENDLOOP;
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- Save the spin map N into M (cosy.fox L647-649) --------------------- }
+PROCEDURE SSNM N M;
+  VARIABLE (RE) I; VARIABLE (RE) J;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      M[I, J] := N[I, J];
+    ENDLOOP;
+  ENDLOOP;
+ENDPROCEDURE;
+
+END;

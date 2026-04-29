@@ -1,0 +1,30 @@
+{ ============================================================================
+  libcosy/helpers/linear_algebra.rosy — Linear-algebra helpers
+
+  Ported from cosy.fox L129, L176-194.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- Order-weighted DA norm (cosy.fox L129) -----------------------------
+  WABS(X, W) returns the COSY order-weighted norm of the DA X using
+  monomial weights from the W vector. The `+ 0*DD(1)` idiom forces the
+  argument to be a DA-typed expression even when X is constant — DANOW
+  expects a DA, and bare RE / VE inputs would mismatch its signature.   }
+FUNCTION (RE) WABS X (DA) W (RE);
+  DANOW X + 0*DD[1] W WABS;
+ENDFUNCTION;
+
+{ ----- DA map inversion (cosy.fox L176-194) -------------------------------
+  DEFERRED: MI inverts a DA map M into N using L Newton-style iterations
+  with normalization passes and POLVAL evaluations. The body uses
+       VARIABLE AI NM1 L L; VARIABLE C NM1 L; VARIABLE DDA NM1 L; ...
+  for which NM1-sized DA scratch buffers parsed at fn-definition time
+  rather than per-call need ROSY's grammar to evaluate `NM1` as a
+  declaration-time expression. POLVAL bridging plus the normalization
+  loop are also nontrivial. Will land alongside the procedures that
+  consume MI (AM, FM, normal-form pipeline) in M5.                     }
+
+END;

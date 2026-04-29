@@ -9,8 +9,9 @@ BEGIN;
 
 INCLUDE 'fringe_field.rosy';        { M3 }
 INCLUDE 'reference_particle.rosy';  { M3 }
+INCLUDE 'map_ops.rosy';             { M4 (initial — savers only) }
 
-{ M4 will INCLUDE 'map_ops.rosy', 'ray_io.rosy', 'elements_basic.rosy' (drift subset).
+{ M4 (continuing) will add 'ray_io.rosy' and 'elements_basic.rosy' (drift subset).
   M5 will INCLUDE 'normal_form.rosy', 'twiss_tune.rosy', 'spin_su2.rosy'.
   M6 will INCLUDE 'field_potential.rosy', and complete elements_basic.
   M7-M9 will INCLUDE the remaining elements_*.rosy and 'tracking.rosy'. }

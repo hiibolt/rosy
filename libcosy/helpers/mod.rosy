@@ -10,9 +10,8 @@ INCLUDE 'math.rosy';        { v0.36.1 (M2) }
 INCLUDE 'strings.rosy';     { v0.36.1 (M2) }
 INCLUDE 'numerics.rosy';    { v0.36.1 (M2) }
 INCLUDE 'io.rosy';          { v0.36.1 (M2) }
-INCLUDE 'da_helpers.rosy';  { M3 }
-INCLUDE 'polynomial.rosy';  { M3 }
-
-{ M4 will INCLUDE 'linear_algebra.rosy'. }
+INCLUDE 'da_helpers.rosy';      { M3 }
+INCLUDE 'polynomial.rosy';      { M3 }
+INCLUDE 'linear_algebra.rosy';  { M4 }
 
 END;
