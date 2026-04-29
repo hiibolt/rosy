@@ -253,6 +253,11 @@ WRITE 6 MAP[1];
 WRITE 6 'After MH, MAP[2] (p_x kick -- picks up x^2, y^2 terms at order 2):';
 WRITE 6 MAP[2];
 
+{ Verify RPR (rigidity-based RP) gives the same kinematics as RPP. }
+RPR 1.482 1.00727646688 1;     { Bρ ≈ 1.48 T·m matches 100 MeV proton }
+WRITE 6 'After RPR 1.482 1.00727 1, CONS(P0) = ' CONS(P0) '   [expect ~444.5 MeV/c]';
+WRITE 6 'After RPR, CONS(E0) [kinetic E] = ' CONS(E0) '   [expect ~100 MeV]';
+
 { FODO cell: focus-drift-defocus-drift, the building block of every
   storage-ring lattice. MQK takes the integrated strength K directly. }
 UM;

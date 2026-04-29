@@ -337,4 +337,35 @@ PROCEDURE RPS LS (RE) G (RE);    { spin-flag + Lorentz-factor override }
   ENDIF;
 ENDPROCEDURE;
 
+{ ----- Rigidity-based RP (cosy.fox L2800-2803) ----------------------------
+  RPR(CHI, M, Z) sets the reference particle from the magnetic rigidity
+  CHI = Bρ [T·m], the mass M [amu], and the charge Z [units]. The cosy.fox
+  body bootstraps with a dummy RP 1 1 1 (so ETA_local stays in scope at
+  the right CHI value), computes pφ via χ_m / (M c²) form, derives the
+  kinetic energy ETA_local, then re-runs RP with the correct values.   }
+PROCEDURE RPR CHI (RE) M (RE) Z (RE);
+  VARIABLE (DA) PHI_L;
+  VARIABLE (DA) ETA_L;
+  VARIABLE (RE) NOM;
+  NOM := NOC;
+  RP 1 1 1;
+  CO NO+1;
+  PHI_L := CHI/(AMU*CLIGHT/EZERO)/M*Z + 0*DA(1);
+  ETA_L := SQRT(1 + PHI_L*PHI_L) - 1;
+  { ETA_L is DA but RP's E parameter is RE — extract the constant part.
+    The DA-bound parameter dependence (when ND=3 and CHI is itself DA)
+    is recovered later by the ND=3 branch of RP, which is currently
+    deferred; cosy.fox's loose typing does this transparently.       }
+  RP CONS(ETA_L)*M*AMUMEV M Z;
+  CO NOM;
+ENDPROCEDURE;
+
+{ ----- Momentum-based RP (cosy.fox L2804-2805) ----------------------------
+  RPM(P_MeVc, M, Z): set the reference particle from the canonical
+  momentum p [MeV/c]. Converts to magnetic rigidity and delegates to RPR. }
+PROCEDURE RPM MEVC (RE) M (RE) Z (RE);
+  RP 1 1 1;
+  RPR MEVC*(1E6/CLIGHT)/Z M Z;
+ENDPROCEDURE;
+
 END;
