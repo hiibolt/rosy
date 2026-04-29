@@ -77,13 +77,25 @@ FUNCTION (RE) IPOS C (ST) A (ST);
 ENDFUNCTION;
 
 { ----- Lower -> Upper case (cosy.fox L144-156) ----------------------------
-  DEFERRED: TRCAP rebuilds its in/out string parameter A_ via slice-and-
-  concat-into-itself: `A_ := (A_|...) & (AC|IA) & (A_|...)`. ROSY's type
-  resolver flags this as self-referential. Two viable rewrites later:
-   (a) buffer through a `VARIABLE (ST) TEMP` and assign TEMP back to A_;
-   (b) explicit param type: `PROCEDURE TRCAP A_ (ST);` plus the self-cast.
-  Will pick the cleaner one when porting code that calls TRCAP (only used
-  by interactive parsers in cosy.fox; not load-bearing for libcosy v1).   }
+  DEFERRED — needs further transpiler work. Two related fixes are required:
+
+   (1) Self-referential RHS in assignment — fixed (the assign codegen now
+       wraps `*A = (...)` through a temp local, so the natural form
+       `A := (A|...) & (AC|IA) & (A|...)` no longer triggers E0502 by
+       itself).
+
+   (2) NOT YET FIXED: a function/procedure call whose arg list mixes a
+       `&mut <var>` with another arg that reads the same variable inside
+       a sub-expression — e.g. `ILAST(A, 1, LENGTH(A))` emits
+           __fn_ILAST(&mut *A, ..., &mut RosyLENGTH::rosy_length(&*A))
+       where `&mut *A` and `&*A` overlap temporally in the same call.
+       Fixing properly means evaluating each arg into a temp before the
+       call so all borrows are released between arg materializations.
+       That's a separate codegen change at the call-site level, parallel
+       to the dup-args fix in v0.36.4.
+
+  Until (2) lands, TRCAP stays out of libcosy v1 (interactive-parser only,
+  not used in the physics surface).                                       }
 
 { ----- Tokenize string by separator (cosy.fox L157-165) -------------------
   DEFERRED: WORDS / FIELDS build per-token (start, end) position pairs by

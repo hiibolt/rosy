@@ -1,0 +1,52 @@
+{ ============================================================================
+  Regression test: self-referential RHS in an assignment to a non-Local-
+  scoped variable.
+
+  When the LHS is `&mut T` (a parameter or a captured Higher-scope global)
+  and the RHS reads the same variable, the natural `*A = (... &*A ...);`
+  emits an immutable borrow of `*A` simultaneous with the mutable borrow
+  for the assignment, and rustc rejects with E0502.
+
+  The assign codegen now routes through a let-binding so the immutable
+  borrow is released before the mutable assignment fires:
+       { let __rosy_self_ref_tmp = (... &*A ...); *A = __rosy_self_ref_tmp; }
+  ============================================================================ }
+
+BEGIN;
+
+{ Captured global, written from inside a procedure (Higher scope). }
+VARIABLE (ST) MSG;
+
+PROCEDURE APPEND_BANG;
+  MSG := MSG & '!';     { reads MSG, writes MSG — would E0502 without the fix }
+ENDPROCEDURE;
+
+{ Procedure parameter (Arg scope), written from inside the procedure. }
+PROCEDURE DOUBLE_PREFIX A (ST);
+  A := A & '_' & A;     { read A twice, then write A — same self-ref pattern }
+ENDPROCEDURE;
+
+{ Real-valued self-ref through arithmetic, Higher scope. }
+VARIABLE (RE) ACC;
+
+PROCEDURE INC_BY N (RE);
+  ACC := ACC + N;
+ENDPROCEDURE;
+
+MSG := 'hi';
+APPEND_BANG;
+APPEND_BANG;
+WRITE 6 'MSG after 2 APPEND_BANG = ''' MSG '''   [expect ''hi!!'']';
+
+VARIABLE (ST) BUF;
+BUF := 'hi';
+DOUBLE_PREFIX BUF;
+WRITE 6 'BUF after DOUBLE_PREFIX = ''' BUF '''   [expect ''hi_hi'']';
+
+ACC := 0;
+INC_BY 5;
+INC_BY 3;
+INC_BY 8;
+WRITE 6 'ACC after 5+3+8 = ' ACC '   [expect 16]';
+
+END;

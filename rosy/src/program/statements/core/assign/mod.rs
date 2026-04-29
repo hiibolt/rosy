@@ -606,6 +606,21 @@ impl Transpile for AssignStatement {
             }
         };
 
+        // Self-referential RHS handling: when the LHS needs dereferencing
+        // (Arg or Higher scope, where the binding is `&mut T`), the natural
+        //     *A = (... &*A ...);
+        // simultaneously borrows A immutable (for the RHS reads) and mutable
+        // (for the assignment), and rustc rejects with E0502 when the RHS
+        // does in fact read A. Detecting "RHS reads LHS" exactly would mean
+        // walking the AST or scanning the serialization for the identifier
+        // name; either is brittle. Instead, ALWAYS route through a temp
+        // when the LHS needs deref:
+        //     { let __rosy_self_ref_tmp = (... &*A ...); *A = __rosy_self_ref_tmp; }
+        // This is a no-op when the RHS doesn't read A — the extra binding
+        // is optimized out — and a clean fix when it does. For a plain
+        // Local `T` LHS no aliasing exists, so we skip the wrap.
+        let needs_self_ref_temp = !dereference.is_empty();
+
         let num_indices = self.identifier.num_index_dimensions();
         let serialization = if num_indices > 0 {
             // Indexed assignment: build a rosy_get_mut() chain.
@@ -645,7 +660,22 @@ impl Transpile for AssignStatement {
                     name = self.identifier.name,
                 );
             }
-            format!("*{} = {};", result, serialized_value)
+            if needs_self_ref_temp {
+                format!(
+                    "{{ let __rosy_self_ref_tmp = {value}; *{lhs} = __rosy_self_ref_tmp; }}",
+                    value = serialized_value,
+                    lhs = result,
+                )
+            } else {
+                format!("*{} = {};", result, serialized_value)
+            }
+        } else if needs_self_ref_temp {
+            format!(
+                "{{ let __rosy_self_ref_tmp = {value}; {deref}{lhs} = __rosy_self_ref_tmp; }}",
+                value = serialized_value,
+                deref = dereference,
+                lhs = serialized_identifier,
+            )
         } else {
             format!(
                 "{}{} = {};",
