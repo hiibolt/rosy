@@ -1,0 +1,64 @@
+{ ============================================================================
+  libcosy/physics/elements_basic.rosy — Basic / drift-class elements
+
+  Initial port of cosy.fox L2890-2932. Starts with the drift element DL,
+  built on DLACT (the underlying field-free advance of a DA-array map).
+
+  Deferred:
+    * SDELE / SDELEREF / DSDED / SIELE / FFELE / GE / SYSCLM / RSM —
+      depend on the RK Runge-Kutta integrator (cosy.fox L2816), the
+      symplectic-scaling fringe-field globals, and the larger numerics
+      stack that lands in M6.
+    * LOCSET / UPDATE  calls inside DL are graphics-only; permanently
+      out of scope.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- Drift action on a DA-array map (cosy.fox L2892-2900) ---------------
+  DLACT advances the DA-array ARR by a drift of length L. ARR is
+  modified in place: position components ARR[1, 3, 5] pick up
+  L · momentum / γ-corrected step, where γ comes from the canonical
+  energy / mass relations through ETA and the canonical-momentum
+  components ARR[2], ARR[4], ARR[6], ARR[7].
+
+  LKC = 0 → use the full kinematic correction (default)
+  LKC = 1 → use the linearized version (faster, less accurate at
+            large transverse momenta)                                    }
+PROCEDURE DLACT ARR L (RE);
+  VARIABLE (DA) LP0PZ;
+  LP0PZ := CONS(ETA) + 0*DA(1);
+  LP0PZ := (1 + ARR[6])*(2*(1 + ARR[7]) + (1 + ARR[6])*LP0PZ)/(2 + LP0PZ);
+  IF LKC = 0;
+    LP0PZ := L*ISRT(LP0PZ - SQR(ARR[2]) - SQR(ARR[4]));
+  ELSEIF LKC = 1;
+    LP0PZ := L*ISRT(LP0PZ);
+  ENDIF;
+  ARR[1] := ARR[1] + LP0PZ*ARR[2];
+  IF ND > 1;
+    ARR[3] := ARR[3] + LP0PZ*ARR[4];
+  ENDIF;
+  IF ND > 2;
+    LP0PZ := (1 + ARR[7] + (1 + ARR[6])*CONS(ETA))*LP0PZ/(1 + CONS(ETA)) - L;
+    ARR[5] := ARR[5] - LP0PZ*(1 + CONS(ETA))/(2 + CONS(ETA));
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- Field-free drift (cosy.fox L2902-2905) -----------------------------
+  Propagates the active MAP and the scratch MSC through a drift of length
+  L. cosy.fox additionally calls LOCSET (axis-display offset) and UPDATE
+  (graphics + ray flow); both are graphics-only and skipped.             }
+PROCEDURE DL L (RE);
+  IF LUM # 1;
+    WRITE 6 ' *** ERROR, call UM before DL';
+    QUIT 0;
+  ENDIF;
+  DLACT MAP L;
+  UMS;
+  DLACT MSC L;
+  DR := 0;
+ENDPROCEDURE;
+
+END;

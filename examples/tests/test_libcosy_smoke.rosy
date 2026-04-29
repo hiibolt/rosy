@@ -216,6 +216,17 @@ WRITE 6 MAP[1];
 WRITE 6 'After UM, MAP[2] (should be DA(2) = x_2):';
 WRITE 6 MAP[2];
 
+{ DL: drift of length L. After UM, MAP is identity. After DL L, the
+  position component MAP[1] should pick up L * <something> * MAP[2]
+  (the canonical drift transformation: x' = x + (L/p_z) p_x). With
+  ND=1 and on-momentum (delta_E = delta_M = 0), the kinematic
+  pre-factor reduces to L itself. }
+DL 0.5;
+WRITE 6 'After DL 0.5, MAP[1] (drift transforms x = x + L*x'' approximately):';
+WRITE 6 MAP[1];
+WRITE 6 'After DL 0.5, MAP[2] (momentum unchanged):';
+WRITE 6 MAP[2];
+
 BBC 13 27 2.7 1.66E-7 0 0;   { Aluminum: Z=13, A=27, density 2.7 g/cm^3, I=166eV; uses scientific notation }
 WRITE 6 'BBC: BETHEBLOCHC(1) = ' BETHEBLOCHC(1) '   [expect 13]';
 WRITE 6 'BBC: BETHEBLOCHC(3) = ' BETHEBLOCHC(3) '   [expect 2.7]';
