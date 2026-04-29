@@ -87,3 +87,47 @@ impl Transpile for f64 {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::ast::{CosyParser, Rule};
+    use pest::Parser;
+
+    /// Parse a numeric literal source through the grammar and assert that the
+    /// rule matches the entire input — i.e. nothing was left unconsumed.
+    fn must_parse_as_number(src: &str) {
+        let mut pairs = CosyParser::parse(Rule::number, src)
+            .unwrap_or_else(|e| panic!("grammar rejected '{src}': {e}"));
+        let pair = pairs.next().expect("no pair");
+        assert_eq!(
+            pair.as_str(),
+            src,
+            "rule consumed only '{}' of '{}' (expected full match)",
+            pair.as_str(),
+            src
+        );
+    }
+
+    #[test]
+    fn number_parses_integer_and_decimal() {
+        must_parse_as_number("0");
+        must_parse_as_number("42");
+        must_parse_as_number("-7");
+        must_parse_as_number("3.14");
+        must_parse_as_number("-2.71828");
+    }
+
+    /// Scientific notation must match in ONE rule application, otherwise
+    /// `1.66E-7` decays to `1.66` followed by an unbound `E-7` expression
+    /// (the latter being treated as an undeclared variable). Checks both
+    /// uppercase / lowercase E and explicit / implicit exponent sign.
+    #[test]
+    fn number_parses_scientific_notation() {
+        must_parse_as_number("1e5");
+        must_parse_as_number("1E5");
+        must_parse_as_number("1.5e10");
+        must_parse_as_number("1.66E-7");
+        must_parse_as_number("-2.5e+10");
+        must_parse_as_number("6.022E+23");
+    }
+}

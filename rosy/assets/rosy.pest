@@ -449,7 +449,9 @@ variable_identifier = { variable_name ~ paren_group* ~ bracket_index? }
 paren_group = { "(" ~ expr ~ ("," ~ expr)* ~ ")" }
 bracket_index = { "[" ~ expr ~ ("," ~ expr)* ~ "]" }
 variable_name  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
-number      = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+/// Numeric literal — integer, fractional, and optional decimal exponent.
+/// Examples: 42  -7  3.14  1.23E-4  1e5  -2.5e+10
+number      = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ (("e" | "E") ~ ("+" | "-")? ~ ASCII_DIGIT+)? }
 unit        = @{ ASCII_DIGIT+ }
 constant    = @{ ASCII_DIGIT+ }
 string      = { new_string | old_string }

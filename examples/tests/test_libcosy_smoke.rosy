@@ -51,7 +51,7 @@ M0 := 1.00727646688;     { proton mass in u, used by VELC via globals }
 AMUMEV := 931.494;
 RESULT := VELC(100);     WRITE 6 'VELC(100 MeV proton) = ' RESULT '   [expect ~0.428 (v/c)]';
 
-BBC 13 27 2.7 0.000000166 0 0;   { Aluminum: Z=13, A=27, density 2.7 g/cm^3, I=166eV }
+BBC 13 27 2.7 1.66E-7 0 0;   { Aluminum: Z=13, A=27, density 2.7 g/cm^3, I=166eV; uses scientific notation }
 WRITE 6 'BBC: BETHEBLOCHC(1) = ' BETHEBLOCHC(1) '   [expect 13]';
 WRITE 6 'BBC: BETHEBLOCHC(3) = ' BETHEBLOCHC(3) '   [expect 2.7]';
 
