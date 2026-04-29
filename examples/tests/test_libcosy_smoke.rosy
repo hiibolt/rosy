@@ -57,6 +57,39 @@ MIXED := 'Hello WORLD';
 TRCAP MIXED;
 WRITE 6 'TRCAP(''Hello WORLD'') -> ''' MIXED '''   [expect ''HELLO WORLD'']';
 
+{ M3: exercise helpers/da_helpers.rosy
+  COSY's TRANSPORT id encoding: leftmost decimal digit = variable 1 exponent.
+  id=1 → x₁¹     id=11 → x₁¹·x₂¹     id=2 → x₁² }
+DAINI 3 2 0 0;
+VARIABLE (DA) F;
+F := 3*DA(1) + 5*DA(2) + 7*DA(1)*DA(2);
+
+WRITE 6 'COEF(F, 1)  [x_1     coefficient] = ' COEF(F, 1)  '   [expect 3]';
+WRITE 6 'COEF(F, 11) [x_1*x_2 coefficient] = ' COEF(F, 11) '   [expect 7]';
+
+WRITE 6 'DER(1, F) [partial wrt x_1] — expect 3 (constant) + 7*x_2:';
+WRITE 6 DER(1, F);
+WRITE 6 'INTEG(1, DER(1, F)) — round-trips x_1-dependent terms (5*x_2 is lost):';
+WRITE 6 INTEG(1, DER(1, F));
+
+{ M3: exercise helpers/polynomial.rosy::POLY
+  Drives type inference for the untyped P param: P is a 3x3 RE table.
+  Uses [i,j] indexed-assignment syntax (parens are reserved for fn calls). }
+VARIABLE (RE 3 3) PCOEFS;
+VARIABLE (RE) ERR_DUMMY;
+VARIABLE (RE 25 100) MFD_DUMMY;
+PCOEFS[1, 1] := 1;     PCOEFS[1, 2] := 2;     PCOEFS[1, 3] := 0;     { 1 + 2y          }
+PCOEFS[2, 1] := 3;     PCOEFS[2, 2] := 0;     PCOEFS[2, 3] := 0;     { + 3x            }
+PCOEFS[3, 1] := 0;     PCOEFS[3, 2] := 0;     PCOEFS[3, 3] := 0;
+RESULT := POLY(2, 5, PCOEFS, 2);
+WRITE 6 'POLY(2, 5, [[1,2,0],[3,0,0],[0,0,0]], order=2) = ' RESULT '   [expect 1+2*5+3*2 = 17]';
+
+{ Drive GAUSS1 / GAUSS inference too. Use MFD-shaped 25x100 dummy. }
+RESULT := GAUSS1(0, 100, 1, 2, 1, MFD_DUMMY, ERR_DUMMY);
+WRITE 6 'GAUSS1 on zero MFD (sanity) = ' RESULT '   [expect 0]';
+RESULT := GAUSS(0, 0, 25, 100, 1, 1, 2, MFD_DUMMY, ERR_DUMMY);
+WRITE 6 'GAUSS  on zero MFD (sanity) = ' RESULT '   [expect 0]';
+
 { M2: exercise helpers/numerics.rosy }
 M0 := 1.00727646688;     { proton mass in u, used by VELC via globals }
 AMUMEV := 931.494;

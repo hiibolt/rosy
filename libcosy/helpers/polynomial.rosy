@@ -1,0 +1,114 @@
+{ ============================================================================
+  libcosy/helpers/polynomial.rosy — Polynomial / interpolation helpers
+
+  Ported from cosy.fox L230-290.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- 2D polynomial evaluation (cosy.fox L239-243) -----------------------
+  Evaluates  Σ_{i,j ≤ IS_} P[i+1, j+1] * X^i * Y^j  by nested loops with
+  X1 and Y1 carrying the running powers. The coefficient table P is a 2D
+  RE array; bracket-indexed because ROSY reserves `name(args)` for fn
+  calls (would otherwise be misparsed as a call to a function named P). }
+FUNCTION (RE) POLY X (RE) Y (RE) P IS_ (RE);
+  VARIABLE (RE) I; VARIABLE (RE) J;
+  VARIABLE (RE) X1; VARIABLE (RE) Y1;
+  POLY := 0;
+  X1 := 1;
+  LOOP I 1 IS_+1;
+    Y1 := 1;
+    LOOP J 1 IS_+1;
+      POLY := POLY + P[I, J]*X1*Y1;
+      Y1 := Y*Y1;
+    ENDLOOP;
+    X1 := X*X1;
+  ENDLOOP;
+ENDFUNCTION;
+
+{ ----- 1D Gaussian interpolation (cosy.fox L261-272) ----------------------
+  Smooths a measured-field column at fractional index X using a Gaussian
+  kernel of width SIGMA. Boundary clamping fires when the kernel window
+  touches either end (ERR=1 in that case). MFD_ is the field array;
+  untyped so the call site's MFD shape (typically 2D 25×100 or similar)
+  drives inference.                                                       }
+FUNCTION (RE) GAUSS1 X (RE) NX (RE) DX (RE) SIGMA (RE) IP (RE) MFD_ ERR (RE);
+  VARIABLE (RE) NG;
+  VARIABLE (RE) IXN;
+  VARIABLE (RE) IX;
+  VARIABLE (RE) IXM;
+  NG := NINT(8*SIGMA);
+  GAUSS1 := 0;
+  IXN := NINT(1 + CONS(X)/DX);
+  IF (IXN-NG < 1) OR (IXN+NG > NX);
+    ERR := 1;
+    LOOP IX IXN-NG IXN+NG;
+      IXM := IX;
+      IF IX < 1; IXM := 1;
+      ELSEIF IX > NX; IXM := NX;
+      ENDIF;
+      GAUSS1 := GAUSS1 + MFD_[IP, IXM]*EXP(-SQR((IX-1-X/DX)/SIGMA));
+    ENDLOOP;
+  ELSE;
+    ERR := 0;
+    LOOP IX IXN-NG IXN+NG;
+      GAUSS1 := GAUSS1 + MFD_[IP, IX]*EXP(-SQR((IX-1-X/DX)/SIGMA));
+    ENDLOOP;
+  ENDIF;
+  GAUSS1 := GAUSS1/(SQRT(PI)*SIGMA);
+ENDFUNCTION;
+
+{ ----- 2D Gaussian interpolation (cosy.fox L274-290) ---------------------- }
+FUNCTION (RE) GAUSS X (RE) Z (RE) NX (RE) NZ (RE) DX (RE) DZ (RE) SIGMA (RE) MFD_ ERR (RE);
+  VARIABLE (RE) NG;
+  VARIABLE (RE) IXN; VARIABLE (RE) IZN;
+  VARIABLE (RE) SUMZ;
+  VARIABLE (RE) IX; VARIABLE (RE) IZ;
+  VARIABLE (RE) IXM; VARIABLE (RE) IZM;
+  NG := NINT(8*SIGMA);
+  GAUSS := 0;
+  IXN := NINT(1 + CONS(X)/DX);
+  IZN := NINT(1 + CONS(Z)/DZ);
+  IF (IXN-NG < 1) OR (IXN+NG > NX) OR (IZN-NG < 1) OR (IZN+NG > NZ);
+    ERR := 1;
+    LOOP IX IXN-NG IXN+NG;
+      SUMZ := 0;
+      IXM := IX;
+      IF IX < 1; IXM := 1;
+      ELSEIF IX > NX; IXM := NX;
+      ENDIF;
+      LOOP IZ IZN-NG IZN+NG;
+        IZM := IZ;
+        IF IZ < 1; IZM := 1;
+        ELSEIF IZ > NZ; IZM := NZ;
+        ENDIF;
+        SUMZ := SUMZ + MFD_[IXM, IZM]*EXP(-SQR((IZ-1-Z/DZ)/SIGMA));
+      ENDLOOP;
+      GAUSS := GAUSS + SUMZ*EXP(-SQR((IX-1-X/DX)/SIGMA));
+    ENDLOOP;
+  ELSE;
+    ERR := 0;
+    LOOP IX IXN-NG IXN+NG;
+      SUMZ := 0;
+      LOOP IZ IZN-NG IZN+NG;
+        SUMZ := SUMZ + MFD_[IX, IZ]*EXP(-SQR((IZ-1-Z/DZ)/SIGMA));
+      ENDLOOP;
+      GAUSS := GAUSS + SUMZ*EXP(-SQR((IX-1-X/DX)/SIGMA));
+    ENDLOOP;
+  ENDIF;
+  GAUSS := GAUSS/(PI*SIGMA*SIGMA);
+ENDFUNCTION;
+
+{ ----- Complex polynomial evaluation (cosy.fox L230-237) ------------------
+  DEFERRED: CPOLVAL declares scratch buffers `RIPOL NM1 2*NPOL` and
+  `RIRES 2*NM1 2*NRES` whose ROSY equivalents need NM1 (a global DA-poly
+  size sentinel) to be a known constant at parse time. The function body
+  also bridges between (CM) input arrays and (RE) interleaved real/imag
+  arrays for the underlying POLVAL intrinsic — that bridge is correct
+  COSY semantics but needs explicit coordination with the POLVAL call
+  signature in ROSY. Will port alongside the modules that actually call
+  it (lie_normalform / spin_su2 in M5).                                   }
+
+END;
