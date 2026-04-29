@@ -1,0 +1,39 @@
+{ ============================================================================
+  libcosy/helpers/numerics.rosy — Numerical primitives
+
+  Ported from cosy.fox L4195-4262.
+
+  M2 ships only the leaf procedures (BBC setter, VELC kinematic). The full
+  Bethe-Bloch / EODE / RK4 chain is deferred to a later milestone because:
+   * BETHEBLOCH declares scratch variables with `NM1`-sized memory which is
+     DA-typed in COSY. Translating requires deciding whether BETHEBLOCH's
+     scratch variables (GAMMA, BETA, ...) should be RE or DA — and the
+     correct answer depends on the type of ETOT at call sites we haven't
+     ported yet.
+   * EODE, RK4 transitively call BETHEBLOCH; same issue plus the
+     transitive-global-capture transpiler limitation.
+  ============================================================================ }
+
+BEGIN;
+
+{ ----- Bethe-Bloch coefficient setter (cosy.fox L4195-4203) ---------------
+  cosy.fox params Z A RHO I DELTA C all collide with libcosy globals
+  (A, C declared in globals.rosy as Butcher tableau, I undeclared but used
+  as an iterator in many ports). Rename to *_ throughout.                  }
+PROCEDURE BBC Z_ A_ RHO I_ DELTA C_;
+  BETHEBLOCHC(1) := Z_;     BETHEBLOCHC(2) := A_;    BETHEBLOCHC(3) := RHO;
+  BETHEBLOCHC(4) := I_;     BETHEBLOCHC(5) := DELTA; BETHEBLOCHC(6) := C_;
+ENDPROCEDURE;
+
+{ ----- Velocity from kinetic energy (cosy.fox L4260-4262) ----------------
+  v/c = sqrt( eta * (2 + eta) ) / (1 + eta), where eta = KE / (M0 * AMUMEV)
+  Reads globals M0 and AMUMEV. Caller must run on the top level (or from a
+  procedure) — calling VELC from inside a FUNCTION currently fails because
+  the transpiler only lifts global captures one level deep.                 }
+FUNCTION (RE) VELC KE (RE);
+  VARIABLE (RE) ETA0;
+  ETA0 := KE/(M0*AMUMEV);
+  VELC := SQRT(ETA0*(2 + ETA0))/(1 + ETA0);
+ENDFUNCTION;
+
+END;

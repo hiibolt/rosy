@@ -1,0 +1,135 @@
+{ ============================================================================
+  libcosy/globals.rosy — Shared global state
+
+  Translated from cosy.fox (COSY INFINITY 10.2) lines 28-100.
+
+  Translation rules applied:
+   * COSY's leading "memory size" prefix on map / field arrays (4000)
+     becomes a ROSY (DA ...) type — ROSY handles per-DA storage internally.
+   * Other COSY declarations become ROSY (RE ...) with the same trailing
+     dimensions.
+   * COSY string variables (CE, RKOFNST, TFPFN, TFPRFN) become (ST).
+   * COSY's TRUE / FALSE are reserved keywords in ROSY; they are NOT declared
+     here and must be replaced by literal 1 / 0 when porting DEF and consumers.
+
+  Types may need to widen later (e.g., E0/M0 -> DA for parameter sweeps).
+  Adjust here as porting milestones expose mismatches.
+  ============================================================================ }
+
+BEGIN;
+
+{ Physical constants — set in DEF }
+VARIABLE (RE) AMU; VARIABLE (RE) AMUMEV; VARIABLE (RE) EZERO; VARIABLE (RE) CLIGHT;
+VARIABLE (RE) PI; VARIABLE (RE) DEGRAD;
+{ NOTE: cosy.fox also declares TRUE and FALSE here; both are reserved in ROSY,
+        so DEF must use literal 1 / 0 when porting. }
+
+{ Reference particle — set in RP / RPR / RPM / RPP / RPE / RPPI / RPMU }
+VARIABLE (RE) E0;   VARIABLE (RE) M0;   VARIABLE (RE) Z0;   VARIABLE (RE) V0;
+VARIABLE (RE) P0;   VARIABLE (RE) G0;   VARIABLE (RE) CHIM; VARIABLE (RE) CHIE;
+VARIABLE (RE) ETA;  VARIABLE (RE) HFAC; VARIABLE (RE) TFAC;
+
+{ Maps — momentary and scratch COSY map (DA polynomials) }
+VARIABLE (DA 8) MAP;        VARIABLE (DA 8) MSC;
+VARIABLE (DA 3 3) SPNR;     VARIABLE (DA 3 3) SSCR;
+VARIABLE (RE) LSPN;
+VARIABLE (DA 20) MCT;
+
+{ Rays }
+VARIABLE (RE 10001 8) RAY;  VARIABLE (RE 10001 8) RSC;  VARIABLE (RE 10001) RCOL;
+VARIABLE (RE 10001 3) SPI;  VARIABLE (RE 10001 3) SSC;
+VARIABLE (RE 10001) REMAIN; VARIABLE (RE 10001) REMOVE;
+VARIABLE (RE) NRAY; VARIABLE (RE) NSPN;
+VARIABLE (RE 2) XCUT;       VARIABLE (RE) LCUT;
+VARIABLE (RE) NCT;          VARIABLE (RE) NCCT;
+VARIABLE (RE 2 10) XCT;     VARIABLE (RE 10) LCT;
+
+{ Envelope }
+VARIABLE (RE) ESC; VARIABLE (RE) ENC;
+VARIABLE (RE 4) ERAY; VARIABLE (RE 4) ERSC; VARIABLE (RE 2) EMAX;
+
+{ Axis coordinates }
+VARIABLE (RE 1000 3) AXP; VARIABLE (RE 1000 6) AXD; VARIABLE (RE 1000) SPOS;
+VARIABLE (RE 20) XLOC;    VARIABLE (RE 20) ZLOC;    VARIABLE (RE 20) PLOC;
+VARIABLE (RE 20) SLOC;    VARIABLE (RE 20) VLOC;    VARIABLE (RE 20) TLOC;
+VARIABLE (RE) GPLOC;
+
+{ Picture buffers — graphics is skipped in libcosy v1; arrays exist only for
+  procedures (e.g. UPDATE) that reference them via flag-guarded paths. }
+VARIABLE (RE 20000) SYS;
+VARIABLE (ST) CE;
+VARIABLE (RE 1000 251) TRA;
+VARIABLE (RE) NRAYTRA0; VARIABLE (RE) NRAYTRA;
+VARIABLE (RE 1000) ETRA; VARIABLE (RE 200) SYS0; VARIABLE (RE 200) TRTST;
+
+{ Picture-related sizing }
+VARIABLE (RE) LSCR; VARIABLE (RE) LSCT;
+VARIABLE (RE 20 3) LTRA; VARIABLE (RE 20 3) GTRA;
+
+{ Field arrays — DA expansions of the on-axis fields }
+VARIABLE (DA) EFX; VARIABLE (DA) EFY; VARIABLE (DA) EFZ; VARIABLE (DA) V;
+VARIABLE (DA) BFX; VARIABLE (DA) BFY; VARIABLE (DA) BFZ; VARIABLE (DA) W;
+VARIABLE (DA) H;
+VARIABLE (RE) CHIM1; VARIABLE (RE) CHIE1; VARIABLE (RE) TP1;
+
+{ Multipole fields }
+VARIABLE (RE 20 40) PMM; VARIABLE (RE 20 40) PEM; VARIABLE (RE) LM;
+VARIABLE (RE 20 36) PPOL; VARIABLE (RE 20 30) MPOL;
+VARIABLE (RE) NPOL; VARIABLE (RE) LS;
+VARIABLE (RE) NSDP; VARIABLE (RE) LCCT; VARIABLE (RE) LOFF;
+
+{ Enge fringe-field coefficients — accessed as ENGEC(IMP, IEE, IEM, K) }
+VARIABLE (RE 2 20 2 2 6) ENGEC;
+VARIABLE (RE) LE;
+
+{ Symplectic-scaling fringe-field arrays }
+VARIABLE (RE 40 2 6 10) GFF2; VARIABLE (RE 400 2 6 10) LFF2;
+VARIABLE (RE 2 6 10) DATFF2;
+
+{ Measured-field interpolation buffers }
+VARIABLE (RE) INP; VARIABLE (RE) NN;
+VARIABLE (RE 10 100) SN; VARIABLE (RE 25 100) HN;
+VARIABLE (RE 25 100) VN; VARIABLE (RE 25 100) WN;
+VARIABLE (RE 40) PN;     VARIABLE (RE) NPG;
+VARIABLE (RE 10) DR;     VARIABLE (RE) DMAX;
+VARIABLE (RE 8) MFP;     VARIABLE (RE 6 700 30) MFD;
+
+{ Bethe-Bloch / box-counting helpers }
+VARIABLE (RE 6) BETHEBLOCHC;
+VARIABLE (RE 5) BXNOB;       VARIABLE (RE 5 7) BXBDT;
+VARIABLE (RE 5) BXNOD;       VARIABLE (RE 5 7) BXDDT;
+VARIABLE (RE 70) BXBOXID;    VARIABLE (RE) BXIBOX;
+VARIABLE (RE 70 4) BX1BOXPN; VARIABLE (RE 70 4 2 3) BX1BOXP;
+
+{ Runge-Kutta Butcher tableau }
+VARIABLE (RE 13) A; VARIABLE (RE 13 12) B; VARIABLE (RE 13) C; VARIABLE (RE 13) D;
+VARIABLE (RE) HSQR; VARIABLE (RE) LRKCO; VARIABLE (RE) LRKO; VARIABLE (RE 2) RKO;
+VARIABLE (ST) RKOFNST;
+VARIABLE (RE) EPS; VARIABLE (RE) WAF;
+VARIABLE (ST) TFPFN; VARIABLE (ST) TFPRFN;
+
+{ Generic scratch buffers }
+VARIABLE (RE 20) DD; VARIABLE (RE 20) DX;
+VARIABLE (RE 15 30) XX;
+VARIABLE (RE) DEPS;
+
+{ DA dimension / order parameters — set in OV }
+VARIABLE (RE) NO;  VARIABLE (RE) NV;  VARIABLE (RE) ND;  VARIABLE (RE) TWOND;
+VARIABLE (RE) NOC; VARIABLE (RE) NM1; VARIABLE (RE) NM2; VARIABLE (RE) NM3;
+VARIABLE (RE) NMP; VARIABLE (RE) NP;
+
+{ Flow-control flags }
+VARIABLE (RE) LOV;  VARIABLE (RE) LRP;  VARIABLE (RE) LUM;  VARIABLE (RE) LFR;
+VARIABLE (RE) LPS;  VARIABLE (RE) LPI;  VARIABLE (RE) LPG;  VARIABLE (RE) LCB;
+VARIABLE (RE) LFR2; VARIABLE (RE) LCR;  VARIABLE (RE) LKC;
+VARIABLE (RE) LENV; VARIABLE (RE) LSYS; VARIABLE (RE) LCE;  VARIABLE (RE) LAX;
+VARIABLE (RE) LWA;  VARIABLE (RE) LCO;
+VARIABLE (RE) LTR;  VARIABLE (RE) LTRR; VARIABLE (RE) LTRI;
+VARIABLE (RE) LTRPRAY; VARIABLE (RE) LTRPRAYU;
+VARIABLE (RE) LTRPSPI; VARIABLE (RE) LTRPSPIU;
+VARIABLE (RE) LWNDANF; VARIABLE (RE) LWNTS; VARIABLE (RE) LWNTR;
+
+{ Phase space and parameter data }
+VARIABLE (RE 8) PHSP; VARIABLE (RE 8) PARS; VARIABLE (RE 3) PHSR;
+
+END;

@@ -164,7 +164,7 @@ pub fn analyze(source: &str, source_path: Option<&std::path::Path>) -> AnalysisR
     let mut ast = match Program::from_rule_with_includes(
         program_pair,
         source_path,
-        &mut std::collections::HashSet::new(),
+        &mut crate::program::IncludeTracker::default(),
     ) {
         Ok(Some(ast)) => ast,
         Ok(None) => {

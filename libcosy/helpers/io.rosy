@@ -1,0 +1,34 @@
+{ ============================================================================
+  libcosy/helpers/io.rosy — File I/O utilities
+
+  Ported from cosy.fox L4636-4641 (and partial others).
+
+  M2 ships only COPYF. FILE2VE and RFILT depend on WORDS (deferred —
+  see helpers/strings.rosy), so they will land alongside that fix.
+  ============================================================================ }
+
+BEGIN;
+
+{ ----- Copy a text file FN1 -> FN2 (cosy.fox L4636-4641) ------------------
+  Conversion: cosy.fox uses `ELSEIF LO(1) ;` as an always-true tail clause;
+  becomes `ELSE` in ROSY. No global captures, fully self-contained.        }
+PROCEDURE COPYF FN1 (ST) FN2 (ST);
+  VARIABLE (ST) LIN;
+  OPENF 77 FN1 'OLD';
+  OPENF 78 FN2 'UNKNOWN';
+  LIN := 'START';
+  WHILE LIN # '';
+    READS 77 LIN;
+    IF LIN # '';
+      IF LIN = ' ';
+        WRITE 78 '';
+      ELSE;
+        WRITE 78 LIN;
+      ENDIF;
+    ENDIF;
+  ENDWHILE;
+  CLOSEF 77;
+  CLOSEF 78;
+ENDPROCEDURE;
+
+END;

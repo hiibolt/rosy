@@ -1,0 +1,58 @@
+{ ============================================================================
+  test_libcosy_smoke.rosy — Smoke test for libcosy/
+
+  Confirms that:
+   * `INCLUDE 'libcosy';` resolves through the directory fallback to
+     libcosy/mod.rosy (added in v0.36.0).
+   * libcosy/globals.rosy parses and its declarations (PI, NRAY, ...) are
+     visible at the top level after splicing.
+   * Empty libcosy/{helpers,physics}/mod.rosy stubs INCLUDE cleanly.
+
+  Run with:
+    cargo run --bin rosy -- run examples/tests/test_libcosy_smoke.rosy
+
+  Note: globals are uninitialized in M1, so reads return type-default values
+  (PI -> 0.0). This test only verifies that the INCLUDE chain succeeds and
+  globals are addressable.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../../libcosy';     { resolves to libcosy/mod.rosy }
+
+VARIABLE (RE) RESULT;
+
+WRITE 6 'libcosy loaded successfully.';
+WRITE 6 'PI (uninitialized in M1) = ' PI;
+WRITE 6 'NRAY (uninitialized in M1) = ' NRAY;
+
+{ M2: exercise helpers/math.rosy }
+PI := 3.141592653589793;     { Initialize PI so ATAN2 returns a meaningful value }
+RESULT := MAX(3, 7);     WRITE 6 'MAX(3, 7) = ' RESULT;
+RESULT := MIN(3, 7);     WRITE 6 'MIN(3, 7) = ' RESULT;
+RESULT := MOD(17, 5);    WRITE 6 'MOD(17, 5) = ' RESULT;
+RESULT := SIG(-4);       WRITE 6 'SIG(-4) = ' RESULT;
+RESULT := FACT(5);       WRITE 6 'FACT(5) = ' RESULT;
+RESULT := NMON(3, 2);    WRITE 6 'NMON(3, 2) [monomials, order 3, vars 2] = ' RESULT;
+RESULT := ATAN2(1, 1);   WRITE 6 'ATAN2(1, 1) = ' RESULT '   [expect ~0.785]';
+RESULT := ATAN2(1, -1);  WRITE 6 'ATAN2(1, -1) = ' RESULT '   [expect ~2.356]';
+
+{ M2: exercise helpers/strings.rosy }
+VARIABLE (ST) STR;
+STR := SS('Hello, World!', 8, 12);   WRITE 6 'SS(''Hello, World!'', 8, 12) = ''' STR '''   [expect ''World'']';
+STR := S(2.5);                        WRITE 6 'S(2.5) = ''' STR '''';
+STR := SI(42);                        WRITE 6 'SI(42) = ''' STR '''   [expect ''42'']';
+STR := SI(-17);                       WRITE 6 'SI(-17) = ''' STR '''   [expect ''-17'']';
+RESULT := ILAST('hello   ', 1, 8);   WRITE 6 'ILAST(''hello   '', 1, 8) = ' RESULT '   [expect 5]';
+RESULT := IPOS(',', 'a,b,c');        WRITE 6 'IPOS('','', ''a,b,c'') = ' RESULT '   [expect 2]';
+
+{ M2: exercise helpers/numerics.rosy }
+M0 := 1.00727646688;     { proton mass in u, used by VELC via globals }
+AMUMEV := 931.494;
+RESULT := VELC(100);     WRITE 6 'VELC(100 MeV proton) = ' RESULT '   [expect ~0.428 (v/c)]';
+
+BBC 13 27 2.7 0.000000166 0 0;   { Aluminum: Z=13, A=27, density 2.7 g/cm^3, I=166eV }
+WRITE 6 'BBC: BETHEBLOCHC(1) = ' BETHEBLOCHC(1) '   [expect 13]';
+WRITE 6 'BBC: BETHEBLOCHC(3) = ' BETHEBLOCHC(3) '   [expect 2.7]';
+
+END;

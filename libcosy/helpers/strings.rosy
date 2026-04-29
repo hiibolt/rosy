@@ -1,0 +1,101 @@
+{ ============================================================================
+  libcosy/helpers/strings.rosy — String utilities
+
+  Ported from cosy.fox L120-127, L136-174.
+
+  Conversions applied:
+   * Boolean conjunction by multiplication ((P)*(Q) for AND) becomes
+     `(P) AND (Q)`. ROSY's `*` requires same-type operands; LO×LO is not
+     valid, so the explicit AND is required.
+   * `ELSEIF LO(1)` (always-true tail clause) becomes `ELSE`.
+   * Some parameter names rename to avoid colliding with globals declared
+     in libcosy/globals.rosy. Conflicts: A (Butcher tableau), C (Butcher
+     tableau), all use underscore suffix.
+  ============================================================================ }
+
+BEGIN;
+
+{ ----- Substring (cosy.fox L120) ------------------------------------------ }
+FUNCTION (ST) SS A_ (ST) I1 (RE) I2 (RE);
+  SS := A_|(I1&I2);
+ENDFUNCTION;
+
+{ ----- String -> Real (cosy.fox L121) ------------------------------------- }
+FUNCTION (RE) R S_ (ST) I1 (RE) I2 (RE);
+  STCRE (S_|(I1&I2)) R;
+ENDFUNCTION;
+
+{ ----- Real -> String, default G23.16 format (cosy.fox L122) -------------- }
+FUNCTION (ST) S R_ (RE);
+  RECST R_ '(G23.16)' S;
+ENDFUNCTION;
+
+{ ----- Real -> String, custom Fortran format (cosy.fox L123) -------------- }
+FUNCTION (ST) SF R_ (RE) FORM (ST);
+  RECST R_ FORM SF;
+ENDFUNCTION;
+
+{ ----- Integer -> String (cosy.fox L124-127) ------------------------------ }
+FUNCTION (ST) SI I (RE);
+  VARIABLE (RE) J; VARIABLE (RE) K;
+  K := ABS(I);
+  SI := SF(K - 10*INT(K/10), '(I1)');
+  LOOP J 1 LOG(K + 0.1)/LOG(10);
+    K := INT(K/10);
+    SI := SF(K - 10*INT(K/10), '(I1)') & SI;
+  ENDLOOP;
+  IF I < 0;
+    SI := '-' & SI;
+  ENDIF;
+ENDFUNCTION;
+
+{ ----- Last non-blank position (cosy.fox L136-139) ------------------------
+  Note: SS(A_, I, I) compiles to `__fn_SS(&mut A_, &mut I, &mut I)` which
+  Rust rejects (two mutable borrows of the same variable). Workaround: pass
+  two distinct copies (IL, IH). Remove once the transpiler emits read-only
+  borrows for non-mutated function args.                                   }
+FUNCTION (RE) ILAST A_ (ST) IA1 (RE) IA2 (RE);
+  VARIABLE (RE) I; VARIABLE (RE) IL; VARIABLE (RE) IH; VARIABLE (ST) CH;
+  CH := ' ';
+  I := IA2 + 1;
+  WHILE (CH = ' ') AND (I > IA1);
+    I := I - 1;
+    IL := I; IH := I;
+    CH := SS(A_, IL, IH);
+  ENDWHILE;
+  ILAST := I;
+ENDFUNCTION;
+
+{ ----- First position of character (cosy.fox L140-143) -------------------- }
+FUNCTION (RE) IPOS C_ (ST) A_ (ST);
+  VARIABLE (RE) LEN; VARIABLE (RE) I;
+  LEN := LENGTH(A_);
+  IPOS := 0;
+  I := 0;
+  WHILE I < LEN;
+    I := I + 1;
+    IF C_ = (A_|I);
+      IPOS := I;
+      I := LEN;     { early-out: pin to the upper bound }
+    ENDIF;
+  ENDWHILE;
+ENDFUNCTION;
+
+{ ----- Lower -> Upper case (cosy.fox L144-156) ----------------------------
+  DEFERRED: TRCAP rebuilds its in/out string parameter A_ via slice-and-
+  concat-into-itself: `A_ := (A_|...) & (AC|IA) & (A_|...)`. ROSY's type
+  resolver flags this as self-referential. Two viable rewrites later:
+   (a) buffer through a `VARIABLE (ST) TEMP` and assign TEMP back to A_;
+   (b) explicit param type: `PROCEDURE TRCAP A_ (ST);` plus the self-cast.
+  Will pick the cleaner one when porting code that calls TRCAP (only used
+  by interactive parsers in cosy.fox; not load-bearing for libcosy v1).   }
+
+{ ----- Tokenize string by separator (cosy.fox L157-165) -------------------
+  DEFERRED: WORDS / FIELDS build per-token (start, end) position pairs by
+  initially storing a scalar then concatenating a second scalar into the
+  same slot. ROSY's type elision sees this as a RE-1D -> VE-1D conflict.
+  Will revisit when (a) the FEEDBACK Issue 6 fix lets indexed arrays carry
+  composite element types, or (b) we rewrite to use a 2D array with two
+  fixed columns up front.                                                  }
+
+END;

@@ -173,7 +173,7 @@ fn rosy(
     let mut ast = Program::from_rule_with_includes(
         program,
         Some(script_path),
-        &mut std::collections::HashSet::new(),
+        &mut rosy::program::IncludeTracker::default(),
     )
         .context("Failed to build AST!")?
         .context("Expected a program")?;

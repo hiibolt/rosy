@@ -1,0 +1,17 @@
+{ ============================================================================
+  libcosy/helpers — non-physics utilities (math, strings, polynomial, IO, ...)
+
+  Filled in incrementally. Adding files in dependency order.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE 'math.rosy';        { v0.36.1 (M2) }
+INCLUDE 'strings.rosy';     { v0.36.1 (M2) }
+INCLUDE 'numerics.rosy';    { v0.36.1 (M2) }
+INCLUDE 'io.rosy';          { v0.36.1 (M2) }
+
+{ M3 will INCLUDE 'polynomial.rosy', 'da_helpers.rosy'.
+  M4 will INCLUDE 'linear_algebra.rosy'. }
+
+END;

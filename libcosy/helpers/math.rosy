@@ -1,0 +1,126 @@
+{ ============================================================================
+  libcosy/helpers/math.rosy — Math utilities
+
+  Ported from cosy.fox L105-118, L255-259, L196-211, L292-294, L133-134.
+
+  Explicit return types are required because ROSY type inference cannot
+  resolve a function's return type unless the function is called somewhere
+  in scope (FEEDBACK.md Issue 4). cosy.fox omits these because COSY's loose
+  mode tolerates it.
+  ============================================================================ }
+
+BEGIN;
+
+{ ----- Basic arithmetic primitives (cosy.fox L105-110) -------------------- }
+
+FUNCTION (RE) MAX I (RE) J (RE);
+  MAX := VMAX(I&J);
+ENDFUNCTION;
+
+FUNCTION (RE) MIN I (RE) J (RE);
+  MIN := VMIN(I&J);
+ENDFUNCTION;
+
+FUNCTION (RE) MOD I1 (RE) I2 (RE);
+  MOD := I1 - INT(I1/I2)*I2;
+ENDFUNCTION;
+
+FUNCTION (RE) SIG I (RE);
+  SIG := 1;
+  IF I # 0;
+    SIG := I/ABS(CONS(I));
+  ENDIF;
+ENDFUNCTION;
+
+{ ----- Imaginary multiply (cosy.fox L110) --------------------------------- }
+
+FUNCTION (CM) IM X (CM);
+  IM := CM(0&1)*X;
+ENDFUNCTION;
+
+{ ----- ATAN2 in [-pi, pi] (cosy.fox L111-116) ------------------------------
+  Uses RE-as-bool multiplication where COSY does. AND is used here because
+  ROSY's compound boolean expressions need explicit logical operators when
+  the operands are LO. }
+FUNCTION (RE) ATAN2 Y (RE) X (RE);
+  VARIABLE (RE) XC; VARIABLE (RE) YC;
+  XC := CONS(X); YC := CONS(Y);
+  IF (XC=0) AND (YC=0);
+    ATAN2 := 0;
+  ELSEIF ABS(YC) > ABS(XC);
+    ATAN2 := ATAN(X/Y);
+    IF YC > 0;
+      ATAN2 := PI*0.5 - ATAN2;
+    ELSE;
+      ATAN2 := -PI*0.5 - ATAN2;
+    ENDIF;
+  ELSE;
+    ATAN2 := ATAN(Y/X);
+    IF XC < 0;
+      IF YC < 0;
+        ATAN2 := -PI + ATAN2;
+      ELSE;
+        ATAN2 := PI + ATAN2;
+      ENDIF;
+    ENDIF;
+  ENDIF;
+ENDFUNCTION;
+
+{ ----- Vectorized ATAN2 (cosy.fox L117-118) -------------------------------
+  DEFERRED: VATAN2 calls ATAN2 (which captures the global PI). The current
+  transpiler only lifts global captures one level deep, so VATAN2 fails to
+  compile because PI isn't in its scope at codegen time. Re-enable once the
+  transpiler propagates transitive captures, or inline ATAN2's body here.  }
+
+{ ----- Factorial / monomial count (cosy.fox L255-259) --------------------- }
+
+FUNCTION (RE) FACT N (RE);
+  VARIABLE (RE) I;
+  FACT := 1;
+  LOOP I 1 N;
+    FACT := FACT*I;
+  ENDLOOP;
+ENDFUNCTION;
+
+FUNCTION (RE) NMON NO_ (RE) NV_ (RE);
+  VARIABLE (RE) I;
+  NMON := 1;
+  LOOP I 1 NO_;
+    NMON := NMON*(NV_+I)/I;
+  ENDLOOP;
+ENDFUNCTION;
+
+{ ----- 1D Fourier transform (cosy.fox L196-211) ---------------------------
+  DEFERRED: FOURIERTRANS uses ambiguous VE/RE element typing on its scratch
+  variables (RS, RC) and output arrays (FTA, FTP). cosy.fox declares them as
+  `VARIABLE RS LENGTH(D(1))`, which depends on whether D is 1D-of-RE or
+  2D-with-vector-rows. ROSY requires that type be known up front. Will port
+  in a later milestone alongside the procedures that actually call it.    }
+
+{ ----- Constant setters (cosy.fox L292-294) ------------------------------- }
+
+PROCEDURE WSET W_;     { W_ underscore-suffixed: 'W' is a global DA field array }
+  WAF := W_;
+ENDPROCEDURE;
+
+PROCEDURE ESET E;
+  EPS := E;
+ENDPROCEDURE;
+
+PROCEDURE DSET E;
+  DAEPS E;
+  DEPS := E;
+ENDPROCEDURE;
+
+{ ----- Misc helpers (cosy.fox L133-134) ----------------------------------- }
+
+PROCEDURE CONTINUE;
+  PI := PI;        { documented no-op in cosy.fox }
+ENDPROCEDURE;
+
+PROCEDURE SVSCR;
+  LSCR := -1;
+  SCRLEN LSCR;     { stores the screen line length into LSCR }
+ENDPROCEDURE;
+
+END;
