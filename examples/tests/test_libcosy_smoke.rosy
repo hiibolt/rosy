@@ -51,6 +51,12 @@ STR := SI(-17);                       WRITE 6 'SI(-17) = ''' STR '''   [expect '
 RESULT := ILAST('hello   ', 1, 8);   WRITE 6 'ILAST(''hello   '', 1, 8) = ' RESULT '   [expect 5]';
 RESULT := IPOS(',', 'a,b,c');        WRITE 6 'IPOS('','', ''a,b,c'') = ' RESULT '   [expect 2]';
 
+{ TRCAP combines self-ref assignment + mixed-borrow-in-call (ILAST(A, 1, LENGTH(A))). }
+VARIABLE (ST) MIXED;
+MIXED := 'Hello WORLD';
+TRCAP MIXED;
+WRITE 6 'TRCAP(''Hello WORLD'') -> ''' MIXED '''   [expect ''HELLO WORLD'']';
+
 { M2: exercise helpers/numerics.rosy }
 M0 := 1.00727646688;     { proton mass in u, used by VELC via globals }
 AMUMEV := 931.494;

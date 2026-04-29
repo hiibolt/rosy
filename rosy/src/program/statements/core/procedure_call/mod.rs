@@ -151,15 +151,19 @@ impl Transpile for ProcedureCallStatement {
             serialized_args.push(serialized_arg);
         }
 
-        // Detect repeated bare-variable args ahead of serialization. See the
-        // matching comment in expressions/core/var_expr/mod.rs — `&mut X`
-        // emitted for two args that name the same variable would alias under
-        // Rust's borrow rules. Materialize a fresh local for each duplicate.
+        // See expressions/core/var_expr/mod.rs for the symmetric design rationale.
+        // Two call-site borrow hazards lower to the same fix — pre-evaluate
+        // offending args into fresh local temps:
+        //   (a) bare-variable duplicates (E0499: two `&mut <var>`)
+        //   (b) mixed mut/shared in one arg list (E0502: `&mut *X` somewhere
+        //       overlapping a `&*X` baked into another arg's expression)
         let mut first_occurrence: std::collections::HashMap<String, usize> =
             std::collections::HashMap::new();
-        let mut dup_temp_declarations: Vec<String> = Vec::new();
-        let mut dup_temp_overrides: std::collections::HashMap<usize, String> =
+        let mut prelude_decls: Vec<String> = Vec::new();
+        let mut prelude_overrides: std::collections::HashMap<usize, String> =
             std::collections::HashMap::new();
+
+        // Pass 1 — record (a) bare-variable duplicates.
         for (i, arg_expr) in self.args.iter().enumerate() {
             if let Some(arg_name) = arg_expr.as_bare_variable_name() {
                 if first_occurrence.contains_key(arg_name) {
@@ -171,9 +175,9 @@ impl Transpile for ProcedureCallStatement {
                             }
                             VariableScope::Local => format!("{}.clone()", arg_name),
                         };
-                        dup_temp_declarations
+                        prelude_decls
                             .push(format!("let mut {} = {};", temp_name, value_expr));
-                        dup_temp_overrides.insert(i, format!("&mut {}", temp_name));
+                        prelude_overrides.insert(i, format!("&mut {}", temp_name));
                     }
                 } else {
                     first_occurrence.insert(arg_name.to_string(), i);
@@ -203,15 +207,25 @@ impl Transpile for ProcedureCallStatement {
                             "procedure '{}' expects argument {} ('{}') to be of type '{}', but type '{}' was provided!",
                             self.name, i+1, proc_context.args[i].name, expected_type, provided_type
                         ));
-                    } else if let Some(override_serialization) = dup_temp_overrides.remove(&i) {
+                    } else if let Some(override_serialization) = prelude_overrides.remove(&i) {
+                        // (a) bare-variable duplicate.
                         serialized_args.push(override_serialization);
                         requested_variables.extend(arg_output.requested_variables);
-                    } else {
-                        // Use as_mut_ref() so a Ref-kind arg (a parameter or
-                        // captured variable that's already `&mut T`) becomes
-                        // `&mut *X` instead of `&mut X` — the latter would be
-                        // `&mut &mut T` and rustc would reject it.
+                    } else if arg_expr.as_bare_variable_name().is_some() {
+                        // Bare-variable first-occurrence — use as_mut_ref()
+                        // so a Ref-kind arg (already `&mut T`) becomes
+                        // `&mut *X` (a fresh reborrow) instead of
+                        // `&mut <&mut T>`.
                         serialized_args.push(arg_output.as_mut_ref());
+                        requested_variables.extend(arg_output.requested_variables);
+                    } else {
+                        // (b) Non-bare arg: pre-evaluate so any borrows the
+                        // expression takes are released before the call.
+                        let temp_name = format!("__rosy_arg_tmp_{}", i);
+                        let value_serial = arg_output.as_owned(&expected_type);
+                        prelude_decls
+                            .push(format!("let mut {} = {};", temp_name, value_serial));
+                        serialized_args.push(format!("&mut {}", temp_name));
                         requested_variables.extend(arg_output.requested_variables);
                     }
                 }
@@ -227,18 +241,18 @@ impl Transpile for ProcedureCallStatement {
             }
         }
 
-        // Serialize the entire procedure (wrap in a block so any duplicate-arg
-        // temp locals are scoped to this single call).
+        // Serialize the entire procedure (wrap in a block when any prelude
+        // temps are needed so they're scoped to this single call).
         let call = format!(
             "{}({}).context(\"...while calling procedure '{}'\")?;",
             self.name,
             serialized_args.join(", "),
             self.name
         );
-        let serialization = if dup_temp_declarations.is_empty() {
+        let serialization = if prelude_decls.is_empty() {
             call
         } else {
-            format!("{{ {} {} }}", dup_temp_declarations.join(" "), call)
+            format!("{{ {} {} }}", prelude_decls.join(" "), call)
         };
         if errors.is_empty() {
             // Transitive global capture: see matching comment in

@@ -1,0 +1,51 @@
+{ ============================================================================
+  Regression test: mixed mut + shared borrows of the same variable across
+  one function/procedure call's argument list.
+
+  Without per-arg pre-evaluation, `F(A, ..., LENGTH(A))` emits
+       __fn_F(&mut *A, ..., &mut RosyLENGTH::rosy_length(&*A))
+  and the immutable `&*A` baked into the third arg's expression overlaps
+  the first arg's `&mut *A` — rustc rejects with E0502.
+
+  Fix: every non-bare arg is materialized into a fresh local before the
+  call, so its borrows release before the call's `&mut <var>` references
+  fire. Combined with the duplicate-bare-var fix from v0.36.4, the call
+  site now handles every aliasing combination uniformly.
+  ============================================================================ }
+
+BEGIN;
+
+{ Function: arg 0 is a bare var, arg 1 is an expression that reads the same var. }
+FUNCTION (RE) FIRST_AT_OFFSET S (ST) DELTA (RE);
+  FIRST_AT_OFFSET := DELTA + LENGTH(S);
+ENDFUNCTION;
+
+{ Procedure: same structure but as a side-effect. }
+PROCEDURE STAMP_LENGTH S (ST) OUT (RE);
+  OUT := LENGTH(S);
+ENDPROCEDURE;
+
+{ Self-call form: a function whose body passes a variable as both bare
+  and inside a sub-expression. Forces the fix at one nesting level deeper. }
+FUNCTION (RE) PADDED_LENGTH S (ST);
+  PADDED_LENGTH := FIRST_AT_OFFSET(S, LENGTH(S));   { S appears bare AND inside LENGTH(S) }
+ENDFUNCTION;
+
+VARIABLE (ST) MSG;
+VARIABLE (RE) RESULT;
+
+MSG := 'hello';
+
+{ Direct call mixing bare + LENGTH(A) — used to fail with E0502. }
+RESULT := FIRST_AT_OFFSET(MSG, 100);
+WRITE 6 'FIRST_AT_OFFSET(''hello'', 100) = ' RESULT '   [expect 105]';
+
+{ Procedure version. }
+STAMP_LENGTH MSG RESULT;
+WRITE 6 'STAMP_LENGTH ''hello'' → ' RESULT '   [expect 5]';
+
+{ The case from libcosy/helpers/strings.rosy::ILAST(A, 1, LENGTH(A)). }
+RESULT := PADDED_LENGTH(MSG);
+WRITE 6 'PADDED_LENGTH(''hello'') = ' RESULT '   [expect LENGTH(''hello'')+LENGTH(''hello'') = 10]';
+
+END;

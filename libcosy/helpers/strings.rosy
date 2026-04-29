@@ -76,26 +76,37 @@ FUNCTION (RE) IPOS C (ST) A (ST);
   ENDWHILE;
 ENDFUNCTION;
 
-{ ----- Lower -> Upper case (cosy.fox L144-156) ----------------------------
-  DEFERRED — needs further transpiler work. Two related fixes are required:
-
-   (1) Self-referential RHS in assignment — fixed (the assign codegen now
-       wraps `*A = (...)` through a temp local, so the natural form
-       `A := (A|...) & (AC|IA) & (A|...)` no longer triggers E0502 by
-       itself).
-
-   (2) NOT YET FIXED: a function/procedure call whose arg list mixes a
-       `&mut <var>` with another arg that reads the same variable inside
-       a sub-expression — e.g. `ILAST(A, 1, LENGTH(A))` emits
-           __fn_ILAST(&mut *A, ..., &mut RosyLENGTH::rosy_length(&*A))
-       where `&mut *A` and `&*A` overlap temporally in the same call.
-       Fixing properly means evaluating each arg into a temp before the
-       call so all borrows are released between arg materializations.
-       That's a separate codegen change at the call-site level, parallel
-       to the dup-args fix in v0.36.4.
-
-  Until (2) lands, TRCAP stays out of libcosy v1 (interactive-parser only,
-  not used in the physics surface).                                       }
+{ ----- Lower -> Upper case (cosy.fox L144-156) --------------------------- }
+PROCEDURE TRCAP A (ST);
+  VARIABLE (ST) AC; VARIABLE (ST) AS;
+  VARIABLE (RE) LSL; VARIABLE (RE) IA; VARIABLE (RE) I;
+  AC := 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  AS := 'abcdefghijklmnopqrstuvwxyz';
+  LSL := ILAST(A, 1, LENGTH(A));
+  IF LSL > 1;
+    LOOP I 2 LSL - 1;
+      IA := IPOS((A|I), AS);
+      IF IA > 0;
+        A := (A|(1 & (I-1))) & (AC|IA) & (A|((I+1) & LSL));
+      ENDIF;
+    ENDLOOP;
+    I := 1;
+    IA := IPOS((A|I), AS);
+    IF IA > 0;
+      A := (AC|IA) & (A|((I+1) & LSL));
+    ENDIF;
+    I := LSL;
+    IA := IPOS((A|I), AS);
+    IF IA > 0;
+      A := (A|(1 & (I-1))) & (AC|IA);
+    ENDIF;
+  ELSEIF LSL = 1;
+    IA := IPOS((A|1), AS);
+    IF IA > 0;
+      A := (AC|IA);
+    ENDIF;
+  ENDIF;
+ENDPROCEDURE;
 
 { ----- Tokenize string by separator (cosy.fox L157-165) -------------------
   DEFERRED: WORDS / FIELDS build per-token (start, end) position pairs by
