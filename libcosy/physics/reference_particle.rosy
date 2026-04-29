@@ -210,6 +210,7 @@ ENDFUNCTION;
      so derivative orders propagate correctly through SQRT / CONS.    }
 PROCEDURE RP E (RE) M (RE) Z (RE);
   VARIABLE (RE) NOM;
+  VARIABLE (RE) I;
   IF LOV # 1;
     WRITE 6 ' *** ERROR, call OV before RP ';
     QUIT 0;
@@ -222,6 +223,22 @@ PROCEDURE RP E (RE) M (RE) Z (RE);
   E0 := E + 0*DA(1);
   M0 := M + 0*DA(1);
   Z0 := Z + 0*DA(1);
+  { Seed XX[1..8] — the canonical phase-space basis used by UM / UMS to
+    initialise MAP and MSC. cosy.fox L2788-2792:
+       XX[I] := DD[I] when I ≤ TWOND, otherwise 0*DD[I];
+       XX[6, 7, 8] hold the (E0, M0, Z0) parameter-dependence terms,
+                   which are zero for ND<3 and DD[6]-bound for ND=3.    }
+  LOOP I 1 8;
+    XX[I] := DD[I];
+    IF I > TWOND;
+      XX[I] := 0*DD[I];
+    ENDIF;
+  ENDLOOP;
+  XX[6] := (E0 - CONS(E0))/CONS(E0);
+  XX[7] := (M0 - CONS(M0))/CONS(M0);
+  XX[8] := (Z0 - CONS(Z0))/CONS(Z0);
+  { Spin-matrix identity at XX[21..29] is deferred — needs LSPN-controlled
+    setup that pairs with the spin tracking in M5 spin_su2.            }
   ETA  := E0/M0/AMUMEV;
   V0   := CLIGHT*SQRT(ETA*(2 + ETA))/(1 + ETA);
   P0   := AMUMEV*M0*SQRT(ETA*(2 + ETA));
@@ -230,6 +247,63 @@ PROCEDURE RP E (RE) M (RE) Z (RE);
   CHIE := CHIM*V0;
   HFAC := SQRT(SQR(CHIM/CONS(CHIM)) - DD[2]*DD[2] - DD[4]*DD[4]);
   CO NOM;
+ENDPROCEDURE;
+
+{ ----- Unity map (cosy.fox L627-635) --------------------------------------
+  Sets MAP and MSC to the identity transformation by copying the XX basis
+  seeded by RP. Spin maps (SPNR / SSCR) become 3×3 identities when LSPN=1.
+
+  Differences from cosy.fox:
+   * Axis-tracking arrays AXP / AXD / LTRA / GTRA are all touched by the
+     cosy.fox UM body for the COSY graphics display — graphics is out of
+     scope for libcosy so the corresponding lines are intentionally
+     omitted. The flow-control flag LUM and the path-length scalars
+     SPOS / GPLOC / NCT / NCCT are still set so downstream guards see
+     `UM-was-called`.                                                    }
+PROCEDURE UM;
+  VARIABLE (RE) I; VARIABLE (RE) J;
+  IF LRP = 0;
+    WRITE 6 ' *** ERROR, call RP before UM ';
+    QUIT 0;
+  ENDIF;
+  LOOP I 1 8;
+    MAP[I] := XX[I];
+    MSC[I] := MAP[I];
+  ENDLOOP;
+  IF LSPN = 1;
+    LOOP I 1 3;
+      LOOP J 1 3;
+        SPNR[I, J] := 0*DA(1);
+        SSCR[I, J] := 0*DA(1);
+      ENDLOOP;
+      SPNR[I, I] := 1 + 0*DA(1);
+      SSCR[I, I] := 1 + 0*DA(1);
+    ENDLOOP;
+  ENDIF;
+  LUM := 1; SPOS := 0; GPLOC := 0; NCT := 0; NCCT := 0;
+ENDPROCEDURE;
+
+{ ----- Unity scratch map (cosy.fox L621-625) ------------------------------
+  Sets MSC to the identity (without touching the active MAP). Used as
+  the starting point for accumulating a new map without clobbering the
+  current one.                                                            }
+PROCEDURE UMS;
+  VARIABLE (RE) I; VARIABLE (RE) J;
+  IF LRP = 0;
+    WRITE 6 ' *** ERROR, call RP before UMS ';
+    QUIT 0;
+  ENDIF;
+  LOOP I 1 8;
+    MSC[I] := XX[I];
+  ENDLOOP;
+  IF LSPN = 1;
+    LOOP I 1 3;
+      LOOP J 1 3;
+        SSCR[I, J] := 0*DA(1);
+      ENDLOOP;
+      SSCR[I, I] := 1 + 0*DA(1);
+    ENDLOOP;
+  ENDIF;
 ENDPROCEDURE;
 
 { ----- Particle-specific RP shortcuts (cosy.fox L2807-2814) ---------------

@@ -56,8 +56,11 @@ VARIABLE (RE 2 10) XCT;     VARIABLE (RE 10) LCT;
 VARIABLE (RE) ESC; VARIABLE (RE) ENC;
 VARIABLE (RE 4) ERAY; VARIABLE (RE 4) ERSC; VARIABLE (RE 2) EMAX;
 
-{ Axis coordinates }
-VARIABLE (RE 1000 3) AXP; VARIABLE (RE 1000 6) AXD; VARIABLE (RE 1000) SPOS;
+{ Axis coordinates — AXP / AXD are graphics-only buffers (skipped in
+  libcosy v1). SPOS is the current arc-length scalar updated by every
+  element body; cosy.fox declares it `1000` (a graphics trace buffer)
+  but the cosy.fox UM body sets it scalar-wise (`SPOS := 0`).         }
+VARIABLE (RE 3 1000) AXP; VARIABLE (RE 6 1000) AXD; VARIABLE (RE) SPOS;
 VARIABLE (RE 20) XLOC;    VARIABLE (RE 20) ZLOC;    VARIABLE (RE 20) PLOC;
 VARIABLE (RE 20) SLOC;    VARIABLE (RE 20) VLOC;    VARIABLE (RE 20) TLOC;
 VARIABLE (RE) GPLOC;

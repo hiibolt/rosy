@@ -206,6 +206,16 @@ WRITE 6 'After RPP 100, CONS(P0) = ' CONS(P0)    '   [expect ~444.5 MeV/c]';
 WRITE 6 'After RPP 100, CONS(V0) = ' CONS(V0)    '   [expect ~1.28e8 m/s = 0.428*CLIGHT]';
 WRITE 6 'After RPP 100, G0       = ' G0          '   [expect 1.792847337 (proton anomalous moment)]';
 
+{ UM: set MAP to the identity. After RPP populated XX, UM copies it into
+  MAP and MSC. The first TWOND components are the basis DAs (DA(1), DA(2)
+  for ND=1), the rest are 0. }
+UM;
+WRITE 6 'After UM, LUM   = ' LUM '   [expect 1]';
+WRITE 6 'After UM, MAP[1] (should be DA(1) = x_1):';
+WRITE 6 MAP[1];
+WRITE 6 'After UM, MAP[2] (should be DA(2) = x_2):';
+WRITE 6 MAP[2];
+
 BBC 13 27 2.7 1.66E-7 0 0;   { Aluminum: Z=13, A=27, density 2.7 g/cm^3, I=166eV; uses scientific notation }
 WRITE 6 'BBC: BETHEBLOCHC(1) = ' BETHEBLOCHC(1) '   [expect 13]';
 WRITE 6 'BBC: BETHEBLOCHC(3) = ' BETHEBLOCHC(3) '   [expect 2.7]';
