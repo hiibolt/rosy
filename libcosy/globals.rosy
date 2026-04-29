@@ -112,9 +112,12 @@ VARIABLE (ST) RKOFNST;
 VARIABLE (RE) EPS; VARIABLE (RE) WAF;
 VARIABLE (ST) TFPFN; VARIABLE (ST) TFPRFN;
 
-{ Generic scratch buffers }
-VARIABLE (RE 20) DD; VARIABLE (RE 20) DX;
-VARIABLE (RE 15 30) XX;
+{ Generic scratch buffers — DD and XX hold DA polynomials in cosy.fox.
+  cosy.fox declares `DD 1 20` and `XX 15 30`; the leading 1 / 15 are
+  COSY's "memory hint" prefix. Each cell stores a DA, accessed via a
+  single index (DD(I), XX(I)). DEPS is a scalar tolerance.            }
+VARIABLE (DA 20) DD; VARIABLE (DA 20) DX;
+VARIABLE (DA 30) XX;
 VARIABLE (RE) DEPS;
 
 { DA dimension / order parameters — set in OV }

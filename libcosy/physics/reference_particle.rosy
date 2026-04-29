@@ -58,6 +58,76 @@ PROCEDURE CO NNO (RE);
   DANOT NOC;
 ENDPROCEDURE;
 
+{ ----- Order / dimension / parameter setup (cosy.fox L406-426) ------------
+  The single most important entry point in libcosy: every cosy.fox script
+  starts with `OV order ND NP;` to set the phase-space order, dimension,
+  and parameter count. Initializes the DA system (DAINI), seeds the DD
+  scratch buffer with basis variables DA(1)..DA(NV), sets every flow-
+  control flag to its default, and chains DEF → FD for constants and
+  fringe-field defaults.
+
+  cosy.fox additionally calls CR at the bottom to clear ray buffers; CR
+  needs partial-index slice semantics on RAY / RSC / SPI / SSC that ROSY
+  doesn't yet provide, so the corresponding scalar flags (NRAY, NSPN,
+  LCR, LENV) are zeroed inline here. The array-clearing CR will land
+  alongside ray_io.rosy in M4.                                             }
+PROCEDURE OV ORD (RE) NND (RE) NNP (RE);
+  VARIABLE (RE) I;
+  IF NND > 3;     WRITE 6 ' *** ERROR in OV, ND > 3 '; QUIT 0;
+  ELSEIF NND < 0; WRITE 6 ' *** ERROR in OV, ND < 0 '; QUIT 0;
+  ELSEIF NNP < 0; WRITE 6 ' *** ERROR in OV, NP < 0 '; QUIT 0;
+  ENDIF;
+  NO := ORD; ND := NND; TWOND := 2*ND; NP := NNP; NV := TWOND + NP;
+  IF LWA < 0; LWA := -LWA; NV := NV + 1; ENDIF;
+  IF NV > 40;
+    IF LWA = 0;
+      WRITE 6 '*** ERROR in OV, 2*ND+NP > 40 ';
+    ELSEIF LWA # 0;
+      WRITE 6 '*** ERROR in OV, 2*ND+NP > 39 ';
+    ENDIF;
+    QUIT 0;
+  ENDIF;
+  DEF;
+  IF ND = 0;
+    DAINI NO NV 0 NM1;
+  ELSE;
+    DAINI NO+1 MAX(NV, 3) 0 NM1;
+  ENDIF;
+  NM2 := NMON(NO, TWOND + NP);
+  NM3 := NMON(NO + 1, 3);
+  NMP := NMON(NO, NP);
+  { Clear the DD slots above NV. Bare RE 0 would mismatch the DA-typed
+    DD; use `0*DA(1)` so the assignment is in DA-space. }
+  LOOP I NV+1 20;
+    DD[I] := 0*DA(1);
+  ENDLOOP;
+  SVSCR;
+  LSCR := MAX(50000, LSCR);
+  LSCR := MAX(LSCR, 2*NM1);
+  SCRLEN LSCR;
+  LSCT := 50000;
+  { Seed DD with the basis DA variables DA(1)..DA(MAX(NV, 3)). }
+  LOOP I 1 MAX(NV, 3);
+    DD[I] := DA(I);
+  ENDLOOP;
+  DSET 1E-16;
+  CO NO;
+  { Default flow-control state — every flag off / unset, with LSYS / LCE /
+    LAX / LCB pre-armed to enable the picture / energy-grid / axis update
+    paths once their state machines start firing. }
+  LOV := 1;     LRP := 0;     LUM := 0;     LPI := 0;
+  LCB := 1;     LPG := 0;     LPS := 0;     LM  := 0;
+  LFR := 0;     LFR2 := 0;
+  LENV := 0;    LSYS := 1;    LCE := 1;     LAX := 1;
+  LTRR := 0;    LTRI := 0;
+  LTRPRAY := 0; LTRPSPI := 0;
+  { CR-equivalent scalar resets (the array clears defer to M4 ray_io). }
+  NRAY := 0; NSPN := 0; LCR := 0;
+  NRAYTRA0 := 251;
+  NRAYTRA := NRAY;
+  FD;
+ENDPROCEDURE;
+
 { ----- Kinematic-correction flag (cosy.fox L2324-2326) -------------------- }
 PROCEDURE KC I (RE);
   LKC := I;

@@ -122,6 +122,19 @@ WRITE 6 'After WAS 0, LWA = ' LWA '   [expect 0]';
 CO 2;          { computational order = 2 (must be ≤ DAINI order 3) }
 WRITE 6 'After CO 2, NOC  = ' NOC '   [expect 2]';
 
+{ Exercise OV — the gateway setup procedure that every cosy.fox script
+  starts with. After this fires, NO/ND/NP/NV/TWOND are set, the DA
+  system is re-initialized, and DD holds the basis DA variables.        }
+OV 2 1 0;          { order 2, ND=1 (1D phase space), NP=0 parameters }
+WRITE 6 'After OV 2 1 0:';
+WRITE 6 '  NO    = ' NO    '   [expect 2]';
+WRITE 6 '  ND    = ' ND    '   [expect 1]';
+WRITE 6 '  TWOND = ' TWOND '   [expect 2]';
+WRITE 6 '  NP    = ' NP    '   [expect 0]';
+WRITE 6 '  NV    = ' NV    '   [expect 2]';
+WRITE 6 '  LOV   = ' LOV   '   [expect 1 — the OV-was-called flag]';
+WRITE 6 '  PI    = ' PI    '   [expect ~3.14159 — DEF was called by OV]';
+
 { M2: exercise helpers/numerics.rosy }
 M0 := 1.00727646688;     { proton mass in u, used by VELC via globals }
 AMUMEV := 931.494;
