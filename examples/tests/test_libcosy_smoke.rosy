@@ -167,6 +167,20 @@ WRITE 6 'SSM/SSNM round-trip OK (no print — output is the all-zero default).';
 WABS_RESULT := WABS(MAP[1], 0.1);
 WRITE 6 'WABS(MAP[1], 0.1) = ' WABS_RESULT '   [order-weighted norm]';
 
+{ ME: matrix-element extraction from MAP. }
+WRITE 6 'ME(1, 1)  [x_1 coefficient of MAP[1]=x_1+2*x_2]      = ' ME(1, 1)  '   [expect 1]';
+WRITE 6 'ME(2, 1)  [x_1 coefficient of MAP[2]=3*x_1-x_2]      = ' ME(2, 1)  '   [expect 3]';
+WRITE 6 'ME(2, 11) [x_1*x_2 coefficient of MAP[2]=3*x_1-x_2]  = ' ME(2, 11) '   [expect 0]';
+
+{ PB: Poisson bracket {x_1, x_2} = 1 (canonical pair after OV 2 1 0). }
+VARIABLE (DA) PB_RESULT;
+PB_RESULT := PB(DA(1), DA(2));
+WRITE 6 'PB(x_1, x_2) — expect constant 1:';
+WRITE 6 PB_RESULT;
+PB_RESULT := PB(DA(1)*DA(1), DA(2));
+WRITE 6 'PB(x_1^2, x_2) — expect 2*x_1:';
+WRITE 6 PB_RESULT;
+
 { M2: exercise helpers/numerics.rosy }
 M0 := 1.00727646688;     { proton mass in u, used by VELC via globals }
 AMUMEV := 931.494;

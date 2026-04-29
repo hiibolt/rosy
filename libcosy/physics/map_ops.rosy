@@ -56,4 +56,28 @@ PROCEDURE SSNM N M;
   ENDLOOP;
 ENDPROCEDURE;
 
+{ ----- Matrix-element extraction (cosy.fox L216) --------------------------
+  ME(M, I) returns the I-th monomial coefficient of MAP[M]. Like COEF,
+  the input is a single DA pulled from a DA-array slot; ROSY's DAPEE
+  expects a `Vec<DA>` so we wrap into a one-element scratch.            }
+FUNCTION (RE) ME M (RE) I (RE);
+  VARIABLE (DA 1) XS;
+  XS[1] := MAP[M];
+  DAPEE XS I ME;
+ENDFUNCTION;
+
+{ ----- Poisson bracket (cosy.fox L223-225) --------------------------------
+  PB(X, Y) = Σ_{i=1,3,5,...} ∂X/∂q_i · ∂Y/∂p_i − ∂X/∂p_i · ∂Y/∂q_i
+  where (q_i, p_i) are the canonical phase-space pairs and the sum runs
+  over the ND pairs (TWOND = 2*ND, step 2).
+  The `0*X + 0*Y` initializer keeps PB DA-typed even before the first
+  loop iteration writes — bare RE 0 would mismatch the DA return slot. }
+FUNCTION (DA) PB X (DA) Y (DA);
+  VARIABLE (RE) I;
+  PB := 0*X + 0*Y;
+  LOOP I 1 TWOND 2;
+    PB := PB + DER(I, X)*DER(I+1, Y) - DER(I+1, X)*DER(I, Y);
+  ENDLOOP;
+ENDFUNCTION;
+
 END;
