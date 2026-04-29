@@ -1,0 +1,162 @@
+{ ============================================================================
+  libcosy/physics/elements_magnetic.rosy — Magnetic-element initial port
+
+  M5 starts with the analytical-fast-path quadrupole (MQ) — no fringe
+  field, no spin, low order — which exercises the nested-procedure scope
+  semantics (MQ → MQUAD nested helper, with MAPY further nested inside
+  MQUAD reading MQUAD's locals).
+
+  Deferred:
+    * The fringe-field branch of MQ (and the entire MH / MO / MD / MZ /
+      M5 / MM / MMS family) calls FFELE, which itself chains into SIELE
+      and POTFLD — both depend on the m6 field_potential.rosy body
+      (POTFLD with its 8 nested helpers, ODE / HAMILTONIAN / RK).
+      Will land alongside that milestone.
+    * BEND (the dipole monster, 13 nested procedures) — its own focused
+      milestone in m7.
+    * MQK / MSK / MOK / MDK / MZK / MMK / MMSK (integrated-strength
+      variants) and the solenoid family — port after FFELE.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- Magnetic quadrupole (analytical fast path, cosy.fox L3126-3155) ----
+  Inline port of MQ's no-fringe-field / no-spin / low-order branch. The
+  cosy.fox structure is MQ procedure containing nested MQUAD which itself
+  contains nested MAPY. All three levels are preserved here so the
+  scope-sharing matches what cosy.fox expects (MAPY reads MQUAD's locals
+  N, FP, IAP).
+
+  Parameters
+    L (RE)  — physical length [m]
+    B (RE)  — pole-tip magnetic field [T]
+    D (RE)  — pole-tip aperture [m]                                       }
+PROCEDURE MQ L (RE) B (RE) D (RE);
+
+  PROCEDURE MQUAD IAP L (RE) F (RE) AP (RE);
+    VARIABLE (RE) C; VARIABLE (DA) OM1; VARIABLE (DA) OM2;
+    VARIABLE (DA) FI; VARIABLE (DA) FP; VARIABLE (DA) N; VARIABLE (DA) OM;
+
+    { MAPY: a 2x2 rotation-style update on (IAP[c], IAP[c+1]) using cosines
+      / sines (or hyperbolic counterparts for c = 3, the y plane). }
+    PROCEDURE MAPY C (RE) X (DA) Y (DA);
+      N := IAP[C];
+      IAP[C] := IAP[C]*X + IAP[C + 1]/FP*Y;
+      IF C = 1;
+        IAP[C + 1] := -FP*N*Y + IAP[C + 1]*X;
+      ELSEIF C = 3;
+        IAP[C + 1] :=  FP*N*Y + IAP[C + 1]*X;
+      ENDIF;
+    ENDPROCEDURE;
+
+    IF LUM # 1;
+      WRITE 6 ' *** ERROR, call UM before MQ';
+      QUIT 0;
+    ENDIF;
+    IF ABS(CONS(F)) < 1E-15;
+      DLACT IAP L;            { zero strength → drift }
+    ELSE;
+      FI := F + 0*DA(1);
+      IF CONS(F*Z0) < 0;
+        FI := -F + 0*DA(1);
+        N := IAP[1]; IAP[1] := IAP[3]; IAP[3] := N;
+        N := IAP[2]; IAP[2] := IAP[4]; IAP[4] := N;
+      ENDIF;
+      C := CONS(ETA);
+      OM := SQRT(FI/(AP*CHIM));
+      OM1 := CONS(OM) + 0*DA(1);
+      OM2 := 2*OM1*L;
+      FP := SQRT((1 + IAP[6])*((1 + IAP[6])*C + 2*(1 + IAP[7]))/(C + 2))*OM;
+      IF ND > 2;
+        N := IAP[3]*IAP[4]*(COSH(OM2) - 1) + IAP[1]*IAP[2]*(COS(OM2) - 1);
+        N := N
+            + SQR(IAP[2])*(L + 0.5/OM1*SIN(OM2))
+            + SQR(IAP[4])*(L + 0.5/OM1*SINH(OM2));
+        N := N + (SQR(IAP[1])*(L - SIN(OM2)*0.5/OM1)
+                + SQR(IAP[3])*(-L + SINH(OM2)*0.5/OM1))*SQR(OM1);
+        IAP[5] := IAP[5]
+              + ((1 + C)*(1 - 0.25*N/L) - ((1 + IAP[7]) + (1 + IAP[6])*C)*OM/FP)/(2 + C)*L;
+      ENDIF;
+      OM := OM*L;
+      MAPY 1 COS(OM)  SIN(OM);
+      MAPY 3 COSH(OM) SINH(OM);
+      IF CONS(F*Z0) < 0;
+        N := IAP[1]; IAP[1] := IAP[3]; IAP[3] := N;
+        N := IAP[2]; IAP[2] := IAP[4]; IAP[4] := N;
+      ENDIF;
+    ENDIF;
+  ENDPROCEDURE;
+
+  { MQ outer body: only the analytical fast path is kept (NOC < 3, no
+    fringe field, no spin). The fringe-field branch is deferred until
+    FFELE lands.                                                         }
+  IF (NOC < 3) AND (LFR = 0) AND (LSPN = 0);
+    MQUAD MAP L B D;
+    IF NRAY # 0;
+      UMS;
+      MQUAD MSC L B D;
+    ENDIF;
+    DR := D;
+    CE := 'MQ';
+  ELSE;
+    WRITE 6 ' *** ERROR, MQ fringe-field path not yet ported (needs FFELE)';
+    QUIT 0;
+  ENDIF;
+
+ENDPROCEDURE;
+
+{ ----- Magnetic sextupole (analytical fast path, cosy.fox L3157-3176) -----
+  Sextupole kick computed via the second-order expansion of the cubic
+  potential. Two-deep nesting (MH → MHEXA) — simpler than MQ since
+  MHEXA does not need a MAPY-style helper.
+
+  Parameters
+    L (RE) — physical length [m]
+    B (RE) — pole-tip magnetic field [T]
+    D (RE) — pole-tip aperture [m]                                       }
+PROCEDURE MH L (RE) B (RE) D (RE);
+
+  PROCEDURE MHEXA IAP L (RE) F (RE) AP (RE);
+    VARIABLE (RE) C;
+    VARIABLE (DA) X; VARIABLE (DA) XZ; VARIABLE (DA) Y;
+    VARIABLE (DA) FP; VARIABLE (DA) FI;
+    C := CONS(ETA);
+    IF LUM # 1;
+      WRITE 6 ' *** ERROR, call UM before MH';
+      QUIT 0;
+    ENDIF;
+    FP := SQRT((1 + IAP[6])*((1 + IAP[6])*C + 2*(1 + IAP[7]))/(C + 2));
+    X  := IAP[1];
+    XZ := IAP[2];
+    Y  := IAP[3];
+    DLACT IAP L;
+    IF NO > 1;
+      FI := F/(3*SQR(AP)) + 0*DA(1);
+      C := CONS(CHIM);
+      IAP[1] := IAP[1] - FI/C*1.5*SQR(L)*(SQR(X) - SQR(Y)
+              + (2.0/3.0)*L*(X*XZ - Y*IAP[4] + 0.25*L*(SQR(XZ) - SQR(IAP[4]))));
+      IAP[2] := IAP[2] - FI/C*L*3*(SQR(X) - SQR(Y)
+              + L*(X*XZ - Y*IAP[4] + (1.0/3.0)*L*(SQR(XZ) - SQR(IAP[4]))));
+      IAP[3] := IAP[3] + FI/C*SQR(L)*(3*X*Y + L*(Y*XZ + X*IAP[4] + 0.5*L*XZ*IAP[4]));
+      IAP[4] := IAP[4] + FI/C*L*(6*X*Y + L*(3*(Y*XZ + X*IAP[4]) + 2*L*XZ*IAP[4]));
+    ENDIF;
+  ENDPROCEDURE;
+
+  IF (NOC < 3) AND (LFR = 0) AND (LSPN = 0);
+    MHEXA MAP L B D;
+    IF NRAY # 0;
+      UMS;
+      MHEXA MSC L B D;
+    ENDIF;
+    DR := D;
+    CE := 'MH';
+  ELSE;
+    WRITE 6 ' *** ERROR, MH fringe-field path not yet ported (needs FFELE)';
+    QUIT 0;
+  ENDIF;
+
+ENDPROCEDURE;
+
+END;

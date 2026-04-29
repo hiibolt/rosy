@@ -227,6 +227,32 @@ WRITE 6 MAP[1];
 WRITE 6 'After DL 0.5, MAP[2] (momentum unchanged):';
 WRITE 6 MAP[2];
 
+{ Re-setup with 2D phase space for the quadrupole test.
+  ND=2 -> 4 phase-space variables: (x, p_x, y, p_y) = DA(1..4). }
+OV 2 2 0;
+RPP 100;
+UM;
+WRITE 6 'After OV 2 2 0 + RPP + UM, identity MAP[1] = x = DA(1):';
+WRITE 6 MAP[1];
+
+{ MQ: focusing magnetic quadrupole, length 0.5 m, pole-tip field 1.0 T,
+  aperture 5 cm. The cosy.fox analytical fast path applies the canonical
+  quad map (cosine in focusing plane, hyperbolic-cosine in defocusing).
+  After this, MAP[1] picks up the cos(KL)*x + sin(KL)/K*p_x pattern. }
+MQ 0.5 1.0 0.05;
+WRITE 6 'After MQ 0.5 1.0 0.05, MAP[1] (focusing-plane x map):';
+WRITE 6 MAP[1];
+WRITE 6 'After MQ, MAP[3] (defocusing-plane y map):';
+WRITE 6 MAP[3];
+
+{ MH: sextupole — second-order kick; reset to identity before applying. }
+UM;
+MH 0.3 0.5 0.05;
+WRITE 6 'After UM + MH 0.3 0.5 0.05, MAP[1] (sextupole x kick):';
+WRITE 6 MAP[1];
+WRITE 6 'After MH, MAP[2] (p_x kick — picks up x^2, y^2 terms at order 2):';
+WRITE 6 MAP[2];
+
 BBC 13 27 2.7 1.66E-7 0 0;   { Aluminum: Z=13, A=27, density 2.7 g/cm^3, I=166eV; uses scientific notation }
 WRITE 6 'BBC: BETHEBLOCHC(1) = ' BETHEBLOCHC(1) '   [expect 13]';
 WRITE 6 'BBC: BETHEBLOCHC(3) = ' BETHEBLOCHC(3) '   [expect 2.7]';
