@@ -1,5 +1,5 @@
 { ============================================================================
-  test_libcosy_smoke.rosy — Smoke test for libcosy/
+  test_libcosy_smoke.rosy --Smoke test for libcosy/
 
   Confirms that:
    * `INCLUDE 'libcosy';` resolves through the directory fallback to
@@ -67,9 +67,9 @@ F := 3*DA(1) + 5*DA(2) + 7*DA(1)*DA(2);
 WRITE 6 'COEF(F, 1)  [x_1     coefficient] = ' COEF(F, 1)  '   [expect 3]';
 WRITE 6 'COEF(F, 11) [x_1*x_2 coefficient] = ' COEF(F, 11) '   [expect 7]';
 
-WRITE 6 'DER(1, F) [partial wrt x_1] — expect 3 (constant) + 7*x_2:';
+WRITE 6 'DER(1, F) [partial wrt x_1] --expect 3 (constant) + 7*x_2:';
 WRITE 6 DER(1, F);
-WRITE 6 'INTEG(1, DER(1, F)) — round-trips x_1-dependent terms (5*x_2 is lost):';
+WRITE 6 'INTEG(1, DER(1, F)) --round-trips x_1-dependent terms (5*x_2 is lost):';
 WRITE 6 INTEG(1, DER(1, F));
 
 { M3: exercise helpers/polynomial.rosy::POLY
@@ -116,13 +116,13 @@ WRITE 6 'After DEF, WAF    = ' WAF    '   [expect 0.1]';
 WRITE 6 'After DEF, DEPS   = ' DEPS   '   [expect 1e-16]';
 
 { Control-flow flag setters. }
-KC 1;          { kinematic correction off — emits a warning }
+KC 1;          { kinematic correction off --emits a warning }
 WAS 0;         { wedge mode 0 → LWA = 0 }
 WRITE 6 'After WAS 0, LWA = ' LWA '   [expect 0]';
 CO 2;          { computational order = 2 (must be ≤ DAINI order 3) }
 WRITE 6 'After CO 2, NOC  = ' NOC '   [expect 2]';
 
-{ Exercise OV — the gateway setup procedure that every cosy.fox script
+{ Exercise OV --the gateway setup procedure that every cosy.fox script
   starts with. After this fires, NO/ND/NP/NV/TWOND are set, the DA
   system is re-initialized, and DD holds the basis DA variables.        }
 OV 2 1 0;          { order 2, ND=1 (1D phase space), NP=0 parameters }
@@ -132,8 +132,8 @@ WRITE 6 '  ND    = ' ND    '   [expect 1]';
 WRITE 6 '  TWOND = ' TWOND '   [expect 2]';
 WRITE 6 '  NP    = ' NP    '   [expect 0]';
 WRITE 6 '  NV    = ' NV    '   [expect 2]';
-WRITE 6 '  LOV   = ' LOV   '   [expect 1 — the OV-was-called flag]';
-WRITE 6 '  PI    = ' PI    '   [expect ~3.14159 — DEF was called by OV]';
+WRITE 6 '  LOV   = ' LOV   '   [expect 1 --the OV-was-called flag]';
+WRITE 6 '  PI    = ' PI    '   [expect ~3.14159 --DEF was called by OV]';
 
 { M4 minimal: exercise the simple map savers + WABS.
   These calls drive ROSY type inference for the untyped DA-array params. }
@@ -161,7 +161,7 @@ WRITE 6 M_OTHER[1];
 { Spin map savers: SPNR is zero by default; copy round-trip exercises the loops. }
 SSM SPIN_SAVE;
 SSNM SPIN_SAVE SPIN_OTHER;
-WRITE 6 'SSM/SSNM round-trip OK (no print — output is the all-zero default).';
+WRITE 6 'SSM/SSNM round-trip OK (no print --output is the all-zero default).';
 
 { WABS: COSY order-weighted norm. WAF is the global weight scalar. }
 WABS_RESULT := WABS(MAP[1], 0.1);
@@ -175,15 +175,27 @@ WRITE 6 'ME(2, 11) [x_1*x_2 coefficient of MAP[2]=3*x_1-x_2]  = ' ME(2, 11) '   
 { PB: Poisson bracket {x_1, x_2} = 1 (canonical pair after OV 2 1 0). }
 VARIABLE (DA) PB_RESULT;
 PB_RESULT := PB(DA(1), DA(2));
-WRITE 6 'PB(x_1, x_2) — expect constant 1:';
+WRITE 6 'PB(x_1, x_2) --expect constant 1:';
 WRITE 6 PB_RESULT;
 PB_RESULT := PB(DA(1)*DA(1), DA(2));
-WRITE 6 'PB(x_1^2, x_2) — expect 2*x_1:';
+WRITE 6 'PB(x_1^2, x_2) --expect 2*x_1:';
 WRITE 6 PB_RESULT;
 
 { PM: pretty-print the first 5 components of MAP via DAPRV. }
-WRITE 6 'PM 6: print MAP[1..5] to stdout (unit 6) —';
+WRITE 6 'PM 6: print MAP[1..5] to stdout (unit 6) --';
 PM 6;
+
+{ PNM: print an arbitrary saved map (M_SAVE was populated by SM earlier). }
+WRITE 6 'PNM M_SAVE 6: print the snapshot map --';
+PNM M_SAVE 6;
+
+{ DMAP: SM saved MAP into M_SAVE, so DMAP(MAP, M_SAVE, …) should be all zero. }
+WRITE 6 'DMAP MAP M_SAVE 6: difference of MAP and its snapshot --expect all zero --';
+DMAP MAP M_SAVE 6;
+
+{ DSMAP: SSM saved SPNR into SPIN_SAVE; DSMAP(SPNR, SPIN_SAVE, ..) is all zero. }
+WRITE 6 'DSMAP SPNR SPIN_SAVE 6: spin-map difference --expect all zero --';
+DSMAP SPNR SPIN_SAVE 6;
 
 { M2: exercise helpers/numerics.rosy }
 M0 := 1.00727646688;     { proton mass in u, used by VELC via globals }
