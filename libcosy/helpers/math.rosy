@@ -66,11 +66,15 @@ FUNCTION (RE) ATAN2 Y (RE) X (RE);
   ENDIF;
 ENDFUNCTION;
 
-{ ----- Vectorized ATAN2 (cosy.fox L117-118) -------------------------------
-  DEFERRED: VATAN2 calls ATAN2 (which captures the global PI). The current
-  transpiler only lifts global captures one level deep, so VATAN2 fails to
-  compile because PI isn't in its scope at codegen time. Re-enable once the
-  transpiler propagates transitive captures, or inline ATAN2's body here.  }
+{ ----- Vectorized ATAN2 (cosy.fox L117-118) ------------------------------- }
+
+FUNCTION (VE) VATAN2 Y (VE) X (VE);
+  VARIABLE (RE) I;
+  VATAN2 := Y;
+  LOOP I 1 LENGTH(Y);
+    VELSET VATAN2 I ATAN2(Y|I, X|I);
+  ENDLOOP;
+ENDFUNCTION;
 
 { ----- Factorial / monomial count (cosy.fox L255-259) --------------------- }
 

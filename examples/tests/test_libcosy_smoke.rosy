@@ -37,6 +37,11 @@ RESULT := NMON(3, 2);    WRITE 6 'NMON(3, 2) [monomials, order 3, vars 2] = ' RE
 RESULT := ATAN2(1, 1);   WRITE 6 'ATAN2(1, 1) = ' RESULT '   [expect ~0.785]';
 RESULT := ATAN2(1, -1);  WRITE 6 'ATAN2(1, -1) = ' RESULT '   [expect ~2.356]';
 
+{ Transitive capture: VATAN2 calls ATAN2 (which captures global PI). }
+VARIABLE (VE) VRES;
+VRES := VATAN2(1 & 1 & 1, 1 & -1 & 0);
+WRITE 6 'VATAN2([1,1,1], [1,-1,0]) = ' VRES '   [expect (~0.785, ~2.356, ~1.571)]';
+
 { M2: exercise helpers/strings.rosy }
 VARIABLE (ST) STR;
 STR := SS('Hello, World!', 8, 12);   WRITE 6 'SS(''Hello, World!'', 8, 12) = ''' STR '''   [expect ''World'']';

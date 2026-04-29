@@ -207,8 +207,11 @@ impl Transpile for ProcedureCallStatement {
                         serialized_args.push(override_serialization);
                         requested_variables.extend(arg_output.requested_variables);
                     } else {
-                        // If the type is correct, add the serialization
-                        serialized_args.push(format!("&mut {}", arg_output.serialization));
+                        // Use as_mut_ref() so a Ref-kind arg (a parameter or
+                        // captured variable that's already `&mut T`) becomes
+                        // `&mut *X` instead of `&mut X` — the latter would be
+                        // `&mut &mut T` and rustc would reject it.
+                        serialized_args.push(arg_output.as_mut_ref());
                         requested_variables.extend(arg_output.requested_variables);
                     }
                 }
@@ -238,6 +241,11 @@ impl Transpile for ProcedureCallStatement {
             format!("{{ {} {} }}", dup_temp_declarations.join(" "), call)
         };
         if errors.is_empty() {
+            // Transitive global capture: see matching comment in
+            // expressions/core/var_expr/mod.rs. The procedure's own
+            // captured globals must propagate up to the caller's signature,
+            // otherwise nested calls fail to resolve their globals.
+            requested_variables.extend(proc_context.requested_variables.iter().cloned());
             Ok(TranspilationOutput {
                 serialization,
                 requested_variables,

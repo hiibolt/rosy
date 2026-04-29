@@ -539,6 +539,14 @@ pub fn function_call_transpile_helper(
         )
     };
     if errors.is_empty() {
+        // Transitive global capture: every variable the called function
+        // captures must also be visible to the caller, otherwise the
+        // generated Rust call `__fn_F(PI, ...)` references a `PI` that
+        // isn't in the caller's parameter list. The body transpiler
+        // collects this requested_variables set per statement and rolls it
+        // up into the enclosing function/procedure's own signature, so
+        // captures flow along the call graph by simple union at each link.
+        requested_variables.extend(func_context.requested_variables.iter().cloned());
         Ok(TranspilationOutput {
             serialization,
             requested_variables,
