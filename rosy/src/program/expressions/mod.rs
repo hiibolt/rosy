@@ -761,6 +761,16 @@ impl TranspileableExpr for Expr {
     ) -> ExprRecipe {
         self.inner.build_expr_recipe(resolver, ctx, deps)
     }
+    fn as_bare_variable_name(&self) -> Option<&str> {
+        self.inner.as_bare_variable_name()
+    }
+    fn try_inplace_append(
+        &self,
+        target_var: &str,
+        context: &mut TranspilationInputContext,
+    ) -> Option<Result<TranspilationOutput, Vec<Error>>> {
+        self.inner.try_inplace_append(target_var, context)
+    }
 }
 impl Transpile for Expr {
     fn transpile (

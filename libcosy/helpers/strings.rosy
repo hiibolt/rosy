@@ -49,19 +49,14 @@ FUNCTION (ST) SI I (RE);
   ENDIF;
 ENDFUNCTION;
 
-{ ----- Last non-blank position (cosy.fox L136-139) ------------------------
-  Note: SS(A, I, I) compiles to `__fn_SS(&mut A, &mut I, &mut I)` which
-  Rust rejects (two mutable borrows of the same variable). Workaround: pass
-  two distinct copies (IL, IH). Will be removed once the transpiler emits
-  read-only borrows for non-mutated function args (next bug fix).         }
+{ ----- Last non-blank position (cosy.fox L136-139) ------------------------ }
 FUNCTION (RE) ILAST A (ST) IA1 (RE) IA2 (RE);
-  VARIABLE (RE) I; VARIABLE (RE) IL; VARIABLE (RE) IH; VARIABLE (ST) CH;
+  VARIABLE (RE) I; VARIABLE (ST) CH;
   CH := ' ';
   I := IA2 + 1;
   WHILE (CH = ' ') AND (I > IA1);
     I := I - 1;
-    IL := I; IH := I;
-    CH := SS(A, IL, IH);
+    CH := SS(A, I, I);            { I appears twice — handled by call-site dup detection }
   ENDWHILE;
   ILAST := I;
 ENDFUNCTION;

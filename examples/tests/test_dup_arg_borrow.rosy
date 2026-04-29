@@ -1,0 +1,51 @@
+{ ============================================================================
+  Regression test: passing the same variable as multiple arguments.
+
+  Functions and procedures take `&mut T` per arg under COSY in/out semantics.
+  Without per-call duplicate detection, `F(I, I)` would emit two `&mut I`
+  references to the same memory and Rust's borrow checker rejects it
+  (E0499). The transpiler now materializes a fresh local for each repeated
+  occurrence — first occurrence keeps the original (so a function that
+  mutates the arg still propagates its writes through the first parameter).
+  ============================================================================ }
+
+BEGIN;
+
+{ Pure read (typical case): same var passed twice. }
+FUNCTION (RE) ADD3 A (RE) B (RE) C (RE);
+  ADD3 := A + B + C;
+ENDFUNCTION;
+
+VARIABLE (RE) X;
+VARIABLE (RE) RESULT;
+
+X := 7;
+RESULT := ADD3(X, X, X);    { all three args reference the same X }
+WRITE 6 'ADD3(X, X, X) where X=7  →  ' RESULT '   [expect 21]';
+
+{ Procedure with the same arg repeated. SAVE_PAIR writes to OUT1 only. }
+PROCEDURE SAVE_PAIR IN1 (RE) IN2 (RE) OUT1 (RE);
+  OUT1 := IN1 + IN2;
+ENDPROCEDURE;
+
+VARIABLE (RE) Y;
+Y := 10;
+SAVE_PAIR Y Y RESULT;       { Y appears twice as input args }
+WRITE 6 'SAVE_PAIR Y Y RESULT  →  ' RESULT '   [expect 20]';
+
+{ Mixed: first occurrence is the original (mutation would propagate),
+  later occurrences are fresh clones. Verifies the FIRST keeps the
+  original binding by passing the same var as both an input and the
+  output. }
+PROCEDURE INC_AND_REPORT IN_OUT (RE) ORIGINAL (RE) RESULT_OUT (RE);
+  IN_OUT := IN_OUT + 1;
+  RESULT_OUT := IN_OUT - ORIGINAL;
+ENDPROCEDURE;
+
+VARIABLE (RE) Z;
+Z := 5;
+INC_AND_REPORT Z Z RESULT;  { Z passed twice; first one mutates, second is a clone of pre-call value }
+WRITE 6 'After INC_AND_REPORT Z Z, Z = ' Z '   [expect 6 — first arg mutation propagates]';
+WRITE 6 'RESULT = ' RESULT '   [expect 1 — IN_OUT after +1 minus pre-call ORIGINAL]';
+
+END;

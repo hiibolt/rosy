@@ -439,6 +439,40 @@ pub fn function_call_transpile_helper(
         serialized_args.push(serialized_arg);
     }
 
+    // Detect repeated bare-variable args ahead of serialization. Functions
+    // take `&mut T` per-arg (COSY in/out semantics), so passing the same
+    // variable twice — e.g. `SS(A, I, I)` — would emit two `&mut <I>`
+    // references to the same memory and Rust's borrow checker rejects it.
+    // For each repeated occurrence we materialize a fresh local with the
+    // value cloned from the original, so the call gets distinct mutable
+    // references. The first occurrence keeps the original (so any mutation
+    // a function actually performs still propagates to the caller's binding).
+    let mut first_occurrence: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    let mut dup_temp_declarations: Vec<String> = Vec::new();
+    let mut dup_temp_overrides: std::collections::HashMap<usize, String> =
+        std::collections::HashMap::new();
+    for (i, arg_expr) in args.iter().enumerate() {
+        if let Some(arg_name) = arg_expr.as_bare_variable_name() {
+            if first_occurrence.contains_key(arg_name) {
+                if let Some(var_data) = context.variables.get(arg_name) {
+                    let temp_name = format!("__rosy_dup_arg_{}", i);
+                    let value_expr = match var_data.scope {
+                        VariableScope::Higher | VariableScope::Arg => {
+                            format!("(*{}).clone()", arg_name)
+                        }
+                        VariableScope::Local => format!("{}.clone()", arg_name),
+                    };
+                    dup_temp_declarations
+                        .push(format!("let mut {} = {};", temp_name, value_expr));
+                    dup_temp_overrides.insert(i, format!("&mut {}", temp_name));
+                }
+            } else {
+                first_occurrence.insert(arg_name.to_string(), i);
+            }
+        }
+    }
+
     // Add the manual arguments
     for (i, arg_expr) in args.iter().enumerate() {
         match arg_expr.transpile(context) {
@@ -461,6 +495,9 @@ pub fn function_call_transpile_helper(
                         "Function '{}' expects argument {} ('{}') to be of type '{}', but type '{}' was provided!",
                         name, i+1, func_context.args[i].name, expected_type, provided_type
                     ));
+                } else if let Some(override_serialization) = dup_temp_overrides.remove(&i) {
+                    serialized_args.push(override_serialization);
+                    requested_variables.extend(arg_output.requested_variables);
                 } else {
                     // If the type is correct, add the serialization
                     // Functions take &mut T args (COSY semantics: args are mutable)
@@ -484,12 +521,23 @@ pub fn function_call_transpile_helper(
     // Uses the `__fn_` prefix to match the generated Rust function name
     // (the prefix avoids shadowing by the implicit return variable).
     let rust_fn_name = format!("__fn_{}", name);
-    let serialization = format!(
-        "({}({})? as {})",
-        rust_fn_name,
-        serialized_args.join(", "),
-        func_context.return_type.as_rust_type()
-    );
+    let serialization = if dup_temp_declarations.is_empty() {
+        format!(
+            "({}({})? as {})",
+            rust_fn_name,
+            serialized_args.join(", "),
+            func_context.return_type.as_rust_type()
+        )
+    } else {
+        // Wrap in a block so the temp locals don't leak into the surrounding scope.
+        format!(
+            "{{ {} ({}({})? as {}) }}",
+            dup_temp_declarations.join(" "),
+            rust_fn_name,
+            serialized_args.join(", "),
+            func_context.return_type.as_rust_type()
+        )
+    };
     if errors.is_empty() {
         Ok(TranspilationOutput {
             serialization,
