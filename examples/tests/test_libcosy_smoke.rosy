@@ -197,10 +197,14 @@ DMAP MAP M_SAVE 6;
 WRITE 6 'DSMAP SPNR SPIN_SAVE 6: spin-map difference --expect all zero --';
 DSMAP SPNR SPIN_SAVE 6;
 
-{ M2: exercise helpers/numerics.rosy }
-M0 := 1.00727646688;     { proton mass in u, used by VELC via globals }
-AMUMEV := 931.494;
+{ M2: exercise helpers/numerics.rosy
+  M0 / AMUMEV are now populated by the RP family (RPP for proton). }
+RPP 100;
 RESULT := VELC(100);     WRITE 6 'VELC(100 MeV proton) = ' RESULT '   [expect ~0.428 (v/c)]';
+WRITE 6 'After RPP 100, CONS(M0) = ' CONS(M0)    '   [expect 1.00728 amu]';
+WRITE 6 'After RPP 100, CONS(P0) = ' CONS(P0)    '   [expect ~444.5 MeV/c]';
+WRITE 6 'After RPP 100, CONS(V0) = ' CONS(V0)    '   [expect ~1.28e8 m/s = 0.428*CLIGHT]';
+WRITE 6 'After RPP 100, G0       = ' G0          '   [expect 1.792847337 (proton anomalous moment)]';
 
 BBC 13 27 2.7 1.66E-7 0 0;   { Aluminum: Z=13, A=27, density 2.7 g/cm^3, I=166eV; uses scientific notation }
 WRITE 6 'BBC: BETHEBLOCHC(1) = ' BETHEBLOCHC(1) '   [expect 13]';

@@ -24,10 +24,18 @@ VARIABLE (RE) PI; VARIABLE (RE) DEGRAD;
 { NOTE: cosy.fox also declares TRUE and FALSE here; both are reserved in ROSY,
         so DEF must use literal 1 / 0 when porting. }
 
-{ Reference particle — set in RP / RPR / RPM / RPP / RPE / RPPI / RPMU }
-VARIABLE (RE) E0;   VARIABLE (RE) M0;   VARIABLE (RE) Z0;   VARIABLE (RE) V0;
-VARIABLE (RE) P0;   VARIABLE (RE) G0;   VARIABLE (RE) CHIM; VARIABLE (RE) CHIE;
-VARIABLE (RE) ETA;  VARIABLE (RE) HFAC; VARIABLE (RE) TFAC;
+{ Reference particle — set in RP / RPR / RPM / RPP / RPE / RPPI / RPMU.
+  These are DA because cosy.fox lets the energy carry a parameter
+  dependence when ND=3 (`E0 := CONS(E0)*(1+DD(6))`), and the derived
+  quantities (V0, P0, ETA, CHIM, CHIE, HFAC) propagate that DA-ness
+  through their arithmetic. Even when the RP body skips the ND=3
+  branch the slots stay DA-typed; callers wrap RE inputs with the
+  `+ 0*DA(1)` idiom to lift them into DA-space. TFAC and the spin
+  Lorentz factor G0 remain RE (TFAC reads CONS, G0 is set to
+  particle-specific RE constants by the RP* variants).             }
+VARIABLE (DA) E0;   VARIABLE (DA) M0;   VARIABLE (DA) Z0;   VARIABLE (DA) V0;
+VARIABLE (DA) P0;   VARIABLE (RE) G0;   VARIABLE (DA) CHIM; VARIABLE (DA) CHIE;
+VARIABLE (DA) ETA;  VARIABLE (DA) HFAC; VARIABLE (RE) TFAC;
 
 { Maps — momentary and scratch COSY map (DA polynomials) }
 VARIABLE (DA 8) MAP;        VARIABLE (DA 8) MSC;

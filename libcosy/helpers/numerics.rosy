@@ -29,7 +29,11 @@ ENDPROCEDURE;
   the transpiler only lifts global captures one level deep.                 }
 FUNCTION (RE) VELC KE (RE);
   VARIABLE (RE) ETA0;
-  ETA0 := KE/(M0*AMUMEV);
+  { CONS(M0) extracts the constant part of M0 (now DA-typed since the
+    RP family promotes the reference particle scalars). VELC is a pure
+    kinematic helper — a scalar in / scalar out — so we avoid carrying
+    the DA dependence through SQRT and instead read M0's bare value. }
+  ETA0 := KE/(CONS(M0)*AMUMEV);
   VELC := SQRT(ETA0*(2 + ETA0))/(1 + ETA0);
 ENDFUNCTION;
 

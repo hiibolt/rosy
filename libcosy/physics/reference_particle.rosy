@@ -192,4 +192,75 @@ FUNCTION (DA) PARA I (RE);
   ENDIF;
 ENDFUNCTION;
 
+{ ----- Set reference particle (cosy.fox L2782-2798) -----------------------
+  RP(E, M, Z) seeds the global reference-particle quantities from a kinetic
+  energy E [MeV], mass M [amu], and charge Z [units]. Computes the standard
+  relativistic derived values (η, β, γ) and the rigidity coefficients used
+  throughout the element families.
+
+  Differences from cosy.fox:
+   * The ND=3 branch that promotes E0 to a DA-of-DD(6) is omitted — that
+     mode requires a 6D phase space and adds parameter dependence; will
+     port alongside the elements that actually use it.
+   * The XX setup loop (cosy.fox L2788-2792) and the spin-matrix block
+     (XX[21..29]) are deferred — they require partial-index access on
+     DD / XX which the M4 ray_io milestone will introduce.
+   * cosy.fox saves NOC, raises the order via `CO NO+1` for the
+     calculation, then restores via `CO NOM`. The order shuffle is kept
+     so derivative orders propagate correctly through SQRT / CONS.    }
+PROCEDURE RP E (RE) M (RE) Z (RE);
+  VARIABLE (RE) NOM;
+  IF LOV # 1;
+    WRITE 6 ' *** ERROR, call OV before RP ';
+    QUIT 0;
+  ENDIF;
+  LRP := 1;
+  NOM := NOC;
+  CO NO+1;
+  { Lift the RE parameters into DA-space — the slots are DA-typed so that
+    later procedures can mix them freely with DD-bound expressions. }
+  E0 := E + 0*DA(1);
+  M0 := M + 0*DA(1);
+  Z0 := Z + 0*DA(1);
+  ETA  := E0/M0/AMUMEV;
+  V0   := CLIGHT*SQRT(ETA*(2 + ETA))/(1 + ETA);
+  P0   := AMUMEV*M0*SQRT(ETA*(2 + ETA));
+  TFAC := ((1 + CONS(ETA))/(2 + CONS(ETA)))*CONS(V0);
+  CHIM := (AMU*CLIGHT/EZERO)*M0/Z0*SQRT(ETA*(2 + ETA));
+  CHIE := CHIM*V0;
+  HFAC := SQRT(SQR(CHIM/CONS(CHIM)) - DD[2]*DD[2] - DD[4]*DD[4]);
+  CO NOM;
+ENDPROCEDURE;
+
+{ ----- Particle-specific RP shortcuts (cosy.fox L2807-2814) ---------------
+  These call RP with the standard atomic-mass and charge values for each
+  particle species and stamp the spin-Lorentz factor G0. cosy.fox uses
+  procedure-call syntax (e.g. `RP E 1.00727646688 1`) — ports verbatim. }
+PROCEDURE RPP E (RE);     { proton  }
+  RP E 1.00727646688 1;
+  G0 := 1.792847337;
+ENDPROCEDURE;
+
+PROCEDURE RPE E (RE);     { electron }
+  RP E 5.485799110D-4 (-1);
+  G0 := 0.001159652187;
+ENDPROCEDURE;
+
+PROCEDURE RPPI E (RE) Z (RE);   { pion (charge configurable) }
+  RP E 0.149834758 Z;
+  G0 := 0;
+ENDPROCEDURE;
+
+PROCEDURE RPMU E (RE);    { muon }
+  RP E 0.1134289168 (-1);
+  G0 := 0.0011659160;
+ENDPROCEDURE;
+
+PROCEDURE RPS LS (RE) G (RE);    { spin-flag + Lorentz-factor override }
+  LSPN := LS;
+  IF G # 0;
+    G0 := G;
+  ENDIF;
+ENDPROCEDURE;
+
 END;
