@@ -250,8 +250,20 @@ UM;
 MH 0.3 0.5 0.05;
 WRITE 6 'After UM + MH 0.3 0.5 0.05, MAP[1] (sextupole x kick):';
 WRITE 6 MAP[1];
-WRITE 6 'After MH, MAP[2] (p_x kick — picks up x^2, y^2 terms at order 2):';
+WRITE 6 'After MH, MAP[2] (p_x kick -- picks up x^2, y^2 terms at order 2):';
 WRITE 6 MAP[2];
+
+{ FODO cell: focus-drift-defocus-drift, the building block of every
+  storage-ring lattice. MQK takes the integrated strength K directly. }
+UM;
+MQK 0.2 2.0 0.05;        { focusing quad,   K = +2 m^-2, L = 0.2 m  }
+DL 1.0;                  { drift,            L = 1.0 m              }
+MQK 0.2 (-2.0) 0.05;     { defocusing quad, K = -2 m^-2, L = 0.2 m  }
+DL 1.0;                  { drift                                    }
+WRITE 6 'After a FODO cell (FQ-D-DQ-D), MAP[1] (x-plane composed map):';
+WRITE 6 MAP[1];
+WRITE 6 'After FODO cell, MAP[3] (y-plane composed map):';
+WRITE 6 MAP[3];
 
 BBC 13 27 2.7 1.66E-7 0 0;   { Aluminum: Z=13, A=27, density 2.7 g/cm^3, I=166eV; uses scientific notation }
 WRITE 6 'BBC: BETHEBLOCHC(1) = ' BETHEBLOCHC(1) '   [expect 13]';

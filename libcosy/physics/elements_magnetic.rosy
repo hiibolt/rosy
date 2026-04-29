@@ -159,4 +159,17 @@ PROCEDURE MH L (RE) B (RE) D (RE);
 
 ENDPROCEDURE;
 
+{ ----- Integrated-strength variants (cosy.fox L3208-3210) -----------------
+  MQK and MSK delegate to MQ / MH after converting the integrated strength
+  K into the equivalent pole-tip field B = K · χ_m · D^(2n) / D, where n is
+  the multipole order. Useful when lattice files specify K1 / K2 directly
+  rather than B.                                                          }
+PROCEDURE MQK L (RE) K (RE) D (RE);
+  MQ L K*CONS(CHIM)*D D;
+ENDPROCEDURE;
+
+PROCEDURE MSK L (RE) K (RE) D (RE);
+  MH L K*CONS(CHIM)*D*D D;
+ENDPROCEDURE;
+
 END;
