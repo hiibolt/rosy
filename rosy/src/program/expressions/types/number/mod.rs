@@ -51,7 +51,16 @@ impl FromRule for f64 {
             "Expected number rule, got {:?}",
             pair.as_rule()
         );
-        let n = pair.as_str().parse::<f64>()?;
+        // Accept Fortran-style `D/d` exponents (e.g. `1.66053873D-27`)
+        // alongside `E/e`. Rust's `f64::from_str` only knows about the
+        // latter, so normalize before parsing.
+        let raw = pair.as_str();
+        let normalized = if raw.contains(|c: char| c == 'd' || c == 'D') {
+            raw.replace('D', "E").replace('d', "e")
+        } else {
+            raw.to_string()
+        };
+        let n = normalized.parse::<f64>()?;
         Ok(Some(n))
     }
 }
@@ -129,5 +138,18 @@ mod tests {
         must_parse_as_number("1.66E-7");
         must_parse_as_number("-2.5e+10");
         must_parse_as_number("6.022E+23");
+    }
+
+    /// cosy.fox uses Fortran's `D/d` exponent convention to mark
+    /// double-precision literals (e.g. `1.66053873D-27` for the AMU).
+    /// The parser accepts this form too, normalizing to `E/e` before
+    /// the actual `f64::from_str`.
+    #[test]
+    fn number_parses_fortran_d_exponent() {
+        must_parse_as_number("1.66053873D-27");
+        must_parse_as_number("1.602176462D-19");
+        must_parse_as_number("2.99792458D8");
+        must_parse_as_number("5.485799110d-4");
+        must_parse_as_number("1D-6");
     }
 }

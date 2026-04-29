@@ -90,6 +90,38 @@ WRITE 6 'GAUSS1 on zero MFD (sanity) = ' RESULT '   [expect 0]';
 RESULT := GAUSS(0, 0, 25, 100, 1, 1, 2, MFD_DUMMY, ERR_DUMMY);
 WRITE 6 'GAUSS  on zero MFD (sanity) = ' RESULT '   [expect 0]';
 
+{ M3: exercise physics/fringe_field.rosy
+  FD populates ENGEC with default fringe-field coefficients (PEP-fitted). }
+FD;
+WRITE 6 'After FD, ENGEC[1,1,1,1] = ' ENGEC[1, 1, 1, 1] '   [expect 0.478959 (dipole, entrance, magnetic, c1)]';
+WRITE 6 'After FD, ENGEC[2,1,1,2] = ' ENGEC[2, 1, 1, 2] '   [expect 4.533219 (quadrupole, entrance, magnetic, c2)]';
+
+{ Evaluate ENGE at a DA point in the transition window. With S = DA(1)
+  (i.e. the symbolic path coordinate at the magnet edge), F should be a
+  Taylor series with constant part ~0.5 (the midpoint of the transition). }
+VARIABLE (DA) F_ENGE;
+F_ENGE := ENGE(1, 1, 1, 0 + DA(1));
+WRITE 6 'ENGE(dipole, entrance, magnetic, S=DA(1)):';
+WRITE 6 F_ENGE;
+
+{ M3: exercise physics/reference_particle.rosy }
+DEF;
+WRITE 6 'After DEF, AMU    = ' AMU    '   [expect 1.66053873e-27]';
+WRITE 6 'After DEF, CLIGHT = ' CLIGHT '   [expect 2.99792458e8]';
+WRITE 6 'After DEF, AMUMEV = ' AMUMEV '   [expect ~931.494]';
+WRITE 6 'After DEF, PI     = ' PI     '   [expect ~3.14159265]';
+WRITE 6 'After DEF, DEGRAD = ' DEGRAD '   [expect ~0.0174533]';
+WRITE 6 'After DEF, EPS    = ' EPS    '   [expect 1e-10]';
+WRITE 6 'After DEF, WAF    = ' WAF    '   [expect 0.1]';
+WRITE 6 'After DEF, DEPS   = ' DEPS   '   [expect 1e-16]';
+
+{ Control-flow flag setters. }
+KC 1;          { kinematic correction off — emits a warning }
+WAS 0;         { wedge mode 0 → LWA = 0 }
+WRITE 6 'After WAS 0, LWA = ' LWA '   [expect 0]';
+CO 2;          { computational order = 2 (must be ≤ DAINI order 3) }
+WRITE 6 'After CO 2, NOC  = ' NOC '   [expect 2]';
+
 { M2: exercise helpers/numerics.rosy }
 M0 := 1.00727646688;     { proton mass in u, used by VELC via globals }
 AMUMEV := 931.494;

@@ -1,0 +1,125 @@
+{ ============================================================================
+  libcosy/physics/reference_particle.rosy — Reference particle + setup
+
+  Ports the lightweight setup primitives from cosy.fox L393-444, L2319-2329:
+
+    DEF       — physical constants (AMU, EZERO, CLIGHT, AMUMEV, PI, DEGRAD)
+    CO  NNO   — change computational order (writes NOC + DANOT)
+    KC  I     — kinematic-correction flag (LKC), warns on disable
+    WAS I     — wedge-computation flag (LWA = -I)
+    FR  I     — fringe-field mode flag (LFR), conditionally bootstraps FD2
+    SB ...    — set phase-space widths (PHSP / PHSR + LPS guard)
+    SP ...    — set parameter widths (PARS)
+    PARA(I)   — DA-coordinate helper for parameter dependence
+
+  Deferred to a later milestone (need correct DA-typed RAY / MAP / DD
+  globals plus DAINI ordering — they're a tight cluster):
+
+    OV  ORD NND NNP    — order / dimension / parameter setup, the gateway
+                          procedure every cosy.fox script calls first
+    CR                 — clear rays (touches RAY / RSC / SPI / SSC, and
+                          treats RAY(I) as a column slice of a 10001×8
+                          array — needs slice-via-partial-index semantics)
+    UM / UMS           — unity map and unity scratch map (touch MAP / MSC
+                          which must be (DA 8) and accept 0*DD(1) idioms)
+    RP / RPR / RPM /
+    RPP / RPE / RPPI /
+    RPMU / RPS         — reference-particle setup variants (depend on OV)
+
+  These will be the focus of the next milestone (M3.5 / M4) along with
+  fixes to globals.rosy for the few RE/DA mis-typings that block them.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- Physical constants (cosy.fox L393-398) -----------------------------
+  cosy.fox additionally calls `LTRUE TRUE; LFALSE FALSE` to seed two of
+  COSY's RE-as-bool globals; ROSY reserves TRUE / FALSE as keywords (LO
+  literals) so those globals don't exist here, and the corresponding lines
+  are intentionally omitted. Code that previously branched on `IF X = TRUE`
+  is ported as `IF X = 1` (or stays as `IF X` when TRUE was a bare guard). }
+PROCEDURE DEF;
+  AMU    := 1.66053873D-27;
+  EZERO  := 1.602176462D-19;
+  CLIGHT := 2.99792458D8;
+  AMUMEV := AMU * SQR(CLIGHT) / EZERO * 1D-6;
+  PI     := 3.1415926535897932384626433832795028842;
+  DEGRAD := PI / 180;
+  ESET 1E-10;
+  WSET 0.1;
+  DSET 1E-16;
+ENDPROCEDURE;
+
+{ ----- Computational-order change (cosy.fox L405) ------------------------- }
+PROCEDURE CO NNO (RE);
+  NOC := NNO;
+  DANOT NOC;
+ENDPROCEDURE;
+
+{ ----- Kinematic-correction flag (cosy.fox L2324-2326) -------------------- }
+PROCEDURE KC I (RE);
+  LKC := I;
+  IF I = 1;
+    WRITE 6 ' --- WARNING in KC, effects only in ODE and DLACT';
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- Wedge-computation flag (cosy.fox L2328-2329) ----------------------- }
+PROCEDURE WAS I (RE);
+  LWA := -I;
+ENDPROCEDURE;
+
+{ ----- Fringe-field mode (cosy.fox L2319-2322) ----------------------------
+  The conditional FD2 bootstrap is suppressed here because FD2 lives in
+  the deferred symplectic-scaling block (FC2/FD2/SYSCFL). When FD2 lands,
+  the inner branch becomes `IF (I < 3) AND (I > 0) AND (LFR2 = 0); FD2;
+  LFR2 := 1; ENDIF;`.                                                     }
+PROCEDURE FR I (RE);
+  IF LOV = 0;
+    WRITE 6 ' *** ERROR, call OV before FR';
+    QUIT 0;
+  ENDIF;
+  LFR := I;
+  IF (I < 3) AND (I > 0) AND (LFR2 = 0);
+    LFR2 := 1;     { FD2 placeholder — will call FD2 once that ports }
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- Phase-space widths (cosy.fox L434-439) ----------------------------- }
+PROCEDURE SB PX (RE) PA (RE) R12 (RE) PY (RE) PB (RE) R34 (RE) PT (RE) PD (RE) R56 (RE) PG (RE) PZ (RE);
+  IF LOV = 0;
+    WRITE 6 ' *** ERROR, call OV before SB';
+    QUIT 0;
+  ENDIF;
+  PHSP[1] := PX; PHSP[2] := PA; PHSP[3] := PY; PHSP[4] := PB;
+  PHSP[5] := PT; PHSP[6] := PD; PHSP[7] := PG; PHSP[8] := PZ;
+  PHSR[1] := R12; PHSR[2] := R34; PHSR[3] := R56;
+  LPS := 1;
+ENDPROCEDURE;
+
+{ ----- Parameter widths (cosy.fox L441-443) ------------------------------- }
+PROCEDURE SP P1 (RE) P2 (RE) P3 (RE) P4 (RE) P5 (RE) P6 (RE);
+  PARS[1] := P1; PARS[2] := P2; PARS[3] := P3;
+  PARS[4] := P4; PARS[5] := P5; PARS[6] := P6;
+ENDPROCEDURE;
+
+{ ----- Parameter-identifier helper (cosy.fox L428-432) -------------------- }
+{ Returns a DA expression `1 + DA(2*ND + I)` when the I-th parameter is in
+  scope, else 1 — used by element procedures to weight parameter-dependent
+  terms in their kick.                                                     }
+FUNCTION (DA) PARA I (RE);
+  PARA := 1 + 0*DA(1);
+  IF LWA = 1;
+    IF TWOND + I < NV;
+      PARA := 1 + DA(TWOND + I);
+    ENDIF;
+  ELSEIF LWA # 1;
+    IF TWOND + I < NV + 1;
+      PARA := 1 + DA(TWOND + I);
+    ENDIF;
+  ENDIF;
+ENDFUNCTION;
+
+END;

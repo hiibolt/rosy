@@ -1,0 +1,92 @@
+{ ============================================================================
+  libcosy/physics/fringe_field.rosy — Enge fringe-field machinery
+
+  Ported from cosy.fox L303-391. The Enge function is the standard COSY
+  model for the longitudinal profile of a magnet's or electrostatic
+  element's fringe field:
+
+      F(s) = 1 / (1 + exp(c_1 + c_2 s + c_3 s^2 + ... + c_6 s^5))
+
+  where {c_1..c_6} are the Enge coefficients stored in the global
+  ENGEC table, indexed by multipole order, entry/exit, and magnetic /
+  electric kind. F transitions from ~1 (deep inside the magnet) to ~0
+  (deep outside) over a normalized arclength s ∈ [-3, 5].
+
+  Deferred from this milestone:
+    * FP — visualization of the Enge profile (graphics, skipped per scope)
+    * FC2 / FD2 / SYSCFL — symplectic-scaling fringe-field mode setup;
+      depends on file I/O patterns plus GFF2/LFF2/DATFF2 globals that
+      will be exercised first by the procedures consuming them.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- Enge function (cosy.fox L303-313) ----------------------------------
+  Returns DA in the production case where S is a Taylor series in the
+  path coordinate. The CONS(S) guards short-circuit when the constant
+  part is well outside the transition window — a constant DA result is
+  a tight Rust optimization.                                              }
+FUNCTION (DA) ENGE IMP (RE) IEE (RE) IEM (RE) S (DA);
+  IF CONS(S) < -3;
+    ENGE := 1 + 0*S;                  { fully inside  → F ≡ 1 }
+  ELSEIF CONS(S) > 5;
+    ENGE := 0*S;                       { fully outside → F ≡ 0 }
+  ELSE;                                { in the transition window — evaluate }
+    ENGE :=        ENGEC[IMP, IEE, IEM, 1]
+            + S * (ENGEC[IMP, IEE, IEM, 2]
+            + S * (ENGEC[IMP, IEE, IEM, 3]
+            + S * (ENGEC[IMP, IEE, IEM, 4]
+            + S * (ENGEC[IMP, IEE, IEM, 5]
+            + S *  ENGEC[IMP, IEE, IEM, 6]))));
+    { Clamp the polynomial argument so EXP doesn't underflow / overflow.
+      The `0*S +` keeps the assignment in DA-space — assigning a bare RE
+      to the DA-typed return slot would be flagged as a type mismatch. }
+    IF     CONS(ENGE) < -60; ENGE := 0*S + (-60);
+    ELSEIF CONS(ENGE) >  30; ENGE := 0*S +   30;
+    ENDIF;
+    ENGE := EXP(ENGE);
+    ENGE := 1/(1 + ENGE);
+  ENDIF;
+ENDFUNCTION;
+
+{ ----- Set the six Enge coefficients (cosy.fox L315-331) ------------------
+  cosy.fox additionally validates that the resulting Enge profile is
+  monotonic and asymptotes to {0, 1}. The validation loop calls ENGE
+  with RE arguments (LOOP S 4 -3 -1; F := ENGE(...,S)), which would
+  require an RE↔DA bridge that's out of scope here. The setter portion
+  is identical and lossless; validation is deferred until the elements
+  consuming FC drive it.                                                  }
+PROCEDURE FC IMP (RE) IEE (RE) IEM (RE) C1 (RE) C2 (RE) C3 (RE) C4 (RE) C5 (RE) C6 (RE);
+  ENGEC[IMP, IEE, IEM, 1] := C1;
+  ENGEC[IMP, IEE, IEM, 2] := C2;
+  ENGEC[IMP, IEE, IEM, 3] := C3;
+  ENGEC[IMP, IEE, IEM, 4] := C4;
+  ENGEC[IMP, IEE, IEM, 5] := C5;
+  ENGEC[IMP, IEE, IEM, 6] := C6;
+ENDPROCEDURE;
+
+{ ----- Default Enge coefficients (cosy.fox L383-391) ----------------------
+  Measured at SLAC PEP, fitted to dipole / quadrupole / hexapole / higher
+  multipoles up to 30-pole. Reference: K.L. Brown and J.E. Spencer,
+  IEEE Trans. Nucl. Sci. NS-28 No. 3, June 1981.                          }
+PROCEDURE FD;
+  { Negative coefficients are wrapped in parens because ROSY's procedure-
+    call argument parser would otherwise consume `<prev> -<next>` as the
+    binary subtraction `<prev> - <next>` (collapsing two args into one).
+    cosy.fox's whitespace-only separation works in COSY but not in ROSY. }
+  VARIABLE (RE) I; VARIABLE (RE) J; VARIABLE (RE) K;
+  LOOP J 1 2;
+    LOOP K 1 2;
+      FC 1 J K 0.478959 1.911289 (-1.185953) 1.630554 (-1.082657) 0.318111;
+      FC 2 J K 0.296471 4.533219 (-2.270982) 1.068627 (-0.036391) 0.022261;
+      LOOP I 3 15;
+        FC I J K 0.176659 7.153079 (-3.113116) 3.444311 (-1.976740) 0.540068;
+      ENDLOOP;
+    ENDLOOP;
+  ENDLOOP;
+  LE := 1;
+ENDPROCEDURE;
+
+END;

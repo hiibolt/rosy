@@ -7,11 +7,12 @@
 
 BEGIN;
 
-{ M3 will INCLUDE 'fringe_field.rosy', 'reference_particle.rosy'.
-  M4 will INCLUDE 'map_ops.rosy', 'ray_io.rosy', 'elements_basic.rosy' (drift subset).
+INCLUDE 'fringe_field.rosy';        { M3 }
+INCLUDE 'reference_particle.rosy';  { M3 }
+
+{ M4 will INCLUDE 'map_ops.rosy', 'ray_io.rosy', 'elements_basic.rosy' (drift subset).
   M5 will INCLUDE 'normal_form.rosy', 'twiss_tune.rosy', 'spin_su2.rosy'.
   M6 will INCLUDE 'field_potential.rosy', and complete elements_basic.
-  M7-M9 will INCLUDE the remaining elements_*.rosy and 'tracking.rosy'.
-  Until then this is empty. }
+  M7-M9 will INCLUDE the remaining elements_*.rosy and 'tracking.rosy'. }
 
 END;

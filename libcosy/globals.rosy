@@ -78,8 +78,12 @@ VARIABLE (RE 20 36) PPOL; VARIABLE (RE 20 30) MPOL;
 VARIABLE (RE) NPOL; VARIABLE (RE) LS;
 VARIABLE (RE) NSDP; VARIABLE (RE) LCCT; VARIABLE (RE) LOFF;
 
-{ Enge fringe-field coefficients — accessed as ENGEC(IMP, IEE, IEM, K) }
-VARIABLE (RE 2 20 2 2 6) ENGEC;
+{ Enge fringe-field coefficients — accessed as ENGEC[IMP, IEE, IEM, K]
+  cosy.fox declares `VARIABLE ENGEC 2 20 2 2 6;` (five dimensions) but
+  every access in cosy.fox uses exactly four indices, with K bounded by 6.
+  The leading 2 is COSY's "two-reals-per-cell" reservation that is unused
+  in the cosy.fox body, so the ROSY port collapses to a 4D table.        }
+VARIABLE (RE 20 2 2 6) ENGEC;
 VARIABLE (RE) LE;
 
 { Symplectic-scaling fringe-field arrays }

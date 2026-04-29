@@ -450,8 +450,10 @@ paren_group = { "(" ~ expr ~ ("," ~ expr)* ~ ")" }
 bracket_index = { "[" ~ expr ~ ("," ~ expr)* ~ "]" }
 variable_name  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
 /// Numeric literal — integer, fractional, and optional decimal exponent.
-/// Examples: 42  -7  3.14  1.23E-4  1e5  -2.5e+10
-number      = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ (("e" | "E") ~ ("+" | "-")? ~ ASCII_DIGIT+)? }
+/// Both `e/E` (modern) and `d/D` (Fortran double-precision, used by
+/// cosy.fox) are accepted as the exponent marker.
+/// Examples: 42  -7  3.14  1.23E-4  1e5  -2.5e+10  1.66053873D-27
+number      = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ (("e" | "E" | "d" | "D") ~ ("+" | "-")? ~ ASCII_DIGIT+)? }
 unit        = @{ ASCII_DIGIT+ }
 constant    = @{ ASCII_DIGIT+ }
 string      = { new_string | old_string }
