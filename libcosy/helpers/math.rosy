@@ -99,8 +99,8 @@ ENDFUNCTION;
 
 { ----- Constant setters (cosy.fox L292-294) ------------------------------- }
 
-PROCEDURE WSET W_;     { W_ underscore-suffixed: 'W' is a global DA field array }
-  WAF := W_;
+PROCEDURE WSET W;
+  WAF := W;
 ENDPROCEDURE;
 
 PROCEDURE ESET E;

@@ -16,13 +16,10 @@
 
 BEGIN;
 
-{ ----- Bethe-Bloch coefficient setter (cosy.fox L4195-4203) ---------------
-  cosy.fox params Z A RHO I DELTA C all collide with libcosy globals
-  (A, C declared in globals.rosy as Butcher tableau, I undeclared but used
-  as an iterator in many ports). Rename to *_ throughout.                  }
-PROCEDURE BBC Z_ A_ RHO I_ DELTA C_;
-  BETHEBLOCHC(1) := Z_;     BETHEBLOCHC(2) := A_;    BETHEBLOCHC(3) := RHO;
-  BETHEBLOCHC(4) := I_;     BETHEBLOCHC(5) := DELTA; BETHEBLOCHC(6) := C_;
+{ ----- Bethe-Bloch coefficient setter (cosy.fox L4195-4203) -------------- }
+PROCEDURE BBC Z A RHO I DELTA C;
+  BETHEBLOCHC(1) := Z; BETHEBLOCHC(2) := A;     BETHEBLOCHC(3) := RHO;
+  BETHEBLOCHC(4) := I; BETHEBLOCHC(5) := DELTA; BETHEBLOCHC(6) := C;
 ENDPROCEDURE;
 
 { ----- Velocity from kinetic energy (cosy.fox L4260-4262) ----------------

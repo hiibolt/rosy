@@ -1,0 +1,38 @@
+{ ============================================================================
+  Regression test: a procedure / function argument may shadow a global
+  VARIABLE of the same name.
+
+  Earlier, declaring `PROCEDURE WSET W ;` while a global `VARIABLE W` was
+  in scope produced "Argument 'W' is already defined!". This was inconsistent
+  with the recently-landed VARIABLE shadowing fix, which already permits
+  inner-scope `VARIABLE W` to shadow a higher-scope `W`. Procedure / function
+  arguments now follow the same rule:
+
+    * Shadowing a Higher-scope (parent / global) variable: allowed
+    * Shadowing an Arg or Local in the SAME scope:        still rejected
+
+  Two args with the same name remain a hard error.
+  ============================================================================ }
+
+BEGIN;
+
+VARIABLE (RE) W;       { global }
+VARIABLE (RE) WAF;     { also global, used as the assignment target below }
+
+{ This used to fail; now W (arg) cleanly shadows W (global). }
+PROCEDURE WSET W;
+  WAF := W;            { writes the arg into the global WAF }
+ENDPROCEDURE;
+
+{ Function arg also shadows. }
+FUNCTION (RE) ECHO W (RE);
+  ECHO := W;
+ENDFUNCTION;
+
+W := 999;              { sentinel — must NOT leak inside WSET }
+WSET 42;               { sets WAF := 42 }
+WRITE 6 'WAF = ' WAF '   [expect 42]';
+WRITE 6 'W   = ' W   '   [expect 999, untouched by WSET]';
+WRITE 6 'ECHO(7) = ' ECHO(7) '   [expect 7]';
+
+END;

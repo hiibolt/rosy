@@ -16,23 +16,23 @@
 BEGIN;
 
 { ----- Substring (cosy.fox L120) ------------------------------------------ }
-FUNCTION (ST) SS A_ (ST) I1 (RE) I2 (RE);
-  SS := A_|(I1&I2);
+FUNCTION (ST) SS A (ST) I1 (RE) I2 (RE);
+  SS := A|(I1&I2);
 ENDFUNCTION;
 
 { ----- String -> Real (cosy.fox L121) ------------------------------------- }
-FUNCTION (RE) R S_ (ST) I1 (RE) I2 (RE);
-  STCRE (S_|(I1&I2)) R;
+FUNCTION (RE) R S (ST) I1 (RE) I2 (RE);
+  STCRE (S|(I1&I2)) R;
 ENDFUNCTION;
 
 { ----- Real -> String, default G23.16 format (cosy.fox L122) -------------- }
-FUNCTION (ST) S R_ (RE);
-  RECST R_ '(G23.16)' S;
+FUNCTION (ST) S R (RE);
+  RECST R '(G23.16)' S;
 ENDFUNCTION;
 
 { ----- Real -> String, custom Fortran format (cosy.fox L123) -------------- }
-FUNCTION (ST) SF R_ (RE) FORM (ST);
-  RECST R_ FORM SF;
+FUNCTION (ST) SF R (RE) FORM (ST);
+  RECST R FORM SF;
 ENDFUNCTION;
 
 { ----- Integer -> String (cosy.fox L124-127) ------------------------------ }
@@ -50,31 +50,31 @@ FUNCTION (ST) SI I (RE);
 ENDFUNCTION;
 
 { ----- Last non-blank position (cosy.fox L136-139) ------------------------
-  Note: SS(A_, I, I) compiles to `__fn_SS(&mut A_, &mut I, &mut I)` which
+  Note: SS(A, I, I) compiles to `__fn_SS(&mut A, &mut I, &mut I)` which
   Rust rejects (two mutable borrows of the same variable). Workaround: pass
-  two distinct copies (IL, IH). Remove once the transpiler emits read-only
-  borrows for non-mutated function args.                                   }
-FUNCTION (RE) ILAST A_ (ST) IA1 (RE) IA2 (RE);
+  two distinct copies (IL, IH). Will be removed once the transpiler emits
+  read-only borrows for non-mutated function args (next bug fix).         }
+FUNCTION (RE) ILAST A (ST) IA1 (RE) IA2 (RE);
   VARIABLE (RE) I; VARIABLE (RE) IL; VARIABLE (RE) IH; VARIABLE (ST) CH;
   CH := ' ';
   I := IA2 + 1;
   WHILE (CH = ' ') AND (I > IA1);
     I := I - 1;
     IL := I; IH := I;
-    CH := SS(A_, IL, IH);
+    CH := SS(A, IL, IH);
   ENDWHILE;
   ILAST := I;
 ENDFUNCTION;
 
 { ----- First position of character (cosy.fox L140-143) -------------------- }
-FUNCTION (RE) IPOS C_ (ST) A_ (ST);
+FUNCTION (RE) IPOS C (ST) A (ST);
   VARIABLE (RE) LEN; VARIABLE (RE) I;
-  LEN := LENGTH(A_);
+  LEN := LENGTH(A);
   IPOS := 0;
   I := 0;
   WHILE I < LEN;
     I := I + 1;
-    IF C_ = (A_|I);
+    IF C = (A|I);
       IPOS := I;
       I := LEN;     { early-out: pin to the upper bound }
     ENDIF;
