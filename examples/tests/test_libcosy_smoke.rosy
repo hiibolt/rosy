@@ -181,6 +181,10 @@ PB_RESULT := PB(DA(1)*DA(1), DA(2));
 WRITE 6 'PB(x_1^2, x_2) — expect 2*x_1:';
 WRITE 6 PB_RESULT;
 
+{ PM: pretty-print the first 5 components of MAP via DAPRV. }
+WRITE 6 'PM 6: print MAP[1..5] to stdout (unit 6) —';
+PM 6;
+
 { M2: exercise helpers/numerics.rosy }
 M0 := 1.00727646688;     { proton mass in u, used by VELC via globals }
 AMUMEV := 931.494;
