@@ -200,20 +200,28 @@ impl Transpile for PolvalStatement {
             "rosy_polval_re"
         };
 
-        // If A and R alias the same variable, clone A to avoid borrow conflict.
-        // This matches COSY's in-place POLVAL behavior.
+        // COSY's in-place POLVAL allows P, A, and R to alias each other. Rust's
+        // borrow checker rejects two `&mut` to the same memory or a `&` + `&mut`
+        // overlap, so we clone any input arg whose underlying name matches R's.
         let a_ref = a_out.as_ref();
-        let a_arg = if a_ref.trim_start_matches('&') == r_mut.trim_start_matches("&mut ") {
+        let p_ref = p_out.as_ref();
+        let r_strip = r_mut.trim_start_matches("&mut ");
+        let a_arg = if a_ref.trim_start_matches('&') == r_strip {
             format!("&{}.clone()", a_ref.trim_start_matches('&'))
         } else {
             a_ref
+        };
+        let p_arg = if p_ref.trim_start_matches('&') == r_strip {
+            format!("&{}.clone()", p_ref.trim_start_matches('&'))
+        } else {
+            p_ref
         };
 
         let serialization = format!(
             "rosy_lib::core::polval::{}({}, {}, {} as usize, {}, {} as usize, {}, {} as usize)?;",
             polval_fn,
             l_out.as_value(),
-            p_out.as_ref(),
+            p_arg,
             np_out.as_value(),
             a_arg,
             na_out.as_value(),

@@ -179,6 +179,70 @@ PROCEDURE AM M;
   ANM M MAP MAP;
 ENDPROCEDURE;
 
+{ ----- COSY → exponential-theory variable reorder (cosy.fox L1874-1878) ----
+  RCT(X) reorders the array X from COSY's canonical pairing (q1 p1 q2 p2 ...)
+  to exponential-theory's grouped pairing (q1 q2 ... qN p1 p2 ... pN).
+  Uses a POLVAL substitution: build TMP with the reordered components,
+  build RCE as the basis-DA mapping for the reorder, then evaluate.
+
+  TMP holds the *reordered* version of X under the new layout; RCE holds
+  the substitution polynomial that maps a canonical-input to a reordered
+  position. POLVAL applies the reorder via Horner. The result is written
+  back into X — same dup-arg-writeback pattern as ANM.                  }
+PROCEDURE RCT X;
+  VARIABLE (RE) I;
+  VARIABLE (DA 8) RCE;
+  VARIABLE (DA 8) TMP;
+
+  LOOP I 1 ND;
+    TMP[I] := X[2*I-1];
+    TMP[ND+I] := X[2*I];
+  ENDLOOP;
+  LOOP I 1 ND;
+    RCE[2*I-1] := DA(I);
+    RCE[2*I] := DA(ND+I);
+  ENDLOOP;
+  POLVAL 2 TMP TWOND RCE TWOND X TWOND;
+ENDPROCEDURE;
+
+{ ----- Exponential-theory → COSY variable reorder (cosy.fox L1880-1884) ----
+  RET(X): inverse of RCT. Reorders from grouped (q...p...) back to
+  canonical (q1 p1 q2 p2 ...). The pair-then-substitute mechanic mirrors
+  RCT exactly with the indices swapped.                                  }
+PROCEDURE RET X;
+  VARIABLE (RE) I;
+  VARIABLE (DA 8) REC;
+  VARIABLE (DA 8) TMP;
+
+  LOOP I 1 ND;
+    TMP[2*I-1] := X[I];
+    TMP[2*I] := X[ND+I];
+  ENDLOOP;
+  LOOP I 1 ND;
+    REC[I] := DA(2*I-1);
+    REC[ND+I] := DA(2*I);
+  ENDLOOP;
+  POLVAL 2 TMP TWOND REC TWOND X TWOND;
+ENDPROCEDURE;
+
+{ ----- Reorder a single function from exp-theory to COSY (L1886-1889) ----
+  RETF reorders the variables inside a single DA function F (rather than
+  an array of DAs), via a 1-element POLVAL with the same basis-DA
+  reorder used by RET.                                                    }
+PROCEDURE RETF F;
+  VARIABLE (RE) I;
+  VARIABLE (DA 8) REC;
+  VARIABLE (DA 1) X;
+
+  LOOP I 1 ND;
+    REC[I] := DA(2*I-1);
+    REC[ND+I] := DA(2*I);
+  ENDLOOP;
+  X[1] := F;
+  POLVAL 2 X 1 REC TWOND X 1;
+  F := X[1];
+ENDPROCEDURE;
+
 { ----- Canonical → TRANSPORT-standard map (cosy.fox L699-717) --------------
   CATR(IAP, NAP, LGH) converts the canonical map IAP into TRANSPORT's
   small-angle-approximation representation NAP, with LGH the element's

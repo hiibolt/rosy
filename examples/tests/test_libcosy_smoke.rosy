@@ -316,6 +316,28 @@ AM M_OTHER;               { composes M_OTHER onto MAP → drift(1.0) }
 WRITE 6 'After AM M_OTHER, MAP[1] (composed via AM, expect drift(1.0)):';
 WRITE 6 MAP[1];
 
+{ ----- RCT / RET (COSY ↔ exponential-theory reorder roundtrip) -----
+  Build a small DA array, RCT it (canonical → grouped), then RET back
+  (grouped → canonical). The roundtrip should reproduce the input. }
+WRITE 6 ' ----- RCT / RET roundtrip on a 2D phase-space DA array -----';
+OV 2 2 0;       { ND=2, TWOND=4 }
+RPP 100;
+UM;
+VARIABLE (DA 8) X_ORIG;
+VARIABLE (DA 8) X_TEST;
+X_ORIG[1] := DA(1);
+X_ORIG[2] := DA(2);
+X_ORIG[3] := DA(3);
+X_ORIG[4] := DA(4);
+X_TEST[1] := X_ORIG[1];
+X_TEST[2] := X_ORIG[2];
+X_TEST[3] := X_ORIG[3];
+X_TEST[4] := X_ORIG[4];
+RCT X_TEST;
+RET X_TEST;
+WRITE 6 'RCT-then-RET roundtrip diff (X_TEST vs X_ORIG, expect ~0):';
+DMAP X_TEST X_ORIG 6;
+
 { ----- LOCSET / LOCTRA (local Cartesian axis state + transform) -----
   LOCSET stores 6 angle/position scalars into globals; verify by
   reading back. LOCTRA constructs a position-only DA map from a 6-angle
