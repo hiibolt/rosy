@@ -323,4 +323,16 @@ PROCEDURE NF EPS (RE) MA (DA 8);
   DANF MAP MN_LOCAL MA 1 RES EPS;
 ENDPROCEDURE;
 
+{ ----- RS: resonance-strengths wrapper (cosy.fox L1639-1641) --------------
+  Computes the symplectic resonance strengths of the active MAP into RES.
+  Internally a one-line call to DANF with MA computed but discarded
+  (LWNDANF tracks numerical health).                                       }
+PROCEDURE RS RES (CD);
+  VARIABLE (DA 8) MN_LOCAL;
+  VARIABLE (DA 8) MA_LOCAL;
+  VARIABLE (RE) EPS;
+  EPS := 1E-7;
+  DANF MAP MN_LOCAL MA_LOCAL 1 RES EPS;
+ENDPROCEDURE;
+
 END;
