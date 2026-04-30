@@ -620,6 +620,61 @@ FUNCTION (DA) PB X (DA) Y (DA);
   ENDLOOP;
 ENDFUNCTION;
 
+{ ----- Block-diagonalize a linear map (cosy.fox L1495-1505) ---------------
+  BM(M, MB, A, IER) writes M as A^{-1} · MB · A where MB has decoupled
+  planes (the linear part is block-diagonal). Used by DANF as the first
+  step of normal-form analysis: linearize, decouple planes, then run
+  per-plane normal form on each.
+
+  Algorithm:
+    1. Extract the linear matrix MM from M via DAPEE per slot.
+    2. MBLOCK splits MM into the forward (MA) and inverse (MI) similarity
+       transformations that decouple it.
+    3. Build A from MI·DD (the inverse-transform map basis).
+    4. Build SCR from MA·DD (the forward-transform map basis).
+    5. Apply M to SCR via ANM, then re-multiply by MI to extract MB.
+
+  MBLOCK is provided as a ROSY statement (rosy/src/program/statements/math/
+  mblock/). Output A is a DA-array map; MB is the decoupled image. }
+PROCEDURE BM M (DA 8) MB (DA 8) A (DA 8) IER (RE);
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE 20 20) MM;
+  VARIABLE (RE 20 20) MA;
+  VARIABLE (RE 20 20) MI;
+  VARIABLE (DA 20) SCR;
+
+  { Linear matrix extraction via DER+CONS: ∂M[I]/∂x_J at origin = m_IJ.
+    cosy.fox uses `DAPEE M(I) J K` with J as the id, but ROSY's TRANSPORT
+    id is left-to-right (id=10 → x_1 not x_2), so single-digit J only
+    works for J=1. The DER route is encoding-agnostic. }
+  LOOP I 1 TWOND;
+    LOOP J 1 TWOND;
+      MM[I, J] := CONS(DER(J, M[I]));
+    ENDLOOP;
+  ENDLOOP;
+
+  MBLOCK MM MA MI NV TWOND;
+
+  LOOP I 1 TWOND;
+    A[I]   := 0*DD[1];
+    SCR[I] := 0*DD[1];
+    LOOP J 1 TWOND;
+      A[I]   := A[I]   + MI[I, J]*DD[J];
+      SCR[I] := SCR[I] + MA[I, J]*DD[J];
+    ENDLOOP;
+  ENDLOOP;
+
+  ANM M SCR SCR;
+
+  LOOP I 1 TWOND;
+    MB[I] := 0*DD[1];
+    LOOP J 1 TWOND;
+      MB[I] := MB[I] + MI[I, J]*SCR[J];
+    ENDLOOP;
+  ENDLOOP;
+ENDPROCEDURE;
+
 { ----- Twiss / tune extraction for block-diagonal maps (cosy.fox L1507-1543)
   GT(MM, F, MU, ALPHA, BETA, GAMMA, R) computes the tune (MU), the three
   Twiss parameters (ALPHA, BETA, GAMMA) and the contraction factor (R) from
