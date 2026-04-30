@@ -663,6 +663,35 @@ PROCEDURE PT IU (RE);
   DAPRV MM 5 6 TWOND IU;
 ENDPROCEDURE;
 
+{ ----- Print aberrations of the active MAP (cosy.fox L776-781) -----------
+  PA(IU) prints aberration coefficients of the active MAP to unit IU,
+  scaled by per-coordinate phase-space factors (PHSP) and parameter-
+  space factors (PARS). The scaling makes higher-order coefficients
+  dimensionally meaningful as percentage / mrad / etc.
+
+  Algorithm:
+    1. Build MM with PHSP-scaled DD basis for the dynamical TWOND
+       slots, and PARS-scaled DD for the NV-TWOND parameter slots.
+    2. POLVAL substitutes MM into MAP — output has aberrations
+       expressed in the user's chosen scaled units.
+    3. Pad MM[TWOND+1..5] with zero DAs and DAPRV-print 5 components. }
+PROCEDURE PA IU (RE);
+  VARIABLE (RE) I;
+  VARIABLE (DA 20) MM;
+
+  LOOP I 1 TWOND;
+    MM[I] := PHSP[I]*DD[I];
+  ENDLOOP;
+  LOOP I TWOND+1 NV;
+    MM[I] := PARS[I-TWOND]*DD[I];
+  ENDLOOP;
+  POLVAL 1 MAP TWOND MM NV MM TWOND;
+  LOOP I TWOND+1 5;
+    MM[I] := 0*DD[1];
+  ENDLOOP;
+  DAPRV MM 5 6 TWOND IU;
+ENDPROCEDURE;
+
 { ----- Block-diagonalize a linear map (cosy.fox L1495-1505) ---------------
   BM(M, MB, A, IER) writes M as A^{-1} · MB · A where MB has decoupled
   planes (the linear part is block-diagonal). Used by DANF as the first
