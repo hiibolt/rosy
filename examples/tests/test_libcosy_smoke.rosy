@@ -316,6 +316,21 @@ AM M_OTHER;               { composes M_OTHER onto MAP → drift(1.0) }
 WRITE 6 'After AM M_OTHER, MAP[1] (composed via AM, expect drift(1.0)):';
 WRITE 6 MAP[1];
 
+{ ----- MT (rotated-element map) -----
+  Rotate a quadrupole map by 0 degrees and verify the result equals the
+  input (rotation by zero is a no-op). The full MT logic — pre-rotate
+  variables, POLVAL substitute, post-rotate outputs — must net to the
+  identity at PHI=0. }
+WRITE 6 ' ----- MT: 0-deg rotation of a quadrupole map (expect identity) -----';
+OV 2 2 0;
+RPP 100;
+UM;
+MQ 0.5 1.0 0.05;          { build a quadrupole map }
+SNM MAP M_OTHER;          { save the canonical quadrupole }
+MT M_OTHER M_SAVE 0.0;    { rotate by 0 degrees → no change }
+WRITE 6 'MT 0-deg roundtrip diff (M_OTHER vs MT(M_OTHER, 0), expect ~0):';
+DMAP M_OTHER M_SAVE 6;
+
 { ----- CATR / TRCA (canonical / TRANSPORT conversion) -----
   Build a drift(1.0) canonical map, convert to TRANSPORT, convert back.
   The roundtrip should reproduce the original up to DA truncation. }

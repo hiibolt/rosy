@@ -239,6 +239,83 @@ PROCEDURE CATR IAP NAP LGH (RE);
   ANM DOP COP NAP;
 ENDPROCEDURE;
 
+{ ----- Map of rotated element (cosy.fox L474-487) -------------------------
+  MT(IAP, NAP, PHI) rotates the input map IAP by PHI degrees about the
+  beam axis, producing NAP. Used to construct skew variants of upright
+  elements (skew quad / sextupole) — the rotation acts on (x, y) and
+  (p_x, p_y) jointly.
+
+  Algorithm:
+    1. Build the 4×4 block-diagonal rotation matrix R = diag(R_2, R_2)
+       where R_2 = [[cos PHI, sin PHI], [−sin PHI, cos PHI]].
+    2. COD := R · DD — rotated canonical variables (positions + momenta).
+    3. POLVAL: NAP := IAP ∘ COD — substitute rotated variables into IAP.
+    4. NAP[1..4] := R^T · NAP[1..4] — undo the variable rotation in the
+       output dimensions, leaving a map that's PHI-rotated about the axis.
+
+  PHI is given in degrees; common multiples of 90 take exact-cosine
+  shortcuts to avoid floating-point drift. ND>1 is required; the
+  ND=1 path with non-zero PHI errors out (no y-axis to rotate into). }
+PROCEDURE MT IAP NAP PHI (RE);
+  VARIABLE (RE 4 4) R;
+  VARIABLE (DA 20) COD;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) S;
+  VARIABLE (RE) C;
+
+  IF PHI = 0;
+    C := 1; S := 0;
+  ELSEIF ABS(PHI+90) = 180;
+    C := 0; S := 1;
+  ELSEIF ABS(PHI) = 180;
+    C := -1; S := 0;
+  ELSEIF ABS(PHI-90) = 180;
+    C := 0; S := -1;
+  ELSE;
+    C := COS(PHI*DEGRAD);
+    S := SIN(PHI*DEGRAD);
+  ENDIF;
+
+  IF (TWOND = 1) AND (S # 0);
+    WRITE 6 ' *** ERROR in MT, ND too low';
+    QUIT 0;
+  ENDIF;
+
+  LOOP I 1 4;
+    LOOP J 1 4;
+      R[I, J] := 0;
+    ENDLOOP;
+    R[I, I] := C;
+  ENDLOOP;
+  LOOP I 1 2;
+    R[I, I+2] := S;
+    R[I+2, I] := -S;
+  ENDLOOP;
+
+  LOOP I 1 4;
+    COD[I] := 0*DD[1];
+    LOOP J 1 4;
+      COD[I] := COD[I] + R[I, J]*DD[J];
+    ENDLOOP;
+  ENDLOOP;
+  LOOP I 5 NV;
+    COD[I] := DD[I];
+  ENDLOOP;
+
+  POLVAL 1 IAP TWOND COD NV NAP TWOND;
+
+  LOOP I 1 4;
+    COD[I] := 0*DD[1];
+    LOOP J 1 4;
+      COD[I] := COD[I] + R[J, I]*NAP[J];
+    ENDLOOP;
+  ENDLOOP;
+  LOOP I 1 4;
+    NAP[I] := COD[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
 { ----- TRANSPORT-standard → canonical map (cosy.fox L719-738) --------------
   TRCA is the inverse of CATR: convert NAP-as-TRANSPORT into NAP-as-canonical.
   The kinematic factors GM and MG swap roles (GM now divides DOP, MG divides
