@@ -620,4 +620,46 @@ FUNCTION (DA) PB X (DA) Y (DA);
   ENDLOOP;
 ENDFUNCTION;
 
+{ ----- Momentum compaction dL(dP)/L (cosy.fox L1483-1487) -----------------
+  MCM(IAP, LGH, ALPHA) computes the momentum-compaction factor αp from a
+  ring map IAP. αp = dL/L per dP — fractional path-length change per
+  fractional momentum offset, the foundational figure of merit for
+  storage-ring optics.
+
+  Algorithm: convert IAP to TRANSPORT representation (CATR), then use
+  FM under TWOND=5 (treating the time slot as parameter, not phase-space)
+  to extract the path-length-vs-momentum derivative XF[5]. ALPHA = (XF[5]
+  - DD[5]) / LGH normalizes to the COSY convention.                      }
+PROCEDURE MCM IAP (DA 8) LGH (RE) ALPHA (DA);
+  VARIABLE (DA 20) XF;
+  VARIABLE (DA 20) MF;
+  VARIABLE (RE) IER;
+
+  IF ND # 3;
+    WRITE 6 ' *** ERROR in MCM, dimension # 3';
+  ENDIF;
+  CATR IAP IAP LGH;
+  TWOND := 5;
+  FM IAP XF MF IER;
+  TWOND := 6;
+  ALPHA := (XF[5] - DD[5])/LGH;
+ENDPROCEDURE;
+
+{ ----- Energy compaction dT(dE) (cosy.fox L1489-1493) ---------------------
+  ECM(IAP, LGH, ALPHA): the relativistic-energy analogue of MCM. Returns
+  the time-of-flight derivative with respect to energy offset.           }
+PROCEDURE ECM IAP (DA 8) LGH (RE) ALPHA (DA);
+  VARIABLE (DA 20) XF;
+  VARIABLE (DA 20) MF;
+  VARIABLE (RE) IER;
+
+  IF ND # 3;
+    WRITE 6 ' *** ERROR in ECM, dimension # 3';
+  ENDIF;
+  TWOND := 5;
+  FM IAP XF MF IER;
+  TWOND := 6;
+  ALPHA := XF[5] - DD[5];
+ENDPROCEDURE;
+
 END;
