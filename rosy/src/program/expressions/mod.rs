@@ -127,6 +127,16 @@ pub struct Expr {
 
 impl FromRule for Expr {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Expr>> {
+        // Accept either an `expr` pair (walk its children for primaries+
+        // infixes) or a bare primary pair (like neg_expr's operand after
+        // the `neg_expr = { "-" ~ term }` grammar fix). Collecting into a
+        // Vec<Pair> lets us feed both shapes through the same PrattParser
+        // call uniformly.
+        let pairs_iter: Vec<pest::iterators::Pair<Rule>> = if pair.as_rule() == Rule::expr {
+            pair.into_inner().collect()
+        } else {
+            vec![pair]
+        };
         let result = PRATT_PARSER
             .map_primary(|primary| {
                 let loc = SourceLocation::from_pair(&primary);
@@ -737,7 +747,7 @@ impl FromRule for Expr {
                 _ => bail!("Unexpected infix operator: {:?}", op.as_rule()),
                 }
             })
-            .parse(pair.into_inner());
+            .parse(pairs_iter.into_iter());
 
         result.map(Some)
     }

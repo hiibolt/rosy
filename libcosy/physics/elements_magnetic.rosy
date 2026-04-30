@@ -44,14 +44,8 @@ PROCEDURE MQ L (RE) B (RE) D (RE);
     PROCEDURE MAPY C (RE) X (DA) Y (DA);
       N := IAP[C];
       IAP[C] := IAP[C]*X + IAP[C + 1]/FP*Y;
-      { Note: parens around `-FP*N*Y` are required because ROSY's unary-minus
-        rule binds to a full expression rather than a term — `-A*B + C` is
-        currently parsed as `-(A*B + C)`. Without parens, the cos·p_x term
-        ends up sign-flipped, breaking the symplectic structure (m22 = -cos
-        instead of +cos) and turning every quad into an apparent rotation
-        by ~180 degrees. Track-and-fix this in the parser when convenient. }
       IF C = 1;
-        IAP[C + 1] := (-FP*N*Y) + IAP[C + 1]*X;
+        IAP[C + 1] := -FP*N*Y + IAP[C + 1]*X;
       ELSEIF C = 3;
         IAP[C + 1] :=  FP*N*Y + IAP[C + 1]*X;
       ENDIF;

@@ -416,12 +416,13 @@ term = _{
     variable_identifier |
     "(" ~ expr ~ ")" }
 
-// Unary negation (prefix minus). Currently binds to a full expression,
-// which means `-A*B + C` parses as `-(A*B + C)`. This is non-standard
-// (should bind to a single term per math precedence) but changing it
-// requires a corresponding rework in the AST builder — for now, callers
-// in libcosy explicitly parenthesize negated terms when followed by `+`.
-neg_expr = { "-" ~ expr }
+// Unary negation (prefix minus). Binds to a single term so that `-A*B + C`
+// parses as `(-A)*B + C`, matching standard math precedence and COSY
+// semantics. Expr::from_rule transparently handles both `expr` pairs
+// (with into_inner-yielded primaries+infixes) and bare primary pairs
+// (neg_expr's operand) by routing both through a single PRATT_PARSER call
+// — see expressions/mod.rs.
+neg_expr = { "-" ~ term }
 
 // Boolean literals
 boolean = { ^"TRUE" | ^"FALSE" }
