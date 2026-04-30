@@ -347,6 +347,19 @@ PROCEDURE DI R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE);
   BEND R PHI*DEGRAD D E1*DEGRAD H1 E2*DEGRAD H2 NZ S1Z S2Z 0;
 ENDPROCEDURE;
 
+{ ----- DIL: length-form dipole (cosy.fox L3468-3469) ----------------------
+  DIL(L, PHI, D, E1, H1, E2, H2) is DI parameterized by arc length L
+  instead of bending radius R. Falls back to a pure drift DL(L) when
+  PHI = 0. The R = L/(PHI·DEGRAD) substitution gives the same magnet
+  with a more lattice-builder-friendly signature.                         }
+PROCEDURE DIL L (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE);
+  IF PHI = 0;
+    DL L;
+  ELSE;
+    DI L/(PHI*DEGRAD) PHI D E1 H1 E2 H2;
+  ENDIF;
+ENDPROCEDURE;
+
 { ----- DP: parallel-faced dipole convenience wrapper (cosy.fox L3437-3439) }
 PROCEDURE DP R (RE) PHI (RE) D (RE);
   VARIABLE (RE) PH;

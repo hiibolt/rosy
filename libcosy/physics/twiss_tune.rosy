@@ -125,4 +125,49 @@ FUNCTION (RE) OE A (DA 3 3);
   OE := OE/9 + WABS(X - 1, WAF);
 ENDFUNCTION;
 
+{ ----- SBE: set beam ellipsoid from emittances (cosy.fox L866-875) ----------
+  SBE(EX, EY, ET) configures the beam phase-space ellipsoid (via SB) from
+  three emittances — horizontal (EX), vertical (EY), and longitudinal (ET).
+  For each plane, the ellipsoid axes (X, A) and correlation R are derived
+  from the linear matrix elements of the active MAP, assuming the map is
+  stable in that plane (|trace/2| < 1).
+
+  Algorithm: per plane I = 1..ND,
+    1. trace = ME(J, J) + ME(K, K)  where J=2I-1, K=2I.
+    2. If |trace| < 2-1E-10 (stable): compute DUM scaling factor, then
+       X = sqrt(DUM·|ME(J,K)|), A = sqrt(DUM·|ME(K,J)|),
+       R = (ME(K,K)-ME(J,J))/2 · sign(ME(J,K)) / sqrt(|ME(J,K)·ME(K,J)|).
+    3. Otherwise: zero out the plane and warn ("map unstable").
+  Finally calls SB to install the ellipsoid into the global beam state. }
+PROCEDURE SBE EX (RE) EY (RE) ET (RE);
+  VARIABLE (RE 3) E_VEC;
+  VARIABLE (RE) I; VARIABLE (RE) J; VARIABLE (RE) K;
+  VARIABLE (RE) DUM;
+  VARIABLE (RE 3) X_VEC;
+  VARIABLE (RE 3) A_VEC;
+  VARIABLE (RE 3) R_VEC;
+
+  E_VEC[1] := EX; E_VEC[2] := EY; E_VEC[3] := ET;
+
+  LOOP I 1 ND;
+    K := 2*I;
+    J := K - 1;
+    IF ABS(ME(J, J) + ME(K, K)) < (2 - 1E-10);
+      DUM := E_VEC[I]/PI/SQRT(1 - SQR(ME(J, J) + ME(K, K))/4);
+      X_VEC[I] := SQRT(DUM*ABS(ME(J, K)));
+      A_VEC[I] := SQRT(DUM*ABS(ME(K, J)));
+      R_VEC[I] := (ME(K, K) - ME(J, J))/2*SIG(ME(J, K))
+                  / SQRT(ABS(ME(J, K)*ME(K, J)));
+    ELSE;
+      X_VEC[I] := 0;
+      A_VEC[I] := 0;
+      R_VEC[I] := 0;
+      WRITE 6 ' --- WARNING in SBE, map unstable';
+    ENDIF;
+  ENDLOOP;
+
+  SB X_VEC[1] A_VEC[1] R_VEC[1] X_VEC[2] A_VEC[2] R_VEC[2]
+     X_VEC[3] A_VEC[3] R_VEC[3] 0 0;
+ENDPROCEDURE;
+
 END;
