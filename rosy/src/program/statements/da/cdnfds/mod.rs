@@ -18,8 +18,10 @@
 #![doc = include_str!("rosy_output.txt")]
 //! ```
 //!
-//! TODO: COSY INFINITY test requires beam physics library (`INCLUDE 'COSY'`)
-//! which is not available for standalone testing.
+//! Note: the standalone `test.rosy` exercises CDNFDS directly with hand-built
+//! CD inputs and runs end-to-end. A `test.fox` cosy-parity fixture is
+//! deferred — it would require running the cosy.fox / libcosy normal-form
+//! pipeline (DANF / NF) against the COSY 10.2 binary and diffing output.
 
 use anyhow::{Context, Error, Result, ensure};
 use std::collections::BTreeSet;
