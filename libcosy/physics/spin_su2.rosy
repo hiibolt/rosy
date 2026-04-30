@@ -155,4 +155,133 @@ PROCEDURE MEXPSU2 A (CD 2) B (CD 2);
   ENDLOOP;
 ENDPROCEDURE;
 
+{ ----- EHOMSU2: extract J-th-order homogeneous part of an SU(2) (cosy.fox L1668)
+  EHOMSU2(A, B, J) computes A := B|_{order=J} - B|_{order=J-1}, isolating
+  the J-th order homogeneous slice of B. Uses CO truncation walks to
+  extract each order without disturbing NOC.                              }
+PROCEDURE EHOMSU2 A (CD 2) B (CD 2) J (RE);
+  VARIABLE (CD 2) C;
+  VARIABLE (RE) K;
+  K := NOC;
+  CO J;
+  A[1] := B[1]; A[2] := B[2];
+  CO J - 1;
+  C[1] := B[1]; C[2] := B[2];
+  CO K;
+  A[1] := A[1] - C[1];
+  A[2] := A[2] - C[2];
+ENDPROCEDURE;
+
+{ ----- MAPINVR: error-checked DA-map inverse (cosy.fox L1704-1707) ---------
+  Thin MI wrapper that errors out cleanly if the inverse fails. }
+PROCEDURE MAPINVR M1 (DA 8) M2 (DA 8);
+  VARIABLE (RE) IER;
+  MI M1 M2 NV IER NOC NV NM1;
+  IF IER # 0;
+    WRITE 6 ' *** ERROR in MAPINVR';
+    QUIT 0;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- ANALMAP: extract Twiss / linear-tune basis from a CD map ------------
+  cosy.fox L1681-1703. Diagonalizes the linear part of MN per phase-space
+  pair into PHI (tune) + R (radius) plus the M1, M2 substitution
+  polynomials needed to map between Floquet and canonical coords.
+
+  All locals are RE-typed scalars extracted via COEF (matrix elements at
+  specific TRANSPORT id's). Note: COEF id encoding works correctly here
+  since the K, L indices are single digits (≤ 6); for higher-index access
+  we'd need DER+CONS like in GT/BM.                                       }
+PROCEDURE ANALMAP MN (CD 8) PHI (RE 8) R (RE 8) M1 (CD 20) M2 (CD 20);
+  VARIABLE (RE) J;
+  VARIABLE (RE) K;
+  VARIABLE (RE) L;
+  VARIABLE (RE) AC;
+  VARIABLE (RE) BC;
+  VARIABLE (RE) CC_;
+  VARIABLE (RE) D_VAL;
+  VARIABLE (CM) IU;
+
+  IMUNIT IU;
+
+  LOOP J 1 ND;
+    K := 2*J - 1;
+    L := K + 1;
+    { COEF takes DA, MN is CD — REAL-cast inside before COEF. }
+    AC  := COEF(REAL(MN[K]), K);
+    BC  := COEF(REAL(MN[K]), L);
+    CC_ := COEF(REAL(MN[L]), K);
+    D_VAL := COEF(REAL(MN[L]), L);
+    IF 1 + BC*BC + CC_*CC_ # 1;
+      R[K] := SQRT(AC*AC + BC*BC);
+      R[L] := R[K];
+      PHI[K] := ACOS(AC/R[K])*(BC/ABS(BC));
+      PHI[L] := -PHI[K];
+    ELSE;
+      PHI[K] := 0;
+      PHI[L] := 0;
+      R[K] := AC;
+      R[L] := D_VAL;
+    ENDIF;
+    IF PHI[K] # 0;
+      M1[K] := DD[K] - IU*DD[L];
+      M1[L] := DD[K] + IU*DD[L];
+      M2[K] := (DD[K] + DD[L])/2 + 0*IU;
+      M2[L] := (IU*DD[K] - IU*DD[L])/2;
+    ELSE;
+      M1[K] := DD[K] + 0*IU;
+      M1[L] := DD[L] + 0*IU;
+      M2[K] := DD[K] + 0*IU;
+      M2[L] := DD[L] + 0*IU;
+    ENDIF;
+  ENDLOOP;
+  LOOP J TWOND+1 NV;
+    M1[J] := DD[J] + 0*IU;
+    M2[J] := DD[J] + 0*IU;
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- SOLVSU2: per-order Cj-operator solver (cosy.fox L1675-1680) --------
+  Applies CDNFDS to extract the j-th order resonance correction in
+  Floquet variables, then maps back to canonical coords. Used inside
+  the NORMSU2 main iteration loop.                                       }
+PROCEDURE SOLVSU2 U1 (CD 2) U2 (CD 2) D (CD) PHI (RE 8) R (RE 8)
+                  M1 (CD 20) M2 (CD 20) EPS (RE);
+  VARIABLE (CD 1) U1_BUF;
+  VARIABLE (CD 1) YY;
+  VARIABLE (VE) PHI_VE;
+  VARIABLE (VE) R_VE;
+
+  { Materialize VE views of PHI/R for CDNFDS. Branched by TWOND. }
+  IF TWOND = 2;
+    PHI_VE := PHI[1] & PHI[2];
+    R_VE := R[1] & R[2];
+  ELSEIF TWOND = 4;
+    PHI_VE := PHI[1] & PHI[2] & PHI[3] & PHI[4];
+    R_VE := R[1] & R[2] & R[3] & R[4];
+  ELSEIF TWOND = 6;
+    PHI_VE := PHI[1] & PHI[2] & PHI[3] & PHI[4] & PHI[5] & PHI[6];
+    R_VE := R[1] & R[2] & R[3] & R[4] & R[5] & R[6];
+  ELSE;
+    WRITE 6 ' *** ERROR in SOLVSU2, unsupported TWOND';
+    QUIT 0;
+  ENDIF;
+
+  CPOLVAL 1 U2 2 M2 NV U1 2;
+
+  U1_BUF[1] := U1[1];
+  CDNFDS U1_BUF R_VE PHI_VE 0 2*ND EPS YY;
+  U1[1] := YY[1];
+
+  U1_BUF[1] := U1[2];
+  VARIABLE (RE) NEG_D_RE;
+  NEG_D_RE := -CONS(REAL(D));
+  CDNFDS U1_BUF R_VE PHI_VE NEG_D_RE 2*ND EPS YY;
+  U1[2] := YY[1];
+
+  CPOLVAL 1 U1 2 M1 NV U2 2;
+  U1[1] := U2[1];
+  U1[2] := U2[2];
+ENDPROCEDURE;
+
 END;
