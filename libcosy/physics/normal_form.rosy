@@ -323,6 +323,28 @@ PROCEDURE NF EPS (RE) MA (DA 8);
   DANF MAP MN_LOCAL MA 1 RES EPS;
 ENDPROCEDURE;
 
+{ ----- LEXP: Lie exponential operator (cosy.fox L226-228) -----------------
+  LEXP(A, B) returns exp(:A:)·B where :A: is the Poisson-bracket Lie
+  operator. Computed as the truncated Lie series:
+
+    LEXP = B + {A,B} + {A,{A,B}}/2! + {A,{A,{A,B}}}/3! + … + (NOC terms)
+
+  cosy.fox uses the Hamiltonian-flow integrator DAFLO with scalar B; ROSY's
+  DAFLO requires a TWOND-length IC vector, so we use the direct Lie-series
+  form via PB instead. Mathematically equivalent through truncation order
+  NOC, slower for high orders but transparent and correct.                 }
+FUNCTION (DA) LEXP A (DA) B (DA);
+  VARIABLE (RE) I;
+  VARIABLE (DA) TERM;
+
+  TERM := B;
+  LEXP := B;
+  LOOP I 1 NOC;
+    TERM := PB(A, TERM)/I;
+    LEXP := LEXP + TERM;
+  ENDLOOP;
+ENDFUNCTION;
+
 { ----- TS: tune dependence on parameters AND amplitude (cosy.fox L1608-1625)
   TS(MU) computes the parameter- AND amplitude-dependence of the tunes
   from the active MAP, returning per-plane tune polynomials in MU.
