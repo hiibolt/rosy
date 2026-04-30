@@ -1,0 +1,47 @@
+{ ============================================================================
+  libcosy/physics/twiss_tune.rosy — Twiss / sigma-matrix / tune helpers
+
+  cosy.fox L489-502 onwards. Beam-envelope and sigma-matrix utilities
+  layered on top of the GT / DANF / NF stack.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- SIGMA: beam sigma-matrix element (cosy.fox L489-502) ---------------
+  SIGMA(I, J) returns the (I, J) element of the beam sigma matrix from
+  the active MAP. Handles three cases:
+    * I = J, I odd  → position-position variance (q_i^2 term)
+    * I = J, I even → momentum-momentum variance (p_i^2 term)
+    * |I - J| = 1, max(I, J) even → cross-correlation between conjugate
+                                    position-momentum pair
+  Other (I, J) combinations error out (cross-pair correlations vanish for
+  uncoupled lattices).
+
+  PHSP[i] are the per-coordinate phase-space scaling factors and PHSR[k]
+  are the correlation coefficients between the k-th conjugate pair —
+  both declared in globals.rosy and seeded by user code (typically zero
+  initially in libcosy v1).                                               }
+FUNCTION (RE) SIGMA I (RE) J (RE);
+  VARIABLE (RE) K;
+  IF (I = J) AND (INT(I/2) # I/2);
+    SIGMA := SQR(PHSP[I]*ME(I, I)) + SQR(PHSP[I+1]*ME(I, I+1))
+           + 2*PHSP[I]*PHSP[I+1]*PHSR[(I+1)/2]*ME(I, I)*ME(I, I+1);
+  ELSEIF (I = J) AND (INT(I/2) = I/2);
+    SIGMA := SQR(PHSP[I-1]*ME(I, I-1)) + SQR(PHSP[I]*ME(I, I))
+           + 2*PHSP[I-1]*PHSP[I]*PHSR[I/2]*ME(I, I-1)*ME(I, I);
+  ELSEIF (ABS(I - J) = 1) AND (INT(MAX(J, I)/2)*2 = MAX(J, I));
+    K := MIN(I, J);
+    SIGMA := SQR(PHSP[K])*ME(K, K)*ME(K+1, K)
+           + SQR(PHSP[K+1])*ME(K, K+1)*ME(K+1, K+1);
+    SIGMA := SIGMA
+           + PHSP[K]*PHSP[K+1]*PHSR[(K+1)/2]*(ME(K, K)*ME(K+1, K+1)
+                                              + ME(K, K+1)*ME(K+1, K));
+  ELSE;
+    WRITE 6 ' *** ERROR in SIGMA, wrong element';
+    QUIT 0;
+  ENDIF;
+ENDFUNCTION;
+
+END;

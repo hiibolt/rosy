@@ -13,8 +13,9 @@ INCLUDE 'map_ops.rosy';             { M4 (savers + ME/PB/PM/PSM/PNM/DMAP/DSMAP) 
 INCLUDE 'elements_basic.rosy';      { M4.6 (DLACT + DL drift) }
 INCLUDE 'elements_magnetic.rosy';   { M5 (MQ analytical fast path) }
 INCLUDE 'normal_form.rosy';         { M5 (DANF / NF normal-form pipeline) }
+INCLUDE 'twiss_tune.rosy';          { M5 (SIGMA beam-envelope helper) }
 
-{ Future: M5 will add 'twiss_tune.rosy', 'spin_su2.rosy'.
+{ Future: M5 will add 'spin_su2.rosy'.
   M6 will INCLUDE 'field_potential.rosy', and the rest of elements_basic.
   M7-M9 will INCLUDE the remaining elements_*.rosy and 'tracking.rosy'. }
 
