@@ -316,6 +316,22 @@ AM M_OTHER;               { composes M_OTHER onto MAP → drift(1.0) }
 WRITE 6 'After AM M_OTHER, MAP[1] (composed via AM, expect drift(1.0)):';
 WRITE 6 MAP[1];
 
+{ ----- LOCSET / LOCTRA (local Cartesian axis state + transform) -----
+  LOCSET stores 6 angle/position scalars into globals; verify by
+  reading back. LOCTRA constructs a position-only DA map from a 6-angle
+  rotation/translation; with all-zero arguments, NAP should be the
+  identity in DD[1..3] (no rotation, no translation). }
+LOCSET 1.0 2.0 3.0 4.0 5.0 6.0;
+WRITE 6 'After LOCSET 1..6: XLOC =' XLOC '   [expect 1]';
+WRITE 6 'After LOCSET 1..6: SLOC =' SLOC '   [expect 4]';
+WRITE 6 'After LOCSET 1..6: TLOC =' TLOC '   [expect 6]';
+LOCSET 0.0 0.0 0.0 0.0 0.0 0.0;        { reset state }
+
+VARIABLE (DA 8) M_LOC;
+LOCTRA 0 0 0 0 0 0 M_LOC;               { all-zero → identity DA in DD[1..3] }
+WRITE 6 'After LOCTRA 0..0, M_LOC[1] (expect identity in DD[1] = x):';
+WRITE 6 M_LOC[1];
+
 { ----- MT (rotated-element map) -----
   Rotate a quadrupole map by 0 degrees and verify the result equals the
   input (rotation by zero is a no-op). The full MT logic — pre-rotate

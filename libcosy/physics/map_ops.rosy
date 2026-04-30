@@ -239,6 +239,56 @@ PROCEDURE CATR IAP NAP LGH (RE);
   ANM DOP COP NAP;
 ENDPROCEDURE;
 
+{ ----- Set local-Cartesian axis coordinates (cosy.fox L460-462) -----------
+  LOCSET stashes 6 angles/positions into globals XLOC/ZLOC/PLOC/SLOC/
+  VLOC/TLOC. Element procedures and UPDATE consult these to know the
+  reference axis's orientation in the lab frame. Thin wrapper, but
+  required so AM (which calls LOCSET 0 0 0 0 0 0 in cosy.fox to "reset"
+  the axis state) and downstream tracking code can find the symbols. }
+PROCEDURE LOCSET X (RE) Z (RE) P (RE) S (RE) V (RE) T (RE);
+  XLOC := X; ZLOC := Z; PLOC := P;
+  SLOC := S; VLOC := V; TLOC := T;
+ENDPROCEDURE;
+
+{ ----- Final-to-initial Cartesian transformation (cosy.fox L445-458) -------
+  LOCTRA(X, Y, Z, T, P, A, NAP) builds a 3-row map NAP describing the
+  position-vector transformation from the final reference frame back to
+  the initial frame, parameterized by translation (X, Y, Z) and Euler-
+  like rotation angles (T = θ, P = φ, A = α).
+
+  The math is a standard 3-2-1 Euler rotation composed with a translation:
+  CT/ST = cos/sin(θ), CP/SP = cos/sin(φ), CA/SA = cos/sin(α). The
+  IF/ELSEIF on `ABS(ST*SP)=1` handles the gimbal-lock degenerate case.
+  Final NAP[1..3] are DA polynomials in DD[1..3] (the canonical position
+  variables x, y, z).                                                    }
+PROCEDURE LOCTRA X (RE) Y (RE) Z (RE) T (RE) P (RE) A (RE) NAP;
+  VARIABLE (RE) CT; VARIABLE (RE) ST;
+  VARIABLE (RE) CP; VARIABLE (RE) SP;
+  VARIABLE (RE) CA; VARIABLE (RE) SA;
+  VARIABLE (RE) CB; VARIABLE (RE) SB;
+  VARIABLE (RE) CM; VARIABLE (RE) SM;
+  VARIABLE (RE) N;
+
+  CT := COS(T); ST := SIN(T);
+  CP := COS(P); SP := SIN(P);
+  CA := COS(A); SA := SIN(A);
+
+  IF ABS(ST*SP) = 1;
+    CB := 0; SB := 1;
+  ELSE;
+    N := SQRT(1 - SQR(ST)*SQR(SP));
+    CB := CP/N;
+    SB := CT*SP/N;
+  ENDIF;
+
+  CM := CA*CB + SA*SB;
+  SM := SA*CB - CA*SB;
+
+  NAP[1] := X + (CM*CT*CP - SM*SP)*DD[1] - (CM*SP + SM*CT*CP)*DD[2] + (ST*CP)*DD[3];
+  NAP[2] := Y + (CM*CT*SP + SM*CP)*DD[1] + (CM*CP - SM*CT*SP)*DD[2] + (ST*SP)*DD[3];
+  NAP[3] := Z - (CM*ST)*DD[1]            + (SM*ST)*DD[2]            + (CT)*DD[3];
+ENDPROCEDURE;
+
 { ----- Map of rotated element (cosy.fox L474-487) -------------------------
   MT(IAP, NAP, PHI) rotates the input map IAP by PHI degrees about the
   beam axis, producing NAP. Used to construct skew variants of upright
