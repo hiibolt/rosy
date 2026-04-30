@@ -160,6 +160,56 @@ PROCEDURE ANM N M O;
   POLVAL 1 N TWOND MM NV O TWOND;
 ENDPROCEDURE;
 
+{ ----- UPDATEMAP: compose two maps + spin update (cosy.fox L504-519) -------
+  UPDATEMAP(MAPT, MAPO, MAPU, SPNT, SPNO, SPNU): apply (MAPT, SPNT) onto
+  the previous state (MAPO, SPNO), producing the updated state
+  (MAPU, SPNU). Used by UPDATE and ring-element procedures to chain
+  per-element maps together.
+
+  Algorithm:
+    1. Build MS as MAPO padded with DD basis beyond TWOND.
+    2. POLVAL: MAPU = MAPT ∘ MS — pure map composition.
+    3. If spin tracking is on (LSPN=1), call SPNMUL to compose spin
+       matrices via the order-2 POLVAL trick. DEFERRED in libcosy v1
+       (errors out cleanly when LSPN=1).
+                                                                            }
+PROCEDURE UPDATEMAP MAPT (DA 8) MAPO (DA 8) MAPU (DA 8)
+                    SPNT (DA 3 3) SPNO (DA 3 3) SPNU (DA 3 3);
+  VARIABLE (DA 20) MS;
+  VARIABLE (RE) I;
+
+  LOOP I 1 TWOND;
+    MS[I] := MAPO[I];
+  ENDLOOP;
+  LOOP I TWOND+1 NV;
+    MS[I] := DD[I];
+  ENDLOOP;
+  POLVAL 1 MAPT TWOND MS NV MAPU TWOND;
+
+  IF LSPN = 1;
+    WRITE 6 ' *** ERROR in UPDATEMAP, spin-update path SPNMUL is deferred';
+    QUIT 0;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- UPDATE: standard step-update for ring tracking (cosy.fox L521+) ----
+  UPDATE(IM, IR): the per-element finalizer that composes MSC into MAP
+  (when IM=1), updates ray bundles (when IR=1 and NRAY≠0), refreshes the
+  envelope ERAY (when LENV=1), and emits any active graphics.
+
+  libcosy v1 ports only the IM=1 path: UPDATEMAP MSC MAP MAP — applying
+  the local element map onto the running active MAP. Ray application and
+  graphics are stubbed (NRAY=0 in default libcosy v1 setup, so the ray
+  branch is a no-op anyway).                                             }
+PROCEDURE UPDATE IM (RE) IR (RE);
+  IF IM # 0;
+    UPDATEMAP MSC MAP MAP SSCR SPNR SPNR;
+  ENDIF;
+  { IR≠0 + NRAY≠0 → ray application via POLVAL: deferred (NRAY-aware).
+    LENV=1 → envelope NEWENV: deferred.
+    LSYS / LCE / LPI graphics: skipped permanently per libcosy v1 plan. }
+ENDPROCEDURE;
+
 { ----- Apply a map to the momentary MAP (cosy.fox L651-653) --------------
   AM(M) composes M onto the active map: MAP := M ∘ MAP. The cosy.fox AM
   also propagates the action to ray bundles via UPDATE; without UPDATE
@@ -173,7 +223,7 @@ ENDPROCEDURE;
   composition during cosy.fox's standard tracking workflow.            }
 PROCEDURE AM M;
   IF NRAY # 0;
-    WRITE 6 ' *** ERROR, AM with rays needs UPDATE (not yet ported in libcosy v1)';
+    WRITE 6 ' *** ERROR, AM with rays needs UPDATE+ray pipeline (deferred)';
     QUIT 0;
   ENDIF;
   ANM M MAP MAP;
