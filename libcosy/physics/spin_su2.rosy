@@ -89,4 +89,70 @@ PROCEDURE SO3_IN_SU2 A (DA 3 3) B (CD 2) KEY (RE);
   ENDIF;
 ENDPROCEDURE;
 
+{ ----- SU(2) arithmetic primitives (cosy.fox L1651-1674) -------------------
+  These are the building blocks of NORMSU2's spin normal-form algorithm,
+  exposed here as standalone procedures so users can build custom spin
+  tracking pipelines without reimplementing the basic SU(2) algebra.    }
+
+{ IDENSU2(A): set A to the SU(2) identity (1, 0). }
+PROCEDURE IDENSU2 A (CD 2);
+  VARIABLE (CM) IM;
+  IMUNIT IM;
+  A[1] := 1 + IM*0 + 0*DD[1];
+  A[2] := 0 + IM*0 + 0*DD[1];
+ENDPROCEDURE;
+
+{ MULASU2(A, B, C): SU(2) multiplication A := B * C using the canonical
+  SU(2) matrix-product formula (B(1)*C(1) - B(2)*conj(C(2)), …). }
+PROCEDURE MULASU2 A (CD 2) B (CD 2) C (CD 2);
+  A[1] := B[1]*C[1] - B[2]*CONJ(C[2]);
+  A[2] := B[1]*C[2] + B[2]*CONJ(C[1]);
+ENDPROCEDURE;
+
+{ INVRSU2(A, B): SU(2) inverse A := B^{-1} = (conj(B(1)), -B(2)). Valid
+  because |B(1)|² + |B(2)|² = 1 for unit SU(2). }
+PROCEDURE INVRSU2 A (CD 2) B (CD 2);
+  A[1] := CONJ(B[1]);
+  A[2] := -B[2];
+ENDPROCEDURE;
+
+{ CORRSU2(A): normalize A to a unit SU(2) by dividing through by
+  the magnitude. Useful after numerical operations that may have
+  drifted off the unit sphere.                                       }
+PROCEDURE CORRSU2 A (CD 2);
+  VARIABLE (DA) D_VAL;
+  D_VAL := SQR(REAL(A[1])) + SQR(REAL(A[2]))
+         + SQR(IMAG(A[1])) + SQR(IMAG(A[2]));
+  D_VAL := ISRT(D_VAL);
+  A[1] := D_VAL*A[1];
+  A[2] := D_VAL*A[2];
+ENDPROCEDURE;
+
+{ MEXPSU2(A, B): SU(2) exponential A := exp(:B:) via truncated power
+  series. Requires B to be at-origin (constant terms zero); errors
+  out otherwise. cosy.fox uses NOC iterations for the truncation. }
+PROCEDURE MEXPSU2 A (CD 2) B (CD 2);
+  VARIABLE (CD 2) C1;
+  VARIABLE (CD 2) C2;
+  VARIABLE (RE) I;
+  VARIABLE (RE) RES;
+
+  RES := ABS(CONS(REAL(B[1]))) + ABS(CONS(REAL(B[2])))
+       + ABS(CONS(IMAG(B[1]))) + ABS(CONS(IMAG(B[2])));
+  IF RES # 0;
+    WRITE 6 ' *** ERROR in MEXPSU2 — B not at origin';
+    QUIT 0;
+  ENDIF;
+
+  IDENSU2 A;
+  IDENSU2 C1;
+  LOOP I 1 NOC;
+    MULASU2 C2 C1 B;
+    C1[1] := (1/I)*C2[1];
+    C1[2] := (1/I)*C2[2];
+    A[1] := A[1] + C1[1];
+    A[2] := A[2] + C1[2];
+  ENDLOOP;
+ENDPROCEDURE;
+
 END;
