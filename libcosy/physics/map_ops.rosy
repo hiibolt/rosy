@@ -179,6 +179,85 @@ PROCEDURE AM M;
   ANM M MAP MAP;
 ENDPROCEDURE;
 
+{ ----- Fixed point + map-around-fixed-point (cosy.fox L783-799) -----------
+  FM(M, XF, MF, IER) finds the closed-orbit fixed point XF of map M (where
+  M(XF) = XF) and the local map MF around it.
+
+  Algorithm:
+    1. Probe the constant-term displacement of each component (DAPEP at
+       exponent 0). If all are zero, M is already at-origin → XF = 0 and
+       MF = M trivially.
+    2. Otherwise, build N = M - DD (the displacement field) and invert via
+       MI to get NI. Apply NI to C (the constant-only DA) to find the
+       fixed-point offset XF.
+    3. Substitute XF back into M (POLVAL with mode 1) to compute MF, the
+       map seen from the fixed point.
+    4. Subtract C and DD adjustments to leave XF and MF in the COSY-
+       conventional "small displacement" coordinates.
+    5. Special-case TWOND=5: copy DD[5] / DD[6] handling for the time +
+       energy slots that aren't part of the fixed-point search.
+
+  Requires MI (linear_algebra.rosy). Self-contained otherwise.            }
+PROCEDURE FM M XF MF IER;
+  VARIABLE (DA 20) N;
+  VARIABLE (DA 20) NI;
+  VARIABLE (DA 20) C;
+  VARIABLE (RE) I;
+  VARIABLE (DA 1) M_BUF;
+  VARIABLE (DA 1) PEP_BUF;
+  VARIABLE (RE) COR;
+  VARIABLE (RE) P;
+
+  P := 0;
+  IF TWOND = 5;
+    COR := 4;
+  ELSE;
+    COR := TWOND;
+  ENDIF;
+
+  LOOP I 1 COR;
+    M_BUF[1] := M[I];
+    DAPEP M_BUF 0 COR PEP_BUF;
+    P := P + ABS(PEP_BUF[1]);
+  ENDLOOP;
+
+  IF P = 0;
+    LOOP I 1 TWOND;
+      MF[I] := M[I];
+      XF[I] := 0*DD[1];
+    ENDLOOP;
+    IER := 0;
+  ELSE;
+    LOOP I 1 COR;
+      C[I] := 0*DD[1];
+      N[I] := M[I] - DD[I];
+    ENDLOOP;
+    LOOP I COR+1 NV;
+      C[I] := DD[I];
+      N[I] := DD[I];
+    ENDLOOP;
+    MI N NI NV IER NOC NV NM1;
+    IF IER # 0;
+      WRITE 6 ' --- WARNING in FM, no fixed point';
+    ENDIF;
+    POLVAL 1 NI NV C NV XF NV;
+    POLVAL 1 M TWOND XF NV C TWOND;
+    LOOP I 1 COR;
+      XF[I] := XF[I] + DD[I];
+    ENDLOOP;
+    POLVAL 0 M TWOND XF NV MF TWOND;
+    LOOP I 1 COR;
+      MF[I] := MF[I] - C[I];
+      XF[I] := XF[I] - DD[I];
+    ENDLOOP;
+    IF TWOND = 5;
+      XF[5] := C[5];
+      MF[5] := MF[5] - C[5] + DD[5];
+      MF[6] := DD[6];
+    ENDIF;
+  ENDIF;
+ENDPROCEDURE;
+
 { ----- Map reverse — beam time-reversal (cosy.fox L464-472) ---------------
   MR(NAP, LAP) computes the time-reversed map LAP from the forward map NAP.
   Time reversal inverts the map and flips the sign of all momenta and

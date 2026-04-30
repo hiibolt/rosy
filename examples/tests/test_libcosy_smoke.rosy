@@ -316,6 +316,27 @@ AM M_OTHER;               { composes M_OTHER onto MAP → drift(1.0) }
 WRITE 6 'After AM M_OTHER, MAP[1] (composed via AM, expect drift(1.0)):';
 WRITE 6 MAP[1];
 
+{ ----- FM (fixed-point search) -----
+  Find the fixed point of an at-origin map (drift). With M = drift(0.5),
+  M(0) = 0 — the origin IS the fixed point — so FM should return XF = 0
+  and MF = M unchanged. This exercises the fast-path of FM where the
+  constant terms are detected as zero. }
+WRITE 6 ' ----- FM: drift(0.5) is at-origin, expect XF=0 -----';
+OV 2 1 0;
+RPP 100;
+UM;
+DL 0.5;
+SNM MAP M_OTHER;
+VARIABLE (DA 8) FM_XF;
+VARIABLE (DA 8) FM_MF;
+VARIABLE (RE) FM_IER;
+FM M_OTHER FM_XF FM_MF FM_IER;
+WRITE 6 'FM completed, IER =' FM_IER '   [expect 0]';
+WRITE 6 'FM_XF[1] (fixed-point offset, expect 0):';
+WRITE 6 FM_XF[1];
+WRITE 6 'FM_MF[1] (map at fixed point, expect drift(0.5) = x + 0.5*p_x):';
+WRITE 6 FM_MF[1];
+
 { ----- MR (map reverse — beam time-reversal) -----
   Reverse a drift(0.5) map. The time-reversed map should be drift(-0.5)
   in canonical coords (positions advance, momenta flip sign). Compose:
