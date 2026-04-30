@@ -345,6 +345,96 @@ FUNCTION (DA) LEXP A (DA) B (DA);
   ENDLOOP;
 ENDFUNCTION;
 
+{ ----- POTI: potential to a vector field (cosy.fox L245-253) -------------
+  POTI(F, NF, P) finds a scalar potential P satisfying ∂P/∂x_i = F[i] for
+  i=1..NF (a vector field is conservative if it admits such a potential).
+  Used by MLF / MGF to extract a Lie generator from a map.
+
+  Algorithm (per i):
+    1. Take F[i] as a candidate "antiderivative seed" FF.
+    2. Plug 0 for variables i+1..NF (DAPLU sweep) so FF retains only
+       early-variable dependence.
+    3. Integrate FF along variable i and accumulate into P.
+  After accumulation, check ∂P/∂x_i ≈ F[i] (consistency); warn if the
+  L1 error norm exceeds 1E-5.                                              }
+PROCEDURE POTI F (DA 8) NF (RE) P (DA);
+  VARIABLE (RE) I;
+  VARIABLE (RE) K;
+  VARIABLE (DA 1) FF;
+  VARIABLE (DA 1) SCR_BUF;
+  VARIABLE (RE) SCR;
+
+  P := 0*DD[1];
+  LOOP I 1 NF;
+    FF[1] := F[I];
+    LOOP K I+1 NF;
+      DAPLU FF K 0 SCR_BUF;
+      FF[1] := SCR_BUF[1];
+    ENDLOOP;
+    P := P + INTEG(I, FF[1]);
+  ENDLOOP;
+
+  DANOT NOC-1;
+  SCR := 0;
+  LOOP I 1 NF;
+    SCR := SCR + WABS(DER(I, P) - F[I], WAF);
+  ENDLOOP;
+  IF SCR > 1E-5;
+    WRITE 6 ' --- WARNING in POTI, error norm > 1E-5';
+  ENDIF;
+  DANOT NOC;
+ENDPROCEDURE;
+
+{ ----- GFM: map from generating function F (cosy.fox L1397-1410) ----------
+  GFM(MM, F, IT) reconstructs a symplectic map MM from a scalar generating
+  function F. The four IT modes correspond to four standard generating-
+  function types in classical mechanics (Goldstein § 9.4):
+    IT=1 / 2 (ABS(IT-1.5)=0.5): first-kind partials.
+    IT=3 / 4 (ABS(IT-3.5)=0.5): second-kind partials.
+  Each mode builds an intermediate M from F's gradients, inverts via MI,
+  then composes via ANM to recover the symplectic map MM.                  }
+PROCEDURE GFM MM (DA 8) F (DA) IT (RE);
+  VARIABLE (DA 20) N;
+  VARIABLE (DA 20) M_LOCAL;
+  VARIABLE (RE) I;
+  VARIABLE (RE) IER;
+
+  IF ABS(IT-1.5) = 0.5;
+    LOOP I 1 TWOND 2;
+      M_LOCAL[I]   := DD[I];
+      M_LOCAL[I+1] := DER(I, F);
+    ENDLOOP;
+  ELSEIF ABS(IT-3.5) = 0.5;
+    LOOP I 1 TWOND 2;
+      M_LOCAL[I]   := -DER(I, F);
+      M_LOCAL[I+1] := DD[I];
+    ENDLOOP;
+  ELSE;
+    WRITE 6 ' *** ERROR in GFM, wrong type';
+    QUIT 0;
+  ENDIF;
+  LOOP I TWOND+1 NV;
+    M_LOCAL[I] := DD[I];
+  ENDLOOP;
+  MI M_LOCAL N NV IER NOC NV NM1;
+  IF IER # 0;
+    WRITE 6 ' *** ERROR in GFM, no inverse';
+    QUIT 0;
+  ENDIF;
+  IF ABS(IT-2) = 1;
+    LOOP I 1 TWOND 2;
+      M_LOCAL[I]   := DD[I+1];
+      M_LOCAL[I+1] := -DER(I+1, F);
+    ENDLOOP;
+  ELSEIF ABS(IT-3) = 1;
+    LOOP I 1 TWOND 2;
+      M_LOCAL[I]   := DER(I+1, F);
+      M_LOCAL[I+1] := DD[I+1];
+    ENDLOOP;
+  ENDIF;
+  ANM M_LOCAL N MM;
+ENDPROCEDURE;
+
 { ----- LFM (scalar-mode): compute map from Lie factorization (cosy.fox L1317)
   LFM_SCALAR(MF, C, M, F, IT) computes the map MF from a single Lie generator
   F (scalar DA) and a base map M, with constant offset C added at the end.
