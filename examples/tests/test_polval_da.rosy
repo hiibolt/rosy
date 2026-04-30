@@ -1,0 +1,40 @@
+{ ============================================================================
+  test_polval_da.rosy — DA-input POLVAL (polynomial composition).
+
+  Exercises the rosy_polval_da branch added alongside ANM. We build:
+
+    P(1) = 1 + DA(1)              { polynomial in x_1 }
+    P(2) =     DA(2)              { polynomial in x_2 }
+
+    A(1) = 2 + 3*DA(1)            { substitute Taylor series for x_1 }
+    A(2) = 5*DA(1) + 7*DA(2)      { substitute Taylor series for x_2 }
+
+  Composition R = P ∘ A should yield Taylor series:
+
+    R(1) = 1 + (2 + 3*DA(1))      = 3 + 3*DA(1)
+    R(2) =     5*DA(1) + 7*DA(2)
+
+  The const_part (DAPEE at all-zero) of R(1) should be 3 and R(2) should be 0.
+  ============================================================================ }
+
+BEGIN;
+  DAINI 3 2 0 0;
+  VARIABLE (DA 2) P;
+  VARIABLE (DA 2) A;
+  VARIABLE (DA 2) R;
+
+  P[1] := 1 + DA(1);
+  P[2] := DA(2);
+
+  A[1] := 2 + 3*DA(1);
+  A[2] := 5*DA(1) + 7*DA(2);
+
+  POLVAL 1 P 2 A 2 R 2;
+
+  WRITE 6 ' R[1] (expect const part 3):';
+  WRITE 6 R[1];
+  WRITE 6 ' R[2] (expect const part 0):';
+  WRITE 6 R[2];
+
+  WRITE 6 ' polval-da ok';
+END;

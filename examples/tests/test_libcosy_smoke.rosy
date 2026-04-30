@@ -274,4 +274,46 @@ BBC 13 27 2.7 1.66E-7 0 0;   { Aluminum: Z=13, A=27, density 2.7 g/cm^3, I=166eV
 WRITE 6 'BBC: BETHEBLOCHC(1) = ' BETHEBLOCHC(1) '   [expect 13]';
 WRITE 6 'BBC: BETHEBLOCHC(3) = ' BETHEBLOCHC(3) '   [expect 2.7]';
 
+{ ----- ANM (map composition, cosy.fox L655-658) -----
+  Build two half-length drift maps and compose them via ANM. The result
+  should equal a single full-length drift map up to DA-truncation. This
+  exercises the rosy_polval_da path (DA→DA polynomial composition).
+  Reset to ND=1 first because the two earlier (DA 8) buffers were sized
+  for that test, but the polynomial composition is order-truncation only —
+  compose works at any phase-space dimension. }
+WRITE 6 ' ----- ANM: drift(0.5) ∘ drift(0.5) should equal drift(1.0) -----';
+OV 2 1 0;
+RPP 100;
+UM;
+DL 0.5;
+SNM MAP M_OTHER;          { reuse M_OTHER as D1 = drift(0.5) }
+UM;
+DL 0.5;
+SNM MAP M_SAVE;           { reuse M_SAVE as D2 = drift(0.5) }
+ANM M_OTHER M_SAVE M_SAVE;   { compose: M_SAVE := M_OTHER ∘ M_SAVE }
+WRITE 6 'ANM-composed M_SAVE[1] (drift(0.5) applied to drift(0.5)):';
+WRITE 6 M_SAVE[1];
+{ Reference: drift(1.0) directly. }
+UM;
+DL 1.0;
+WRITE 6 'Direct DL 1.0 MAP[1] for comparison (should match composed result):';
+WRITE 6 MAP[1];
+DMAP M_SAVE MAP 6;
+WRITE 6 'DMAP M_SAVE MAP 6 above: composed-vs-direct diff (expect all zero).';
+
+{ ----- AM (apply a saved map to the active MAP, cosy.fox L651-653) -----
+  Build drift(0.5) twice, save the first one, then apply the saved map to
+  the second. Result should be drift(1.0). This exercises the dup-arg
+  writeback through procedural-call dispatch — AM internally calls
+  ANM M MAP MAP, where positions 1 and 2 alias MAP. }
+WRITE 6 ' ----- AM: applying saved drift(0.5) to active drift(0.5) yields drift(1.0) -----';
+UM;
+DL 0.5;
+SNM MAP M_OTHER;          { save first drift(0.5) }
+UM;
+DL 0.5;                   { active MAP = drift(0.5) }
+AM M_OTHER;               { composes M_OTHER onto MAP → drift(1.0) }
+WRITE 6 'After AM M_OTHER, MAP[1] (composed via AM, expect drift(1.0)):';
+WRITE 6 MAP[1];
+
 END;

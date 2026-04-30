@@ -131,6 +131,54 @@ PROCEDURE DSMAP M N IU (RE);
   ENDLOOP;
 ENDPROCEDURE;
 
+{ ----- Apply a map to a saved map (cosy.fox L655-658) ---------------------
+  ANM(N, M, O) computes the polynomial composition O = N ∘ M, treating M as
+  the substitution argument for the canonical phase-space variables in N.
+
+  Algorithm: build a working buffer MM of size NV where MM[1..TWOND] = M
+  and MM[TWOND+1..NV] = DD[i] (the identity DAs for the non-dynamical
+  variables — energy, mass, time, etc.). Then call POLVAL 1 N TWOND MM NV
+  O TWOND to substitute. The DD-padding is what lets the composition leave
+  parameter-style variables alone while still producing TWOND outputs.
+
+  POLVAL routes to rosy_polval_da once the dispatch sees DA-typed args —
+  see rosy/src/program/statements/math/polval/mod.rs.
+
+  In COSY, MM is `VARIABLE MM NM1 NV` (size-NV at runtime). ROSY needs
+  compile-time dims for arrays, so MM is declared (DA 20) — the same upper
+  bound DD uses in libcosy/globals.rosy. POLVAL only reads the first NV
+  elements anyway.                                                          }
+PROCEDURE ANM N M O;
+  VARIABLE (DA 20) MM;
+  VARIABLE (RE) I;
+  LOOP I 1 TWOND;
+    MM[I] := M[I];
+  ENDLOOP;
+  LOOP I TWOND+1 NV;
+    MM[I] := DD[I];
+  ENDLOOP;
+  POLVAL 1 N TWOND MM NV O TWOND;
+ENDPROCEDURE;
+
+{ ----- Apply a map to the momentary MAP (cosy.fox L651-653) --------------
+  AM(M) composes M onto the active map: MAP := M ∘ MAP. The cosy.fox AM
+  also propagates the action to ray bundles via UPDATE; without UPDATE
+  ported, the ray-tracking branch is gated behind a clear error. For the
+  common NRAY=0 case (pure map composition, no rays), AM reduces to a
+  single ANM call that's mathematically identical to cosy.fox's behavior.
+
+  AM is the procedural equivalent of ANM with the implicit "compose into
+  the live map" convention — every element procedure (DL / MQ / MH /
+  MQK / MSK / ...) ultimately writes into MAP via this kind of in-place
+  composition during cosy.fox's standard tracking workflow.            }
+PROCEDURE AM M;
+  IF NRAY # 0;
+    WRITE 6 ' *** ERROR, AM with rays needs UPDATE (not yet ported in libcosy v1)';
+    QUIT 0;
+  ENDIF;
+  ANM M MAP MAP;
+ENDPROCEDURE;
+
 { ----- Poisson bracket (cosy.fox L223-225) --------------------------------
   PB(X, Y) = Σ_{i=1,3,5,...} ∂X/∂q_i · ∂Y/∂p_i − ∂X/∂p_i · ∂Y/∂q_i
   where (q_i, p_i) are the canonical phase-space pairs and the sum runs

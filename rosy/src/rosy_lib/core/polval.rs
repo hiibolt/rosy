@@ -248,6 +248,126 @@ fn scalar_powi(val: f64, exp: u8) -> f64 {
     }
 }
 
+/// Substitute NA Taylor-series arguments into NP Taylor-series polynomials,
+/// producing NR Taylor-series results — the COSY map-composition path.
+///
+/// Each `p_array[i]` is a polynomial in canonical DA variables (e.g. δx, δp_x …);
+/// each `a_array[j]` is itself a Taylor series in the *same* canonical variables
+/// (typically a saved map's j-th component). The output `r_array[i]` is the
+/// composition `p_array[i] ∘ a_array`, truncated automatically to the current
+/// truncation order via DA's overloaded `*` and `+`.
+///
+/// COSY's `ANM N M O` lowers to `POLVAL 1 N TWOND MM NV O TWOND` where MM is N's
+/// map padded with identity DAs for non-physical slots — see libcosy/physics/map_ops.rosy.
+pub fn rosy_polval_da(
+    _l: f64,
+    p_array: &[DA],
+    np: usize,
+    a_array: &[DA],
+    na: usize,
+    r_array: &mut Vec<DA>,
+    nr: usize,
+) -> Result<()> {
+    if np < nr {
+        bail!("POLVAL: NP ({}) must be >= NR ({})", np, nr);
+    }
+    if a_array.len() < na {
+        bail!(
+            "POLVAL: argument array has {} elements but NA={}",
+            a_array.len(),
+            na
+        );
+    }
+
+    while r_array.len() < nr {
+        r_array.push(DA::zero());
+    }
+
+    for i in 0..nr {
+        if i >= p_array.len() {
+            bail!("POLVAL: polynomial array too short at index {}", i);
+        }
+        r_array[i] = evaluate_da_at_da(&p_array[i], a_array, na)?;
+    }
+
+    Ok(())
+}
+
+/// Compose a single DA polynomial with NA Taylor-series substitutions.
+///
+/// For each monomial `c · x_1^{e_1} · … · x_na^{e_na}` of `poly` we form
+/// `c · args[0]^{e_1} · … · args[na-1]^{e_na}` (DA × DA), then sum across
+/// monomials. DA `*` and `+` return `Result` (truncation-buffer overflow is
+/// rare but surfaceable), so we propagate with `?` rather than panic.
+fn evaluate_da_at_da(poly: &DA, args: &[DA], na: usize) -> Result<DA> {
+    let mut result = DA::zero();
+
+    for (monomial, coeff) in poly.coeffs_iter().into_iter() {
+        let exponents = &monomial.exponents;
+        let mut term = DA::from_coeff(coeff);
+
+        for (var_idx, &exp) in exponents.iter().enumerate() {
+            if exp == 0 {
+                continue;
+            }
+            if var_idx >= na || var_idx >= args.len() {
+                bail!(
+                    "POLVAL: variable index {} out of range (NA={})",
+                    var_idx + 1,
+                    na
+                );
+            }
+            let pow = da_powi(&args[var_idx], exp)?;
+            term = (term * pow)?;
+        }
+
+        result = (result + term)?;
+    }
+
+    Ok(result)
+}
+
+/// Compute base^exp for small u8 exponents using exponentiation-by-squaring.
+#[inline]
+fn da_powi(base: &DA, exp: u8) -> Result<DA> {
+    Ok(match exp {
+        0 => DA::from_coeff(1.0),
+        1 => base.clone(),
+        2 => (base.clone() * base)?,
+        3 => {
+            let v2 = (base.clone() * base)?;
+            (v2 * base)?
+        }
+        4 => {
+            let v2 = (base.clone() * base)?;
+            (v2.clone() * &v2)?
+        }
+        5 => {
+            let v2 = (base.clone() * base)?;
+            let v4 = (v2.clone() * &v2)?;
+            (v4 * base)?
+        }
+        6 => {
+            let v2 = (base.clone() * base)?;
+            let v3 = (v2 * base)?;
+            (v3.clone() * &v3)?
+        }
+        _ => {
+            let mut result = DA::from_coeff(1.0);
+            let mut current = base.clone();
+            let mut e = exp;
+            while e > 0 {
+                if e & 1 == 1 {
+                    result = (result * &current)?;
+                }
+                current = (current.clone() * &current)?;
+                e >>= 1;
+            }
+            result
+        }
+    })
+}
+
 /// Evaluate a single DA polynomial at the given real-valued point.
 ///
 /// For each monomial c * x1^e1 * x2^e2 * ... we substitute the values from

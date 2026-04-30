@@ -1,0 +1,40 @@
+{ ============================================================================
+  Regression test: duplicate-bare-arg writeback for the ANM/AM pattern.
+
+  When a procedure is called with the same variable in two positions and the
+  procedure's later position is the output (the COSY convention), the
+  generated code clones the duplicated source for the later position and
+  writes the clone back to the source variable after the call. Without the
+  writeback the result is silently dropped — see commit history for the ANM
+  bug that surfaced this.
+
+  This test verifies the writeback works for the "compose-in-place" pattern
+  by calling a procedure with `M M` aliasing where the second M is the
+  output position.
+  ============================================================================ }
+
+BEGIN;
+
+  { COMPOSE_PAIR adds A to B and writes the sum back to B. Calling it with
+    B=A (i.e. `COMPOSE_PAIR Z Z`) is the test: we want Z to hold Z+Z = 2*Z
+    after the call. Without writeback, Z stays at its pre-call value. }
+  PROCEDURE COMPOSE_PAIR A (RE) B (RE);
+    B := A + B;
+  ENDPROCEDURE;
+
+  VARIABLE (RE) Z;
+  Z := 7;
+  COMPOSE_PAIR Z Z;
+  WRITE 6 'COMPOSE_PAIR Z Z (Z=7 pre-call) → Z =' Z '   [expect 14 — writeback applies]';
+
+  { Three-arg variant: COMPOSE_TRIPLE with later-position output. }
+  PROCEDURE COMPOSE_TRIPLE A (RE) B (RE) C (RE);
+    C := A + B;
+  ENDPROCEDURE;
+
+  VARIABLE (RE) W;
+  W := 4;
+  COMPOSE_TRIPLE W W W;
+  WRITE 6 'COMPOSE_TRIPLE W W W (W=4 pre-call) → W =' W '   [expect 8 — last-occurrence writeback wins]';
+
+END;

@@ -463,6 +463,11 @@ pub fn function_call_transpile_helper(
     let mut prelude_decls: Vec<String> = Vec::new();
     let mut prelude_overrides: std::collections::HashMap<usize, String> =
         std::collections::HashMap::new();
+    // Writebacks for dup-arg clones — see procedure_call/mod.rs for the
+    // matching rationale. Without this, a function called with aliased
+    // mutable args (`F(A, A)`) silently drops the mutation that would have
+    // landed in the second occurrence.
+    let mut writeback_decls: Vec<String> = Vec::new();
 
     // Pass 1 — record (a) bare-variable duplicates.
     for (i, arg_expr) in args.iter().enumerate() {
@@ -470,14 +475,19 @@ pub fn function_call_transpile_helper(
             if first_occurrence.contains_key(arg_name) {
                 if let Some(var_data) = context.variables.get(arg_name) {
                     let temp_name = format!("__rosy_dup_arg_{}", i);
-                    let value_expr = match var_data.scope {
-                        VariableScope::Higher | VariableScope::Arg => {
-                            format!("(*{}).clone()", arg_name)
-                        }
-                        VariableScope::Local => format!("{}.clone()", arg_name),
+                    let (value_expr, writeback) = match var_data.scope {
+                        VariableScope::Higher | VariableScope::Arg => (
+                            format!("(*{}).clone()", arg_name),
+                            format!("*{} = {};", arg_name, temp_name),
+                        ),
+                        VariableScope::Local => (
+                            format!("{}.clone()", arg_name),
+                            format!("{} = {};", arg_name, temp_name),
+                        ),
                     };
                     prelude_decls.push(format!("let mut {} = {};", temp_name, value_expr));
                     prelude_overrides.insert(i, format!("&mut {}", temp_name));
+                    writeback_decls.push(writeback);
                 }
             } else {
                 first_occurrence.insert(arg_name.to_string(), i);
@@ -549,14 +559,14 @@ pub fn function_call_transpile_helper(
     // Uses the `__fn_` prefix to match the generated Rust function name
     // (the prefix avoids shadowing by the implicit return variable).
     let rust_fn_name = format!("__fn_{}", name);
-    let serialization = if prelude_decls.is_empty() {
+    let serialization = if prelude_decls.is_empty() && writeback_decls.is_empty() {
         format!(
             "({}({})? as {})",
             rust_fn_name,
             serialized_args.join(", "),
             func_context.return_type.as_rust_type()
         )
-    } else {
+    } else if writeback_decls.is_empty() {
         // Wrap in a block so the temp locals don't leak into the surrounding scope.
         format!(
             "{{ {} ({}({})? as {}) }}",
@@ -564,6 +574,18 @@ pub fn function_call_transpile_helper(
             rust_fn_name,
             serialized_args.join(", "),
             func_context.return_type.as_rust_type()
+        )
+    } else {
+        // Capture the return value, run writebacks, then yield the value.
+        // The trailing expression (no semicolon) makes the block evaluate to
+        // __rosy_fn_ret, preserving the function-call-as-expression semantics.
+        format!(
+            "{{ {} let __rosy_fn_ret = ({}({})? as {}); {} __rosy_fn_ret }}",
+            prelude_decls.join(" "),
+            rust_fn_name,
+            serialized_args.join(", "),
+            func_context.return_type.as_rust_type(),
+            writeback_decls.join(" "),
         )
     };
     if errors.is_empty() {

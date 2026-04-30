@@ -183,13 +183,18 @@ impl Transpile for PolvalStatement {
         // already starts with `&`. Replace the leading `&` with `&mut `.
         let r_mut = r_out.as_ref().replacen('&', "&mut ", 1);
 
-        // Dispatch based on whether A is a scalar VE or a batch (VE ND) array
+        // Dispatch based on A's element type:
+        //   DA-array  → DA→DA polynomial composition (map-composition path)
+        //   VE-array  → batch evaluation across many particles
+        //   otherwise → plain RE evaluation
         let a_type = self
             .a_expr
             .type_of(context)
             .map_err(|e| vec![e.context("...while determining type of A in POLVAL")])?;
 
-        let polval_fn = if a_type.base_type == RosyBaseType::VE && a_type.dimensions > 0 {
+        let polval_fn = if a_type.base_type == RosyBaseType::DA && a_type.dimensions > 0 {
+            "rosy_polval_da"
+        } else if a_type.base_type == RosyBaseType::VE && a_type.dimensions > 0 {
             "rosy_polval_ve"
         } else {
             "rosy_polval_re"

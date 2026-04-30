@@ -162,6 +162,13 @@ impl Transpile for ProcedureCallStatement {
         let mut prelude_decls: Vec<String> = Vec::new();
         let mut prelude_overrides: std::collections::HashMap<usize, String> =
             std::collections::HashMap::new();
+        // Writebacks — one entry per duplicated bare-variable arg. After the
+        // call, copy each clone temp back into its source variable so the
+        // procedure's mutation lands in the caller's binding (matching COSY's
+        // pass-by-reference convention where later args are typically
+        // outputs — e.g. `ANM N M O` called as `ANM A B B` writes the result
+        // into B). Without this, dup-arg clones silently swallow the writes.
+        let mut writeback_decls: Vec<String> = Vec::new();
 
         // Pass 1 — record (a) bare-variable duplicates.
         for (i, arg_expr) in self.args.iter().enumerate() {
@@ -169,15 +176,20 @@ impl Transpile for ProcedureCallStatement {
                 if first_occurrence.contains_key(arg_name) {
                     if let Some(var_data) = context.variables.get(arg_name) {
                         let temp_name = format!("__rosy_dup_arg_{}", i);
-                        let value_expr = match var_data.scope {
-                            VariableScope::Higher | VariableScope::Arg => {
-                                format!("(*{}).clone()", arg_name)
-                            }
-                            VariableScope::Local => format!("{}.clone()", arg_name),
+                        let (value_expr, writeback) = match var_data.scope {
+                            VariableScope::Higher | VariableScope::Arg => (
+                                format!("(*{}).clone()", arg_name),
+                                format!("*{} = {};", arg_name, temp_name),
+                            ),
+                            VariableScope::Local => (
+                                format!("{}.clone()", arg_name),
+                                format!("{} = {};", arg_name, temp_name),
+                            ),
                         };
                         prelude_decls
                             .push(format!("let mut {} = {};", temp_name, value_expr));
                         prelude_overrides.insert(i, format!("&mut {}", temp_name));
+                        writeback_decls.push(writeback);
                     }
                 } else {
                     first_occurrence.insert(arg_name.to_string(), i);
@@ -242,17 +254,24 @@ impl Transpile for ProcedureCallStatement {
         }
 
         // Serialize the entire procedure (wrap in a block when any prelude
-        // temps are needed so they're scoped to this single call).
+        // temps are needed so they're scoped to this single call). Writebacks
+        // run *after* the call to copy duplicate-arg clones back into their
+        // source variables (see writeback_decls comment above).
         let call = format!(
             "{}({}).context(\"...while calling procedure '{}'\")?;",
             self.name,
             serialized_args.join(", "),
             self.name
         );
-        let serialization = if prelude_decls.is_empty() {
+        let serialization = if prelude_decls.is_empty() && writeback_decls.is_empty() {
             call
         } else {
-            format!("{{ {} {} }}", prelude_decls.join(" "), call)
+            format!(
+                "{{ {} {} {} }}",
+                prelude_decls.join(" "),
+                call,
+                writeback_decls.join(" ")
+            )
         };
         if errors.is_empty() {
             // Transitive global capture: see matching comment in

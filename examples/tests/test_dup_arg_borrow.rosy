@@ -4,9 +4,15 @@
   Functions and procedures take `&mut T` per arg under COSY in/out semantics.
   Without per-call duplicate detection, `F(I, I)` would emit two `&mut I`
   references to the same memory and Rust's borrow checker rejects it
-  (E0499). The transpiler now materializes a fresh local for each repeated
-  occurrence — first occurrence keeps the original (so a function that
-  mutates the arg still propagates its writes through the first parameter).
+  (E0499). The transpiler materializes a fresh local for each repeated
+  occurrence and after the call writes the clone back to the source variable,
+  matching COSY's pass-by-reference convention where later arg positions are
+  conventionally outputs (e.g. `ANM N M O` called as `ANM A B B` writes the
+  composition result into B). The writeback overwrites any in-place mutation
+  the procedure may have made through the first occurrence — see the
+  INC_AND_REPORT case below. This is the only consistent semantic Rust's
+  borrow checker leaves us; first-occurrence-mutation-wins would break the
+  ANM/UPDATE/AM patterns that are pervasive in beam-physics code.
   ============================================================================ }
 
 BEGIN;
@@ -33,10 +39,13 @@ Y := 10;
 SAVE_PAIR Y Y RESULT;       { Y appears twice as input args }
 WRITE 6 'SAVE_PAIR Y Y RESULT  →  ' RESULT '   [expect 20]';
 
-{ Mixed: first occurrence is the original (mutation would propagate),
-  later occurrences are fresh clones. Verifies the FIRST keeps the
-  original binding by passing the same var as both an input and the
-  output. }
+{ Mixed: first-arg in-place mutation is overwritten by the writeback of the
+  duplicate-clone after the call returns. Z appears twice; the second
+  occurrence's clone (still holding the pre-call value, since IN_OUT's +1
+  ran on the FIRST &mut Z, not on the clone) is written back to Z. So Z
+  ends up at its pre-call value, not Z+1. RESULT is computed from
+  IN_OUT-ORIGINAL inside the procedure where IN_OUT=Z+1=6 and ORIGINAL=
+  clone=5, yielding 1. }
 PROCEDURE INC_AND_REPORT IN_OUT (RE) ORIGINAL (RE) RESULT_OUT (RE);
   IN_OUT := IN_OUT + 1;
   RESULT_OUT := IN_OUT - ORIGINAL;
@@ -44,8 +53,8 @@ ENDPROCEDURE;
 
 VARIABLE (RE) Z;
 Z := 5;
-INC_AND_REPORT Z Z RESULT;  { Z passed twice; first one mutates, second is a clone of pre-call value }
-WRITE 6 'After INC_AND_REPORT Z Z, Z = ' Z '   [expect 6 — first arg mutation propagates]';
-WRITE 6 'RESULT = ' RESULT '   [expect 1 — IN_OUT after +1 minus pre-call ORIGINAL]';
+INC_AND_REPORT Z Z RESULT;  { Z passed twice; later occurrences's writeback wins }
+WRITE 6 'After INC_AND_REPORT Z Z, Z = ' Z '   [expect 5 — clone writeback overrides first-arg mutation]';
+WRITE 6 'RESULT = ' RESULT '   [expect 1 — IN_OUT (=Z+1=6) minus clone-of-pre-call-Z (=5)]';
 
 END;
