@@ -848,6 +848,161 @@ PROCEDURE TS MU (CD 4);
   ENDLOOP;
 ENDPROCEDURE;
 
+{ ----- BDEP: parameter dependence from field dependence (cosy.fox L1446-1461)
+  BDEP(NAP, LGH, B) maps the parameter-space dependence of map NAP through
+  a magnetic-field strength B and arc length LGH. The output NAP is the
+  same map but with parameter dependencies adjusted for normalized field
+  scaling.
+
+  Algorithm:
+    1. Build IAP from DD basis, with momentum/parameter slots scaled by
+       AW (length-normalization), PW (momentum-normalization).
+    2. Find the first parameter slot I where B has nonzero dependence
+       (DER(I, B) != 0) — this is the slot to inject the BW-1 perturbation.
+    3. POLVAL substitutes IAP into NAP, scales the position/momentum slots
+       back, and adjusts the time-of-flight slot for ND=3.
+
+  Nested helper WW(Q): normalize a DA Q to its constant part (Q/CONS(Q))
+  or 1 if Q has zero constant. Used to extract the "shape" of B, Z0,
+  LGH, P0 independent of their reference values.                            }
+PROCEDURE BDEP NAP (DA 8) LGH (DA) B (DA);
+  VARIABLE (DA 20) IAP;
+  VARIABLE (DA) NT;
+  VARIABLE (RE) NC;
+  VARIABLE (DA) F1;
+  VARIABLE (RE) I;
+  VARIABLE (DA) BW;
+  VARIABLE (DA) ZW;
+  VARIABLE (DA) AW;
+  VARIABLE (RE) NU1;
+  VARIABLE (RE) NU2;
+  VARIABLE (RE) MC;
+  VARIABLE (DA) PW;
+
+  { WW: shape-normalize a DA. Returns Q/CONS(Q) when CONS≠0, else 1. }
+  FUNCTION (DA) WW Q (DA);
+    IF CONS(Q) # 0;
+      WW := Q/CONS(Q);
+    ELSE;
+      WW := 1 + 0*DD[1];
+    ENDIF;
+  ENDFUNCTION;
+
+  NU1 := MIN(TWOND, 4);
+  NU2 := MIN(TWOND, 5);
+  MC := CONS(M0);
+  BW := WW(B);
+  ZW := WW(Z0);
+  AW := WW(LGH);
+  PW := WW(P0);
+  NC := CONS(ETA);
+  BW := BW*ZW*AW/PW;
+
+  LOOP I 1 NU1 2;
+    IAP[I] := DD[I]/AW;
+    IAP[I+1] := DD[I+1]/PW;
+  ENDLOOP;
+  LOOP I NU1+1 NV;
+    IAP[I] := DD[I];
+  ENDLOOP;
+  IF ND > 2;
+    NAP[6] := DD[6];
+  ENDIF;
+
+  { Find the parameter slot where B has nonzero dependence. Bounded
+    by NV to prevent infinite loop if B has no parameter dependence. }
+  I := TWOND + 1;
+  WHILE (CONS(DER(I, B)) = 0) AND (I < NV);
+    I := I + 1;
+  ENDWHILE;
+  IAP[I] := 0*IAP[1] + BW - 1;
+
+  POLVAL 1 NAP NU2 IAP NV NAP NU2;
+
+  LOOP I 1 NU1 2;
+    NAP[I] := NAP[I]*AW;
+    NAP[I+1] := NAP[I+1]*PW;
+  ENDLOOP;
+
+  IF ND = 3;
+    F1 := CONS(V0)/V0;
+    NAP[5] := DD[5] + LGH*(1+NC)/(2+NC)*(1-F1) + F1*AW*(NAP[5]-DD[5]);
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- EDEP: parameter dependence from energy dependence (cosy.fox L1463-1481)
+  EDEP(NAP, LGH, B) is the energy-dependence analogue of BDEP. Where BDEP
+  treats B as the magnetic-field-strength parameter, EDEP treats it
+  through the relativistic NT = sqrt(1 + (P0/M·c/B·Z·L)²) - 1 substitution
+  to handle energy-dependent scaling of the map's parameters.
+
+  Same algorithm structure as BDEP — find energy parameter slot, inject
+  NT/NC-1 perturbation, POLVAL substitute, scale position/momentum back
+  and adjust time-of-flight at ND=3.                                       }
+PROCEDURE EDEP NAP (DA 8) LGH (DA) B (DA);
+  VARIABLE (DA 20) IAP;
+  VARIABLE (DA) NT;
+  VARIABLE (RE) NC;
+  VARIABLE (DA) F1;
+  VARIABLE (RE) I;
+  VARIABLE (DA) BW;
+  VARIABLE (DA) ZW;
+  VARIABLE (DA) AW;
+  VARIABLE (RE) NU1;
+  VARIABLE (RE) NU2;
+  VARIABLE (RE) MC;
+
+  FUNCTION (DA) WW Q (DA);
+    IF CONS(Q) # 0;
+      WW := Q/CONS(Q);
+    ELSE;
+      WW := 1 + 0*DD[1];
+    ENDIF;
+  ENDFUNCTION;
+
+  NU1 := MIN(TWOND, 4);
+  NU2 := MIN(TWOND, 5);
+  MC := CONS(M0);
+  BW := WW(B);
+  ZW := WW(Z0);
+  AW := WW(LGH);
+  NC := CONS(ETA);
+  NT := SQRT(1 + SQR(P0/MC/AMUMEV/BW/ZW/AW)) - 1;
+
+  LOOP I 1 NU1 2;
+    IAP[I] := DD[I]/AW;
+    NAP[I] := NAP[I]*AW;
+  ENDLOOP;
+  LOOP I 2 NU1 2;
+    IAP[I] := DD[I]/BW/ZW/AW;
+    NAP[I] := NAP[I]*BW*ZW*AW;
+  ENDLOOP;
+  LOOP I NU1+1 NV;
+    IAP[I] := DD[I];
+  ENDLOOP;
+
+  IF ND < 3;
+    I := TWOND + 1;
+    WHILE (CONS(DER(I, E0)) = 0) AND (I < NV);
+      I := I + 1;
+    ENDWHILE;
+    IF I > NV;
+      WRITE 6 ' *** ERROR in EDEP, energy not parameter';
+      QUIT 0;
+    ENDIF;
+  ELSE;
+    I := 6;
+  ENDIF;
+  IAP[I] := 0*IAP[1] + NT/NC - 1;
+
+  POLVAL 1 NAP NU2 IAP NV NAP NU2;
+
+  IF ND = 3;
+    F1 := (1+ETA)/(1+NT)*M0/MC/BW/ZW/AW;
+    NAP[5] := DD[5] + LGH*(1+NC)/(2+NC)*(1-F1) + F1*AW*(NAP[5]-DD[5]);
+  ENDIF;
+ENDPROCEDURE;
+
 { ----- TP: tune dependence on parameters (cosy.fox L1627-1637) ------------
   TP(MU) computes the parameter-dependence of the tunes from the active
   MAP. For decoupled planes (LC=0), this is just GT MAP F MU A B G R.
