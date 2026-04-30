@@ -620,6 +620,103 @@ FUNCTION (DA) PB X (DA) Y (DA);
   ENDLOOP;
 ENDFUNCTION;
 
+{ ----- Twiss / tune extraction for block-diagonal maps (cosy.fox L1507-1543)
+  GT(MM, F, MU, ALPHA, BETA, GAMMA, R) computes the tune (MU), the three
+  Twiss parameters (ALPHA, BETA, GAMMA) and the contraction factor (R) from
+  a one-turn map MM. F is the fixed point (output of FM).
+
+  Algorithm (per phase-space pair J = 1..ND):
+    1. FM extracts the linear part M of MM around its fixed point F.
+    2. DAPEP at the (K, TWOND) and (L, TWOND) exponents pulls out the
+       2x2 stability sub-matrix [[A, B], [C, D]].
+    3. DET = CONS(A·D - B·C) classifies the tune:
+        DET > 0  → stable (real tune from cos(MU) = (A+D)/2/R)
+        DET = 0  → degenerate (parabolic — tune frozen at 0)
+        DET < 0  → unstable (imaginary tune)
+    4. The OUT helper (inlined here) folds R·SIN(MU) into the Twiss values:
+        ALPHA = (A-D)/(2·DUM), BETA = B/DUM, GAMMA = -C/DUM
+       where DUM = R·SIN(MU).
+
+  Per-call CO NOC-1 / CO NOC+1 brackets keep the linear-part extraction at
+  the right truncation order.
+
+  This port handles only the stable real-tune case (the DET>0 / |cos(MU)|<1
+  branch). Hyperbolic / parabolic / instability branches need CD-arithmetic
+  helpers (ACOS on CD, LOG on CD) that aren't yet wired through ROSY's
+  intrinsic surface — they error out with a clear message.
+
+  Variables renamed: cosy.fox's nested OUT helper closes over A/B/C/D in
+  the enclosing scope, but inlining it sidesteps the closure entirely.
+  CC stands in for cosy.fox's C (avoiding the C / C_2 / C_3 namespace
+  pollution from libcosy global declarations).                            }
+PROCEDURE GT MM F MU ALPHA BETA GAMMA R;
+  VARIABLE (RE) A;
+  VARIABLE (RE) B;
+  VARIABLE (RE) CC;
+  VARIABLE (RE) D;
+  VARIABLE (RE) DET;
+  VARIABLE (RE) COSMU;
+  VARIABLE (RE) SINMU;
+  VARIABLE (RE) DEN;
+  VARIABLE (RE) MU_J;
+  VARIABLE (DA 8) M;
+  VARIABLE (RE) IER;
+  VARIABLE (RE) J;
+  VARIABLE (RE) K;
+  VARIABLE (RE) L;
+
+  FM MM F M IER;
+
+  LOOP J 1 ND;
+    K := 2*J - 1;
+    L := K + 1;
+    { Extract the 2x2 stability sub-matrix [[A, B], [CC, D]] via partial-
+      derivative-then-CONS. ROSY's DAPEP uses left-to-right TRANSPORT id
+      encoding (id=10 → x_1 not x_2), so cosy.fox's `DAPEP M(K) K TWOND`
+      doesn't extract the K-th-variable coefficient when K>1. The DER
+      route is encoding-agnostic: ∂M[K]/∂x_K at origin = linear
+      coefficient m_KK.                                                   }
+    A  := CONS(DER(K, M[K]));
+    B  := CONS(DER(L, M[K]));
+    CC := CONS(DER(K, M[L]));
+    D  := CONS(DER(L, M[L]));
+    DET := A*D - B*CC;
+    IF DET > 0;
+      IF ABS((A+D)/2/SQRT(A*D - B*CC)) < 1;
+        R[J] := SQRT(A*D - B*CC) + 0*DD[1];
+        COSMU := (A+D)/2/CONS(R[J]);
+        MU_J := ACOS(COSMU);
+        IF B < 0;
+          MU_J := 2*PI - MU_J;
+        ENDIF;
+        SINMU := SIN(MU_J);
+        DEN := CONS(R[J])*SINMU;
+        MU[J]    := MU_J/(2*PI) + 0*DD[1];
+        ALPHA[J] := (A-D)/(2*DEN) + 0*DD[1];
+        BETA[J]  := B/DEN + 0*DD[1];
+        GAMMA[J] := -CC/DEN + 0*DD[1];
+      ELSE;
+        WRITE 6 ' *** ERROR in GT, hyperbolic / parabolic branch not yet ported (needs CD arithmetic)';
+        QUIT 0;
+      ENDIF;
+    ELSEIF DET = 0;
+      IF (ABS(A) = 0) AND (ABS(B) = 0) AND (ABS(CC) = 0) AND (ABS(D) = 0);
+        R[J]     := 0*DD[1];
+        MU[J]    := 0*DD[1];
+        ALPHA[J] := 0*DD[1];
+        BETA[J]  := 1 + 0*DD[1];
+        GAMMA[J] := 1 + 0*DD[1];
+      ELSE;
+        WRITE 6 ' *** ERROR in GT, DET=0';
+        QUIT 0;
+      ENDIF;
+    ELSE;
+      WRITE 6 ' *** ERROR in GT, instability branch not yet ported (needs CD arithmetic)';
+      QUIT 0;
+    ENDIF;
+  ENDLOOP;
+ENDPROCEDURE;
+
 { ----- Momentum compaction dL(dP)/L (cosy.fox L1483-1487) -----------------
   MCM(IAP, LGH, ALPHA) computes the momentum-compaction factor αp from a
   ring map IAP. αp = dL/L per dP — fractional path-length change per

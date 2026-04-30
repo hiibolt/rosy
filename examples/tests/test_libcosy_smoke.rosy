@@ -316,6 +316,29 @@ AM M_OTHER;               { composes M_OTHER onto MAP → drift(1.0) }
 WRITE 6 'After AM M_OTHER, MAP[1] (composed via AM, expect drift(1.0)):';
 WRITE 6 MAP[1];
 
+{ ----- GT (Twiss / tune extraction from one-turn map) -----
+  Build a stable simple drift "ring" — really just a drift, but the
+  one-turn map is degenerate (DET=0 since linear drift has trace 2 +
+  L*0 = 2). Skip this for now since GT requires a stable RING map. }
+WRITE 6 ' ----- GT: extract Twiss/tune from a 1D thin-quad-drift ring -----';
+OV 2 1 0;
+RPP 100;
+UM;
+MQK 0.05 0.2 0.05;    { very weak focusing quad — small phase advance }
+DL 0.5;
+VARIABLE (DA 8) M_FODO;
+SNM MAP M_FODO;
+VARIABLE (DA 8) GT_F;
+VARIABLE (DA 4) GT_MU;
+VARIABLE (DA 4) GT_ALPHA;
+VARIABLE (DA 4) GT_BETA;
+VARIABLE (DA 4) GT_GAMMA;
+VARIABLE (DA 4) GT_R;
+GT M_FODO GT_F GT_MU GT_ALPHA GT_BETA GT_GAMMA GT_R;
+WRITE 6 'Horizontal tune fraction CONS(GT_MU[1]) =' CONS(GT_MU[1]);
+WRITE 6 'Horizontal beta CONS(GT_BETA[1])  =' CONS(GT_BETA[1]);
+WRITE 6 'Horizontal alpha CONS(GT_ALPHA[1]) =' CONS(GT_ALPHA[1]);
+
 { ----- FM (fixed-point search) -----
   Find the fixed point of an at-origin map (drift). With M = drift(0.5),
   M(0) = 0 — the origin IS the fixed point — so FM should return XF = 0
