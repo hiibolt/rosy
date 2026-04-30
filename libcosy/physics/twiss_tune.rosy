@@ -44,4 +44,85 @@ FUNCTION (RE) SIGMA I (RE) J (RE);
   ENDIF;
 ENDFUNCTION;
 
+{ ----- STW: set MAP from Twiss parameters (cosy.fox L1283-1288) -----------
+  STW(I, MU, ALPHA, BETA, GAMMA) builds a single-plane Courant-Snyder map
+  in the I-th phase-space pair (I=1, 2, or 3) of the active MAP, from the
+  given tune (MU in radians) and Twiss alpha/beta/gamma. Useful for
+  bootstrapping a known-Twiss linear lattice without integrating elements. }
+PROCEDURE STW I (RE) MU (RE) ALPHA (RE) BETA (RE) GAMMA (RE);
+  VARIABLE (RE) COSMU;
+  VARIABLE (RE) SINMU;
+  VARIABLE (RE) I1;
+  VARIABLE (RE) I2;
+  I1 := 2*I - 1;
+  I2 := 2*I;
+  COSMU := COS(MU);
+  SINMU := SIN(MU);
+  MAP[I1] := (COSMU + ALPHA*SINMU)*DD[I1] + BETA*SINMU*DD[I2];
+  MAP[I2] := (COSMU - ALPHA*SINMU)*DD[I2] - GAMMA*SINMU*DD[I1];
+ENDPROCEDURE;
+
+{ ----- SE: symplectic-error norm of a map (cosy.fox L1290-1301) -----------
+  SE(M) returns ‖J(M)^T · JJ · J(M) - JJ‖, the deviation of the linear part
+  J(M) of map M from being symplectic. JJ is the canonical 2N×2N symplectic
+  form. SE = 0 means M is exactly symplectic; small SE indicates numerical
+  symplectic-violation of the order's truncation. Result is order-weighted
+  via WABS / WAF.                                                           }
+FUNCTION (RE) SE M (DA 8);
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) K;
+  VARIABLE (DA) X;
+  VARIABLE (RE) Y;
+
+  Y := -1;
+  SE := 0;
+  LOOP I 1 TWOND;
+    LOOP J 1 TWOND;
+      IF Y*(I-J) = 1;
+        X := Y + 0*DD[1];
+      ELSE;
+        X := 0*DD[1];
+      ENDIF;
+      LOOP K 2 TWOND 2;
+        X := X + DER(K-1, M[I])*DER(K, M[J]) - DER(K-1, M[J])*DER(K, M[I]);
+      ENDLOOP;
+      CO NOC-1;
+      SE := SE + WABS(X, WAF);
+      CO NOC+1;
+    ENDLOOP;
+    Y := -Y;
+  ENDLOOP;
+  SE := SE/TWOND/TWOND;
+ENDFUNCTION;
+
+{ ----- OE: spin-map orthogonality error (cosy.fox L1303-1315) -------------
+  OE(A) = ‖A · A^T - I‖ + |det A - 1| for a 3×3 spin map A. Validates
+  that A is a proper rotation: orthogonal AND determinant +1.            }
+FUNCTION (RE) OE A (DA 3 3);
+  VARIABLE (DA) X;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) K;
+
+  OE := 0;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      IF I = J;
+        X := -1 + 0*DD[1];
+      ELSE;
+        X := 0*DD[1];
+      ENDIF;
+      LOOP K 1 3;
+        X := X + A[I, K]*A[J, K];
+      ENDLOOP;
+      OE := OE + WABS(X, WAF);
+    ENDLOOP;
+  ENDLOOP;
+  X := A[1, 1]*(A[2, 2]*A[3, 3] - A[3, 2]*A[2, 3])
+     - A[1, 2]*(A[2, 1]*A[3, 3] - A[3, 1]*A[2, 3])
+     + A[1, 3]*(A[2, 1]*A[3, 2] - A[3, 1]*A[2, 2]);
+  OE := OE/9 + WABS(X - 1, WAF);
+ENDFUNCTION;
+
 END;

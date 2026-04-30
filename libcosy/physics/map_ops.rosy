@@ -663,6 +663,31 @@ PROCEDURE PT IU (RE);
   DAPRV MM 5 6 TWOND IU;
 ENDPROCEDURE;
 
+{ ----- COSY-to-TRANSPORT coordinate conversion (cosy.fox L4264-4269) ------
+  COSY2TR(MC) writes the active phase-space basis XX into MC, scaling the
+  momenta and time-of-flight slots so that MC ends up in TRANSPORT-like
+  coordinates (relative slopes for momenta, normalized time-of-flight).
+
+  Algorithm:
+    1. SCR = inverse-sqrt of the on-momentum momentum factor 1 - p_x^2 - p_y^2.
+    2. Copy XX into MC for all TWOND slots.
+    3. Scale momenta (slots 2, 4) by SCR.
+    4. Time-of-flight slot 5 gets the relativistic conversion -P0/E0.
+
+  Used by users converting symbolic COSY maps to TRANSPORT-readable form. }
+PROCEDURE COSY2TR MC (DA 8);
+  VARIABLE (RE) I;
+  VARIABLE (DA) SCR;
+  SCR := ISRT(SQR(P0/CONS(P0)) - SQR(XX[2]) - SQR(XX[4]));
+  LOOP I 1 TWOND;
+    MC[I] := XX[I];
+  ENDLOOP;
+  LOOP I 2 4 2;
+    MC[I] := MC[I]*SCR;
+  ENDLOOP;
+  MC[5] := -CONS(P0)/CONS(E0)*MC[5];
+ENDPROCEDURE;
+
 { ----- Print aberrations of the active MAP (cosy.fox L776-781) -----------
   PA(IU) prints aberration coefficients of the active MAP to unit IU,
   scaled by per-coordinate phase-space factors (PHSP) and parameter-
