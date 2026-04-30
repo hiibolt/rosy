@@ -316,6 +316,19 @@ AM M_OTHER;               { composes M_OTHER onto MAP → drift(1.0) }
 WRITE 6 'After AM M_OTHER, MAP[1] (composed via AM, expect drift(1.0)):';
 WRITE 6 MAP[1];
 
+{ ----- DI / DP (dipole convenience wrappers around BEND) -----
+  Run a small sector dipole and verify MAP changes meaningfully.
+  DP π/4 0.05 = 45-degree parallel-faced dipole, R=2 m, aperture 5 cm. }
+WRITE 6 ' ----- DP: 10-degree parallel-faced dipole through BEND -----';
+OV 2 2 0;
+RPP 100;
+UM;
+DP 2.0 10.0 0.05;       { R=2m, PHI=10deg, D=5cm }
+WRITE 6 'After DP, MAP[1] (x-plane bent map):';
+WRITE 6 MAP[1];
+WRITE 6 'After DP, MAP[3] (y-plane drift):';
+WRITE 6 MAP[3];
+
 { ----- TS (tune dependence on parameters AND amplitude) -----
   Run TS on the same weak-quad-drift ring used for GT/NF. TS should
   return a CD-typed tune fraction matching what GT extracts (in the

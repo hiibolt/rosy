@@ -1,0 +1,365 @@
+{ ============================================================================
+  libcosy/physics/bend.rosy — BEND (general dipole magnet)
+
+  cosy.fox L3240-3399. The dipole monster — fully general magnet with
+  curved edges, edge angles, optional fringe-field path, and optional
+  inhomogeneous (multipole) content.
+
+  Port scope (libcosy v1):
+    * BENDFF0 path: NT=0 (no multipoles), LSPN=0 (no spin), LFR=0 (no
+      fringe field). The "simple sector dipole" case — works for most
+      teaching examples and basic ring lattices.
+    * BENDFF3 path (fringe-field): DEFERRED. Requires SIELE, UPDATE,
+      FFELE, POTFLD — the M6 milestone.
+    * Multipole content (NT≠0): DEFERRED. Requires SIELE.
+    * Spin tracking (LSPN=1): DEFERRED. Requires UPDATEMAP and
+      reference_particle's spin pipeline.
+
+  Convenience wrappers:
+    DI   = curved-edge dipole (BEND with E1/E2/H1/H2 in degrees)
+    DP   = parallel-faced dipole
+    DIL  = DI with L instead of R (computes R = L/PHI)
+
+  cosy.fox structure (4-deep nesting!):
+    BEND
+      ├─ FK (function)         — circle FK
+      ├─ SNS (procedure)       — SN orders > 3 from poly S
+      ├─ KICK (procedure)      — apply x or y kick
+      ├─ POL (function)        — Horner polynomial
+      ├─ KICKSXYN (procedure)  — both-axis kick for inhomog. magnet
+      ├─ BENDFF3 (procedure)   — fringe-field path [DEFERRED]
+      └─ BENDFF0 (procedure)   — no-fringe path
+            ├─ DIPOLE (procedure) — geometric sector solution
+            │     ├─ RADI (function)    — sqrt(x² + y²)
+            │     ├─ CAPO (procedure)   — atan2-style capture
+            │     ├─ EQ2 (procedure)    — solve Ax² - 2Bx - C = 0
+            │     ├─ LINLIN (procedure) — line × line intersection
+            │     ├─ LINCIR (procedure) — line × circle intersection
+            │     └─ CIRCIR (procedure) — circle × circle intersection
+            └─ DIPOLEY (procedure)      — y-plane KICK + DIPOLE + KICK
+
+  ROSY's strict typing means inner procedures need explicit array sizes
+  and scalar-vs-vector decisions made up front. The DA arithmetic is the
+  canonical phase-space variables, plus reference-particle factors P0,
+  CHIM, ETA, V0 — all already in libcosy/globals.rosy.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- BEND: full general magnet (cosy.fox L3240-3399) --------------------- }
+PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
+              N (RE 5) S1 (RE 5) S2 (RE 5) NT (RE);
+
+  { Working scalars / arrays declared at BEND scope so nested helpers can
+    capture them. cosy.fox uses NMP (number of monomials per parameter)
+    sizes — translates to (DA) for DA-typed scalars, (DA 8) for DA arrays.}
+  VARIABLE (RE) I;
+  VARIABLE (RE) NTS;
+  VARIABLE (RE) LGH;
+
+  { ----- FK: circle FK(X) (cosy.fox L3246-3248) -----------------------------
+    Used to compute the entry/exit edge effects. For zero curvature XI,
+    FK reduces to TAN(E)*X (linear edge angle); otherwise it's the more
+    general circular-edge formula.                                          }
+  FUNCTION (DA) FK X (DA) EE (RE) XI (RE);
+    IF XI # 0;
+      FK := (COS(EE) - SQRT(1 - SQR(X*XI + SIN(EE))))/XI;
+    ELSE;
+      FK := TAN(EE)*X;
+    ENDIF;
+  ENDFUNCTION;
+
+  { ----- KICK: apply transverse kick to a ray array (cosy.fox L3257-3262)
+    Builds a single-DA kick polynomial A from the input field F, then
+    POLVAL-applies it at the canonical basis to extract the kick value
+    that goes into IAP[2*K] (the conjugate momentum slot for axis K).      }
+  PROCEDURE KICK K (RE) F (DA) IAP (DA 8);
+    VARIABLE (DA 1)  A;
+    VARIABLE (DA 20) NAPK;
+    VARIABLE (RE) J;
+
+    LOOP J 1 NV;
+      NAPK[J] := DD[J];
+    ENDLOOP;
+    NAPK[1] := IAP[1];
+    IF ND > 1;
+      NAPK[3] := IAP[3];
+    ENDIF;
+    IF K = 1;
+      A[1] := F;
+    ELSEIF K = 2;
+      A[1] := -DER(1, F)*DD[3];
+      NAPK[1] := 0*NAPK[1];
+    ENDIF;
+    POLVAL 1 A 1 NAPK NV A 1;
+    IAP[2*K] := IAP[2*K] + A[1];
+  ENDPROCEDURE;
+
+  { ----- DIPOLE: sector-bend geometric solution (cosy.fox L3294-3373) ------
+    The keystone routine — solves the "where does the ray exit the dipole"
+    geometry analytically in DA. Given an entry ray IN, computes the exit
+    ray OUT and the path length LGH. cosy.fox writes this as a sequence of
+    geometric problems (line/line, line/circle, circle/circle intersections,
+    angle captures) — implemented here with the same 6 nested helpers.    }
+  PROCEDURE DIPOLE R0 (RE) PHIA (RE) E1A (RE) XI1 (RE) E2A (RE) XI2 (RE)
+                   IN (DA 8) OUT (DA 8) LGHO (RE);
+    VARIABLE (RE) IER;
+    VARIABLE (DA) Z1;  VARIABLE (DA) X1;
+    VARIABLE (DA) ZRI; VARIABLE (DA) XRI;
+    VARIABLE (DA) ZR;  VARIABLE (DA) XR;
+    VARIABLE (DA) Z2;  VARIABLE (DA) X2;
+    VARIABLE (DA) ZA;  VARIABLE (DA) XA;
+    VARIABLE (DA) ZB;  VARIABLE (DA) XB;
+    VARIABLE (DA) CO;  VARIABLE (DA) SI;
+    VARIABLE (DA) THE; VARIABLE (DA) ST1; VARIABLE (DA) ST2;
+    VARIABLE (DA) LN;  VARIABLE (RE) NC;
+    VARIABLE (RE) PC;  VARIABLE (RE) VC;
+    VARIABLE (DA) MG;
+    VARIABLE (DA) RR;
+    { Constants for LINLIN/LINCIR/LINEAR-form arguments.
+      Pre-built since `(expr)` followed by an identifier in arg lists is
+      parsed as a function call by ROSY's grammar. }
+    VARIABLE (DA) DA_NEG_ONE;
+    VARIABLE (DA) DA_PLUS_ONE;
+    VARIABLE (DA) DA_ZERO;
+
+    { ----- RADI: 2D radius (cosy.fox L3303) ------------------------------- }
+    FUNCTION (RE) RADI XX (RE) YY (RE);
+      RADI := SQRT(SQR(XX) + SQR(YY));
+    ENDFUNCTION;
+
+    { ----- CAPO: atan2-style angle capture (cosy.fox L3304-3310) ---------- }
+    PROCEDURE CAPO XC (DA) YC (DA) PHIO (DA) IERO (RE);
+      VARIABLE (RE) XCC; VARIABLE (RE) YCC; VARIABLE (RE) TINY;
+      TINY := 1E-16;
+      XCC := CONS(XC); YCC := CONS(YC);
+      IF (ABS(XCC) + ABS(YCC)) < TINY;
+        PHIO := 0*DD[1]; IERO := 1;
+      ELSE;
+        IERO := 0;
+        IF ABS(XCC) > ABS(YCC);
+          PHIO := ATAN(YC/XC);
+          IF (XCC < 0) AND (YCC < 0); PHIO := PHIO - PI;
+          ELSE;                       PHIO := PHIO + PI;
+          ENDIF;
+        ELSE;
+          PHIO := PI/2 - ATAN(XC/YC);
+          IF YCC < 0; PHIO := PHIO - PI; ENDIF;
+        ENDIF;
+      ENDIF;
+    ENDPROCEDURE;
+
+    { ----- EQ2: solve A·X² - 2B·X - C = 0 (cosy.fox L3311-3314) ----------- }
+    PROCEDURE EQ2 A (DA) B (DA) C_EQ (DA) Z1O (DA) Z2O (DA);
+      IF (CONS(A) = 0) OR (SQR(CONS(B)) + CONS(C_EQ)*CONS(A) < 0);
+        WRITE 6 ' *** ERROR in DIPOLE EQ2, no solution';
+        QUIT 0;
+      ENDIF;
+      Z1O := B/A;
+      Z2O := SQRT(SQR(Z1O) + C_EQ/A);
+    ENDPROCEDURE;
+
+    { ----- LINLIN: A1X+B1Y+C1=0 ∩ A2X+B2Y+C2=0 (cosy.fox L3315-3319) ----- }
+    PROCEDURE LINLIN A1 (DA) B1 (DA) C1 (DA) A2 (DA) B2 (DA) C2 (DA)
+                     XO (DA) YO (DA);
+      VARIABLE (DA) D_LIN;
+      VARIABLE (RE) TINY;
+      TINY := 1E-16;
+      D_LIN := A1*B2 - A2*B1;
+      IF ABS(CONS(D_LIN)) < TINY;
+        WRITE 6 ' *** ERROR in DIPOLE LINLIN, no solution';
+        QUIT 0;
+      ENDIF;
+      XO := (B1*C2 - B2*C1)/D_LIN;
+      YO := (A2*C1 - A1*C2)/D_LIN;
+    ENDPROCEDURE;
+
+    { ----- LINCIR: line ∩ circle (cosy.fox L3320-3329) ------------------- }
+    PROCEDURE LINCIR A (DA) B (DA) C_LC (DA) XR_LC (DA) YR_LC (DA) RA (DA)
+                     X1O (DA) Y1O (DA) X2O (DA) Y2O (DA);
+      VARIABLE (DA) A1; VARIABLE (DA) C1; VARIABLE (DA) ZA1; VARIABLE (DA) ZB1;
+      IF ABS(CONS(B)) > ABS(CONS(A));
+        A1 := A/B; C1 := C_LC/B;
+        EQ2 1 + SQR(A1) XR_LC - A1*(YR_LC + C1) SQR(RA) - SQR(XR_LC) - SQR(YR_LC + C1) ZA1 ZB1;
+        X1O := ZA1 - ZB1; X2O := ZA1 + ZB1;
+        Y1O := -A1*X1O - C1; Y2O := -A1*X2O - C1;
+      ELSE;
+        A1 := B/A; C1 := C_LC/A;
+        EQ2 1 + SQR(A1) YR_LC - A1*(XR_LC + C1) SQR(RA) - SQR(YR_LC) - SQR(XR_LC + C1) ZA1 ZB1;
+        Y1O := ZA1 - ZB1; Y2O := ZA1 + ZB1;
+        X1O := -A1*Y1O - C1; X2O := -A1*Y2O - C1;
+      ENDIF;
+    ENDPROCEDURE;
+
+    { ----- CIRCIR: circle ∩ circle (cosy.fox L3330-3335) ----------------- }
+    PROCEDURE CIRCIR XR1 (DA) YR1 (DA) R1 (DA) XR2 (DA) YR2 (DA) R2 (DA)
+                     X1O (DA) Y1O (DA) X2O (DA) Y2O (DA);
+      VARIABLE (DA) C_CC;
+      C_CC := (SQR(R2) - SQR(XR2) - SQR(YR2)) - (SQR(R1) - SQR(XR1) - SQR(YR1));
+      LINCIR 2*(XR2 - XR1) 2*(YR2 - YR1) C_CC XR1 YR1 R1 X1O Y1O X2O Y2O;
+    ENDPROCEDURE;
+
+    { ----- DIPOLE body: 6-stage geometric ray-trace ---------------------- }
+    DA_NEG_ONE  := -1 + 0*DD[1];
+    DA_PLUS_ONE :=  1 + 0*DD[1];
+    DA_ZERO     :=  0*DD[1];
+    PC := CONS(P0);
+    MG := SQRT(SQR(P0/PC) - SQR(IN[2]) - SQR(IN[4]));
+    IN[2] := IN[2]/MG;
+    IN[4] := IN[4]/MG;
+
+    { Find the entry-tangent point W1 by intersecting the ray with the
+      entry edge surface (line if XI1=0, circle otherwise). }
+    CO := COS(E1A) + 0*DD[1];
+    SI := SIN(E1A) + 0*DD[1];
+    IF XI1 # 0;
+      RR := 1/XI1 + 0*DD[1];
+      ZR := CO/XI1; XR := -SI/XI1;
+      LINCIR IN[2] DA_NEG_ONE IN[1] ZR XR RR ZA XA ZB XB;
+      IF XI1 > 0;
+        Z1 := ZA; X1 := XA;
+      ELSE;
+        Z1 := ZB; X1 := XB;
+      ENDIF;
+    ELSE;
+      VARIABLE (DA) NEG_SI;
+      NEG_SI := -SI;
+      LINLIN IN[2] DA_NEG_ONE IN[1] CO NEG_SI DA_ZERO Z1 X1;
+    ENDIF;
+
+    { Compute reference-orbit radius RR, accounting for momentum offset
+      and (in ND≥2) the y-plane contribution to ST. }
+    ST1 := 1 + SQR(IN[2]);
+    IF ND = 1;
+      ST1 := SQRT(ST1); ST2 := ST1;
+    ELSE;
+      ST2 := SQRT(ST1 + SQR(IN[4])); ST1 := SQRT(ST1);
+    ENDIF;
+    RR := R0*P0/PC*CONS(Z0)/Z0*ST1/ST2;
+    XRI := X1 - RR/ST1;
+    ZRI := Z1 + RR*IN[2]/ST1;
+
+    { Rotate to exit-edge frame. }
+    CO := COS(PHIA) + 0*DD[1];
+    SI := SIN(PHIA) + 0*DD[1];
+    Z2 := R0*SI;
+    X2 := R0*(CO - 1);
+    ZR := (ZRI - Z2)*CO - (XRI - X2)*SI;
+    XR := (XRI - X2)*CO + (ZRI - Z2)*SI;
+
+    { Find the exit-tangent point W2. }
+    CO := COS(E2A) + 0*DD[1];
+    SI := SIN(E2A) + 0*DD[1];
+    IF XI2 # 0;
+      THE := 1/XI2 + 0*DD[1];
+      Z2 := -CO/XI2; X2 := -SI/XI2;
+      CIRCIR ZR XR RR Z2 X2 THE ZA XA ZB XB;
+    ELSE;
+      LINCIR CO SI DA_ZERO ZR XR RR ZA XA ZB XB;
+    ENDIF;
+    IF RADI(CONS(ZA), CONS(XA)) < RADI(CONS(ZB), CONS(XB));
+      Z2 := ZA; X2 := XA;
+    ELSE;
+      Z2 := ZB; X2 := XB;
+    ENDIF;
+    CAPO X1-XRI Z1-ZRI X1 IER;
+    CAPO X2-XR  Z2-ZR  THE IER;
+    THE := PHIA + THE - X1;
+    X1  := -(Z2 - ZR)/(X2 - XR);
+
+    { Final exit-frame coordinates and path-length in OUT. }
+    VARIABLE (DA) X2_MINUS_Z2X1;
+    X2_MINUS_Z2X1 := X2 - Z2*X1;
+    LINLIN X1 DA_NEG_ONE X2_MINUS_Z2X1 DA_PLUS_ONE DA_ZERO DA_ZERO ZRI XRI;
+    OUT[1] := XRI;
+    OUT[2] := X1;
+    LGHO := R0*PHIA;
+    LN := Z1*ST1 + RR*THE - Z2*SQRT(1 + SQR(OUT[2]));
+    IF ND > 1;
+      OUT[3] := IN[3] + IN[4]*LN/ST1;
+      OUT[4] := IN[4]*SQRT(1 + SQR(OUT[2]))/ST1;
+    ENDIF;
+    MG := SQRT(1 + SQR(OUT[2]) + SQR(OUT[4]))*PC/P0;
+    OUT[2] := OUT[2]/MG;
+    OUT[4] := OUT[4]/MG;
+    IF ND > 2;
+      NC := CONS(ETA);
+      VC := CONS(V0);
+      MG := -(1+NC)/(2+NC)*VC/V0;
+      OUT[5] := IN[5] + (LN*ST2/ST1 - V0/VC*LGHO)*MG;
+      OUT[6] := IN[6];
+    ENDIF;
+  ENDPROCEDURE;
+
+  { ----- DIPOLEY: y-plane KICK + DIPOLE + KICK (cosy.fox L3374-3377) ------ }
+  PROCEDURE DIPOLEY R0 (RE) PHIA (RE) E1A (RE) XI1 (RE) E2A (RE) XI2 (RE)
+                    IND (DA 8) OUTD (DA 8) LGHD (RE);
+    KICK 2 FK(DD[1], E1A, XI1)/R0 IND;
+    DIPOLE R0 PHIA E1A XI1 E2A XI2 IND OUTD LGHD;
+    KICK 2 FK(DD[1], E2A, XI2)/R0 OUTD;
+  ENDPROCEDURE;
+
+  { ----- BEND outer body --------------------------------------------------- }
+  IF CONS(R) < 0;
+    WRITE 6 ' *** ERROR in BEND, negative radius';
+    QUIT 0;
+  ELSEIF CONS(PHI) < 0;
+    WRITE 6 ' *** ERROR in BEND, negative angle';
+    QUIT 0;
+  ENDIF;
+
+  DR := D;
+  LOOP I 1 8;
+    MSC[I] := DD[I];
+  ENDLOOP;
+  IF (NRAY = 0) AND (LSPN = 0);
+    LOOP I 1 TWOND;
+      MSC[I] := MAP[I];
+    ENDLOOP;
+  ENDIF;
+  NTS := NOC;
+
+  IF (NT = 0) AND (LSPN = 0) AND (LFR = 0);
+    DIPOLEY R PHI E1 H1 E2 H2 MSC MSC LGH;
+    LOOP I 1 TWOND;
+      MAP[I] := MSC[I];
+    ENDLOOP;
+    SPOS := SPOS + LGH;
+    CE := 'BEND';
+  ELSE;
+    WRITE 6 ' *** ERROR in BEND, NT≠0 / LSPN=1 / LFR≠0 paths need SIELE / UPDATE / FFELE — not yet ported';
+    QUIT 0;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- DI: curved-edge dipole convenience wrapper (cosy.fox L3433-3435) --- }
+PROCEDURE DI R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE);
+  VARIABLE (RE 5) S1Z;
+  VARIABLE (RE 5) S2Z;
+  VARIABLE (RE 5) NZ;
+  VARIABLE (RE) I;
+  LOOP I 1 5;
+    S1Z[I] := 0; S2Z[I] := 0; NZ[I] := 0;
+  ENDLOOP;
+  CE := 'DI';
+  BEND R PHI*DEGRAD D E1*DEGRAD H1 E2*DEGRAD H2 NZ S1Z S2Z 0;
+ENDPROCEDURE;
+
+{ ----- DP: parallel-faced dipole convenience wrapper (cosy.fox L3437-3439) }
+PROCEDURE DP R (RE) PHI (RE) D (RE);
+  VARIABLE (RE) PH;
+  VARIABLE (RE 5) S1Z;
+  VARIABLE (RE 5) S2Z;
+  VARIABLE (RE 5) NZ;
+  VARIABLE (RE) I;
+  LOOP I 1 5;
+    S1Z[I] := 0; S2Z[I] := 0; NZ[I] := 0;
+  ENDLOOP;
+  PH := PHI*DEGRAD;
+  CE := 'DP';
+  BEND R PH D PH/2 0 PH/2 0 NZ S1Z S2Z 0;
+ENDPROCEDURE;
+
+END;

@@ -14,6 +14,7 @@ INCLUDE 'elements_basic.rosy';      { M4.6 (DLACT + DL drift) }
 INCLUDE 'elements_magnetic.rosy';   { M5 (MQ analytical fast path) }
 INCLUDE 'normal_form.rosy';         { M5 (DANF / NF normal-form pipeline) }
 INCLUDE 'twiss_tune.rosy';          { M5 (SIGMA beam-envelope helper) }
+INCLUDE 'bend.rosy';                { M5 (BEND dipole — BENDFF0 path only) }
 
 { Future: M5 will add 'spin_su2.rosy'.
   M6 will INCLUDE 'field_potential.rosy', and the rest of elements_basic.
