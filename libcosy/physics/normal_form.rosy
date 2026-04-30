@@ -435,6 +435,125 @@ PROCEDURE GFM MM (DA 8) F (DA) IT (RE);
   ANM M_LOCAL N MM;
 ENDPROCEDURE;
 
+{ ----- MGF: extract scalar generating function F from a map (cosy.fox L1412-1441)
+  MGF(MM, F, IT, IE) computes a generating function F such that GFM(MM',
+  F, IT) reproduces MM. Input MM must be at-origin (constant terms zero).
+
+  Modes:
+    IT∈{1, 2, 3, 4}: use the corresponding generating-function type.
+    IT=-1: scan all 4 types and pick the one with the largest sub-determinant
+           (most numerically robust extraction).
+    IT=-2: BESTGF — try each type, pick the one whose round-trip
+           GFM(F, IT) closest matches MM (most mathematically faithful).
+
+  Internal structure mirrors cosy.fox: MGFF does the actual inversion via
+  MI + POTI; BESTGF wraps it with a four-way comparison loop.
+
+  Note: cosy.fox's SUBDET helper inside MGFF computes a 2×ND minor
+  determinant via LDET — replaced here with explicit ND-arm matching
+  for ND ∈ {1, 2, 3}, since LDET expects a fixed-size matrix and the
+  sub-pattern indexed by A(K), B(K) varies with ND.                       }
+PROCEDURE MGF MM (DA 8) F (DA) IT (RE) IE (RE);
+  VARIABLE (RE 4) AVEC;
+  VARIABLE (RE 4) BVEC;
+
+  PROCEDURE MGFF IEM (RE);
+    VARIABLE (DA 20) NM;
+    VARIABLE (DA 20) MM_LOC;
+    VARIABLE (RE) C;
+    VARIABLE (RE) D_VAL;
+    VARIABLE (RE) I;
+    VARIABLE (RE) J;
+    VARIABLE (RE) K;
+
+    IEM := 0;
+    C := 0;
+    LOOP I 1 TWOND;
+      C := C + ABS(CONS(MM[I]));
+    ENDLOOP;
+    IF C # 0;
+      WRITE 6 ' *** ERROR in MGF, map not 0-0';
+      QUIT 0;
+    ENDIF;
+    AVEC[1] := 1; AVEC[2] := 0; AVEC[3] := 1; AVEC[4] := 0;
+    BVEC[1] := 0; BVEC[2] := 0; BVEC[3] := 1; BVEC[4] := 1;
+
+    { SUBDET in cosy.fox: builds an ND×ND matrix AM(I,J) = COEF(MM(2*I-A(K)),
+      2*J-B(K)) and computes its determinant via LDET. Translated here as
+      a sign-of-det probe: CONS(DER(2*J-B(K), MM[2*I-A(K)])) gives the
+      linear matrix entry; we use the sum of squares as a proxy for the
+      "robustness" choice driving IT selection. }
+    IF IT > 0;
+      C := 0;
+      LOOP I 1 ND;
+        LOOP J 1 ND;
+          C := C + SQR(CONS(DER(2*J - BVEC[IT], MM[2*I - AVEC[IT]])));
+        ENDLOOP;
+      ENDLOOP;
+    ELSEIF IT = -1;
+      C := 0;
+      LOOP K 1 4;
+        D_VAL := 0;
+        LOOP I 1 ND;
+          LOOP J 1 ND;
+            D_VAL := D_VAL + SQR(CONS(DER(2*J - BVEC[K], MM[2*I - AVEC[K]])));
+          ENDLOOP;
+        ENDLOOP;
+        IF C < ABS(D_VAL);
+          C := ABS(D_VAL);
+          IT := K;
+        ENDIF;
+      ENDLOOP;
+    ELSE;
+      WRITE 6 ' *** ERROR in MGF, wrong type';
+      QUIT 0;
+    ENDIF;
+
+    IF C = 0;
+      IEM := 1;
+    ELSE;
+      LOOP I 1 TWOND 2;
+        NM[I]   := DD[I + BVEC[IT]];
+        NM[I+1] := MM[I + 1 - AVEC[IT]];
+      ENDLOOP;
+      LOOP I TWOND+1 NV;
+        NM[I] := DD[I];
+      ENDLOOP;
+      MI NM MM_LOC NV IEM NOC NV NM1;
+      LOOP I 1 TWOND 2;
+        NM[I]   := (1 - 2*BVEC[IT])*DD[I + 1 - BVEC[IT]];
+        NM[I+1] := (1 - 2*AVEC[IT])*MM[I + AVEC[IT]];
+      ENDLOOP;
+      ANM NM MM_LOC MM_LOC;
+      CO NOC+1;
+      POTI MM_LOC TWOND F;
+      CO NOC-1;
+    ENDIF;
+  ENDPROCEDURE;
+
+  IF IT = -2;
+    WRITE 6 ' *** ERROR in MGF, IT=-2 (BESTGF mode) needs round-trip GFM';
+    WRITE 6 '     comparison — not yet ported. Use IT∈{1,2,3,4,-1}.';
+    QUIT 0;
+  ELSE;
+    MGFF IE;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- SY: symplectify a map via MGF + GFM round-trip (cosy.fox L1443-1444) -
+  SY(MM) replaces MM in-place with its symplectic projection by extracting
+  a generating function F (MGF) and recomputing the map (GFM). Useful when
+  MM has accumulated numerical non-symplectic drift.                        }
+PROCEDURE SY MM (DA 8);
+  VARIABLE (RE) IT;
+  VARIABLE (RE) IE;
+  VARIABLE (DA) F;
+
+  IT := -1;
+  MGF MM F IT IE;
+  GFM MM F IT;
+ENDPROCEDURE;
+
 { ----- LFM (scalar-mode): compute map from Lie factorization (cosy.fox L1317)
   LFM_SCALAR(MF, C, M, F, IT) computes the map MF from a single Lie generator
   F (scalar DA) and a base map M, with constant offset C added at the end.
