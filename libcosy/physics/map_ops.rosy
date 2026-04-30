@@ -179,6 +179,115 @@ PROCEDURE AM M;
   ANM M MAP MAP;
 ENDPROCEDURE;
 
+{ ----- Canonical → TRANSPORT-standard map (cosy.fox L699-717) --------------
+  CATR(IAP, NAP, LGH) converts the canonical map IAP into TRANSPORT's
+  small-angle-approximation representation NAP, with LGH the element's
+  arc length. The conversion folds in kinematic factors so positions and
+  momenta scale to TRANSPORT's conventions:
+    * GM, MG: dimensionless mass/momentum factors built from DD (the
+      canonical reference) and IAP (the actual map's momentum slots).
+    * VN, LT: time-of-flight scaling factors active only at ND=3.
+  COP and DOP are the canonical-and-deflected substitution buffers; the
+  final ANM DOP COP NAP applies the conversion via map composition.
+
+  The nested IF(ND>0)/IF(ND>1)/IF(ND>2) skeleton (not ELSEIF) means each
+  outer branch *adds* terms to COP/DOP — ND=1 only writes positions 1,2;
+  ND=2 also writes 3,4; ND=3 also writes 5,6 (time-of-flight). DD is
+  size-20 so out-of-range references like DD[4] at ND=1 silently read
+  zero DAs without crashing, matching cosy.fox's loose array semantics. }
+PROCEDURE CATR IAP NAP LGH (RE);
+  VARIABLE (RE) NC;
+  VARIABLE (RE) PC;
+  VARIABLE (DA) VN; VARIABLE (DA) LT;
+  VARIABLE (DA) GM; VARIABLE (DA) MG;
+  VARIABLE (DA 20) COP;
+  VARIABLE (DA 20) DOP;
+
+  IF LUM # 1;
+    WRITE 6 ' *** ERROR, call UM before CATR';
+    QUIT 0;
+  ENDIF;
+
+  PC := CONS(P0);
+  IF ND > 2;
+    GM := SQRT(1 + SQR(DD[2]) + SQR(DD[4]))/(1 + DD[6]);
+  ELSEIF ND > 0;
+    GM := SQRT(1 + SQR(DD[2]) + SQR(DD[4]))*PC/P0;
+  ENDIF;
+  IF ND > 1;
+    MG := SQRT(SQR(P0/PC) - SQR(IAP[2]) - SQR(IAP[4]));
+  ELSEIF ND > 0;
+    MG := SQRT(SQR(P0/PC) - SQR(IAP[2]));
+  ENDIF;
+  IF ND > 0;
+    COP[1] := DD[1]; COP[2] := DD[2]/GM;
+    DOP[1] := IAP[1]; DOP[2] := IAP[2]/MG;
+    IF ND > 1;
+      COP[3] := DD[3]; COP[4] := DD[4]/GM;
+      DOP[3] := IAP[3]; DOP[4] := IAP[4]/MG;
+      IF ND > 2;
+        COP[5] := DD[5];
+        NC := CONS(ETA);
+        VN := V0/CONS(V0);
+        LT := -(1+NC)/(2+NC)/VN;
+        COP[6] := (SQRT(SQR(PC*(1+DD[6])/M0/AMUMEV)+1)-1)*M0*AMUMEV/CONS(E0)-1;
+        DOP[5] := DD[5] - (IAP[5]-DD[5])/LT - (VN-1)*LGH;
+        DOP[6] := P0/PC - 1;
+      ENDIF;
+    ENDIF;
+  ENDIF;
+  ANM DOP COP NAP;
+ENDPROCEDURE;
+
+{ ----- TRANSPORT-standard → canonical map (cosy.fox L719-738) --------------
+  TRCA is the inverse of CATR: convert NAP-as-TRANSPORT into NAP-as-canonical.
+  The kinematic factors GM and MG swap roles (GM now divides DOP, MG divides
+  COP), and the time-of-flight LT branch reads from IAP rather than DD for
+  the VN factor. Same nested-IF skeleton as CATR.                            }
+PROCEDURE TRCA IAP NAP LGH (RE);
+  VARIABLE (RE) NC;
+  VARIABLE (RE) PC;
+  VARIABLE (DA) VN; VARIABLE (DA) LT;
+  VARIABLE (DA) GM; VARIABLE (DA) MG;
+  VARIABLE (DA 20) COP;
+  VARIABLE (DA 20) DOP;
+  VARIABLE (RE) I;
+
+  IF LUM # 1;
+    WRITE 6 ' *** ERROR, call UM before TRCA';
+    QUIT 0;
+  ENDIF;
+
+  PC := CONS(P0);
+  IF ND > 2;
+    GM := SQRT(1 + SQR(IAP[2]) + SQR(IAP[4]))/(1 + DD[6]);
+  ELSEIF ND > 1;
+    GM := SQRT(1 + SQR(IAP[2]) + SQR(IAP[4]))*PC/P0;
+  ELSEIF ND > 0;
+    GM := SQRT(1 + SQR(IAP[2]))*PC/P0;
+  ENDIF;
+  MG := SQRT(SQR(P0/PC) - SQR(DD[2]) - SQR(DD[4]));
+  IF ND > 0;
+    COP[1] := DD[1]; COP[2] := DD[2]/MG;
+    DOP[1] := IAP[1]; DOP[2] := IAP[2]/GM;
+    IF ND > 1;
+      COP[3] := DD[3]; COP[4] := DD[4]/MG;
+      DOP[3] := IAP[3]; DOP[4] := IAP[4]/GM;
+      IF ND > 2;
+        COP[5] := DD[5]; COP[6] := P0/PC - 1;
+        NC := CONS(ETA);
+        VN := PC/M0/AMUMEV*(1 + DD[6]);
+        VN := VN/SQRT(1 + SQR(VN));
+        VN := VN/CONS(VN);
+        LT := -(1+NC)/(2+NC)/VN;
+        DOP[6] := (SQRT(SQR(PC*(1+IAP[6])/M0/AMUMEV)+1)-1)*M0*AMUMEV/CONS(E0)-1;
+        DOP[5] := DD[5] - (IAP[5]-DD[5]+(VN-1)*LGH)*LT;
+      ENDIF;
+    ENDIF;
+  ENDIF;
+  ANM DOP COP NAP;
+ENDPROCEDURE;
+
 { ----- Poisson bracket (cosy.fox L223-225) --------------------------------
   PB(X, Y) = Σ_{i=1,3,5,...} ∂X/∂q_i · ∂Y/∂p_i − ∂X/∂p_i · ∂Y/∂q_i
   where (q_i, p_i) are the canonical phase-space pairs and the sum runs

@@ -316,4 +316,20 @@ AM M_OTHER;               { composes M_OTHER onto MAP → drift(1.0) }
 WRITE 6 'After AM M_OTHER, MAP[1] (composed via AM, expect drift(1.0)):';
 WRITE 6 MAP[1];
 
+{ ----- CATR / TRCA (canonical / TRANSPORT conversion) -----
+  Build a drift(1.0) canonical map, convert to TRANSPORT, convert back.
+  The roundtrip should reproduce the original up to DA truncation. }
+WRITE 6 ' ----- CATR / TRCA roundtrip: canonical -- TRANSPORT -- canonical -----';
+OV 2 2 0;
+RPP 100;
+UM;
+DL 1.0;                   { active MAP = drift(1.0) in canonical }
+SNM MAP M_OTHER;          { M_OTHER = canonical original }
+VARIABLE (DA 8) M_TRP;
+VARIABLE (DA 8) M_BACK;
+CATR M_OTHER M_TRP 1.0;
+TRCA M_TRP M_BACK 1.0;
+WRITE 6 'CATR-then-TRCA round-trip diff (canonical original vs reconstructed, expect ~0):';
+DMAP M_OTHER M_BACK 6;
+
 END;
