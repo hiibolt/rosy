@@ -9,7 +9,7 @@
 //! The current implementation supports RE (f64) arguments (plain polynomial evaluation)
 //! and returns an error for other argument types at runtime.
 
-use crate::rosy_lib::taylor::DA;
+use crate::rosy_lib::taylor::{CD, DA};
 use anyhow::{Result, bail};
 
 #[cfg(feature = "nightly-simd")]
@@ -325,6 +325,124 @@ fn evaluate_da_at_da(poly: &DA, args: &[DA], na: usize) -> Result<DA> {
     }
 
     Ok(result)
+}
+
+/// CPOLVAL — complex-DA polynomial composition. Companion to `rosy_polval_da`
+/// where every coefficient algebra is over `Complex64` instead of `f64`.
+///
+/// DANF / NF / TS / TP and the COSY-to-circular conversion procedures (COCR /
+/// CRCO) all chain through this — once a normal-form transformation is
+/// constructed it lives in CD-space, and the resonance / tune / Twiss
+/// extraction relies on substituting CD bases into CD polynomials.
+///
+/// Algorithmically identical to `rosy_polval_da` — only the coefficient
+/// type differs. The DA struct is generic over `T: DACoefficient` and
+/// `Complex64` implements that trait, so the same `*` / `+` / `clone()`
+/// API works through the type alias.
+pub fn rosy_polval_cd(
+    _l: f64,
+    p_array: &[CD],
+    np: usize,
+    a_array: &[CD],
+    na: usize,
+    r_array: &mut Vec<CD>,
+    nr: usize,
+) -> Result<()> {
+    if np < nr {
+        bail!("CPOLVAL: NP ({}) must be >= NR ({})", np, nr);
+    }
+    if a_array.len() < na {
+        bail!(
+            "CPOLVAL: argument array has {} elements but NA={}",
+            a_array.len(),
+            na
+        );
+    }
+
+    while r_array.len() < nr {
+        r_array.push(CD::zero());
+    }
+
+    for i in 0..nr {
+        if i >= p_array.len() {
+            bail!("CPOLVAL: polynomial array too short at index {}", i);
+        }
+        r_array[i] = evaluate_cd_at_cd(&p_array[i], a_array, na)?;
+    }
+
+    Ok(())
+}
+
+/// Compose a single CD polynomial with NA Taylor-series substitutions over
+/// the complex-DA algebra. Mirrors `evaluate_da_at_da` exactly — see its
+/// header for the per-monomial substitution logic.
+fn evaluate_cd_at_cd(poly: &CD, args: &[CD], na: usize) -> Result<CD> {
+    let mut result = CD::zero();
+
+    for (monomial, coeff) in poly.coeffs_iter().into_iter() {
+        let exponents = &monomial.exponents;
+        let mut term = CD::from_coeff(coeff);
+
+        for (var_idx, &exp) in exponents.iter().enumerate() {
+            if exp == 0 {
+                continue;
+            }
+            if var_idx >= na || var_idx >= args.len() {
+                bail!(
+                    "CPOLVAL: variable index {} out of range (NA={})",
+                    var_idx + 1,
+                    na
+                );
+            }
+            let pow = cd_powi(&args[var_idx], exp)?;
+            term = (term * pow)?;
+        }
+
+        result = (result + term)?;
+    }
+
+    Ok(result)
+}
+
+/// CD-typed exponentiation by repeated squaring. Mirrors `da_powi`.
+#[inline]
+fn cd_powi(base: &CD, exp: u8) -> Result<CD> {
+    Ok(match exp {
+        0 => CD::from_coeff(num_complex::Complex64::new(1.0, 0.0)),
+        1 => base.clone(),
+        2 => (base.clone() * base)?,
+        3 => {
+            let v2 = (base.clone() * base)?;
+            (v2 * base)?
+        }
+        4 => {
+            let v2 = (base.clone() * base)?;
+            (v2.clone() * &v2)?
+        }
+        5 => {
+            let v2 = (base.clone() * base)?;
+            let v4 = (v2.clone() * &v2)?;
+            (v4 * base)?
+        }
+        6 => {
+            let v2 = (base.clone() * base)?;
+            let v3 = (v2 * base)?;
+            (v3.clone() * &v3)?
+        }
+        _ => {
+            let mut result = CD::from_coeff(num_complex::Complex64::new(1.0, 0.0));
+            let mut current = base.clone();
+            let mut e = exp;
+            while e > 0 {
+                if e & 1 == 1 {
+                    result = (result * &current)?;
+                }
+                current = (current.clone() * &current)?;
+                e >>= 1;
+            }
+            result
+        }
+    })
 }
 
 /// Compute base^exp for small u8 exponents using exponentiation-by-squaring.
