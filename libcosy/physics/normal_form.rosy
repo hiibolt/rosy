@@ -345,6 +345,47 @@ FUNCTION (DA) LEXP A (DA) B (DA);
   ENDLOOP;
 ENDFUNCTION;
 
+{ ----- LFM (scalar-mode): compute map from Lie factorization (cosy.fox L1317)
+  LFM_SCALAR(MF, C, M, F, IT) computes the map MF from a single Lie generator
+  F (scalar DA) and a base map M, with constant offset C added at the end.
+
+  cosy.fox's LFM is multi-mode (|IT|=1 scalar, |IT|=2,3 array of generators).
+  ROSY's strict typing forbids the scalar/array overloading, so this port
+  handles only the scalar case (IT = ±1), which is the most common — the
+  generating-function-as-single-DA workflow.
+
+  Mode IT=1 (forward):  MF(I) = LEXP(F, DD(I))   — apply exp(:F:) to identity.
+  Mode IT=-1 (reverse): MF(I) = LEXP(F, M(I))    — apply exp(:F:) to M.
+  Then for IT>0, ANM composes MF onto M; finally adds C offset.            }
+PROCEDURE LFM_SCALAR MF (DA 8) C (DA 8) M (DA 8) F (DA) IT (RE);
+  VARIABLE (RE) NOM;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+
+  NOM := NOC;
+  IF ABS(IT) # 1;
+    WRITE 6 ' *** ERROR in LFM_SCALAR, only IT=1 or IT=-1 supported here';
+    QUIT 0;
+  ENDIF;
+  CO NOM+1;
+
+  LOOP I 1 TWOND;
+    IF IT = 1;
+      MF[I] := LEXP(F, DD[I]);
+    ELSE;
+      MF[I] := LEXP(F, M[I]);
+    ENDIF;
+  ENDLOOP;
+
+  CO NOM;
+  IF IT > 0;
+    ANM MF M MF;
+  ENDIF;
+  LOOP J 1 TWOND;
+    MF[J] := MF[J] + C[J];
+  ENDLOOP;
+ENDPROCEDURE;
+
 { ----- TS: tune dependence on parameters AND amplitude (cosy.fox L1608-1625)
   TS(MU) computes the parameter- AND amplitude-dependence of the tunes
   from the active MAP, returning per-plane tune polynomials in MU.
