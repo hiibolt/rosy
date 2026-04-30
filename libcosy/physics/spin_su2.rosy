@@ -284,4 +284,161 @@ PROCEDURE SOLVSU2 U1 (CD 2) U2 (CD 2) D (CD) PHI (RE 8) R (RE 8)
   U1[2] := U2[2];
 ENDPROCEDURE;
 
+{ ----- NORMSU2: spin normal form via SU(2) iteration (cosy.fox L1643-1759)
+  NORMSU2(UI, UO, CU, NBAR, STUNE, MN, MA, EPS) extracts the spin
+  normal-form quantities — closed orbit UO, change-of-basis CU, the
+  rotation axis NBAR, and the spin tune STUNE — from an input SU(2)
+  spin map UI given orbital normal-form data MN, MA.
+
+  Algorithm: repeatedly conjugate-and-correct UI using EHOMSU2/SOLVSU2/
+  MEXPSU2/MULASU2 helpers (see cosy.fox source). Inputs MN, MA must be
+  CD-typed (caller lifts DANF's DA outputs via `+ 0*IM` if needed).
+
+  Type juggling pattern (similar to DANF):
+    * MN, MA: CD-typed parameters. MNN, MAA local CD scratch.
+    * MAPINVR works on DA only — REAL-cast MAA to MAA_DA, invert into
+      MAI_DA, lift back to CD MAI.
+    * U0, K, L: CM scalars. D: RE scalar.
+    * NBN, XX, YY: DA scratch for the final POLVAL extractions.            }
+PROCEDURE NORMSU2 UI (CD 2) UO (RE 4) CU (RE 4) NBAR (DA 3) STUNE (DA)
+                  MN (CD 8) MA (CD 8) EPS (RE);
+  VARIABLE (CD 2) U1;
+  VARIABLE (CD 2) U2;
+  VARIABLE (CD 2) UOO;
+  VARIABLE (CD 2) CUU;
+  VARIABLE (DA 1) XX;
+  VARIABLE (DA 1) YY;
+  VARIABLE (DA 3) NBN;
+  VARIABLE (CD 20) MAI;
+  VARIABLE (CD 20) MNN;
+  VARIABLE (CD 20) MAA;
+  VARIABLE (CD 20) M1;
+  VARIABLE (CD 20) M2;
+  VARIABLE (DA 20) MAA_DA;
+  VARIABLE (DA 20) MAI_DA;
+  VARIABLE (RE 8) PHI;
+  VARIABLE (RE 8) R;
+  VARIABLE (CM 2) U0;
+  VARIABLE (CM) IU;
+  VARIABLE (CM) K;
+  VARIABLE (RE) D;
+  VARIABLE (CM) L;
+  VARIABLE (CD) D_CD;
+  VARIABLE (RE) I;
+
+  IMUNIT IU;
+  ANALMAP MN PHI R M1 M2;
+
+  LOOP I 1 TWOND;
+    MNN[I] := MN[I];
+    MAA[I] := MA[I];
+  ENDLOOP;
+  LOOP I TWOND+1 NV;
+    MNN[I] := DD[I] + 0*IU;
+    MAA[I] := DD[I] + 0*IU;
+  ENDLOOP;
+
+  { MAPINVR expects DA — REAL-cast MAA, invert, lift back to CD MAI. }
+  LOOP I 1 NV;
+    MAA_DA[I] := REAL(MAA[I]);
+  ENDLOOP;
+  MAPINVR MAA_DA MAI_DA;
+  LOOP I 1 NV;
+    MAI[I] := MAI_DA[I] + 0*IU;
+  ENDLOOP;
+
+  U1[1] := UI[1];
+  U1[2] := UI[2];
+  CPOLVAL 1 U1 2 MAI NV UOO 2;
+  CORRSU2 UOO;
+
+  U0[1] := CONS(UOO[1]);
+  U0[2] := CONS(UOO[2]);
+  D := SQR(REAL(U0[2])) + SQR(IMAG(U0[2]));
+  IF D > 0;
+    D := SQRT(D);
+  ENDIF;
+
+  IF 1 + ABS(D) = 1;
+    L := U0[1];
+    IDENSU2 CUU;
+  ELSE;
+    D := REAL(U0[1]);
+    L := D + IU*SQRT(1 - SQR(D));
+    K := U0[2]/(U0[1] - L);
+    D := ISRT(1 + SQR(REAL(K)) + SQR(IMAG(K)));
+    CUU[1] := K*D + 0*DD[1];
+    CUU[2] := D + 0*IU + 0*DD[1];
+  ENDIF;
+  D := ISRT(SQR(REAL(L)) + SQR(IMAG(L)));
+  L := D*L;
+  MULASU2 U1 UOO CUU;
+  INVRSU2 U2 CUU;
+  MULASU2 UOO U2 U1;
+  UOO[1] := UOO[1] - CONS(UOO[1]) + L + 0*DD[1];
+  UOO[2] := UOO[2] - CONS(UOO[2]);
+  D := ACOS(REAL(L));
+  IF IMAG(L) < 0;
+    D := -D;
+  ENDIF;
+  K := -COS(D) + IU*SIN(D);
+  D := 2*D;
+  IF D < 0;
+    D := D + 2*PI;
+  ENDIF;
+
+  D_CD := D + 0*IU + 0*DD[1];
+
+  LOOP I 1 NOC;
+    EHOMSU2 U1 UOO I;
+    U2[1] := K*U1[1] + 0*DD[1];
+    U2[2] := K*U1[2] + 0*DD[1];
+    SOLVSU2 U1 U2 D_CD PHI R M1 M2 EPS;
+    MEXPSU2 U2 U1;
+    MULASU2 U1 CUU U2;
+    CUU[1] := U1[1];
+    CUU[2] := U1[2];
+    MULASU2 U1 UOO U2;
+    INVRSU2 UOO U2;
+    CPOLVAL 1 UOO 2 MNN NV U2 2;
+    MULASU2 UOO U2 U1;
+  ENDLOOP;
+
+  D := SQR(ABS(REAL(UOO[2])) + ABS(IMAG(UOO[2])));
+  IF 1 + D = 1;
+    STUNE := 2*ACOS(REAL(UOO[1]));
+    NBN[1] := -2*(REAL(CUU[1])*REAL(CUU[2]) - IMAG(CUU[1])*IMAG(CUU[2]));
+    NBN[2] := -2*(REAL(CUU[1])*IMAG(CUU[2]) + REAL(CUU[2])*IMAG(CUU[1]));
+    NBN[3] := SQR(REAL(CUU[1])) + SQR(IMAG(CUU[1]))
+            - SQR(REAL(CUU[2])) - SQR(IMAG(CUU[2]));
+    { NBN is DA, MAA is CD — use REAL-cast MAA for the POLVAL_DA route. }
+    POLVAL 1 NBN 3 MAA_DA NV NBAR 3;
+    IF CONS(IMAG(UOO[1])) < 0;
+      NBN[1] := -NBN[1];
+      NBN[2] := -NBN[2];
+      NBN[3] := -NBN[3];
+    ENDIF;
+    XX[1] := STUNE;
+    POLVAL 1 XX 1 MAA_DA NV YY 1;
+    STUNE := YY[1];
+  ELSE;
+    WRITE 6 ' --- WARNING in NORMSU2, spin-orbit resonance';
+    NBAR[1] := 0*DD[1];
+    NBAR[2] := 0*DD[1];
+    NBAR[3] := 0*DD[1];
+    STUNE := 0*DD[1];
+  ENDIF;
+
+  INVRSU2 U1 CUU;
+  CPOLVAL 1 U1 2 MAA NV CUU 2;
+  CU[1] := CONS(REAL(CUU[1]));
+  CU[2] := CONS(IMAG(CUU[1]));
+  CU[3] := CONS(REAL(CUU[2]));
+  CU[4] := CONS(IMAG(CUU[2]));
+  UO[1] := CONS(REAL(UOO[1]));
+  UO[2] := CONS(IMAG(UOO[1]));
+  UO[3] := CONS(REAL(UOO[2]));
+  UO[4] := CONS(IMAG(UOO[2]));
+ENDPROCEDURE;
+
 END;
