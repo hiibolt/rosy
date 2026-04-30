@@ -540,6 +540,28 @@ PROCEDURE MGF MM (DA 8) F (DA) IT (RE) IE (RE);
   ENDIF;
 ENDPROCEDURE;
 
+{ ----- SYMP0: prepare gradient + Hessian for SYMP (cosy.fox L1951-1955) ----
+  SYMP0(F, G, H) extracts the gradient G[I] = ∂F/∂x_I (for I=1..TWOND) and
+  the cross-block Hessian H[ID, JD] = ∂²F/(∂x_{2ID-1}·∂x_{2JD}) from a
+  scalar F. These are the inputs SYMP needs for the symplectification
+  Newton-iteration.                                                         }
+PROCEDURE SYMP0 F (DA) G (DA 8) H (DA 3 3);
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) ID;
+  VARIABLE (RE) JD;
+  LOOP I 1 TWOND;
+    G[I] := DER(I, F);
+  ENDLOOP;
+  LOOP ID 1 ND;
+    I := 2*ID - 1;
+    LOOP JD 1 ND;
+      J := 2*JD;
+      H[ID, JD] := DER(J, G[I]);
+    ENDLOOP;
+  ENDLOOP;
+ENDPROCEDURE;
+
 { ----- SY: symplectify a map via MGF + GFM round-trip (cosy.fox L1443-1444) -
   SY(MM) replaces MM in-place with its symplectic projection by extracting
   a generating function F (MGF) and recomputing the map (GFM). Useful when
