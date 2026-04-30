@@ -620,6 +620,49 @@ FUNCTION (DA) PB X (DA) Y (DA);
   ENDLOOP;
 ENDFUNCTION;
 
+{ ----- Print active MAP in TRANSPORT representation (cosy.fox L766-774) ---
+  PT(IU) prints the active MAP's TRANSPORT-standard form to unit IU. The
+  TRANSPORT convention scales positions to cm (×100) and angles to mrad
+  (×1000), making the matrix elements dimensionally interpretable for
+  physicists used to the standard beam-optics literature.
+
+  Algorithm:
+    1. CATR converts MAP (canonical) to M (TRANSPORT).
+    2. Build MM as DD scaled into TRANSPORT units (×.01 for positions,
+       ×.001 for angles, ×.01 for time-of-flight at ND=3).
+    3. POLVAL substitutes MM into M to compute the scaled output.
+    4. Re-scale MM back to TRANSPORT print units (×100, ×1000, ×.1).
+    5. Pad with zero DAs through slot 5; DAPRV prints.                    }
+PROCEDURE PT IU (RE);
+  VARIABLE (DA 8) M;
+  VARIABLE (RE) I;
+  VARIABLE (DA 20) MM;
+
+  CATR MAP M SPOS;
+  LOOP I TWOND NV;
+    MM[I] := DD[I];
+  ENDLOOP;
+  LOOP I 1 TWOND 2;
+    MM[I] := 0.01*DD[I];
+    MM[I+1] := 0.001*DD[I+1];
+  ENDLOOP;
+  IF ND > 2;
+    MM[6] := 0.01*DD[6];
+  ENDIF;
+  POLVAL 1 M TWOND MM NV MM TWOND;
+  LOOP I 1 TWOND 2;
+    MM[I] := 100*MM[I];
+    MM[I+1] := 1000*MM[I+1];
+  ENDLOOP;
+  IF ND > 2;
+    MM[6] := 0.1*MM[6];
+  ENDIF;
+  LOOP I 1 5;
+    MM[I] := MM[I] + 0*DD[1];
+  ENDLOOP;
+  DAPRV MM 5 6 TWOND IU;
+ENDPROCEDURE;
+
 { ----- Block-diagonalize a linear map (cosy.fox L1495-1505) ---------------
   BM(M, MB, A, IER) writes M as A^{-1} · MB · A where MB has decoupled
   planes (the linear part is block-diagonal). Used by DANF as the first
@@ -813,5 +856,29 @@ PROCEDURE ECM IAP (DA 8) LGH (RE) ALPHA (DA);
   TWOND := 6;
   ALPHA := XF[5] - DD[5];
 ENDPROCEDURE;
+
+{ ----- DANF (full normal-form analysis) — DEFERRED ------------------------
+  cosy.fox's DANF is a 60-line procedure that block-diagonalizes a one-turn
+  map, computes resonant terms, and extracts the symplectic normal form
+  via Cj operator iteration. It heavily mixes DA and CD arithmetic
+  (variables typed differently mid-procedure depending on which step is
+  active), which COSY's loose typing absorbs but ROSY's strict typing
+  requires careful staging:
+    * FM and BM are written for DA inputs (real coefficients).
+    * After GT, the procedure starts CD-arithmetic with `M2(K) := (I*B*DD(K)
+      + I*B*DD(L))/SQRT(2*I*B)` etc.
+    * MN's type implicitly transitions from DA to CD at the `ANM MN M2 MN`
+      line — a transition ROSY can't represent directly.
+
+  The path forward is a DANF_CD-typed port that uses DA scratch internally
+  for FM/BM/GT and then explicitly lifts to CD via DA + 0*IM_unit. The
+  port is staged for a follow-up milestone.
+
+  For users who need:
+    - Just the fixed point: use FM directly.
+    - Just the block-diagonal form: use BM directly.
+    - Just the tunes / Twiss: use GT directly (no DANF needed).
+  These three cover the typical "ring analysis" workflow in libcosy v1
+  even without DANF.                                                        }
 
 END;
