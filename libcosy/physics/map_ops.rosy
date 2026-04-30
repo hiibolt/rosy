@@ -179,6 +179,54 @@ PROCEDURE AM M;
   ANM M MAP MAP;
 ENDPROCEDURE;
 
+{ ----- Map reverse — beam time-reversal (cosy.fox L464-472) ---------------
+  MR(NAP, LAP) computes the time-reversed map LAP from the forward map NAP.
+  Time reversal inverts the map and flips the sign of all momenta and
+  (in 3D) the time variable, since classical mechanics is reversible up
+  to those parities.
+
+  Algorithm:
+    1. Pad NAP with DD's identity slots beyond TWOND → MM (full NV-length).
+    2. Invert MM in-place via MI.
+    3. Build COD: even-indexed slots negate (the momenta and t-of-flight),
+       odd-indexed slots stay as DD; ND=3 also negates DD[5].
+    4. POLVAL: substitute COD into the inverted MM → LAP.
+
+  Requires MI from helpers/linear_algebra.rosy and exercises the dup-arg
+  writeback (MI MM MM NV I NOC NV NM1 aliases positions 0 and 1).      }
+PROCEDURE MR NAP LAP;
+  VARIABLE (DA 20) COD;
+  VARIABLE (RE) NUM;
+  VARIABLE (RE) I;
+  VARIABLE (DA 20) MM;
+
+  NUM := MIN(TWOND, 4);
+  LOOP I 1 TWOND;
+    MM[I] := NAP[I];
+  ENDLOOP;
+  LOOP I TWOND+1 NV;
+    MM[I] := DD[I];
+  ENDLOOP;
+  MI MM MM NV I NOC NV NM1;
+  IF I # 0;
+    WRITE 6 ' *** ERROR in REV, no inverse';
+    QUIT 0;
+  ENDIF;
+  LOOP I 2 NUM 2;
+    COD[I-1] := DD[I-1];
+    COD[I] := -DD[I];
+    MM[I] := -MM[I];
+  ENDLOOP;
+  LOOP I NUM+1 NV;
+    COD[I] := DD[I];
+  ENDLOOP;
+  IF ND > 2;
+    COD[5] := -DD[5];
+    MM[5] := -MM[5];
+  ENDIF;
+  POLVAL 1 MM TWOND COD NV LAP TWOND;
+ENDPROCEDURE;
+
 { ----- COSY → exponential-theory variable reorder (cosy.fox L1874-1878) ----
   RCT(X) reorders the array X from COSY's canonical pairing (q1 p1 q2 p2 ...)
   to exponential-theory's grouped pairing (q1 q2 ... qN p1 p2 ... pN).

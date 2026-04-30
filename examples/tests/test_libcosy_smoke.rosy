@@ -316,6 +316,21 @@ AM M_OTHER;               { composes M_OTHER onto MAP → drift(1.0) }
 WRITE 6 'After AM M_OTHER, MAP[1] (composed via AM, expect drift(1.0)):';
 WRITE 6 MAP[1];
 
+{ ----- MR (map reverse — beam time-reversal) -----
+  Reverse a drift(0.5) map. The time-reversed map should be drift(-0.5)
+  in canonical coords (positions advance, momenta flip sign). Compose:
+  forward ∘ reverse should give identity. }
+WRITE 6 ' ----- MR: reverse drift(0.5), compose, expect identity -----';
+OV 2 1 0;
+RPP 100;
+UM;
+DL 0.5;
+SNM MAP M_OTHER;
+VARIABLE (DA 8) M_REV;
+MR M_OTHER M_REV;
+WRITE 6 'M_REV[1] (time-reversed drift(0.5)):';
+WRITE 6 M_REV[1];
+
 { ----- MI (DA map inversion) -----
   Build a drift(0.5) map and invert it. The inverse should be drift(-0.5)
   (a "negative drift"), which composed with the original yields the
