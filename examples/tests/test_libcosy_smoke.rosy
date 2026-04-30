@@ -316,6 +316,21 @@ AM M_OTHER;               { composes M_OTHER onto MAP → drift(1.0) }
 WRITE 6 'After AM M_OTHER, MAP[1] (composed via AM, expect drift(1.0)):';
 WRITE 6 MAP[1];
 
+{ ----- TS (tune dependence on parameters AND amplitude) -----
+  Run TS on the same weak-quad-drift ring used for GT/NF. TS should
+  return a CD-typed tune fraction matching what GT extracts (in the
+  on-momentum, on-amplitude limit). }
+WRITE 6 ' ----- TS: amplitude-dependent tune via DANF + DAPLU/DADIU -----';
+OV 2 1 0;
+RPP 100;
+UM;
+MQK 0.05 0.2 0.05;
+DL 0.5;
+VARIABLE (CD 4) TS_MU;
+TS TS_MU;
+WRITE 6 'TS_MU[1] real part (expect ~0.0118 = horizontal tune fraction):';
+WRITE 6 REAL(TS_MU[1]);
+
 { ----- NF (normal-form analysis via DANF) -----
   Build a stable weak-quad ring, run NF to compute the normal-form
   change-of-basis MA. Sanity check: MA[1] should be a non-trivial DA
