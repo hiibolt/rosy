@@ -562,6 +562,132 @@ PROCEDURE SYMP0 F (DA) G (DA 8) H (DA 3 3);
   ENDLOOP;
 ENDPROCEDURE;
 
+{ ----- SYMP: Newton-iteration symplectification (cosy.fox L1957-1991) -----
+  SYMP(AM, AN, G, H, TY, IE) symplectifies the final coordinate AN given
+  initial AM, gradient G and Hessian sub-matrix H from SYMP0, generating-
+  function type TY ∈ {1,2,3,4}, and outputs IE ∈ {0,1} convergence flag.
+
+  The algorithm is Newton iteration: at each step,
+    1. Build the "constraint vector" D[ID] = GI[ID] - GA[I] from the
+       current A and the GI target.
+    2. Linearize via Hessian HA = ∂²-block of H, invert via LINV.
+    3. Update A's even slots: A[FF] += HA · D.
+    4. Re-evaluate GA from the gradient GM under the updated A.
+    5. Iterate until ‖D‖₁ < 10·DEPS or 100 steps elapse (LWNTR warning).
+
+  The nested PLUA helper plugs A's elements as constants into a DA via
+  successive DAPLU sweeps (every other variable, starting from K1) — this
+  is how cosy.fox reduces a multivariate DA to a univariate residue
+  while keeping the canonical-conjugate structure intact.                  }
+PROCEDURE SYMP AM (DA 8) AN (DA 8) G (DA 8) H (DA 3 3) TY (RE) IE (RE);
+  VARIABLE (RE 8) A_VEC;
+  VARIABLE (RE 3) GI;
+  VARIABLE (RE 3) D_VEC;
+  VARIABLE (RE) ID;
+  VARIABLE (RE) JD;
+  VARIABLE (RE) I;
+  VARIABLE (RE) FF;
+  VARIABLE (DA 8) GM;
+  VARIABLE (RE 8) GA;
+  VARIABLE (RE) DIF;
+  VARIABLE (DA 3 3) HM;
+  VARIABLE (RE 3 3) HA;
+  VARIABLE (RE) IER;
+  VARIABLE (RE) TRY_COUNT;
+  VARIABLE (DA) SCR_DA;
+  VARIABLE (RE) K;
+
+  { PLUA: plug A_VEC[K] (constants) for variables K, K+2, K+4, … into
+    PIN, returning the result via P. cosy.fox's `DAPLU P K A(K) P` reads
+    A from outer SYMP scope; here we wrap the in-place DA into a 1-element
+    buffer so DAPLU's Vec<DA> signature is satisfied. }
+  PROCEDURE PLUA PIN (DA) K1 (RE) P (DA);
+    VARIABLE (DA 1) P_BUF;
+    P_BUF[1] := PIN;
+    LOOP K K1 TWOND 2;
+      DAPLU P_BUF K A_VEC[K] P_BUF;
+    ENDLOOP;
+    P := P_BUF[1];
+  ENDPROCEDURE;
+
+  { ----- Initialize A_VEC and GI from AM/AN per generating-function type --- }
+  LOOP ID 1 ND;
+    FF := 2*ID;
+    I := FF - 1;
+    IF TY = 1;
+      A_VEC[I] := CONS(AN[I]); A_VEC[FF] := CONS(AM[I]); GI[ID] :=  CONS(AN[FF]);
+    ELSEIF TY = 2;
+      A_VEC[I] := CONS(AN[I]); A_VEC[FF] := CONS(AM[FF]); GI[ID] :=  CONS(AN[FF]);
+    ELSEIF TY = 3;
+      A_VEC[I] := CONS(AN[FF]); A_VEC[FF] := CONS(AM[I]); GI[ID] := -CONS(AN[I]);
+    ELSEIF TY = 4;
+      A_VEC[I] := CONS(AN[FF]); A_VEC[FF] := CONS(AM[FF]); GI[ID] := -CONS(AN[I]);
+    ENDIF;
+    PLUA G[I] 1 SCR_DA; GM[I] := SCR_DA;
+    PLUA G[FF] 1 SCR_DA; GM[FF] := SCR_DA;
+    LOOP JD 1 ND;
+      PLUA H[ID, JD] 1 SCR_DA;
+      HM[ID, JD] := SCR_DA;
+    ENDLOOP;
+    PLUA GM[I] 2 SCR_DA;
+    GA[I] := CONS(SCR_DA);
+    D_VEC[ID] := GI[ID] - GA[I];
+  ENDLOOP;
+  TRY_COUNT := 0;
+  IE := 0;
+  DIF := 1;
+
+  { ----- Newton iteration ----- }
+  WHILE (DIF > 10*DEPS) AND (IE = 0);
+    TRY_COUNT := TRY_COUNT + 1;
+    IF TRY_COUNT > 100;
+      LWNTR := LWNTR + 1;
+      IE := 1;
+    ENDIF;
+    LOOP ID 1 ND;
+      LOOP JD 1 ND;
+        PLUA HM[ID, JD] 2 SCR_DA;
+        HA[ID, JD] := CONS(SCR_DA);
+      ENDLOOP;
+    ENDLOOP;
+    LINV HA HA ND ND IER;
+    IF IER # 0;
+      WRITE 6 ' --- WARNING in SYMP, no inverse';
+    ENDIF;
+    LOOP ID 1 ND;
+      FF := 2*ID;
+      LOOP JD 1 ND;
+        A_VEC[FF] := A_VEC[FF] + HA[ID, JD]*D_VEC[JD];
+      ENDLOOP;
+    ENDLOOP;
+    DIF := 0;
+    LOOP ID 1 ND;
+      I := 2*ID - 1;
+      PLUA GM[I] 2 SCR_DA;
+      GA[I] := CONS(SCR_DA);
+      D_VEC[ID] := GI[ID] - GA[I];
+      DIF := DIF + ABS(D_VEC[ID]);
+    ENDLOOP;
+  ENDWHILE;
+
+  { ----- Pack converged A_VEC + GA back into AN per type ----- }
+  LOOP ID 1 ND;
+    FF := 2*ID;
+    I := FF - 1;
+    PLUA GM[FF] 2 SCR_DA;
+    GA[FF] := CONS(SCR_DA);
+    IF TY = 1;
+      AN[I]  :=  A_VEC[FF] + 0*DD[1]; AN[FF] := -GA[FF]   + 0*DD[1];
+    ELSEIF TY = 2;
+      AN[I]  :=  GA[FF]    + 0*DD[1]; AN[FF] :=  A_VEC[FF] + 0*DD[1];
+    ELSEIF TY = 3;
+      AN[I]  :=  A_VEC[FF] + 0*DD[1]; AN[FF] := -GA[FF]   + 0*DD[1];
+    ELSEIF TY = 4;
+      AN[I]  :=  GA[FF]    + 0*DD[1]; AN[FF] :=  A_VEC[FF] + 0*DD[1];
+    ENDIF;
+  ENDLOOP;
+ENDPROCEDURE;
+
 { ----- SY: symplectify a map via MGF + GFM round-trip (cosy.fox L1443-1444) -
   SY(MM) replaces MM in-place with its symplectic projection by extracting
   a generating function F (MGF) and recomputing the map (GFM). Useful when

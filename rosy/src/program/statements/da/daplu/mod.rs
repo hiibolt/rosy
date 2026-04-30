@@ -146,13 +146,24 @@ impl Transpile for DapluStatement {
         })?;
         requested_variables.extend(result_output.requested_variables.clone());
 
+        // COSY's `DAPLU P K C P` aliases input and output. Rust's borrow
+        // checker rejects two `&mut` (or `&` + `&mut`) to the same memory,
+        // so clone the input when its underlying name matches result's.
+        let result_ref = result_output.as_mut_ref();
+        let da_in_ref = da_in_output.as_ref();
+        let result_strip = result_ref.trim_start_matches("&mut ");
+        let da_in_arg = if da_in_ref.trim_start_matches('&') == result_strip {
+            format!("&{}.clone()", da_in_ref.trim_start_matches('&'))
+        } else {
+            da_in_ref
+        };
+
         let serialization = format!(
             "rosy_lib::core::daprv::rosy_daplu({}, {} as usize, {} as f64, {})?;",
-            da_in_output.as_ref(),
+            da_in_arg,
             var_idx_output.as_value(),
             c_output.as_value(),
-            result_output
-                .as_mut_ref(),
+            result_ref,
         );
 
         Ok(TranspilationOutput {
