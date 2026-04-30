@@ -316,6 +316,26 @@ AM M_OTHER;               { composes M_OTHER onto MAP → drift(1.0) }
 WRITE 6 'After AM M_OTHER, MAP[1] (composed via AM, expect drift(1.0)):';
 WRITE 6 MAP[1];
 
+{ ----- MI (DA map inversion) -----
+  Build a drift(0.5) map and invert it. The inverse should be drift(-0.5)
+  (a "negative drift"), which composed with the original yields the
+  identity. A double-roundtrip MI check verifies the inverse is exact. }
+WRITE 6 ' ----- MI: invert drift(0.5), compose, expect identity -----';
+OV 2 1 0;
+RPP 100;
+UM;
+DL 0.5;                 { active MAP = drift(0.5) }
+SNM MAP M_OTHER;        { save M_OTHER = drift(0.5) }
+VARIABLE (DA 8) M_INV;
+VARIABLE (RE) MI_IER;
+MI M_OTHER M_INV TWOND MI_IER NO NV NM1;
+WRITE 6 'MI completed, IER =' MI_IER '   [expect 0]';
+WRITE 6 'M_INV[1] (inverse of drift(0.5), expect x - 0.5*p_x):';
+WRITE 6 M_INV[1];
+ANM M_OTHER M_INV M_SAVE;       { compose drift(0.5) ∘ inverse = identity }
+WRITE 6 'After composition, M_SAVE[1] (expect identity = x = DA(1)):';
+WRITE 6 M_SAVE[1];
+
 { ----- RCT / RET (COSY ↔ exponential-theory reorder roundtrip) -----
   Build a small DA array, RCT it (canonical → grouped), then RET back
   (grouped → canonical). The roundtrip should reproduce the input. }
