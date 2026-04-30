@@ -1,0 +1,326 @@
+{ ============================================================================
+  libcosy/physics/normal_form.rosy — Normal-form analysis (DANF / NF)
+
+  cosy.fox L1545-1606. The keystone procedure for storage-ring analysis:
+  given a one-turn map, DANF computes the symplectic / non-symplectic
+  normal form, the change-of-basis transformation, and the resonance
+  strengths via Cj-operator iteration. NF is a thin wrapper.
+
+  Type-management strategy (the hard part of porting from COSY's loose
+  typing into ROSY's strict typing):
+
+  cosy.fox declares MN, MA, M1, M2, M3 with `2*NM1` size hints (CD-typed)
+  but uses them as DA in the FM/BM/GT phase, then implicitly promotes
+  to CD when the ANM/CPOLVAL stages pull in `IM` (the imaginary unit).
+  ROSY can't represent that mid-procedure type transition.
+
+  Solution: maintain BOTH DA scratch (for the linear FM/BM/GT phase) AND
+  CD scratch (for the nonlinear arithmetic phase) explicitly. Lift DA
+  → CD via `DA + 0*IM` between phases. At the end, REAL-cast the CD
+  outputs back into the DA-typed parameters MN / MA. RS stays CD.
+
+  Dependencies (all already in libcosy):
+    FM, BM, GT (map_ops.rosy)
+    ANM, CPOLVAL, POLVAL (map_ops.rosy + ROSY statements)
+    CDNFDA, CDFLO (ROSY statements)
+    DAEPS (ROSY statement, used in place of cosy.fox's DSET)
+
+  The TYPE() comparison `IF TYPE(MU)=TYPE(1)` (cosy.fox L1561) checks
+  whether MU has zero imaginary part (real tune) vs. complex (hyperbolic
+  tune). In ROSY where MU is always CM, we test `ABS(IMAG(MU)) < EPS`.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- DANF: full normal-form analysis (cosy.fox L1545-1603) --------------
+  Parameters:
+    M    (DA 8) — input one-turn map
+    MN   (DA 8) — output normal-form transformation (REAL'd at exit)
+    MA   (DA 8) — change-of-basis to NF coordinates (REAL'd at exit, only
+                  written if IMA != 0)
+    IMA  (RE)   — flag: 0 → skip MA computation, otherwise compute it
+    RS   (CD)   — resonance-strength accumulator (stays CD)
+    EPS  (RE)   — convergence tolerance for the Cj-operator iteration       }
+PROCEDURE DANF M (DA 8) MN (DA 8) MA (DA 8) IMA (RE) RS (CD) EPS (RE);
+  { ----- DA scratch for the linear (FM/BM/GT) phase ----- }
+  VARIABLE (DA 8)  MN_DA;
+  VARIABLE (DA 8)  MA_DA;
+  VARIABLE (DA 20) M1_DA;
+  VARIABLE (DA 20) XF;
+
+  { ----- CD scratch for the nonlinear (post-GT) phase ----- }
+  VARIABLE (CD 8)  MN_CD;
+  VARIABLE (CD 8)  MA_CD;
+  VARIABLE (CD 20) M1;
+  VARIABLE (CD 20) M2;
+  VARIABLE (CD 20) M3;
+  VARIABLE (CD 1)  T;
+  VARIABLE (CD 1)  MN_BUF;     { single-CD wrapper for CDNFDA's `input` arg }
+  VARIABLE (CD 8)  IC_FULL;    { full DD-basis CD initial condition for CDFLO }
+  VARIABLE (CD 8)  T_FULL;     { full CDFLO result vector }
+
+  { ----- GT outputs ----- }
+  VARIABLE (DA 8) F;
+  VARIABLE (DA 4) MUU;
+  VARIABLE (DA 4) AA;
+  VARIABLE (DA 4) BB;
+  VARIABLE (DA 4) GG;
+  VARIABLE (DA 4) RR;
+
+  { ----- Per-pair extracted CM scalars + RE-array PHI / RVE buffers -----
+    PHI / RVE are stored as RE-arrays (indexed write-friendly) and
+    converted to VE at each CDNFDA call site via element-wise concat. }
+  VARIABLE (CM) MU;
+  VARIABLE (CM) AC;
+  VARIABLE (CM) BC;
+  VARIABLE (CM) DC;
+  VARIABLE (RE 8) PHI;
+  VARIABLE (RE 8) RVE;
+  VARIABLE (VE) PHI_VE;
+  VARIABLE (VE) RVE_VE;
+  VARIABLE (CM) IM;
+
+  VARIABLE (RE) J;
+  VARIABLE (RE) K;
+  VARIABLE (RE) L;
+  VARIABLE (RE) NOM;
+  VARIABLE (RE) IER;
+
+  IMUNIT IM;
+  NOM := NOC;
+  DAEPS 1E-14;
+  LWNDANF := 0;
+
+  { ----- Phase A: linear analysis via FM/BM/GT ----- }
+  FM M XF MN_DA IER;
+  BM MN_DA MN_DA M1_DA IER;
+
+  IF IMA # 0;
+    LOOP J 1 TWOND;
+      MA_DA[J] := -XF[J] + DD[J];
+    ENDLOOP;
+    POLVAL 1 M1_DA TWOND MA_DA TWOND MA_DA TWOND;
+  ENDIF;
+
+  GT MN_DA F MUU AA BB GG RR;
+
+  { ----- Lift to CD scratch for nonlinear arithmetic ----- }
+  LOOP K 1 NV;
+    MN_CD[K] := MN_DA[K] + 0*IM;
+    M1[K]    := M1_DA[K] + 0*IM;
+  ENDLOOP;
+  IF IMA # 0;
+    LOOP K 1 TWOND;
+      MA_CD[K] := MA_DA[K] + 0*IM;
+    ENDLOOP;
+  ENDIF;
+
+  { ----- Phase B: per-pair Twiss → linear-NF basis (cosy.fox L1559-1571) ---
+    For each phase-space pair J = 1..ND we extract the constant tune (MU),
+    Twiss alpha/beta (AC, BC), contraction (DC) from the GT outputs, then
+    build the M1 / M2 substitution polynomials that diagonalize the linear
+    part. Stable case (real tune) uses the symplectic Floquet variables;
+    unstable case (imaginary tune) treats the planes as hyperbolic.        }
+  LOOP J 1 ND;
+    K := 2*J - 1;
+    L := K + 1;
+    { Lift CONS results (RE) to CM by adding zero imaginary unit. }
+    MU := CONS(MUU[J])*2*PI + 0*IM;
+    AC := CONS(AA[J]) + 0*IM;
+    BC := CONS(BB[J]) + 0*IM;
+    DC := CONS(RR[J]) + 0*IM;
+
+    IF ABS(IMAG(MU)) < EPS;
+      PHI[K] := REAL(MU);
+      PHI[L] := -REAL(MU);
+      RVE[K] := REAL(DC);
+      RVE[L] := REAL(DC);
+      M2[K] := (IM*BC*DD[K] + IM*BC*DD[L])/SQRT(2*IM*BC);
+      M2[L] := ((-1-IM*AC)*DD[K] + (1-IM*AC)*DD[L])/SQRT(2*IM*BC);
+      M1[K] := ((1-IM*AC)/(2*IM*BC)*DD[K] - 0.5*DD[L])*SQRT(2*IM*BC);
+      M1[L] := ((1+IM*AC)/(2*IM*BC)*DD[K] + 0.5*DD[L])*SQRT(2*IM*BC);
+    ELSE;
+      { Hyperbolic-tune branch: MU is purely imaginary, the plane is
+        unstable. Use RE-typed scratch since CM ↔ RE assignment is
+        forbidden in ROSY's strict typing. }
+      PHI[K] := 0;
+      PHI[L] := 0;
+      IF IMAG(DC) # 0;
+        WRITE 6 ' *** ERROR DANF unstable plane has nonzero imag rotation';
+      ENDIF;
+      RVE[K] := REAL(DC)*EXP(-IMAG(MU));
+      RVE[L] := REAL(DC)*EXP(IMAG(MU));
+      M2[K] := DD[K] + 0*IM;
+      M2[L] := DD[L] + 0*IM;
+      M1[K] := DD[K] + 0*IM;
+      M1[L] := DD[L] + 0*IM;
+    ENDIF;
+  ENDLOOP;
+
+  { Pad M2 with DD identity slots beyond TWOND so CPOLVAL substitutes
+    parameters as identities (matching ANM's behavior on DA inputs). }
+  LOOP K TWOND+1 NV;
+    M2[K] := DD[K] + 0*IM;
+  ENDLOOP;
+
+  { ANM MN M2 MN equivalent over CD-arithmetic. cosy.fox does ANM (DA-on-DA)
+    here; in ROSY MN_CD is now CD so we use CPOLVAL. ANM is essentially
+    `CPOLVAL 1 N TWOND MM NV O TWOND` with MM = M2 padded. }
+  CPOLVAL 1 MN_CD TWOND M2 NV MN_CD TWOND;
+
+  { Apply the linear-NF basis transform M1: MN := M1(MN). }
+  CPOLVAL 1 M1 TWOND MN_CD TWOND MN_CD TWOND;
+
+  IF IMA # 0;
+    CPOLVAL 0 M1 TWOND MA_CD TWOND MA_CD TWOND;
+  ENDIF;
+
+  { ----- Phase C: order-by-order Cj-operator iteration (cosy.fox L1574-1586)
+    For each order J = 2..NOM, run the Cj operator (CDNFDA) on each
+    coordinate K, accumulate the resonance strengths into RS, then build
+    new M1 / M2 substitution polynomials from -T (negated normal-form
+    increment) and apply them via CPOLVAL.                                  }
+  NOM := NOC;
+  RS := 0*DD[1] + 0*IM;       { zero CD: DA·0 + CM·0 promotes to CD }
+
+  { Build VE-typed copies of PHI / RVE for CDNFDA. ROSY's VE doesn't
+    support indexed writes, so we built PHI / RVE as RE-arrays and
+    materialize the VE here. Branched by TWOND ∈ {2, 4, 6} (ND ∈ {1, 2, 3}). }
+  IF TWOND = 2;
+    PHI_VE := PHI[1] & PHI[2];
+    RVE_VE := RVE[1] & RVE[2];
+  ELSEIF TWOND = 4;
+    PHI_VE := PHI[1] & PHI[2] & PHI[3] & PHI[4];
+    RVE_VE := RVE[1] & RVE[2] & RVE[3] & RVE[4];
+  ELSEIF TWOND = 6;
+    PHI_VE := PHI[1] & PHI[2] & PHI[3] & PHI[4] & PHI[5] & PHI[6];
+    RVE_VE := RVE[1] & RVE[2] & RVE[3] & RVE[4] & RVE[5] & RVE[6];
+  ELSE;
+    WRITE 6 ' *** ERROR DANF, unsupported TWOND value';
+    QUIT 0;
+  ENDIF;
+
+  LOOP J 2 NOM;
+    LOOP K 1 TWOND;
+      CO J;
+      MN_BUF[1] := MN_CD[K];
+      CDNFDA MN_BUF RVE_VE PHI_VE K TWOND EPS T;
+      M3[K] := -T[1];
+      CO NOM;
+      IF (K/2) = NINT(K/2);
+        RS := RS + T[1]*DD[K-1];
+      ENDIF;
+    ENDLOOP;
+
+    { Build M1 = exp(-Cj) and M2 = exp(+Cj) via CDFLO on M3.
+      ROSY's CDFLO returns the full TWOND-length flow vector at the given
+      initial condition; cosy.fox calls CDFLO once per coordinate, treating
+      the IC as a single-component substitution. To match the math, we run
+      the flow ONCE with IC = DD (the full canonical basis lifted to CD)
+      and extract components into M1 / M2 directly.                       }
+    LOOP K 1 TWOND;
+      IC_FULL[K] := DD[K] + 0*IM;
+    ENDLOOP;
+
+    CDFLO M3 IC_FULL T_FULL TWOND;
+    LOOP K 1 TWOND;
+      M1[K] := T_FULL[K];
+    ENDLOOP;
+
+    LOOP K 1 TWOND;
+      M3[K] := -M3[K];
+    ENDLOOP;
+
+    CDFLO M3 IC_FULL T_FULL TWOND;
+    LOOP K 1 TWOND;
+      M2[K] := T_FULL[K];
+    ENDLOOP;
+    LOOP K TWOND+1 NV;
+      M1[K] := DD[K] + 0*IM;
+      M2[K] := DD[K] + 0*IM;
+    ENDLOOP;
+
+    { Apply M1 then M2 to MN (the substitution chain) using a CD scratch M3. }
+    CPOLVAL 1 MN_CD TWOND M1 NV M3 TWOND;
+    LOOP K TWOND+1 NV;
+      M3[K] := M1[K];
+    ENDLOOP;
+    CPOLVAL 1 M2 TWOND M3 NV MN_CD TWOND;
+
+    IF IMA # 0;
+      LOOP K 1 TWOND;
+        M3[K] := MA_CD[K];
+      ENDLOOP;
+      LOOP K TWOND+1 NV;
+        M3[K] := DD[K] + 0*IM;
+      ENDLOOP;
+      CPOLVAL 1 M2 TWOND M3 NV MA_CD TWOND;
+    ENDIF;
+  ENDLOOP;
+
+  { ----- Phase D: final basis transformation (cosy.fox L1587-1598) ---------
+    For each plane, build M1 / M2 as conjugate Floquet polynomials so the
+    final MN comes out in real-valued normal-form coordinates rather than
+    complex Floquet space. Stable planes (PHI != 0) get the sqrt(2i)
+    rotation; unstable planes pass through. }
+  LOOP J 1 ND;
+    K := 2*J - 1;
+    L := K + 1;
+    IF PHI[K] # 0;
+      M1[K] := (DD[K] - IM*DD[L])/SQRT(2*IM);
+      M1[L] := (DD[K] + IM*DD[L])/SQRT(2*IM);
+      M2[K] := (DD[K] + DD[L])*SQRT(IM/2);
+      M2[L] := (IM*DD[K] - IM*DD[L])*SQRT(IM/2);
+    ELSE;
+      M1[K] := DD[K] + 0*IM;
+      M1[L] := DD[L] + 0*IM;
+      M2[K] := DD[K] + 0*IM;
+      M2[L] := DD[L] + 0*IM;
+    ENDIF;
+  ENDLOOP;
+  LOOP K TWOND+1 NV;
+    M1[K] := DD[K] + 0*IM;
+  ENDLOOP;
+  CPOLVAL 1 MN_CD TWOND M1 NV M3 TWOND;
+  LOOP K TWOND+1 NV;
+    M3[K] := M1[K];
+  ENDLOOP;
+  CPOLVAL 1 M2 TWOND M3 NV MN_CD TWOND;
+
+  IF IMA # 0;
+    CPOLVAL 1 M2 TWOND MA_CD TWOND MA_CD TWOND;
+    LOOP K 1 TWOND;
+      MA[K] := REAL(MA_CD[K]);
+    ENDLOOP;
+  ENDIF;
+
+  { ----- Phase E: extract REAL into the DA-typed output MN -----
+    Track imaginary residue as a sanity check (LWNDANF accumulates the
+    count of slots whose imag part exceeds 1E-6 — large means the
+    diagonalization didn't fully converge / the input wasn't symplectic). }
+  LOOP K 1 TWOND;
+    IF ABS(IMAG(MN_CD[K])) > 1E-6;
+      LWNDANF := LWNDANF + 1;
+    ENDIF;
+    MN[K] := REAL(MN_CD[K]);
+  ENDLOOP;
+  DAEPS 1E-16;
+ENDPROCEDURE;
+
+{ ----- NF: standard normal-form wrapper (cosy.fox L1605-1606) -------------
+  NF(EPS, MA) computes the normal form of the active MAP, optionally
+  storing the change-of-basis transformation in MA. Internally a one-line
+  call to DANF on MAP with IMA=1.
+
+  RES is local — the user typically doesn't care about resonance strengths
+  for the standard linear/nonlinear ring analysis. For users who need RS,
+  call DANF directly with their own RS variable.                           }
+PROCEDURE NF EPS (RE) MA (DA 8);
+  VARIABLE (DA 8) MN_LOCAL;
+  VARIABLE (CD)   RES;
+  DANF MAP MN_LOCAL MA 1 RES EPS;
+ENDPROCEDURE;
+
+END;

@@ -316,6 +316,21 @@ AM M_OTHER;               { composes M_OTHER onto MAP → drift(1.0) }
 WRITE 6 'After AM M_OTHER, MAP[1] (composed via AM, expect drift(1.0)):';
 WRITE 6 MAP[1];
 
+{ ----- NF (normal-form analysis via DANF) -----
+  Build a stable weak-quad ring, run NF to compute the normal-form
+  change-of-basis MA. Sanity check: MA[1] should be a non-trivial DA
+  (the diagonalizing transformation in canonical phase-space variables). }
+WRITE 6 ' ----- NF: normal-form analysis on a weak-quad-drift ring -----';
+OV 2 1 0;
+RPP 100;
+UM;
+MQK 0.05 0.2 0.05;
+DL 0.5;
+VARIABLE (DA 8) NF_MA;
+NF 1E-10 NF_MA;
+WRITE 6 'NF_MA[1] (NF change-of-basis, x-component, should be non-trivial DA):';
+WRITE 6 NF_MA[1];
+
 { ----- GT (Twiss / tune extraction from one-turn map) -----
   Build a stable simple drift "ring" — really just a drift, but the
   one-turn map is degenerate (DET=0 since linear drift has trace 2 +
