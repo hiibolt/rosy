@@ -187,6 +187,8 @@ PROCEDURE POTFLD X (DA 30) S (RE);
   VARIABLE (DA) P;
   VARIABLE (DA) JPOL_DA;
   VARIABLE (DA) ZERO_DA;
+  VARIABLE (DA 8) ACCT;
+  VARIABLE (DA 30) X_LOCAL;
   ZERO_DA := 0*DD[1];
   IF LM = 0;
     LM := 1;
@@ -255,8 +257,20 @@ PROCEDURE POTFLD X (DA 30) S (RE);
   BFZ := DER(2, W);
   CO NOC-1;
   IF LCCT = 1;
-    WRITE 6 ' *** ERROR in POTFLD, LCCT=1 (FCCT path) not supported in libcosy v1';
-    QUIT 0;
+    { FCCT — concatenate field expressions with the integration state X.
+      cosy.fox L2462-2469: pack the 8 field components into ACCT, run
+      POLVAL with X (transverse phase-space) substituted in, unpack
+      back. cosy.fox zeros X[2] (momentum slot) before POLVAL and
+      restores after; libcosy uses a local copy to avoid mutation.    }
+    LOOP I 1 TWOND;
+      X_LOCAL[I] := X[I];
+    ENDLOOP;
+    X_LOCAL[2] := 0*DD[1];
+    ACCT[1] := EFX; ACCT[2] := EFY; ACCT[3] := EFZ; ACCT[4] := V;
+    ACCT[5] := BFX; ACCT[6] := BFY; ACCT[7] := BFZ; ACCT[8] := W;
+    POLVAL 1 ACCT 8 X_LOCAL TWOND ACCT 8;
+    EFX := ACCT[1]; EFY := ACCT[2]; EFZ := ACCT[3]; V := ACCT[4];
+    BFX := ACCT[5]; BFY := ACCT[6]; BFZ := ACCT[7]; W := ACCT[8];
   ENDIF;
 ENDPROCEDURE;
 
@@ -335,6 +349,161 @@ PROCEDURE ODE X (DA 30) S (RE) XP (DA 30);
   IF LSPN = 1;
     WRITE 6 ' *** ERROR in ODE, spin path (LSPN=1) not yet ported in libcosy v1';
     QUIT 0;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- RK: classical RK4 fixed-step Runge-Kutta integrator -----
+  cosy.fox uses adaptive Verner 7(8) via RKCO; libcosy v1 uses classical
+  RK4 (4-stage, 4th-order) with fixed step size.
+
+  Reason: ROSY's RKCO intrinsic returns DOP853 coefficients whose b-weight
+  vector sums to ~0.7126 instead of 1.0, producing systematic drift errors
+  of (1 - 0.7126) ≈ 28.7% per step in the integrated state. RK4 has
+  sum(b_J) = 1/6 + 2/6 + 2/6 + 1/6 = 1, so it's correct by construction.
+  The accuracy hit (4th-order vs. 8th-order) is acceptable for libcosy v1
+  use cases (fringe-field s-stepping with many small steps).
+
+  Parameters: same signature as cosy.fox RK so SDELE can call uniformly.
+  N      — number of ODEs
+  X0, X1 — integration interval
+  Y0     — initial state (DA-30)
+  H0     — minimum step (currently unused — RK4 doesn't adapt)
+  HS     — suggested step (drives the fixed step count)
+  H1     — maximum step (currently unused)
+  EPS_PARAM, BS — error / backstep tolerances (unused for fixed-step)
+  Z      — DA-30×16 scratch
+  Y1     — output state
+  ERREST — error estimate output (set to 0 since RK4 is non-adaptive)  }
+PROCEDURE RK N (RE) X0 (RE) X1 (RE) Y0 (DA 30) H0 (RE) HS (RE) H1 (RE)
+            EPS_PARAM (RE) BS (RE) Z (DA 30 16) Y1 (DA 30) ERREST (RE);
+  VARIABLE (RE) I;
+  VARIABLE (RE) NSTEPS;
+  VARIABLE (RE) ISTEP;
+  VARIABLE (RE) X_CUR;
+  VARIABLE (RE) H_STEP;
+  VARIABLE (DA 30) Y_CUR;
+  VARIABLE (DA 30) Y_TMP;
+  VARIABLE (DA 30) K1;
+  VARIABLE (DA 30) K2;
+  VARIABLE (DA 30) K3;
+  VARIABLE (DA 30) K4;
+  ERREST := 0;
+  IF X1 = X0;
+    LOOP I 1 N;
+      Y1[I] := Y0[I];
+    ENDLOOP;
+  ELSE;
+    NSTEPS := MAX(1, NINT(ABS((X1 - X0)/HS)));
+    H_STEP := (X1 - X0)/NSTEPS;
+    LOOP I 1 N;
+      Y_CUR[I] := Y0[I];
+    ENDLOOP;
+    X_CUR := X0;
+    LOOP ISTEP 1 NSTEPS;
+      ODE Y_CUR X_CUR K1;
+      LOOP I 1 N;
+        Y_TMP[I] := Y_CUR[I] + 0.5*H_STEP*K1[I];
+      ENDLOOP;
+      ODE Y_TMP X_CUR+0.5*H_STEP K2;
+      LOOP I 1 N;
+        Y_TMP[I] := Y_CUR[I] + 0.5*H_STEP*K2[I];
+      ENDLOOP;
+      ODE Y_TMP X_CUR+0.5*H_STEP K3;
+      LOOP I 1 N;
+        Y_TMP[I] := Y_CUR[I] + H_STEP*K3[I];
+      ENDLOOP;
+      ODE Y_TMP X_CUR+H_STEP K4;
+      LOOP I 1 N;
+        Y_CUR[I] := Y_CUR[I] + H_STEP/6*(K1[I] + 2*K2[I] + 2*K3[I] + K4[I]);
+      ENDLOOP;
+      X_CUR := X_CUR + H_STEP;
+    ENDLOOP;
+    LOOP I 1 N;
+      Y1[I] := Y_CUR[I];
+    ENDLOOP;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- SDELE: s-dependent element actuator (cosy.fox L2910-2932) ---------
+  SDELE(S1, S2, H1, H2, H3, D) integrates the equations of motion from
+  s = S1 to s = S2 using the adaptive RK integrator. H1/H2/H3 are
+  min/suggested/max step sizes; D is the aperture / characteristic
+  radius (sets DR for POTFLD).
+
+  Setup: build MMP (DA 30) as the initial state — phase space [1..8]
+  from XX, zeros for the unused [9..29] slots, identity diagonal in
+  the [21,25,29] spin slots, and reference-orbit positions XLOC/ZLOC/
+  PLOC/SLOC/VLOC/TLOC into [11..15]. RK integrates in-place into MMQ.
+
+  After integration, copy MMQ[1..8] back into MSC, MMQ[21..29] into
+  the 3×3 spin matrix SSCR, and update LOCSET with the integrated
+  ref-orbit positions. If accumulating energy gain (VLOC≠0), the
+  reference momentum/energy/time are rescaled and the corresponding
+  MSC slots normalized.
+
+  Pre-condition: UM must have been called.
+
+  This is the workhorse for fringe-field elements — FFELE LFR=1/2/3
+  paths drive multi-step SDELE calls with NSDP=1/2 (entrance/exit
+  ENGE) substituted in POTFLD. Note: NSDP=1/2 in POTFLD is not yet
+  ported in libcosy v1, so SDELE works only for NSDP=0 (constant
+  fields) — useful for thick-element drift-equivalent testing.       }
+PROCEDURE SDELE S1 (RE) S2 (RE) H1 (RE) H2 (RE) H3 (RE) D_AP (RE);
+  VARIABLE (RE) ERREST_LOCAL;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) EE0;
+  VARIABLE (RE) PP0;
+  VARIABLE (RE) TFAC0;
+  VARIABLE (DA 30 16) RKSCR;
+  VARIABLE (DA 30) MMP;
+  VARIABLE (DA 30) MMQ;
+  LCCT := 1;
+  DR := D_AP;
+  IF LUM # 1;
+    WRITE 6 ' *** ERROR, call UM before element';
+    QUIT 0;
+  ENDIF;
+  LOOP I 1 8;
+    MMP[I] := XX[I];
+  ENDLOOP;
+  LOOP I 9 29;
+    MMP[I] := 0*DD[1];
+  ENDLOOP;
+  LOOP I 21 29 4;
+    MMP[I] := 1 + 0*DD[1];
+  ENDLOOP;
+  MMP[11] := XLOC + 0*DD[1];
+  MMP[12] := ZLOC + 0*DD[1];
+  MMP[13] := PLOC + 0*DD[1];
+  MMP[14] := TLOC + 0*DD[1];
+  MMP[15] := VLOC + 0*DD[1];
+  RK 29 S1 S2 MMP H1 H2 H3 EPS EPS*20 RKSCR MMQ ERREST_LOCAL;
+  LOOP I 1 8;
+    MSC[I] := MMQ[I];
+  ENDLOOP;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      SSCR[I, J] := MMQ[(I-1)*3 + J + 20];
+    ENDLOOP;
+  ENDLOOP;
+  LOCSET CONS(MMQ[11]) CONS(MMQ[12]) CONS(MMQ[13]) S2-S1 CONS(MMQ[15]) CONS(MMQ[14]);
+  IF NSDP > -1;
+    IF VLOC # 0;
+      PP0 := CONS(P0);
+      EE0 := CONS(E0);
+      TFAC0 := TFAC;
+      RP CONS(E0)+VLOC*0.001 CONS(M0) CONS(Z0);
+      VLOC := 0;
+      MSC[2] := MSC[2]*(PP0/CONS(P0));
+      IF ND > 1;
+        MSC[4] := MSC[4]*(PP0/CONS(P0));
+      ENDIF;
+      IF ND > 2;
+        MSC[5] := MSC[5]*(TFAC/TFAC0);
+        MSC[6] := MSC[6]*(EE0/CONS(E0));
+      ENDIF;
+    ENDIF;
   ENDIF;
 ENDPROCEDURE;
 

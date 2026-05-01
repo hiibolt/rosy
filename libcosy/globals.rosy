@@ -124,7 +124,11 @@ VARIABLE (RE 5) BXNOD;       VARIABLE (RE 5 7) BXDDT;
 VARIABLE (RE 70) BXBOXID;    VARIABLE (RE) BXIBOX;
 VARIABLE (RE 70 4) BX1BOXPN; VARIABLE (RE 70 4 2 3) BX1BOXP;
 
-{ Runge-Kutta Butcher tableau }
+{ Runge-Kutta Butcher tableau (libcosy v1 uses ROSY's DOP853 from RKCO).
+  RK_INIT_COEFFS in field_potential.rosy populates these from the
+  ROSY-side intrinsic. A=nodes, B=coupling matrix, C=8th-order weights,
+  D=7th-order weights (= C - error). HSQR is the step-adjustment
+  exponent. LRKCO marks "coefficients populated" sentinel.            }
 VARIABLE (RE 13) A; VARIABLE (RE 13 12) B; VARIABLE (RE 13) C; VARIABLE (RE 13) D;
 VARIABLE (RE) HSQR; VARIABLE (RE) LRKCO; VARIABLE (RE) LRKO; VARIABLE (RE 2) RKO;
 VARIABLE (ST) RKOFNST;

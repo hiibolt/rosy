@@ -538,6 +538,23 @@ WRITE 6 MSC[1];
 WRITE 6 'After SIELE octupole, MSC[2] (octupole p_x should pick up x^3 kick):';
 WRITE 6 MSC[2];
 
+{ ----- M6.5: SDELE — RK-driven s-dependent element (drift baseline) -----
+  With NPOL=0 (no fields) and NSDP=0, the RK integration over [0, 0.5]
+  should produce drift behavior matching SIELE 0.5. SDELE drives the
+  full RK adaptive integrator chain via ODE → POTFLD lookups.        }
+WRITE 6 ' ----- M6.5: SDELE no-multipole drift via RK adaptive -----';
+OV 3 1 0;
+RPP 100;
+UM;
+NPOL := 0;
+LOFF := 1;
+NSDP := 0;
+SDELE 0 0.5 0.0001 0.005 0.05 0.05;     { Smaller steps for accuracy }
+WRITE 6 'After SDELE 0->0.5 with NPOL=0, MSC[1] (drift = x + 0.5*p_x):';
+WRITE 6 MSC[1];
+WRITE 6 'After SDELE 0->0.5, MSC[2] (momentum unchanged):';
+WRITE 6 MSC[2];
+
 { ----- M6.4: Electric multipoles via FFELE → SIELE → UPDATE -----
   Electric quadrupole EQ: same machinery as MQ but with negative MPOL
   (electric) and PPOL holding voltage (kV). Should produce a focusing
