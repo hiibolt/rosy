@@ -86,9 +86,14 @@ VARIABLE (DA) BFX; VARIABLE (DA) BFY; VARIABLE (DA) BFZ; VARIABLE (DA) W;
 VARIABLE (DA) H;
 VARIABLE (RE) CHIM1; VARIABLE (RE) CHIE1; VARIABLE (RE) TP1;
 
-{ Multipole fields }
-VARIABLE (RE 20 40) PMM; VARIABLE (RE 20 40) PEM; VARIABLE (RE) LM;
-VARIABLE (RE 20 36) PPOL; VARIABLE (RE 20 30) MPOL;
+{ Multipole fields — cosy.fox `VARIABLE PMM 20 40` declares a 40-element
+  DA array (the leading 20 is the DA monomial-count). PMM[i] is the i-th
+  off-plane symmetric magnetic-multipole completion polynomial; PEM[i] is
+  the electric counterpart. PPOL holds per-element multipole strengths
+  (DA so they can carry parameter dependence). MPOL is integer-valued
+  multipole-order indices (kept RE for loose-typed integer arithmetic). }
+VARIABLE (DA 40) PMM; VARIABLE (DA 40) PEM; VARIABLE (RE) LM;
+VARIABLE (DA 36) PPOL; VARIABLE (RE 30) MPOL;
 VARIABLE (RE) NPOL; VARIABLE (RE) LS;
 VARIABLE (RE) NSDP; VARIABLE (RE) LCCT; VARIABLE (RE) LOFF;
 

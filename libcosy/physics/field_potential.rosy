@@ -102,6 +102,39 @@ ENDPROCEDURE;
       analogous expression in RP (cosy.fox L2796) uses CLIGHT — the
       cosy.fox `C` here was almost certainly meant to be CLIGHT, so we
       port as CLIGHT (matches the physics).                              }
+{ ----- POFF: off-plane potential extension (cosy.fox L2443-2451) ---------
+  POFF(P, H, IX, IY, IS) extends the in-plane potential P to off-plane
+  values that satisfy Laplace's equation ∇²P = 0 in particle-optical
+  coordinates. The curvature parameter H_PARAM (separate from the global
+  H curvature scalar) is the local curvature used to scale the
+  metric-aware Laplacian.
+
+  Algorithm (iterative refinement to order NOC):
+    HF := 1 + H_PARAM·DD[IX]
+    HI := 1/HF
+    Iterate I = 2, 4, 6, ..., NOC+2:
+      P := POLD - ∫∫ HI · (∂_IX(HF·∂_IX P) + ∂_IS(HI·∂_IS P)) dy²
+
+  IX, IY, IS are integer indices selecting the three Cartesian directions.
+  Typically called as POFF(P, 0, 1, 3, 2) for the planar (X=1, Y=3, S=2)
+  case with no curvature.
+
+  Mutates P in place. Used by POTFLD's lazy init of PMM/PEM, and by the
+  end-of-POTFLD path for LOFF=2 mode.                                    }
+PROCEDURE POFF P (DA) H_PARAM (DA) IX (RE) IY (RE) IS (RE);
+  VARIABLE (DA) HF;
+  VARIABLE (DA) HI;
+  VARIABLE (DA) POLD;
+  VARIABLE (RE) I;
+  HF := 1 + H_PARAM*DD[IX];
+  HI := 1/HF;
+  POLD := P;
+  LOOP I 2 NOC+2 2;
+    P := POLD - INTEG(IY, INTEG(IY,
+                 HI*(DER(IX, HF*DER(IX, P)) + DER(IS, HI*DER(IS, P)))));
+  ENDLOOP;
+ENDPROCEDURE;
+
 FUNCTION (DA) HAMILTONIAN A_VEC (DA) V_SCAL (DA) H_CURV (DA);
   VARIABLE (DA) ETA_LOCAL;
   VARIABLE (DA) PREL;
@@ -122,5 +155,244 @@ FUNCTION (DA) HAMILTONIAN A_VEC (DA) V_SCAL (DA) H_CURV (DA);
                      - DD[2]*DD[2] - DD[4]*DD[4]);
   CO NOC-1;
 ENDFUNCTION;
+
+{ ----- POTFLD: field-potential evaluator (cosy.fox L2438-2717, partial) ----
+  POTFLD(X, S) computes the electric/magnetic potentials V, W and the
+  on-axis fields (EFX, EFY, EFZ, BFX, BFY, BFZ) plus curvature H at the
+  current particle position, for the multipoles configured in PPOL/MPOL.
+
+  This is the M6 keystone — cosy.fox's POTFLD has 8+ nested helpers and
+  handles 25+ NSDP modes (constant, ENGE fringe, Gaussian, Wiggler,
+  measured-data, etc.). The libcosy v1 port handles only the simplest
+  cases needed for SIELE-driven multipole magnets:
+
+    NSDP =  0  → constant fields                       (handled here)
+    LOFF =  1  → off-plane via PMM/PEM completion      (handled here)
+    NSDP ≠ 0   → fringe/measured/etc.                  ERROR
+    LOFF =  2  → off-plane via DD[1]/DD[3] direct      ERROR
+    LCCT =  1  → FCCT concatenation                    ERROR
+
+  The SIELE → ODE → POTFLD path forces NSDP=0 / LCCT=0; multipole
+  setup procedures (MO, MD, MZ, M5, MM, MMS) set LOFF=1. So this
+  partial port suffices to unblock those.
+
+  Lazy init: on first call (LM=0), populate PMM[1..NOC+1], PEM[1..NOC+1]
+  and PMM[21..21+NOC], PEM[21..21+NOC] with off-plane symmetric multipole
+  completion polynomials via POFF. Then PMM[20] = PEM[20] = 1 sentinels.
+  DX[I] = DD[1]^I cached for LOFF=2 use (deferred).                        }
+PROCEDURE POTFLD X (DA 30) S (RE);
+  VARIABLE (RE) I;
+  VARIABLE (RE) JPOL;
+  VARIABLE (RE) JEM;
+  VARIABLE (DA) P;
+  VARIABLE (DA) JPOL_DA;
+  VARIABLE (DA) ZERO_DA;
+  ZERO_DA := 0*DD[1];
+  IF LM = 0;
+    LM := 1;
+    CO NOC+1;
+    JPOL_DA := 1 + 0*DD[1];
+    DX[1] := DD[1];
+    LOOP I 2 NOC+1;
+      DX[I] := DX[I-1]*DD[1];
+    ENDLOOP;
+    LOOP I 1 NOC+1;
+      P := JPOL_DA*DD[3];
+      POFF P ZERO_DA 1 3 2;
+      PMM[I] := P;
+      PEM[I+20] := P;
+      JPOL_DA := JPOL_DA*DD[1];
+      P := JPOL_DA;
+      POFF P ZERO_DA 1 3 2;
+      PEM[I] := P;
+      PMM[I+20] := P;
+    ENDLOOP;
+    PEM[20] := 1 + 0*DD[1];
+    PMM[20] := 1 + 0*DD[1];
+    CO NOC-1;
+  ENDIF;
+
+  CO NOC+1;
+  IF NSDP = 0;
+    { POTS path with NSDP=0 only. Initialise V/W/H, then accumulate
+      multipole contributions. }
+    V := 0*DD[1];
+    W := 0*DD[2];
+    H := 0 + 0*DD[1];
+    LOOP I 1 NPOL;
+      JPOL := ABS(MPOL[I]);
+      JEM := (3 - MPOL[I]/JPOL)/2;
+      P := PPOL[I];
+      IF MPOL[I] = 1;
+        H := H + P/CHIM1;
+      ELSEIF MPOL[I] = -1;
+        H := H + 1000*P/CHIE1;
+      ENDIF;
+      IF LOFF = 1;
+        IF JEM = 1;
+          P := P*PMM[JPOL];
+          W := W + P;
+        ELSEIF JEM = 2;
+          P := P*PEM[JPOL];
+          V := V + P;
+        ENDIF;
+      ELSE;
+        WRITE 6 ' *** ERROR in POTFLD, only LOFF=1 supported in libcosy v1';
+        QUIT 0;
+      ENDIF;
+    ENDLOOP;
+    H := CONS(H) + 0*DD[1];
+  ELSE;
+    WRITE 6 ' *** ERROR in POTFLD, only NSDP=0 supported in libcosy v1';
+    QUIT 0;
+  ENDIF;
+
+  EFX := -1000*DER(1, V);
+  EFY := -1000*DER(3, V);
+  EFZ := -1000*DER(2, V);
+  BFX := DER(1, W);
+  BFY := DER(3, W);
+  BFZ := DER(2, W);
+  CO NOC-1;
+  IF LCCT = 1;
+    WRITE 6 ' *** ERROR in POTFLD, LCCT=1 (FCCT path) not supported in libcosy v1';
+    QUIT 0;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- ODE: equations of motion right-hand side (cosy.fox L2719-2765) ----
+  ODE(X, S, XP) computes the derivatives XP[1..29] of the integrated
+  quantities at position S given current state X. Used by RK as the rhs
+  callback during s-stepping, and by SIELE to seed DAFLO with the local
+  flow generator at the reference particle.
+
+  X layout:
+    [1..8]   phase-space (x, p_x, y, p_y, t, δ_E/E, δ_M/M, δ_Z/Z)
+    [11..15] ref orbit (X, Z, Φ, time, energy gain in keV)
+    [21..29] spin matrix (3×3 row-major)
+
+  Reference: M. Berz, NIM A298 (1990) 473. The relativistic kinematics
+  (POP0, ETA1, P0PZ scalings) account for changes in reference momentum
+  along the trajectory due to RF cavities or electrostatic fields.
+
+  libcosy v1 skips the spin block (LSPN=1) — see SIELE's separate SPNFLO
+  helper for the spin-flow path. Also assumes LKC ∈ {0, 1} (full or
+  linearised kinematic correction).                                      }
+PROCEDURE ODE X (DA 30) S (RE) XP (DA 30);
+  VARIABLE (DA) ETA1;
+  VARIABLE (DA) P0PZ;
+  VARIABLE (DA) EPG;
+  VARIABLE (DA) EPHX;
+  VARIABLE (DA) XP5;
+  VARIABLE (RE) POP0;
+  VARIABLE (RE) ETA10;
+  VARIABLE (DA) SCR;
+  IF LRP # 1;
+    WRITE 6 ' *** ERROR, call RP before ODE';
+    QUIT 0;
+  ENDIF;
+  ETA10 := (1 + 0.001*CONS(X[15])/CONS(E0))*CONS(ETA);
+  IF ETA10 < 1E-10;
+    WRITE 6 ' *** VOLTAGE TOO HIGH ';
+    QUIT 0;
+  ENDIF;
+  POP0 := SQRT((ETA10/CONS(ETA))*((2+ETA10)/(2+CONS(ETA))));
+  TP1 := ((1 + ETA10)/(1 + CONS(ETA)))/POP0;
+  CHIM1 := CONS(CHIM)*POP0;
+  CHIE1 := CONS(CHIE)*POP0/TP1;
+  POTFLD X S;
+  XP[11] := -SIN(X[13]) + 0*DD[1];
+  XP[12] := COS(X[13]) + 0*DD[1];
+  XP[14] := TP1/CONS(V0) + 0*DD[1];
+  XP[13] := H;
+  XP[15] := 0.001*CONS(Z0)*CONS(EFZ) + 0*DD[1];
+  EPHX := 1 + H*X[1];
+  EPG := 1 + X[7];
+  ETA1 := (1 + X[6] - 0.001*(1 + X[8])*(CONS(Z0)*(V - CONS(V)) - X[15])/CONS(E0))
+         *CONS(ETA)/EPG;
+  SCR := SQR(EPG)*(ETA1/CONS(ETA))*((2 + ETA1)/(2 + CONS(ETA)));
+  IF LKC = 0;
+    P0PZ := ISRT(SCR - SQR(X[2]) - SQR(X[4]));
+  ELSE;
+    P0PZ := ISRT(SCR);
+  ENDIF;
+  SCR := EPHX*P0PZ;
+  XP5 := EPHX*EPG*((1 + ETA1)/(1 + CONS(ETA)))*P0PZ;
+  XP[1] := SCR*X[2];
+  XP[2] := (EFX/CONS(CHIE)*XP5
+         + (-BFY + X[4]*P0PZ*BFZ)/CONS(CHIM)*EPHX)*(1 + X[8]) + H/P0PZ;
+  IF ND > 1;
+    XP[3] := SCR*X[4];
+    XP[4] := (EFY/CONS(CHIE)*XP5
+           + (BFX - X[2]*P0PZ*BFZ)/CONS(CHIM)*EPHX)*(1 + X[8]);
+  ENDIF;
+  IF ND > 2;
+    XP[5] := -(XP5 - CONS(XP5))*(1 + CONS(ETA))/(2 + CONS(ETA));
+  ENDIF;
+  XP[6] := 0*DD[1];
+  XP[7] := 0*DD[1];
+  XP[8] := 0*DD[1];
+  IF LSPN = 1;
+    WRITE 6 ' *** ERROR in ODE, spin path (LSPN=1) not yet ported in libcosy v1';
+    QUIT 0;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- SIELE: s-independent element actuator (cosy.fox L2955-2975) -----
+  SIELE(L, D) applies an s-independent element of length L and aperture D
+  to the active map (via MSC). It works by:
+
+    1. Setting NSDP=0 (constant fields) and LCCT=0 (no concatenation
+       post-processing in POTFLD).
+    2. Calling ODE on the reference particle XX to compute the local
+       flow generator XP (the right-hand side of the equations of motion
+       at S=0).
+    3. Multiplying XP by L to scale the flow by the element length.
+    4. Calling DAFLO to compute exp(L_XP)·DD[i] for each phase-space
+       coordinate, giving the new MSC.
+
+  Spin path (LSPN=1): cosy.fox uses a nested SPNFLO procedure that
+  iteratively applies the spin-flow operator. libcosy v1 errors out
+  for the spin path — needs the SPNFLO sibling to land first.
+
+  SIELE is the simplest element actuator: no s-dependence, no fringe
+  fields, just a constant kick scaled by L. It's how the user-facing
+  multipoles (MO/MD/MZ/M5/MM/MMS, plus the BEND multipole-extension
+  path inside BENDFF0) actually advance the map after setting up
+  PPOL/MPOL/NPOL.
+
+  Lives in field_potential.rosy because it calls ODE, which depends on
+  POTFLD's globals; ROSY's forward-declaration rule means SIELE must
+  be parsed AFTER ODE.
+
+  Pre-condition: UM must have been called.                              }
+PROCEDURE SIELE L (RE) D (RE);
+  VARIABLE (DA 30) XP;
+  VARIABLE (DA 8) IC_VEC;
+  VARIABLE (DA 8) RES_VEC;
+  VARIABLE (RE) I;
+  IF LUM # 1;
+    WRITE 6 ' *** ERROR, call UM before SIELE';
+    QUIT 0;
+  ENDIF;
+  DR := D;
+  NSDP := 0;
+  LCCT := 0;
+  ODE XX 0 XP;
+  LOOP I 1 TWOND;
+    XP[I] := XP[I]*L;
+  ENDLOOP;
+  LOOP I 1 TWOND;
+    IC_VEC[I] := DD[I];
+  ENDLOOP;
+  DAFLO XP IC_VEC RES_VEC TWOND;
+  LOOP I 1 TWOND;
+    MSC[I] := RES_VEC[I];
+  ENDLOOP;
+  IF LSPN = 1;
+    WRITE 6 ' *** ERROR in SIELE, spin path (LSPN=1) not yet ported in libcosy v1';
+    QUIT 0;
+  ENDIF;
+ENDPROCEDURE;
 
 END;
