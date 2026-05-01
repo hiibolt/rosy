@@ -441,4 +441,77 @@ PROCEDURE NORMSU2 UI (CD 2) UO (RE 4) CU (RE 4) NBAR (DA 3) STUNE (DA)
   UO[4] := CONS(IMAG(UOO[2]));
 ENDPROCEDURE;
 
+{ ----- TSS: spin tune + ñ vector on parameters AND orbit (cosy.fox L1789-1816)
+  TSS(ST, NBAR, KEY) computes the spin tune ST and the rotation-axis
+  NBAR of the active MAP via the full DANF + NORMSU2 chain.
+
+  KEY=0 returns the spin quantities expressed in the original orbital
+  variables; KEY≠0 transforms them to the parameter-dependent fixed-point
+  variables (using FM to find the fixed point and POLVAL to relabel).
+
+  Pre-condition: caller has built a stable orbital map in MAP and seeded
+  SPNR (the global spin matrix). Without spin tracking enabled (LSPN=0),
+  SPNR defaults to the identity → the SU(2) input is identity, so spin
+  outputs are trivial. For a real spin study, the caller must explicitly
+  populate SPNR via element-by-element spin propagation.
+
+  Type juggling: DANF outputs (DA 8) MN, MA → lift to (CD 8) for NORMSU2.
+  POLVAL on (DA 4) since the relabeling-via-XF step is purely DA.       }
+PROCEDURE TSS ST (DA) NBAR (DA 3) KEY (RE);
+  VARIABLE (DA 8) MN_DA;
+  VARIABLE (DA 8) MA_DA;
+  VARIABLE (CD 8) MN_CD;
+  VARIABLE (CD 8) MA_CD;
+  VARIABLE (CD)   S1_RS;
+  VARIABLE (RE 4) UO_NORMSU2;
+  VARIABLE (RE 4) CU_NORMSU2;
+  VARIABLE (DA 4) CU_POLVAL;
+  VARIABLE (DA 4) UO_POLVAL;
+  VARIABLE (CD 2) US;
+  VARIABLE (DA 8) XF;
+  VARIABLE (DA 8) MF;
+  VARIABLE (RE) I;
+  VARIABLE (RE) EPS_VAL;
+  VARIABLE (CM) IM;
+
+  IMUNIT IM;
+  EPS_VAL := 1E-7;
+  DANF MAP MN_DA MA_DA 1 S1_RS EPS_VAL;
+
+  { Lift DA → CD for NORMSU2 ingestion. }
+  LOOP I 1 NV;
+    MN_CD[I] := MN_DA[I] + 0*IM;
+    MA_CD[I] := MA_DA[I] + 0*IM;
+  ENDLOOP;
+
+  SO3_IN_SU2 SPNR US 0;
+  NORMSU2 US UO_NORMSU2 CU_NORMSU2 NBAR ST MN_CD MA_CD EPS_VAL;
+
+  IF KEY # 0;
+    FM MAP XF MF I;
+    IF I # 0;
+      WRITE 6 ' *** ERROR in TSS, orbital map has no fixed point';
+      QUIT 0;
+    ENDIF;
+    LOOP I 1 TWOND;
+      XF[I] := DD[I] + XF[I];
+    ENDLOOP;
+    LOOP I TWOND+1 NV;
+      XF[I] := DD[I];
+    ENDLOOP;
+    { Pack ST and NBAR into a (DA 4) bundle, POLVAL-relabel via XF, unpack. }
+    CU_POLVAL[1] := ST;
+    CU_POLVAL[2] := NBAR[1];
+    CU_POLVAL[3] := NBAR[2];
+    CU_POLVAL[4] := NBAR[3];
+    POLVAL 1 CU_POLVAL 4 XF NV UO_POLVAL 4;
+    ST      := UO_POLVAL[1];
+    NBAR[1] := UO_POLVAL[2];
+    NBAR[2] := UO_POLVAL[3];
+    NBAR[3] := UO_POLVAL[4];
+  ENDIF;
+
+  ST := ST/PI/2;
+ENDPROCEDURE;
+
 END;
