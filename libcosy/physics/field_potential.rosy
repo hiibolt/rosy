@@ -298,11 +298,29 @@ PROCEDURE POTFLD X (DA 30) S (RE);
         ENDIF;
         V := V + P;
       ENDIF;
+    ELSEIF LOFF = 2;
+      { LOFF=2: simpler off-plane completion using only DX[I] = DD[1]^I
+        (cached) and DD[3] for the y-direction. Used by EBEND and other
+        elements where the field expansion is naturally Cartesian.   }
+      IF JEM = 1;
+        IF JPOL # 1;
+          P := P*DX[JPOL-1];
+        ENDIF;
+        P := P*DD[3];
+        W := W + P;
+      ELSEIF JEM = 2;
+        P := P*DX[JPOL];
+        V := V + P;
+      ENDIF;
     ELSE;
-      WRITE 6 ' *** ERROR in POTFLD, only LOFF=1 supported in libcosy v1';
+      WRITE 6 ' *** ERROR in POTFLD, only LOFF=1 and LOFF=2 supported in libcosy v1';
       QUIT 0;
     ENDIF;
   ENDLOOP;
+  IF LOFF = 2;
+    POFF V H 1 3 2;
+    POFF W H 1 3 2;
+  ENDIF;
   H := CONS(H) + 0*DD[1];
 
   EFX := -1000*DER(1, V);
