@@ -375,4 +375,95 @@ PROCEDURE DP R (RE) PHI (RE) D (RE);
   BEND R PH D PH/2 0 PH/2 0 NZ S1Z S2Z 0;
 ENDPROCEDURE;
 
+{ ----- MC: combined-function magnet with caller-provided N/S1/S2 arrays
+        (cosy.fox L3441-3443) -----
+  MC(R, PHI, D, N, S1, S2, NT) is a combined-function magnet wrapper
+  that delegates straight to BEND with all four edge angles fixed at
+  zero (sharp-cut entrance/exit, no S-shape inhomogeneity at the
+  edges — sometimes called "no-edge BEND"). The caller supplies the
+  multipole arrays directly; MC just sets CE and converts PHI from
+  degrees to radians.                                                    }
+PROCEDURE MC R (RE) PHI (RE) D (RE) N (RE 5) S1 (RE 5) S2 (RE 5) NT (RE);
+  CE := 'MC';
+  BEND R PHI*DEGRAD D 0 0 0 0 N S1 S2 NT;
+ENDPROCEDURE;
+
+{ ----- MS: combined-function magnet with five scalar multipole strengths
+        (cosy.fox L3445-3449) -----
+  MS(R, PHI, D, N1..N5) packages the five normal multipole strengths
+  N1..N5 (quadrupole through dodecapole) into the N[5] array BEND
+  expects, with zero S1/S2 inhomogeneity. Convenient for users who
+  specify magnets element-by-element rather than supplying full
+  multipole vectors.                                                     }
+PROCEDURE MS R (RE) PHI (RE) D (RE)
+            N1 (RE) N2 (RE) N3 (RE) N4 (RE) N5 (RE);
+  VARIABLE (RE 5) S1;
+  VARIABLE (RE 5) S2;
+  VARIABLE (RE 5) N;
+  VARIABLE (RE) I;
+  LOOP I 1 5;
+    S1[I] := 0;
+    S2[I] := 0;
+  ENDLOOP;
+  N[1] := N1; N[2] := N2; N[3] := N3; N[4] := N4; N[5] := N5;
+  CE := 'MS';
+  BEND R PHI*DEGRAD D 0 0 0 0 N S1 S2 5;
+ENDPROCEDURE;
+
+{ ----- MSL: length-form combined-function magnet (cosy.fox L3451-3457) ----
+  MSL is MS but parameterized by physical length L instead of bending
+  radius R, with the R = L/(PHI·DEGRAD) substitution. PHI=0 short-
+  circuits to a pure drift DL(L), avoiding division-by-zero — handy
+  when the user passes 0 as a sentinel for "no bend".                    }
+PROCEDURE MSL L (RE) PHI (RE) D (RE)
+             N1 (RE) N2 (RE) N3 (RE) N4 (RE) N5 (RE);
+  VARIABLE (RE 5) S1;
+  VARIABLE (RE 5) S2;
+  VARIABLE (RE 5) N;
+  VARIABLE (RE) I;
+  IF PHI = 0;
+    DL L;
+  ELSE;
+    LOOP I 1 5;
+      S1[I] := 0;
+      S2[I] := 0;
+    ENDLOOP;
+    N[1] := N1; N[2] := N2; N[3] := N3; N[4] := N4; N[5] := N5;
+    CE := 'MSL';
+    BEND L/PHI/DEGRAD PHI*DEGRAD D 0 0 0 0 N S1 S2 5;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- MPL: parallel-faced combined-function magnet (cosy.fox L3459-3466)
+  MPL is MSL with parallel pole-face entry/exit edges: the wedges at
+  the magnet's ends are tangent-half-PHI instead of zero, so the
+  reference orbit enters and exits parallel to the magnet's straight
+  centerline. This matches a typical lab-frame combined-function magnet
+  installed in a straight beamline.
+
+  The S1[1] := S2[1] := tan(PH/2) values mark the dipole-component
+  edge angles; higher-multipole edges (S1[2..5]) stay at zero.          }
+PROCEDURE MPL L (RE) PHI (RE) D (RE)
+             N1 (RE) N2 (RE) N3 (RE) N4 (RE) N5 (RE);
+  VARIABLE (RE 5) S1;
+  VARIABLE (RE 5) S2;
+  VARIABLE (RE 5) N;
+  VARIABLE (RE) I;
+  VARIABLE (RE) PH;
+  IF PHI = 0;
+    DL L;
+  ELSE;
+    PH := PHI*DEGRAD;
+    S1[1] := TAN(PH/2);
+    S2[1] := TAN(PH/2);
+    LOOP I 2 5;
+      S1[I] := 0;
+      S2[I] := 0;
+    ENDLOOP;
+    N[1] := N1; N[2] := N2; N[3] := N3; N[4] := N4; N[5] := N5;
+    CE := 'MPL';
+    BEND L/PH PH D 0 0 0 0 N S1 S2 5;
+  ENDIF;
+ENDPROCEDURE;
+
 END;

@@ -491,6 +491,36 @@ MT M_OTHER M_SAVE 0.0;    { rotate by 0 degrees → no change }
 WRITE 6 'MT 0-deg roundtrip diff (M_OTHER vs MT(M_OTHER, 0), expect ~0):';
 DMAP M_OTHER M_SAVE 6;
 
+{ ----- MC / MS / MSL / MPL (combined-function magnet wrappers) -----
+  MC takes caller-supplied N/S1/S2 arrays; MS/MSL/MPL build them from
+  five scalar multipole strengths.
+
+  Note: BEND in libcosy v1 only supports the pure-dipole path (NT=0,
+  no spin, no fringe field). MS/MSL/MPL with non-zero N* will hit the
+  "needs SIELE/FFELE" error — that path is staged for M6. The PHI=0
+  fast paths in MSL/MPL fall through to DL and work today.            }
+WRITE 6 ' ----- MSL / MPL PHI=0 short-circuit (combined-function magnets fall through to DL) -----';
+
+{ MSL L=0.7 PHI=0 → DL fallback; should match DL(0.7) exactly. }
+OV 2 2 0;
+RPP 100;
+UM;
+MSL 0.7 0 0.05 1 0 0 0 0;
+SNM MAP M_OTHER;          { save MSL(L=0.7, PHI=0) result }
+UM;
+DL 0.7;
+WRITE 6 'MSL(L=0.7, PHI=0) vs DL(0.7) diff (expect ~0):';
+DMAP MAP M_OTHER 6;
+
+{ MPL L=0.7 PHI=0 → DL fallback; should also match DL(0.7) exactly. }
+UM;
+MPL 0.7 0 0.05 1 0 0 0 0;
+SNM MAP M_OTHER;
+UM;
+DL 0.7;
+WRITE 6 'MPL(L=0.7, PHI=0) vs DL(0.7) diff (expect ~0):';
+DMAP MAP M_OTHER 6;
+
 { ----- WM / RM round-trip (write transfer map, read it back) -----
   WM dumps the active MAP to a file in the modern " L " header format,
   RM reads it back into MSC then UPDATE commits to MAP. The round-trip
