@@ -17,10 +17,12 @@ INCLUDE 'twiss_tune.rosy';          { M5 (SIGMA beam-envelope helper) }
 INCLUDE 'bend.rosy';                { M5 (BEND dipole — BENDFF0 path only) }
 INCLUDE 'spin_su2.rosy';            { M5 (SO3_IN_SU2 spin SO3→SU2 converter) }
 INCLUDE 'elements_electric.rosy';   { M5 (RF cavity — analytical, no FFELE) }
+INCLUDE 'field_potential.rosy';     { M6 (HAMILTONIAN, LEN2, NORMAL — first batch) }
 INCLUDE 'tracking.rosy';            { M5 (TR* state setters — TR itself in M7+) }
 
-{ Future: M6 will INCLUDE 'field_potential.rosy', and the rest of
-  elements_basic + the FFELE-blocked electric/magnetic multipoles.
+{ Future: M6 will continue adding to 'field_potential.rosy' (RKCO/RK,
+  POTFLD, ODE), then port SIELE/SDELE/FFELE in 'elements_basic.rosy'
+  to unblock the FFELE-gated electric/magnetic multipoles.
   M7-M9 will land the main TR procedure in tracking.rosy. }
 
 END;

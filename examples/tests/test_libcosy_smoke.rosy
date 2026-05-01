@@ -491,6 +491,29 @@ MT M_OTHER M_SAVE 0.0;    { rotate by 0 degrees → no change }
 WRITE 6 'MT 0-deg roundtrip diff (M_OTHER vs MT(M_OTHER, 0), expect ~0):';
 DMAP M_OTHER M_SAVE 6;
 
+{ ----- M6.1: LEN2 / NORMAL / HAMILTONIAN (field_potential.rosy primitives) -----
+  LEN2 — Euclidean norm of a DA 2-vector.
+  NORMAL — point-to-line distance + foot-of-perpendicular.
+  HAMILTONIAN — on-shell H(A, V, H) in particle-optical coords.        }
+WRITE 6 ' ----- M6.1: LEN2 / NORMAL / HAMILTONIAN -----';
+VARIABLE (DA) LEN_OUT;
+LEN_OUT := LEN2(3 + 0*DD[1], 4 + 0*DD[1]);
+WRITE 6 'LEN2(3, 4) constant part = ' CONS(LEN_OUT) '   [expect 5]';
+
+VARIABLE (RE) NORMAL_DIS;
+VARIABLE (RE) NORMAL_XS;
+VARIABLE (RE) NORMAL_ZS;
+NORMAL 1.0 1.0 0.0 0.0 1.0 0.0 NORMAL_DIS NORMAL_XS NORMAL_ZS;
+WRITE 6 'NORMAL((1,1) -> line (0,0)→(1,0)): DIS = ' NORMAL_DIS '  XS = ' NORMAL_XS '  ZS = ' NORMAL_ZS '   [expect 1, 1, 0]';
+
+{ HAMILTONIAN sanity: with V=0 + A=0 + H=0, expect H = -sqrt(1 - DD2² - DD4²)
+  i.e., the kinetic Hamiltonian of a free particle. CONS part should be -1
+  for the at-origin reference particle.                                    }
+RPP 100;
+VARIABLE (DA) HAM_OUT;
+HAM_OUT := HAMILTONIAN(0*DD[1], 0*DD[1], 0*DD[1]);
+WRITE 6 'HAMILTONIAN(0, 0, 0) constant part = ' CONS(HAM_OUT) '   [expect ~ -1 (kinetic at reference)]';
+
 { ----- TR* state setters / getters (cosy.fox L2205-2283) -----
   Pure flag/state mutators for the (deferred) TR tracking procedure.
   Verify each writes its target globals correctly.                      }

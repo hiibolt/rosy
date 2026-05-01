@@ -1,0 +1,126 @@
+{ ============================================================================
+  libcosy/physics/field_potential.rosy — Field/potential primitives (M6)
+
+  M6 keystone file. Holds the integrator stack (RK4 / ODE / HAMILTONIAN) and
+  the field-potential evaluator POTFLD with its helper geometry (LEN2,
+  NORMAL, EDGESEC, PTBOX, MCSDIST, FOURIERGAUSS).
+
+  Porting strategy:
+    M6.1 (this commit): HAMILTONIAN + LEN2 + NORMAL — independent
+                        helpers, no callers in cosy.fox proper.
+    M6.2:               RKCO (Butcher tableau) + RK (adaptive integrator)
+    M6.3:               POTFLD stub (NSDP=0 / NSDP=1/2 ENGE) — enough
+                        for simple multipole magnets via SIELE.
+    M6.4:               ODE (uses POTFLD).
+    M6.5:               SIELE → unblocks BEND multipole path + simple
+                        magnetic multipoles MO/MD/MZ/M5/MM/MMS/etc.
+    M6.6:               SDELE family + FFELE orchestration.
+    M6.7+:              Expand POTFLD with remaining NSDP modes
+                        (Wiggler, Solenoid, Three-tube, etc.).
+
+  Dependencies on existing libcosy:
+    * Globals: ETA / HFAC / E0 / M0 / Z0 / V0 / P0 / CHIM / CHIE
+               (defined by RP family in reference_particle.rosy).
+    * POLVAL — already an intrinsic.
+    * DAFLO — used by SIELE (deferred).
+    * ENGE — already in fringe_field.rosy.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- LEN2: Euclidean norm of a 2-component vector (cosy.fox L2331-2337) -
+  Returns sqrt(X^2 + Y^2). cosy.fox dispatches RE vs DA via TYPE()
+  introspection — libcosy ROSY is strict-typed, so we expose the
+  DA-input version (the more general case). cosy.fox's near-zero
+  fast-path for DA (skips SQRT when constant part is < 1e-8) is
+  preserved: for tiny constants, return CONS+0*DA(1) to avoid the
+  square-root's near-origin gradient blowup.
+
+  RE callers can either lift the inputs (X + 0*DD[1]) or take CONS
+  of the result.                                                            }
+FUNCTION (DA) LEN2 X (DA) Y (DA);
+  VARIABLE (DA) XY2;
+  VARIABLE (RE) LENC;
+  XY2 := SQR(X) + SQR(Y);
+  LENC := SQRT(CONS(XY2));
+  IF LENC < 1E-8;
+    LEN2 := LENC + 0*DA(1);
+  ELSE;
+    LEN2 := SQRT(XY2);
+  ENDIF;
+ENDFUNCTION;
+
+{ ----- NORMAL: distance from point to line + foot-of-perpendicular
+        (cosy.fox L2339-2345) ---
+  Computes:
+    DIS = signed distance from P=(X,Z) to the line P0->P1
+    (XS, ZS) = foot of perpendicular from P onto the line
+  Sign of DIS = sign of cross-product (P1-P0) × (P-P0). Used by EDGESEC
+  to determine which side of an edge the test point lies on.
+
+  All inputs/outputs are RE (the core geometry doesn't propagate DA-ness
+  in cosy.fox usage). Builds the unit-normal (-Δz, Δx) / |Δp1|, then
+  projects.                                                                  }
+PROCEDURE NORMAL X (RE) Z (RE) X0 (RE) Z0 (RE) X1 (RE) Z1 (RE)
+                 DIS (RE) XS (RE) ZS (RE);
+  VARIABLE (RE) NX;
+  VARIABLE (RE) NZ;
+  VARIABLE (RE) SCR;
+  NX := -(Z1 - Z0);
+  NZ := X1 - X0;
+  SCR := SQRT(SQR(NX) + SQR(NZ));
+  NX := NX/SCR;
+  NZ := NZ/SCR;
+  DIS := (X - X0)*NX + (Z - Z0)*NZ;
+  XS := X - DIS*NX;
+  ZS := Z - DIS*NZ;
+ENDPROCEDURE;
+
+{ ----- HAMILTONIAN: H(A, V, H) in particle-optical coordinates
+        (cosy.fox L2767-2780) ---
+  Computes the on-shell Hamiltonian
+    H = A/CONS(CHIM) - (1 + curv·DD[1])·sqrt((CHIM/CONS(CHIM))^2 - DD[2]^2 - DD[4]^2)
+  with relativistic kinematics restricted to the reference-particle plane
+  for V=0 (uses the precomputed HFAC global), or recomputed locally via
+  HFULL when an electric scalar potential V is present.
+
+  Inputs:
+    A : (DA) vector potential component (in T·m)
+    V : (DA) scalar potential (in kV — note the cosy.fox 0.001 conversion)
+    H : (DA) curvature [m^-1]
+  Output: HAMILTONIAN (DA), the Hamiltonian as a Taylor series in DD.
+
+  Notes:
+    * cosy.fox's `IF ABS(V)=0` distinction selects the fast HFAC path.
+      ROSY can't introspect a DA's "is exactly zero" cheaply; we use
+      the equivalent HFULL formula always (slightly slower but correct).
+    * cosy.fox HFULL refers to a bare `C` in the formula
+      `(AMU*C/Z0/EZERO)*M0*PREL`. The global C at libcosy is the RK
+      Butcher-tableau coefficient array (RE 13), not a scalar. The
+      analogous expression in RP (cosy.fox L2796) uses CLIGHT — the
+      cosy.fox `C` here was almost certainly meant to be CLIGHT, so we
+      port as CLIGHT (matches the physics).                              }
+FUNCTION (DA) HAMILTONIAN A_VEC (DA) V_SCAL (DA) H_CURV (DA);
+  VARIABLE (DA) ETA_LOCAL;
+  VARIABLE (DA) PREL;
+  VARIABLE (DA) CHIM_LOCAL;
+  IF LRP # 1;
+    WRITE 6 ' *** ERROR, call RP before HAMILTONIAN ';
+    QUIT 0;
+  ENDIF;
+  CO NOC+1;
+  ETA_LOCAL := ((E0 - 0.001*Z0*V_SCAL)/M0)/AMUMEV;
+  PREL := SQRT(ETA_LOCAL*(2 + ETA_LOCAL));
+  { Reorder so AMU*CLIGHT/EZERO is computed as pure RE first — ROSY's
+    DA/f64 op rejects divisors below 1e-15, and EZERO (1.6e-19) trips
+    that tolerance. The pure-RE division is fine.                       }
+  CHIM_LOCAL := (AMU*CLIGHT/EZERO/Z0)*M0*PREL;
+  HAMILTONIAN := A_VEC/CONS(CHIM_LOCAL) - (1 + H_CURV*DD[1])
+               *SQRT((CHIM_LOCAL/CONS(CHIM_LOCAL))*(CHIM_LOCAL/CONS(CHIM_LOCAL))
+                     - DD[2]*DD[2] - DD[4]*DD[4]);
+  CO NOC-1;
+ENDFUNCTION;
+
+END;
