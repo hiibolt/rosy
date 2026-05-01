@@ -256,6 +256,124 @@ ENDPROCEDURE;
     LOFF = 1  → PMM/PEM symmetric multipole completion
     LOFF = 2  → DD[1]/DD[3] direct off-plane completion
     LCCT = 1  → FCCT concatenation post-step                          }
+{ ----- DIST: signed distance + foot-of-perpendicular (cosy.fox L2503-2516)
+  Computes the signed distance DIS from point (X, Z) to a curve specified
+  by a center point (XC, ZC) and a tangent point (XP, ZP), with curvature
+  parameter H_PAR. If H_PAR != 0, the curve is a circle; if 0, it's a line.
+  LEV=0 also returns the foot-of-perpendicular (XS, ZS) and IDS=1 marker.
+  Used by ENGESIDES + BENDIST for bend-element field profiles.            }
+PROCEDURE DIST X (DA) Z (DA) XP_PT (DA) ZP_PT (DA) XC_PT (DA) ZC_PT (DA)
+              H_PAR (DA) D (RE) LEV_FLAG (RE)
+              DIS (DA) XS (DA) ZS (DA) IDS (RE);
+  VARIABLE (DA) P_LOCAL;
+  VARIABLE (DA) SCR_LOCAL;
+  VARIABLE (RE) HSGN;
+  XS := X;
+  ZS := Z;
+  IDS := 0;
+  IF CONS(H_PAR) # 0;
+    P_LOCAL := (X-XC_PT)*(XP_PT-XC_PT) + (Z-ZC_PT)*(ZP_PT-ZC_PT);
+    IF CONS(P_LOCAL) > 0;
+      SCR_LOCAL := SQRT(SQR(X-XC_PT) + SQR(Z-ZC_PT));
+      HSGN := SIG(CONS(H_PAR));
+      DIS := SCR_LOCAL - HSGN/H_PAR;
+      DIS := DIS*HSGN;
+      IF LEV_FLAG = 0;
+        IF CONS(DIS) > 0;
+          IF CONS(H_PAR) < 0;
+            SCR_LOCAL := -SCR_LOCAL;
+          ENDIF;
+          XS := X - DIS*(X-XC_PT)/SCR_LOCAL;
+          ZS := Z - DIS*(Z-ZC_PT)/SCR_LOCAL;
+          IDS := 1;
+        ENDIF;
+      ENDIF;
+    ELSE;
+      DIS := -100*D + 0*DD[1];
+      DIS := DIS*SIG(CONS(H_PAR));
+    ENDIF;
+  ELSE;
+    DIS := (X-XP_PT)*(XP_PT-XC_PT) + (Z-ZP_PT)*(ZP_PT-ZC_PT);
+    IF LEV_FLAG = 0;
+      IF CONS(DIS) > 0;
+        XS := X - DIS*(XP_PT-XC_PT);
+        ZS := Z - DIS*(ZP_PT-ZC_PT);
+        IDS := 1;
+      ENDIF;
+    ENDIF;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- ENGESIDES: ENGE-modulated distance combo (cosy.fox L2517-2524) -----
+  Uses two DIST calls (one per bend edge) with PPOL[5..14] as the
+  edge geometry, then combines via ENGE for soft-edge fringe.        }
+PROCEDURE ENGESIDES X (DA) Z (DA) D (RE) LEV_FLAG (RE) IEM (RE)
+                    XF (DA) ZF (DA) ENGES (DA);
+  VARIABLE (DA) XS_TMP;
+  VARIABLE (DA) ZS_TMP;
+  VARIABLE (RE) IDS_TMP;
+  VARIABLE (DA) DIS1;
+  VARIABLE (DA) DIS2;
+  XF := X;
+  ZF := Z;
+  DIST X Z PPOL[5] PPOL[6] PPOL[7] PPOL[8] PPOL[13] D LEV_FLAG DIS1 XS_TMP ZS_TMP IDS_TMP;
+  IF IDS_TMP = 1;
+    XF := XS_TMP;
+    ZF := ZS_TMP;
+  ENDIF;
+  DIST X Z PPOL[9] PPOL[10] PPOL[11] PPOL[12] PPOL[14] D LEV_FLAG DIS2 XS_TMP ZS_TMP IDS_TMP;
+  IF IDS_TMP = 1;
+    XF := XS_TMP;
+    ZF := ZS_TMP;
+  ENDIF;
+  ENGES := ENGE(1, 1, IEM, DIS1/D/2)*ENGE(1, 2, IEM, DIS2/D/2);
+ENDPROCEDURE;
+
+{ ----- BENDIST: field distribution of bending sectors (cosy.fox L2535-2546)
+  Returns a DA-valued field strength at (X, Z) for a bending sector with
+  geometry encoded in PPOL[1..36]. IC selects:
+    IC =  1 → standard polynomial radial profile (1 - Σ PPOL[20+i]·xr^i)
+    IC = -1 → linear-in-XR0 profile (used by NSDP=-11 electric bend)
+    IC =  2 → CENT-driven detailed-center profile (used by NSDP=-7;
+             cosy.fox uses CENT here — libcosy v1 errors out for IC=2)
+  Multiplied by PPOL[1] (field magnitude) and ENGES (soft-edge).      }
+FUNCTION (DA) BENDIST X (DA) Z (DA) IC (RE);
+  VARIABLE (DA) XR0;
+  VARIABLE (DA) XR;
+  VARIABLE (DA) XRR;
+  VARIABLE (RE) I;
+  VARIABLE (DA) XF_LOCAL;
+  VARIABLE (DA) ZF_LOCAL;
+  VARIABLE (DA) ENGES_LOCAL;
+  VARIABLE (RE) IEM_LOCAL;
+  VARIABLE (RE) NMULT;
+  VARIABLE (RE) ABS_R;
+  IEM_LOCAL := 1;
+  IF IC < 0;
+    IEM_LOCAL := 2;
+  ENDIF;
+  ENGESIDES X Z CONS(PPOL[4]) 0 IEM_LOCAL XF_LOCAL ZF_LOCAL ENGES_LOCAL;
+  ABS_R := ABS(CONS(PPOL[2]));
+  XR0 := SQRT(SQR(XF_LOCAL-PPOL[2]) + SQR(ZF_LOCAL-PPOL[3])) - ABS_R;
+  IF IC = 2;
+    WRITE 6 ' *** ERROR in BENDIST, IC=2 (CENT-driven) not yet ported in libcosy v1';
+    QUIT 0;
+  ELSE;
+    XR := XR0/ABS_R;
+    XRR := 1 + 0*DD[1];
+    BENDIST := 1 + 0*DD[1];
+    NMULT := CONS(PPOL[20]);
+    LOOP I 1 NMULT;
+      XRR := XRR*XR;
+      BENDIST := BENDIST - PPOL[20+I]*XRR;
+    ENDLOOP;
+    IF IC = -1;
+      BENDIST := BENDIST*XR0;
+    ENDIF;
+  ENDIF;
+  BENDIST := BENDIST*PPOL[1]*ENGES_LOCAL;
+ENDFUNCTION;
+
 PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
   { ----- FIELDXZ: Cartesian-frame field evaluator (cosy.fox L2627-2700)
     Supports a subset of NSDP<0 modes for libcosy v1:
@@ -308,6 +426,14 @@ PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
   ELSEIF NSDP = -3;
     BFY := PPOL[1]*COS((PPOL[2] + PPOL[5]*Z_F)*Z_F);
     BFY := EDGE(Z_F/PPOL[3])*EDGE((-Z_F + PPOL[4])/PPOL[3])*BFY;
+  ELSEIF NSDP = -4;
+    { Magnetic dipole with bend geometry (cosy.fox L2656). BENDIST IC=1
+      gives the standard polynomial radial profile.                      }
+    BFY := BENDIST(X_F, Z_F, 1);
+  ELSEIF NSDP = -11;
+    { Electrostatic deflector (cosy.fox L2674). BENDIST IC=-1 gives the
+      linear-in-XR0 profile multiplied by Σ multipole correction.        }
+    V := BENDIST(X_F, Z_F, -1);
   ELSEIF NSDP = -12;
     XR0 := SQRT(SQR(X_F - PPOL[2]) + SQR(Z_F));
     V := PPOL[1]*LOG(-XR0/PPOL[2]);
