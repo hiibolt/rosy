@@ -491,6 +491,27 @@ MT M_OTHER M_SAVE 0.0;    { rotate by 0 degrees → no change }
 WRITE 6 'MT 0-deg roundtrip diff (M_OTHER vs MT(M_OTHER, 0), expect ~0):';
 DMAP M_OTHER M_SAVE 6;
 
+{ ----- TR* state setters / getters (cosy.fox L2205-2283) -----
+  Pure flag/state mutators for the (deferred) TR tracking procedure.
+  Verify each writes its target globals correctly.                      }
+WRITE 6 ' ----- TR* tracking-flag setters / getters -----';
+TRT 'My beam-line A';
+WRITE 6 'After TRT: LTR =' LTR '   [expect 1]';
+WRITE 6 'After TRT: TRTST =''' TRTST '''   [expect ''My beam-line A'']';
+TRAP 0.05 0.04 1;
+WRITE 6 'After TRAP 0.05 0.04 1: XCUT[1] =' XCUT[1] '  XCUT[2] =' XCUT[2] '  LCUT =' LCUT;
+TRR 1;
+WRITE 6 'After TRR 1: LTRR =' LTRR;
+TRPRAY 21;
+WRITE 6 'After TRPRAY 21: LTRPRAY =' LTRPRAY '  LTRPRAYU =' LTRPRAYU;
+TRPSPI 22;
+WRITE 6 'After TRPSPI 22: LTRPSPI =' LTRPSPI '  LTRPSPIU =' LTRPSPIU;
+VARIABLE (RE) TR_ERR;
+TRSC TR_ERR;
+WRITE 6 'TRSC: last symplectification error =' TR_ERR;
+TRNC TR_ERR;
+WRITE 6 'TRNC: last spin-normalization error =' TR_ERR;
+
 { ----- RF cavity (analytical, no FFELE — cosy.fox L3899-3916) -----
   RF in libcosy v1 supports the kick-only path (no spin, no rays).
   After RP, the cosy.fox semantics put XX[6] = (E0-CONS(E0))/CONS(E0)

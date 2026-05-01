@@ -1,0 +1,108 @@
+{ ============================================================================
+  libcosy/physics/tracking.rosy — Particle tracking auxiliaries
+
+  This file ports the small TR-family state setters and result getters that
+  control the (forthcoming) main TR tracking procedure. The TR procedure
+  itself (cosy.fox L1993-2204) is a multi-hundred-line workhorse that
+  depends on the full element-action / ray-subsystem stack — it lands in a
+  later milestone. The auxiliaries here are pure flag/state mutators and
+  accessor-style read-outs, all under 10 lines each.
+
+  Ported procedures (cosy.fox L2205-2283):
+    * TRT(LIN)       — set TR title string (LTR / TRTST globals)
+    * TRAP(X, Y, I)  — TR aperture-cut parameters (XCUT / LCUT)
+    * TRR(L)         — TR resume flag (LTRR, LTRI)
+    * TRPRAY(IU)     — TR print-ray flag and unit (LTRPRAY / LTRPRAYU)
+    * TRPSPI(IU)     — TR print-spin flag and unit (LTRPSPI / LTRPSPIU)
+    * TRSC(E)        — read last symplectic error (ESC -> E)
+    * TRNC(E)        — read last spin-normalization error (ENC -> E)
+
+  Deferred to the M7+ milestone with the main TR:
+    * TR (the tracker itself), TRAYPAC, TRAPHIST, TRAPN, AP, CR
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- TRT: set TR title (cosy.fox L2205) ---------------------------------
+  TRT(LIN) flags that a title string is set (LTR := 1) and stores the
+  string in TRTST. Used by the (deferred) graphics output path of TR.   }
+PROCEDURE TRT LIN (ST);
+  LTR := 1;
+  TRTST := LIN;
+ENDPROCEDURE;
+
+{ ----- TRAP: TR aperture-cut parameters (cosy.fox L2207-2210) -------------
+  TRAP(X, Y, I) sets the TR-internal aperture cut box:
+    XCUT[1] := |X|, XCUT[2] := |Y|, LCUT := I.
+  Mode I encoding (cosy.fox commentary):
+    0  → no cut
+    1  → elliptic cut (transverse phase-space ellipse rejection)
+    2  → rectangular cut
+    <0 → no cut on initial particles only.                              }
+PROCEDURE TRAP X (RE) Y (RE) I (RE);
+  XCUT[1] := ABS(X);
+  XCUT[2] := ABS(Y);
+  LCUT := I;
+ENDPROCEDURE;
+
+{ ----- TRR: TR resume flag (cosy.fox L2266-2268) --------------------------
+  TRR(L) sets the resume mode — when LTRR ≠ 0, TR will pick up where it
+  left off rather than re-initialising. The LTRI := 0 reset fires when
+  the previous LTRR was 0 (transitioning into resume mode for the first
+  time) or the new flag is 0 (turning resume off).                       }
+PROCEDURE TRR L (RE);
+  IF LOV = 0;
+    WRITE 6 ' *** ERROR, call OV before TRR';
+    QUIT 0;
+  ENDIF;
+  IF (LTRR = 0) OR (L = 0);
+    LTRI := 0;
+  ENDIF;
+  LTRR := L;
+ENDPROCEDURE;
+
+{ ----- TRPRAY: TR ray-print output flag (cosy.fox L2270-2274) -------------
+  Enables the per-step ray dump during TR. IU is the file unit. Errors
+  if TRPSPI is also enabled to the same unit (would interleave output). }
+PROCEDURE TRPRAY IU (RE);
+  LTRPRAY := 1;
+  LTRPRAYU := IU;
+  IF LTRPSPI = 1;
+    IF LTRPRAYU = LTRPSPIU;
+      WRITE 6 ' *** ERROR in TRPRAY, avoid the same unit number with TRPSPI';
+      QUIT 0;
+    ENDIF;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- TRPSPI: TR spin-print output flag (cosy.fox L2276-2280) ------------
+  Enables per-step spin-vector dump during TR. Same unit-clash check
+  as TRPRAY but vs. LTRPRAY.                                              }
+PROCEDURE TRPSPI IU (RE);
+  LTRPSPI := 1;
+  LTRPSPIU := IU;
+  IF LTRPRAY = 1;
+    IF LTRPRAYU = LTRPSPIU;
+      WRITE 6 ' *** ERROR in TRPSPI, avoid the same unit number with TRPRAY';
+      QUIT 0;
+    ENDIF;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- TRSC / TRNC: read tracking error scalars (cosy.fox L2282-2283) -----
+  TRSC reads ESC (the last symplectification error) into the caller's
+  out-argument. TRNC similarly returns ENC (last spin-normalization
+  error). Both are populated by the (deferred) TR procedure during
+  symplectic / spin sub-stepping; reading them before any TR call
+  returns the post-OV initial value (zero or whatever DEF set them to). }
+PROCEDURE TRSC E (RE);
+  E := ESC;
+ENDPROCEDURE;
+
+PROCEDURE TRNC E (RE);
+  E := ENC;
+ENDPROCEDURE;
+
+END;
