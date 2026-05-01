@@ -66,6 +66,53 @@ FUNCTION (RE) ME M (RE) I (RE);
   DAPEE XS I ME;
 ENDFUNCTION;
 
+{ ----- Matrix-element with parameter (cosy.fox L217) ----------------------
+  MEP(M, I) returns the parameter-dependent component of MAP[M] keyed by
+  exponent ID I, where the first TWOND variables are dynamic and the
+  rest are parameters. The result is a DA polynomial in the parameter
+  variables — physically, the parameter-derivative of the I-th matrix
+  element. ROSY's DAPEP fills a DA vector slot, so we unwrap [1].      }
+FUNCTION (DA) MEP M (RE) I (RE);
+  VARIABLE (DA 1) XS;
+  VARIABLE (DA 1) RES;
+  XS[1] := MAP[M];
+  DAPEP XS I TWOND RES;
+  MEP := RES[1];
+ENDFUNCTION;
+
+{ ----- Aberration extraction (cosy.fox L218-222) --------------------------
+  MA(M, II) returns the aberration coefficient of MAP[M] indexed by II
+  in BCD digit-encoding: each decimal digit of II names a phase-space
+  variable index (1..TWOND) or parameter index (TWOND+1..NV). The
+  result is the bare DA coefficient (DAPEE) multiplied by per-variable
+  scaling factors — PHSP[k] for dynamic vars, PARS[k-TWOND] for params.
+  This produces dimensionally meaningful aberration values for users
+  who care about cm/mrad-scaled output.
+
+  The digit-extraction loop:
+    K_curr = I/10        (real-valued, e.g. 123 → 12.3)
+    I_next = INT(K_curr) (12 — quotient)
+    digit  = NINT(10*(K_curr - I_next)) = 3 (last digit)                  }
+FUNCTION (RE) MA M (RE) II (RE);
+  VARIABLE (DA 1) XS;
+  VARIABLE (RE) I;
+  VARIABLE (RE) K;
+  VARIABLE (RE) DIG;
+  XS[1] := MAP[M];
+  DAPEE XS II MA;
+  I := II;
+  WHILE I # 0;
+    K := I/10;
+    I := INT(K + 0.01);
+    DIG := NINT(10*(K - I));
+    IF DIG > TWOND;
+      MA := MA*PARS[DIG - TWOND];
+    ELSE;
+      MA := MA*PHSP[DIG];
+    ENDIF;
+  ENDWHILE;
+ENDFUNCTION;
+
 { ----- Print map to unit (cosy.fox L660-662) ------------------------------
   Pretty-prints the first 5 DA components of MAP via DAPRV. The
   `+ 0*DD[1]` idiom forces M slots to be DA-typed even if MAP[I] is
@@ -114,7 +161,8 @@ PROCEDURE WM IU (RE);
 ENDPROCEDURE;
 
 { ----- WNM: write a saved map NAP to unit IU (cosy.fox L680-684) ----------
-  Like WM but for an arbitrary map NAP (TWOND components, no axis info). }
+  Like WM but for an arbitrary map NAP (8 components written, no axis info).
+  Always writes the full NAP[1..8] even if TWOND < 8 — RNM expects 8. }
 PROCEDURE WNM IU (RE) NAP (DA 8);
   VARIABLE (ST) FORM;
   VARIABLE (RE) I;
@@ -122,7 +170,7 @@ PROCEDURE WNM IU (RE) NAP (DA 8);
   WRITE IU ' L  ' & SF(0, FORM);
   WRITE IU ' P (' & SF(0, FORM) & ',' & SF(0, FORM) & ',' & SF(0, FORM) & ')';
   WRITE IU ' A (' & SF(0, FORM) & ',' & SF(0, FORM) & ',' & SF(0, FORM) & ')';
-  LOOP I 1 TWOND;
+  LOOP I 1 8;
     WRITE IU NAP[I] + 0*DD[1];
   ENDLOOP;
 ENDPROCEDURE;
@@ -1018,5 +1066,90 @@ ENDPROCEDURE;
     - Just the tunes / Twiss: use GT directly (no DANF needed).
   These three cover the typical "ring analysis" workflow in libcosy v1
   even without DANF.                                                        }
+
+{ ----- RM: read transfer map from unit IU (cosy.fox L839-847) -------------
+  Inverse of WM. Two file formats are supported:
+
+    1. Modern (WM-format): first line begins with " L ". Header parses
+       arc-length / position / axis state into SLOC/XLOC/ZLOC/PLOC,
+       then 8 DA components are read via DAREA into MSC[1..8].
+    2. Legacy: no " L " marker. BACKF rewinds, DAREV reads 5 DA
+       components into MSC[1..5] in one shot, MSC[6] := DD[6] sets
+       time-of-flight to identity, axis state cleared via LOCSET.
+
+  After loading MSC, UPDATE 1 1 commits the map (MSC -> MAP path).
+  The format-detect sentinel " L " is the same string WM writes.
+  R(LIN, I1, I2) is the libcosy substring-to-real helper.
+
+  Placed at the end of map_ops.rosy because LOCSET (defined later in
+  the file) and UPDATE both need to be in scope when RM is parsed —
+  ROSY's resolver requires forward declarations within a single file. }
+PROCEDURE RM IU (RE);
+  VARIABLE (ST) LIN;
+  VARIABLE (DA 1) DUM;
+  VARIABLE (RE) I;
+  VARIABLE (RE) DUM_RE;
+  VARIABLE (RE) X_TMP;
+  VARIABLE (RE) Z_TMP;
+  VARIABLE (RE) P_TMP;
+  VARIABLE (RE) S_TMP;
+  READ IU LIN;
+  IF SS(LIN, 1, 3) = ' L ';
+    S_TMP := R(LIN, 5, 28);
+    READ IU LIN;
+    X_TMP := R(LIN, 5, 28);
+    DUM_RE := R(LIN, 30, 53);
+    Z_TMP := R(LIN, 55, 78);
+    READ IU LIN;
+    P_TMP := R(LIN, 5, 28);
+    DUM_RE := R(LIN, 30, 53);
+    DUM_RE := R(LIN, 55, 78);
+    LOCSET X_TMP Z_TMP P_TMP S_TMP 0 0;
+    LOOP I 1 8;
+      DAREA IU DUM NV;
+      MSC[I] := DUM[1];
+    ENDLOOP;
+  ELSE;
+    BACKF IU;
+    DAREV MSC 5 6 TWOND IU;
+    MSC[6] := DD[6];
+    LOCSET 0 0 0 0 0 0;
+  ENDIF;
+  UPDATE 1 1;
+ENDPROCEDURE;
+
+{ ----- RNM: read NAP from unit IU (cosy.fox L849-854) ---------------------
+  Inverse of WNM. Same dual-format scheme as RM but writes into the
+  caller's NAP[8] argument instead of MSC. Skips the LOCSET / UPDATE
+  side effects since NAP is a local variable to the caller, not the
+  active beamline state.
+
+  Modern format: skip 3 header lines, read 8 DAs into IAP[1..8].
+  Legacy format: BACKF, DAREV 5 components, set IAP[6] := DD[6].
+  Final loop copies IAP[1..TWOND] into NAP. Note that the legacy
+  branch leaves IAP[7], IAP[8] uninitialized — but NAP only
+  receives the first TWOND elements.                                  }
+PROCEDURE RNM IU (RE) NAP (DA 8);
+  VARIABLE (ST) LIN;
+  VARIABLE (DA 1) DUM;
+  VARIABLE (RE) I;
+  VARIABLE (DA 8) IAP;
+  READ IU LIN;
+  IF SS(LIN, 1, 3) = ' L ';
+    READ IU LIN;
+    READ IU LIN;
+    LOOP I 1 8;
+      DAREA IU DUM NV;
+      IAP[I] := DUM[1];
+    ENDLOOP;
+  ELSE;
+    BACKF IU;
+    DAREV IAP 5 6 TWOND IU;
+    IAP[6] := DD[6];
+  ENDIF;
+  LOOP I 1 TWOND;
+    NAP[I] := IAP[I];
+  ENDLOOP;
+ENDPROCEDURE;
 
 END;

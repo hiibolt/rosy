@@ -491,6 +491,77 @@ MT M_OTHER M_SAVE 0.0;    { rotate by 0 degrees → no change }
 WRITE 6 'MT 0-deg roundtrip diff (M_OTHER vs MT(M_OTHER, 0), expect ~0):';
 DMAP M_OTHER M_SAVE 6;
 
+{ ----- WM / RM round-trip (write transfer map, read it back) -----
+  WM dumps the active MAP to a file in the modern " L " header format,
+  RM reads it back into MSC then UPDATE commits to MAP. The round-trip
+  should reproduce the original map exactly.                          }
+WRITE 6 ' ----- WM / RM round-trip -----';
+OV 2 1 0;
+RPP 100;
+UM;
+DL 0.5;
+SNM MAP M_OTHER;          { save reference: drift(0.5) }
+OPENF 88 'libcosy_wmrm_test.dat' 'UNKNOWN';
+WM 88;
+CLOSEF 88;
+{ Reset state so RM has work to do. }
+UM;
+OPENF 88 'libcosy_wmrm_test.dat' 'OLD';
+RM 88;
+CLOSEF 88;
+WRITE 6 'WM/RM diff (round-tripped MAP[1] vs original drift(0.5), expect ~0):';
+DMAP MAP M_OTHER 6;
+
+{ ----- WNM / RNM round-trip (write/read arbitrary saved map) ----- }
+WRITE 6 ' ----- WNM / RNM round-trip on a saved drift(0.5) map -----';
+VARIABLE (DA 8) RNM_LOADED;
+OPENF 89 'libcosy_wnmrnm_test.dat' 'UNKNOWN';
+WNM 89 M_OTHER;
+CLOSEF 89;
+OPENF 89 'libcosy_wnmrnm_test.dat' 'OLD';
+RNM 89 RNM_LOADED;
+CLOSEF 89;
+WRITE 6 'WNM/RNM diff (round-tripped vs original, expect ~0):';
+DMAP RNM_LOADED M_OTHER 6;
+
+{ ----- MEP / MA / LEXP (matrix-element + Lie exponent helpers) -----
+  Reset to ND=1 for tractable tests. With MAP[2] = 3*x_1 - x_2,
+  MA(2, 1) extracts coeff(x_1) = 3 and scales by PHSP[1]. With PHSP
+  zeroed by default, MA -> 0; SB sets PHSP[1] := 1 so MA -> 3.        }
+OV 2 1 0;
+RPP 100;
+UM;
+MAP[1] := DA(1) + 2*DA(2);
+MAP[2] := 3*DA(1) - DA(2);
+
+{ Initialize PHSP via SB so MA's scaling produces a non-zero result.
+  SB needs 11 args (the 4 PX-PA-R12-PY-PB-R34 triples + PT-PD-R56 +
+  G + Z); only PHSP[1] = PX matters here.                            }
+SB 1 1 0  1 1 0  1 1 0  0 0;
+WRITE 6 ' ----- MA: aberration with PHSP scaling -----';
+WRITE 6 'MA(2, 1) [coeff(x_1) of MAP[2] * PHSP[1] = 3*1] = ' MA(2, 1) '   [expect 3]';
+
+{ LEXP with A = 0 (zero generator) → exp(0)·B = B. Round-trip check. }
+WRITE 6 ' ----- LEXP: exp(:0:) is identity -----';
+VARIABLE (DA) ZERO_GEN;
+VARIABLE (DA) BFN;
+VARIABLE (DA) LEXP_OUT;
+ZERO_GEN := 0*DD[1];
+BFN := DA(1) + 2*DA(2);
+LEXP_OUT := LEXP(ZERO_GEN, BFN);
+WRITE 6 'LEXP(0, x_1+2*x_2) (expect = x_1+2*x_2):';
+WRITE 6 LEXP_OUT;
+
+{ MEP: with NP=1, MAP carries a parameter slot; MEP(M, id) returns the
+  parameter-dependent component. With trivial map, MEP returns DA = 0. }
+WRITE 6 ' ----- MEP: parameter-dependent matrix element -----';
+OV 2 1 1;     { ND=1, NP=1 → 3 DA variables: x_1, x_2, parameter δ }
+RPP 100;
+UM;
+MAP[1] := DA(1) + 5*DA(3);   { x_1 with parameter dependence on δ=DA(3) }
+WRITE 6 'MEP(1, 1) [x_1 component, parameter-dependent part]:';
+WRITE 6 MEP(1, 1);
+
 { ----- CATR / TRCA (canonical / TRANSPORT conversion) -----
   Build a drift(1.0) canonical map, convert to TRANSPORT, convert back.
   The roundtrip should reproduce the original up to DA truncation. }
