@@ -321,7 +321,7 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
   ENDIF;
   NTS := NOC;
 
-  IF (LSPN = 0) AND ((LFR = 0) OR (LFR = 3) OR (LFR = 2.5));
+  IF (LSPN = 0) AND ((LFR = 0) OR (LFR = 3) OR (LFR = 2.5) OR (LFR = -1) OR (LFR = -2));
     IF (LFR = 0) AND (NT = 0);
       { Pure dipole, no fringe: DIPOLEY entrance + body + exit edge }
       DIPOLEY R PHI E1 H1 E2 H2 MSC MSC LGH;
@@ -330,6 +330,27 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
       ENDLOOP;
       SPOS := SPOS + LGH;
       CE := 'BEND';
+    ELSEIF (LFR = -1) OR (LFR = -2);
+      { LFR=-1/-2: half-fringe via FFELE delegation (cosy.fox L3406-3411).
+        Set up dipole + multipoles in PPOL/MPOL, then call FFELE with
+        L=R·PHI, H_LOCAL=1/R, LF1=-1, LF2=-2. FFELE's LFR=-1/-2 path
+        runs SDELE with NSDP=-1 or -2 (POTXZ NSDP=-1/-2 bend fringe).  }
+      VARIABLE (RE) F_HF;
+      VARIABLE (RE) NEG1_HF;
+      VARIABLE (RE) NEG2_HF;
+      NEG1_HF := -1;
+      NEG2_HF := -2;
+      NPOL := NT + 1;
+      PPOL[1] := CONS(CHIM)/R + 0*DD[1];
+      MPOL[1] := 1;
+      F_HF := 1/R;
+      LOOP I 2 NPOL;
+        PPOL[I] := -CONS(CHIM)/R*N[I-1]*F_HF + 0*DD[1];
+        MPOL[I] := I;
+        F_HF := F_HF/R;
+      ENDLOOP;
+      LOFF := 2;
+      FFELE R*PHI D 1/R NEG1_HF NEG2_HF '  ';
     ELSEIF (LFR = 3) OR (LFR = 2.5);
       { BENDFF3 path (cosy.fox L3268-3290): magnetic dipole + multipoles
         with high-precision soft-edge fringe via NSDP=-4 + BENDIST.   }
@@ -434,7 +455,7 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
       CE := 'BEND';
     ENDIF;
   ELSE;
-    WRITE 6 ' *** ERROR in BEND, LSPN=1 / LFR≠0 paths need spin / fringe support not yet ported';
+    WRITE 6 ' *** ERROR in BEND, LSPN=1 or unsupported LFR (libcosy v1: 0, 3, 2.5, -1, -2)';
     QUIT 0;
   ENDIF;
 ENDPROCEDURE;
