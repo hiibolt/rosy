@@ -470,6 +470,78 @@ PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
   ELSEIF NSDP = -13;
     XR0 := SQRT(SQR(X_F - PPOL[2]) + SQR(Z_F));
     V := PPOL[1]*(1 + PPOL[2]/XR0);
+  ELSEIF NSDP = -21;
+    { MSEM G-2 magnet (cosy.fox L2681-2698): combined magnetic + electric
+      multipoles. Magnetic part has no s-dependent fringe; electric part
+      uses ENGE-modulated soft-edge fringe via two DIST calls.
+      PPOL layout (after NSDP=-21):
+        PPOL[1..NPOL]   = magnetic + electric multipole strengths
+        PPOL[NPOL+1]    = R (bend radius)
+        PPOL[NPOL+2..5] = electric-edge geometry for DIST
+        MPOL[NPOL+1]    = NM (count of magnetic-only multipoles)
+        MPOL[NPOL+2]    = 1 if electric fringe active, 0 to suppress }
+    VARIABLE (RE) NM_MSEM;
+    VARIABLE (DA) R_MSEM;
+    VARIABLE (DA) XF_MSEM;
+    VARIABLE (DA) ZF_MSEM;
+    VARIABLE (DA) DIS1_MSEM;
+    VARIABLE (DA) DIS2_MSEM;
+    VARIABLE (DA) XS_MSEM;
+    VARIABLE (DA) ZS_MSEM;
+    VARIABLE (RE) IDS_MSEM;
+    VARIABLE (RE) J_MSEM;
+    VARIABLE (DA) XR_MSEM;
+    VARIABLE (DA) DIST_ZERO_DA;
+    VARIABLE (DA) DIST_ONE_DA;
+    VARIABLE (DA) ENGES_MSEM;
+    VARIABLE (RE) HIGH_MULT;
+    R_MSEM := PPOL[NPOL+1];
+    NM_MSEM := CONS(MPOL[NPOL+1]);
+    XF_MSEM := X_F;
+    ZF_MSEM := Z_F;
+    DIST_ZERO_DA := 0*DD[1];
+    DIST_ONE_DA := 1 + 0*DD[1];
+    DIST X_F Z_F DIST_ZERO_DA DIST_ZERO_DA DIST_ZERO_DA DIST_ONE_DA
+         DIST_ZERO_DA DR 0 DIS1_MSEM XS_MSEM ZS_MSEM IDS_MSEM;
+    IF IDS_MSEM = 1;
+      XF_MSEM := XS_MSEM;
+      ZF_MSEM := ZS_MSEM;
+    ENDIF;
+    DIST X_F Z_F PPOL[NPOL+2] PPOL[NPOL+3] PPOL[NPOL+4] PPOL[NPOL+5]
+         DIST_ZERO_DA DR 0 DIS2_MSEM XS_MSEM ZS_MSEM IDS_MSEM;
+    IF IDS_MSEM = 1;
+      XF_MSEM := XS_MSEM;
+      ZF_MSEM := ZS_MSEM;
+    ENDIF;
+    { Magnetic part — no s-dependent fringe }
+    J_MSEM := 2;
+    XR0 := SQRT(SQR(X_F + R_MSEM) + SQR(Z_F)) - R_MSEM;
+    XR_MSEM := 1 + 0*DD[1];
+    BFY := PPOL[1];
+    HIGH_MULT := MPOL[NM_MSEM];
+    LOOP I 2 HIGH_MULT;
+      XR_MSEM := XR_MSEM*XR0;
+      IF I = MPOL[J_MSEM];
+        BFY := BFY + PPOL[J_MSEM]*XR_MSEM;
+        J_MSEM := J_MSEM + 1;
+      ENDIF;
+    ENDLOOP;
+    { Electric part — gated by MPOL[NPOL+2]=1, uses ENGE soft fringe }
+    IF MPOL[NPOL+2] = 1;
+      XR0 := SQRT(SQR(XF_MSEM + R_MSEM) + SQR(ZF_MSEM)) - R_MSEM;
+      XR_MSEM := XR0;
+      V := 0*DD[1];
+      HIGH_MULT := ABS(MPOL[NPOL]);
+      LOOP I 2 HIGH_MULT;
+        XR_MSEM := XR_MSEM*XR0;
+        IF I = ABS(MPOL[J_MSEM]);
+          ENGES_MSEM := ENGE(I, 1, 2, DIS1_MSEM/DR/2)
+                      *ENGE(I, 2, 2, DIS2_MSEM/DR/2);
+          V := V + PPOL[J_MSEM]*XR_MSEM*ENGES_MSEM;
+          J_MSEM := J_MSEM + 1;
+        ENDIF;
+      ENDLOOP;
+    ENDIF;
   ELSE;
     WRITE 6 ' *** ERROR in FIELDXZ, NSDP not in {-1,-2,-3,-12,-13} not yet ported in libcosy v1';
     QUIT 0;

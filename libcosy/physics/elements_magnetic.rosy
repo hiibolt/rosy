@@ -287,4 +287,124 @@ PROCEDURE MZK L (RE) K (RE) D (RE);
   FFELE L D 0 1 2 'MZK';
 ENDPROCEDURE;
 
+{ ----- M6.22: MSEM — bend magnet with E-multipoles for g-2 (cosy.fox L3826-3870)
+  MSEM(R, PHI, DM, NB, DE, EV, N, CI): combined-function bending magnet
+  with both magnetic multipole (NB[I] strengths up to N) and electric
+  multipole (EV[I] voltages) content. Designed for g-2 storage rings
+  where the electric quadrupole focuses while the magnetic bend
+  steers.
+
+  Parameters:
+    R   : magnetic bending radius [m]
+    PHI : bend angle [rad]
+    DM  : magnetic aperture (declared but unused — cosy.fox quirk)
+    NB  : RE 16 array of magnetic multipole strengths
+    DE  : electric aperture / characteristic radius
+    EV  : RE 16 array of electric multipole voltages [kV]
+    N   : count of multipoles to use from NB / EV
+    CI  : element name string
+
+  PPOL/MPOL layout: builds standard multipole stack, then sets up
+    PPOL[NPOL+1..5] = R + electric-edge geometry for NSDP=-21
+    MPOL[NPOL+1]    = NM (count of magnetic multipoles)
+    MPOL[NPOL+2]    = 1 (electric fringe flag)
+
+  libcosy v1 supports LFR=0 (no fringe, SIELE-based) and LFR=3/2.5
+  (high-precision NSDP=-21 with bend geometry). LFR=0 with electric
+  multipoles falls back to SIELE — the magnetic part is faithful but
+  the electric part contributes constant-field rather than true
+  fringe-modulated.                                                    }
+PROCEDURE MSEM R (RE) PHI (RE) DM (RE) NB (RE 16) DE (RE) EV (RE 16) N (RE) CI (ST);
+  VARIABLE (RE) I;
+  VARIABLE (RE) NM_LOCAL;
+  VARIABLE (RE) F_LOCAL;
+  VARIABLE (RE) LDL_MS;
+  VARIABLE (RE) NEG_LDL_MS;
+  VARIABLE (RE) ARC_TOTAL_MS;
+  VARIABLE (RE) STEP_MIN_MS;
+  VARIABLE (RE) STEP_MID_MS;
+  VARIABLE (RE) STEP_MAX_MS;
+  VARIABLE (DA 8) MS_MSEM;
+  VARIABLE (DA 3 3) SM_MSEM;
+  CE := CI;
+  DR := DE;
+  LOFF := 2;
+  IF LUM # 1;
+    WRITE 6 ' *** ERROR, call UM before MSEM';
+    QUIT 0;
+  ENDIF;
+  IF R < 0;
+    WRITE 6 ' *** ERROR in MSEM, negative radius';
+    QUIT 0;
+  ELSEIF PHI < 0;
+    WRITE 6 ' *** ERROR in MSEM, negative angle';
+    QUIT 0;
+  ENDIF;
+  { Magnetic multipoles }
+  NPOL := 1;
+  PPOL[1] := CONS(CHIM)/R + 0*DD[1];
+  MPOL[1] := 1;
+  F_LOCAL := 1;
+  LOOP I 1 N;
+    F_LOCAL := F_LOCAL/R;
+    IF ABS(NB[I]) # 0;
+      NPOL := NPOL + 1;
+      MPOL[NPOL] := I+1;
+      PPOL[NPOL] := -CONS(CHIM)/R*NB[I]*F_LOCAL + 0*DD[1];
+    ENDIF;
+  ENDLOOP;
+  NM_LOCAL := NPOL;
+  { Electric multipoles }
+  F_LOCAL := 1/DE;
+  LOOP I 1 N;
+    F_LOCAL := F_LOCAL/DE;
+    IF ABS(EV[I]) # 0;
+      NPOL := NPOL + 1;
+      MPOL[NPOL] := -(I+1);
+      PPOL[NPOL] := EV[I]*F_LOCAL + 0*DD[1];
+    ENDIF;
+  ENDLOOP;
+  { Edge geometry storage at PPOL[NPOL+1..5] for NSDP=-21 }
+  MPOL[NPOL+1] := NM_LOCAL;
+  PPOL[NPOL+1] := R + 0*DD[1];
+  PPOL[NPOL+2] := R*(COS(PHI)-1) + 0*DD[1];
+  PPOL[NPOL+4] := CONS(PPOL[NPOL+2]) + SIN(PHI) + 0*DD[1];
+  PPOL[NPOL+3] := R*SIN(PHI) + 0*DD[1];
+  PPOL[NPOL+5] := CONS(PPOL[NPOL+3]) - COS(PHI) + 0*DD[1];
+  MPOL[NPOL+2] := 1;
+  IF (LFR = 0) OR (NPOL = NM_LOCAL);
+    SIELE R*PHI DE;
+    LOCSET R*(COS(PHI)-1) R*SIN(PHI) PHI R*PHI 0 0;
+    UPDATE 1 1;
+  ELSEIF (LFR = 3) OR (LFR = 2.5);
+    NSDP := -21;
+    LDL_MS := 10*DE;
+    NEG_LDL_MS := -LDL_MS;
+    ARC_TOTAL_MS := R*PHI + 2*LDL_MS;
+    STEP_MIN_MS := MIN(R/10000, DE/200);
+    STEP_MID_MS := MIN(R/20, DE);
+    STEP_MAX_MS := MIN(R, 7*DE);
+    LOCSET 0 0 0 0 0 0;
+    IF LFR = 3;
+      LOCSET R*(COS(0.5*PHI)-1) R*SIN(0.5*PHI) 0.5*PHI 0.5*R*PHI 0 0;
+      SDELEREF 0.5*R*PHI 0 DE/200 DE 7*DE DE;
+    ENDIF;
+    MPOL[NPOL+2] := 0;
+    SDELE 0 NEG_LDL_MS STEP_MIN_MS STEP_MID_MS STEP_MAX_MS DE;
+    SNM MSC MS_MSEM;
+    SSNM SSCR SM_MSEM;
+    MPOL[NPOL+2] := 1;
+    SDELE 0 ARC_TOTAL_MS STEP_MIN_MS STEP_MID_MS STEP_MAX_MS DE;
+    UPDATEMAP MSC MS_MSEM MS_MSEM SSCR SM_MSEM SM_MSEM;
+    MPOL[NPOL+2] := 0;
+    SDELE 0 NEG_LDL_MS STEP_MIN_MS STEP_MID_MS STEP_MAX_MS DE;
+    UPDATEMAP MSC MS_MSEM MSC SSCR SM_MSEM SSCR;
+    SLOC := R*PHI;
+    UPDATE 1 1;
+  ELSE;
+    WRITE 6 ' *** ERROR in MSEM, only LFR=0 / 3 / 2.5 supported in libcosy v1';
+    QUIT 0;
+  ENDIF;
+ENDPROCEDURE;
+
 END;
