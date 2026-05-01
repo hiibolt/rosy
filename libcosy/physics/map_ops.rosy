@@ -21,7 +21,7 @@ INCLUDE '../globals.rosy';
   Copies the active map's first TWOND DA components into M. M is an
   untyped DA-array param; ROSY's inference picks up the dimension from
   the call site (typically `(DA 8)` to match the global MAP).           }
-PROCEDURE SM M;
+PROCEDURE SM M (DA 8);
   VARIABLE (RE) I;
   LOOP I 1 TWOND;
     M[I] := MAP[I];
@@ -29,7 +29,7 @@ PROCEDURE SM M;
 ENDPROCEDURE;
 
 { ----- Save the map N into M (cosy.fox L640-641) -------------------------- }
-PROCEDURE SNM N M;
+PROCEDURE SNM N (DA 8) M (DA 8);
   VARIABLE (RE) I;
   LOOP I 1 TWOND;
     M[I] := N[I];
@@ -37,7 +37,7 @@ PROCEDURE SNM N M;
 ENDPROCEDURE;
 
 { ----- Save the momentary spin map (SPNR 3x3) into M (cosy.fox L643-645) -- }
-PROCEDURE SSM M;
+PROCEDURE SSM M (DA 3 3);
   VARIABLE (RE) I; VARIABLE (RE) J;
   LOOP I 1 3;
     LOOP J 1 3;
@@ -47,7 +47,7 @@ PROCEDURE SSM M;
 ENDPROCEDURE;
 
 { ----- Save the spin map N into M (cosy.fox L647-649) --------------------- }
-PROCEDURE SSNM N M;
+PROCEDURE SSNM N (DA 3 3) M (DA 3 3);
   VARIABLE (RE) I; VARIABLE (RE) J;
   LOOP I 1 3;
     LOOP J 1 3;
@@ -97,7 +97,7 @@ ENDPROCEDURE;
   Same as PM but for an arbitrary parameter map N rather than the global
   active MAP. Used to inspect saved or computed maps without making them
   the active state.                                                       }
-PROCEDURE PNM N IU (RE);
+PROCEDURE PNM N (DA 8) IU (RE);
   VARIABLE (DA 5) M;
   VARIABLE (RE) I;
   LOOP I 1 5;
@@ -110,7 +110,7 @@ ENDPROCEDURE;
   DMAP(M, N, IU) prints D[I] = M[I] - N[I] for I = 1..TWOND. Useful for
   validating that two maps represent the same transformation up to the
   computational order.                                                    }
-PROCEDURE DMAP M N IU (RE);
+PROCEDURE DMAP M (DA 8) N (DA 8) IU (RE);
   VARIABLE (DA 8) D;
   VARIABLE (RE) I;
   LOOP I 1 TWOND;
@@ -120,7 +120,7 @@ PROCEDURE DMAP M N IU (RE);
 ENDPROCEDURE;
 
 { ----- Difference of two spin maps to unit (cosy.fox L693-697) ----------- }
-PROCEDURE DSMAP M N IU (RE);
+PROCEDURE DSMAP M (DA 3 3) N (DA 3 3) IU (RE);
   VARIABLE (DA 3) D;
   VARIABLE (RE) I; VARIABLE (RE) J;
   LOOP I 1 3;
@@ -148,7 +148,7 @@ ENDPROCEDURE;
   compile-time dims for arrays, so MM is declared (DA 20) — the same upper
   bound DD uses in libcosy/globals.rosy. POLVAL only reads the first NV
   elements anyway.                                                          }
-PROCEDURE ANM N M O;
+PROCEDURE ANM N (DA 8) M (DA 8) O (DA 8);
   VARIABLE (DA 20) MM;
   VARIABLE (RE) I;
   LOOP I 1 TWOND;
@@ -221,7 +221,7 @@ ENDPROCEDURE;
   the live map" convention — every element procedure (DL / MQ / MH /
   MQK / MSK / ...) ultimately writes into MAP via this kind of in-place
   composition during cosy.fox's standard tracking workflow.            }
-PROCEDURE AM M;
+PROCEDURE AM M (DA 8);
   IF NRAY # 0;
     WRITE 6 ' *** ERROR, AM with rays needs UPDATE+ray pipeline (deferred)';
     QUIT 0;
@@ -248,7 +248,7 @@ ENDPROCEDURE;
        energy slots that aren't part of the fixed-point search.
 
   Requires MI (linear_algebra.rosy). Self-contained otherwise.            }
-PROCEDURE FM M XF MF IER;
+PROCEDURE FM M (DA 8) XF (DA 8) MF (DA 8) IER (RE);
   VARIABLE (DA 20) N;
   VARIABLE (DA 20) NI;
   VARIABLE (DA 20) C;
@@ -323,7 +323,7 @@ ENDPROCEDURE;
 
   Requires MI from helpers/linear_algebra.rosy and exercises the dup-arg
   writeback (MI MM MM NV I NOC NV NM1 aliases positions 0 and 1).      }
-PROCEDURE MR NAP LAP;
+PROCEDURE MR NAP (DA 8) LAP (DA 8);
   VARIABLE (DA 20) COD;
   VARIABLE (RE) NUM;
   VARIABLE (RE) I;
@@ -366,7 +366,7 @@ ENDPROCEDURE;
   the substitution polynomial that maps a canonical-input to a reordered
   position. POLVAL applies the reorder via Horner. The result is written
   back into X — same dup-arg-writeback pattern as ANM.                  }
-PROCEDURE RCT X;
+PROCEDURE RCT X (DA 8);
   VARIABLE (RE) I;
   VARIABLE (DA 8) RCE;
   VARIABLE (DA 8) TMP;
@@ -386,7 +386,7 @@ ENDPROCEDURE;
   RET(X): inverse of RCT. Reorders from grouped (q...p...) back to
   canonical (q1 p1 q2 p2 ...). The pair-then-substitute mechanic mirrors
   RCT exactly with the indices swapped.                                  }
-PROCEDURE RET X;
+PROCEDURE RET X (DA 8);
   VARIABLE (RE) I;
   VARIABLE (DA 8) REC;
   VARIABLE (DA 8) TMP;
@@ -406,7 +406,7 @@ ENDPROCEDURE;
   RETF reorders the variables inside a single DA function F (rather than
   an array of DAs), via a 1-element POLVAL with the same basis-DA
   reorder used by RET.                                                    }
-PROCEDURE RETF F;
+PROCEDURE RETF F (DA);
   VARIABLE (RE) I;
   VARIABLE (DA 8) REC;
   VARIABLE (DA 1) X;
@@ -436,7 +436,7 @@ ENDPROCEDURE;
   ND=2 also writes 3,4; ND=3 also writes 5,6 (time-of-flight). DD is
   size-20 so out-of-range references like DD[4] at ND=1 silently read
   zero DAs without crashing, matching cosy.fox's loose array semantics. }
-PROCEDURE CATR IAP NAP LGH (RE);
+PROCEDURE CATR IAP (DA 8) NAP (DA 8) LGH (RE);
   VARIABLE (RE) NC;
   VARIABLE (RE) PC;
   VARIABLE (DA) VN; VARIABLE (DA) LT;
@@ -547,7 +547,7 @@ ENDPROCEDURE;
   PHI is given in degrees; common multiples of 90 take exact-cosine
   shortcuts to avoid floating-point drift. ND>1 is required; the
   ND=1 path with non-zero PHI errors out (no y-axis to rotate into). }
-PROCEDURE MT IAP NAP PHI (RE);
+PROCEDURE MT IAP (DA 8) NAP (DA 8) PHI (RE);
   VARIABLE (RE 4 4) R;
   VARIABLE (DA 20) COD;
   VARIABLE (RE) I;
@@ -612,7 +612,7 @@ ENDPROCEDURE;
   The kinematic factors GM and MG swap roles (GM now divides DOP, MG divides
   COP), and the time-of-flight LT branch reads from IAP rather than DD for
   the VN factor. Same nested-IF skeleton as CATR.                            }
-PROCEDURE TRCA IAP NAP LGH (RE);
+PROCEDURE TRCA IAP (DA 8) NAP (DA 8) LGH (RE);
   VARIABLE (RE) NC;
   VARIABLE (RE) PC;
   VARIABLE (DA) VN; VARIABLE (DA) LT;
@@ -851,7 +851,7 @@ ENDPROCEDURE;
   the enclosing scope, but inlining it sidesteps the closure entirely.
   CC stands in for cosy.fox's C (avoiding the C / C_2 / C_3 namespace
   pollution from libcosy global declarations).                            }
-PROCEDURE GT MM F MU ALPHA BETA GAMMA R;
+PROCEDURE GT MM (DA 8) F (DA 8) MU (DA 4) ALPHA (DA 4) BETA (DA 4) GAMMA (DA 4) R (DA 4);
   VARIABLE (RE) A;
   VARIABLE (RE) B;
   VARIABLE (RE) CC;
