@@ -538,6 +538,20 @@ WRITE 6 MSC[1];
 WRITE 6 'After SIELE octupole, MSC[2] (octupole p_x should pick up x^3 kick):';
 WRITE 6 MSC[2];
 
+{ ----- M6.12: BEND multipole-extension via MS combined-function magnet -----
+  Tests the BENDFF0 NT>0 path: dipole + N multipoles. MS bundles 5
+  multipole strengths (quad-sext-oct-dec-dodec) into BEND with edge
+  angles E1=E2=0. Should produce a non-trivial map combining bend
+  dispersion with quadrupole focusing.                                 }
+WRITE 6 ' ----- M6.12: MS combined-function magnet via BEND NT>0 -----';
+OV 3 2 0;
+RPP 100;
+FR 0;
+UM;
+MS 1.0 10.0 0.05 0.5 0 0 0 0;     { R=1m, 10deg, 5cm, weak quad N1=0.5 }
+WRITE 6 'After MS, MAP[1] (combined bend + quadrupole):';
+WRITE 6 MAP[1];
+
 { ----- M6.11: WF balanced Wien filter (electric + magnetic dipole) -----
   Balanced Wien filter has equal electric and magnetic bend radii so
   the net force on the reference particle is zero (H_LOCAL = 1/RM -

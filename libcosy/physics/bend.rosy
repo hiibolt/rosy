@@ -321,15 +321,52 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
   ENDIF;
   NTS := NOC;
 
-  IF (NT = 0) AND (LSPN = 0) AND (LFR = 0);
-    DIPOLEY R PHI E1 H1 E2 H2 MSC MSC LGH;
-    LOOP I 1 TWOND;
-      MAP[I] := MSC[I];
-    ENDLOOP;
-    SPOS := SPOS + LGH;
-    CE := 'BEND';
+  IF (LSPN = 0) AND (LFR = 0);
+    IF NT = 0;
+      { Pure dipole: DIPOLEY entrance + body + exit edge }
+      DIPOLEY R PHI E1 H1 E2 H2 MSC MSC LGH;
+      LOOP I 1 TWOND;
+        MAP[I] := MSC[I];
+      ENDLOOP;
+      SPOS := SPOS + LGH;
+      CE := 'BEND';
+    ELSE;
+      { NT>0: multipole-extension dipole (cosy.fox L3382-3388).
+        Set up PPOL/MPOL with dipole + N multipoles, then:
+          1. DIPOLEY entrance edge (no body bend) → ISC
+          2. Copy ISC[TWOND+1..NV] into MSC (preserve param slots)
+          3. SIELE R·PHI D — body with multipole content
+          4. POLVAL composes ISC into MSC
+          5. DIPOLEY exit edge                                       }
+      VARIABLE (DA 8) ISC;
+      VARIABLE (RE) F_BEND;
+      VARIABLE (RE) NV_LIM;
+      NPOL := NT + 1;
+      PPOL[1] := CONS(CHIM)/R + 0*DD[1];
+      MPOL[1] := 1;
+      F_BEND := 1/R;
+      LOOP I 2 NPOL;
+        PPOL[I] := -CONS(CHIM)/R*N[I-1]*F_BEND + 0*DD[1];
+        MPOL[I] := I;
+        F_BEND := F_BEND/R;
+      ENDLOOP;
+      LOFF := 2;
+      DIPOLEY R 0 E1 H1 0 0 MSC ISC LGH;
+      NV_LIM := MIN(NV, 8);
+      LOOP I TWOND+1 NV_LIM;
+        ISC[I] := MSC[I];
+      ENDLOOP;
+      SIELE R*PHI D;
+      POLVAL 1 MSC TWOND ISC NV_LIM MSC TWOND;
+      DIPOLEY R 0 0 0 E2 H2 MSC MSC LGH;
+      LOOP I 1 TWOND;
+        MAP[I] := MSC[I];
+      ENDLOOP;
+      SPOS := SPOS + LGH;
+      CE := 'BEND';
+    ENDIF;
   ELSE;
-    WRITE 6 ' *** ERROR in BEND, NT≠0 / LSPN=1 / LFR≠0 paths need SIELE / UPDATE / FFELE — not yet ported';
+    WRITE 6 ' *** ERROR in BEND, LSPN=1 / LFR≠0 paths need spin / fringe support not yet ported';
     QUIT 0;
   ENDIF;
 ENDPROCEDURE;
