@@ -918,6 +918,188 @@ PROCEDURE MLF_SCALAR MF (DA 8) C (DA 8) M (DA 8) F (DA) IT (RE);
   CO NOM;
 ENDPROCEDURE;
 
+{ ----- LFM_ARRAY (IT=±2,±3): map from array of Lie generators (cosy.fox L1317)
+  Companion to LFM_SCALAR for the array-mode generating function — IT=2/3
+  build the map from successive Lie operators F[1], F[2], … F[NF] applied
+  in order; IT=-2/-3 reverse the order.
+
+  IT mode ⇒ NF (number of Lie factors):
+    IT = ±2 : NF = NOM - 1               (one factor per nonlinear order)
+    IT = ±3 : NF = floor(log₂(NOC-1)) + 1 (binary-tree squaring)            }
+PROCEDURE LFM_ARRAY MF (DA 8) C (DA 8) M (DA 8) F (DA 8) IT (RE);
+  VARIABLE (RE) NOM;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) NF_CT;
+
+  NOM := NOC;
+  IF ABS(IT) = 2;
+    NF_CT := NOM - 1;
+  ELSEIF ABS(IT) = 3;
+    NF_CT := INT(LOG(NOC-1)/LOG(2)) + 1;
+  ELSE;
+    WRITE 6 ' *** ERROR in LFM_ARRAY, only IT=±2 or ±3 supported';
+    QUIT 0;
+  ENDIF;
+  CO NOM+1;
+
+  LOOP I 1 TWOND;
+    IF IT > 1;
+      MF[I] := LEXP(F[NF_CT], DD[I]);
+      LOOP J NF_CT-1 1 -1;
+        MF[I] := LEXP(F[J], MF[I]);
+      ENDLOOP;
+    ELSE;
+      MF[I] := LEXP(F[1], M[I]);
+      LOOP J 2 NF_CT;
+        MF[I] := LEXP(F[J], MF[I]);
+      ENDLOOP;
+    ENDIF;
+  ENDLOOP;
+
+  CO NOM;
+  IF IT > 0;
+    ANM MF M MF;
+  ENDIF;
+  LOOP J 1 TWOND;
+    MF[J] := MF[J] + C[J];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- MLF_ARRAY (IT=±2,±3): array of Lie generators FROM map (cosy.fox L1378-1391)
+  Companion to MLF_SCALAR for the array-mode extraction. Iteratively peels
+  off one Lie generator per order (IT=±2) or per binary-doubling step
+  (IT=±3), accumulating into F[1..NF].
+
+  Algorithm (IT>1, "extract forward"):
+    1. POLVAL initialize N_DA from SN, N_DA.
+    2. For each I = 1..NF:
+       a. Compute order-K residual SN = (N[J+1]-DD[J+1], -N[J]+DD[J]) per pair.
+       b. POTI to get F[I] from SN.
+       c. Update N := exp(:-F[I]:) · N (LEXP application).
+    K = I+1 for IT=2, K = min(NOM, 2^I) for IT=3.
+
+  IT<-1 mirrors with reversed order. Differences from LFM_SCALAR's PBO
+  approach: simpler iteration since each F[I] is independent (no
+  combinatorial nesting).                                              }
+PROCEDURE MLF_ARRAY MF (DA 8) C (DA 8) M (DA 8) F (DA 8) IT (RE);
+  VARIABLE (DA 20) SN;
+  VARIABLE (DA 20) N_DA;
+  VARIABLE (DA 8) L_DA;
+  VARIABLE (DA) FF;
+  VARIABLE (RE) IE;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) K;
+  VARIABLE (RE) NOM;
+  VARIABLE (RE) NF_CT;
+
+  NOM := NOC;
+  IF ABS(IT) = 2;
+    NF_CT := NOM - 1;
+  ELSEIF ABS(IT) = 3;
+    NF_CT := INT(LOG(NOC-1)/LOG(2)) + 1;
+  ELSE;
+    WRITE 6 ' *** ERROR in MLF_ARRAY, only IT=±2 or ±3 supported';
+    QUIT 0;
+  ENDIF;
+
+  { Linear / nonlinear split (mirrors MLF_SCALAR). }
+  IF TWOND = NV;
+    LOOP I 1 TWOND;
+      C[I] := CONS(MF[I]) + 0*DD[1];
+      N_DA[I] := MF[I] - C[I];
+    ENDLOOP;
+    CO 1;
+    LOOP I 1 TWOND;
+      M[I] := N_DA[I];
+    ENDLOOP;
+    MI M SN NV IE NOC NV NM1;
+    CO NOM;
+  ELSE;
+    LOOP I 1 TWOND;
+      SN[I] := 0*DD[I];
+      M[I] := 0*DD[1];
+    ENDLOOP;
+    LOOP I TWOND+1 NV;
+      SN[I] := DD[I];
+    ENDLOOP;
+    POLVAL 1 MF TWOND SN NV C TWOND;
+    LOOP I 1 TWOND;
+      N_DA[I] := MF[I] - C[I];
+      LOOP J 1 TWOND;
+        L_DA[J] := DER(J, N_DA[I]);
+      ENDLOOP;
+      POLVAL 1 L_DA TWOND SN NV L_DA TWOND;
+      LOOP J 1 TWOND;
+        M[I] := M[I] + L_DA[J]*DD[J];
+      ENDLOOP;
+    ENDLOOP;
+    LOOP I 1 TWOND;
+      SN[I] := M[I];
+    ENDLOOP;
+    MI SN SN NV IE NOC NV NM1;
+  ENDIF;
+
+  IF IE # 0;
+    WRITE 6 ' *** ERROR in MLF_ARRAY, map singular';
+    QUIT 0;
+  ENDIF;
+
+  IF IT > 1;
+    POLVAL 1 N_DA TWOND SN NV N_DA TWOND;
+    LOOP I 1 NF_CT;
+      IF IT = 2;
+        K := I + 1;
+      ELSE;
+        K := MIN(NOM, 2^I);
+      ENDIF;
+      CO K;
+      LOOP J 1 TWOND 2;
+        SN[J]   := N_DA[J+1] - DD[J+1];
+        SN[J+1] := -N_DA[J]  + DD[J];
+      ENDLOOP;
+      CO K+1;
+      POTI SN TWOND FF;
+      F[I] := FF;
+      CO NOM+1;
+      LOOP J 1 TWOND;
+        N_DA[J] := LEXP(-FF, N_DA[J]);
+      ENDLOOP;
+    ENDLOOP;
+    CO NOM;
+  ELSE;
+    LOOP I TWOND+1 NV;
+      N_DA[I] := DD[I];
+    ENDLOOP;
+    POLVAL 1 SN TWOND N_DA NV N_DA TWOND;
+    LOOP J TWOND+1 NV;
+      N_DA[J] := DD[J];
+    ENDLOOP;
+    LOOP I 1 NF_CT;
+      IF IT = -2;
+        K := I + 1;
+      ELSE;
+        K := MIN(NOM, 2^I);
+      ENDIF;
+      CO K;
+      LOOP J 1 TWOND 2;
+        SN[J]   := N_DA[J+1] - DD[J+1];
+        SN[J+1] := -N_DA[J]  + DD[J];
+      ENDLOOP;
+      CO K+1;
+      POTI SN TWOND FF;
+      F[I] := FF;
+      CO NOM+1;
+      LOOP J 1 TWOND;
+        SN[J] := LEXP(-FF, DD[J]);
+      ENDLOOP;
+      CO NOM;
+      POLVAL 1 SN TWOND N_DA NV N_DA TWOND;
+    ENDLOOP;
+  ENDIF;
+ENDPROCEDURE;
+
 { ----- TS: tune dependence on parameters AND amplitude (cosy.fox L1608-1625)
   TS(MU) computes the parameter- AND amplitude-dependence of the tunes
   from the active MAP, returning per-plane tune polynomials in MU.
