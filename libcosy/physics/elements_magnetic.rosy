@@ -287,6 +287,110 @@ PROCEDURE MZK L (RE) K (RE) D (RE);
   FFELE L D 0 1 2 'MZK';
 ENDPROCEDURE;
 
+{ ----- M6.23: WI — wiggler magnet (cosy.fox L3603-3625)
+  WI(B, K, L, D, K1, IA, A): a wiggler with field profile
+    BFY(z) = EDGE(z/D) · EDGE((-z+L)/D) · B · cos((2π/K + K1·z)·z)
+  where the EDGE function provides soft sigmoid end-fields keyed by
+  PPOL[7..16] coefficients.
+
+  Parameters:
+    B  : peak magnetic field [T]
+    K  : wiggler period [m]
+    L  : total length [m]
+    D  : characteristic radius / aperture [m]
+    K1 : period chirp coefficient
+    IA : 0 = use default edge profile (PPOL[8] := 8 sentinel)
+         1 = use user-supplied A[1..10] edge coefficients
+    A  : RE 10 array — user edge coefficients (only when IA=1)
+
+  Algorithm:
+    1. Set up PPOL[1..16] with field magnitude, period, geometry, and
+       edge polynomial coefficients. NSDP=-3 + LOFF=2 routes through
+       POTXZ → FIELDXZ NSDP=-3 → EDGE.
+    2. Build entrance LS = L+4·L1 backward-drift extension.
+    3. FIT X to find the s-parameter X such that ZLOC = L (the
+       reference axis hits the exit boundary). Uses SDELEREF for the
+       reference-orbit-only walk through the wiggler interior.
+    4. Save locked LOCSET globals into XLOC0..SLOC0 snapshots.
+    5. SDELE 0 LS — full integration over [0, L+4·L1].
+    6. UPDATEMAP MSC MS MSC + DLACT for backward exit-drift.
+    7. Restore axis state from snapshots, finalise UPDATE 1 1.
+
+  cosy.fox uses LPI graphics manipulation to suppress wiggler-internal
+  picture updates — libcosy v1 has no graphics, so that's skipped.    }
+PROCEDURE WI B (RE) K (RE) L (RE) D (RE) K1 (RE) IA (RE) A_COEFF (RE 10);
+  VARIABLE (RE) L1;
+  VARIABLE (RE) LS;
+  VARIABLE (RE) I;
+  VARIABLE (RE) X_FIT;
+  VARIABLE (RE) XLOC0;
+  VARIABLE (RE) ZLOC0;
+  VARIABLE (RE) PLOC0;
+  VARIABLE (RE) SLOC0;
+  VARIABLE (DA 8) MS_WI;
+  VARIABLE (DA 3 3) SM_WI;
+  VARIABLE (RE) SCE;
+  VARIABLE (RE) NEG_L1;
+  VARIABLE (RE) NEG_ZLOC_L;
+  VARIABLE (RE) WI_FOM;
+  SCE := 2E-5;
+  PPOL[1] := B + 0*DD[1];
+  PPOL[2] := 2*PI/K + 0*DD[1];
+  PPOL[3] := D + 0*DD[1];
+  PPOL[4] := L + 0*DD[1];
+  PPOL[5] := K1 + 0*DD[1];
+  PPOL[6] := IA + 0*DD[1];
+  NSDP := -3;
+  LOFF := 2;
+  CE := 'WI';
+  IF IA = 0;
+    LOOP I 1 10;
+      PPOL[I+6] := 0*DD[1];
+    ENDLOOP;
+    PPOL[8] := 8 + 0*DD[1];
+    L1 := 5*D;
+  ELSEIF IA = 1;
+    LOOP I 1 10;
+      PPOL[I+6] := A_COEFF[I] + 0*DD[1];
+    ENDLOOP;
+    L1 := 10*D;
+  ELSE;
+    WRITE 6 ' *** ERROR in WI, IA must be 0 or 1';
+    QUIT 0;
+  ENDIF;
+  DR := D;
+  LOCSET 0 0 0 SCE 0 0;
+  UPDATE 0 0;
+  SPOS := SPOS - SCE;
+  LS := L + 4*L1;
+  NEG_L1 := -L1;
+  UMS;
+  DLACT MSC NEG_L1;
+  SNM MSC MS_WI;
+  SSNM SSCR SM_WI;
+  X_FIT := L;
+  { FIT to find X such that |ZLOC - L| is minimised: walks the
+    reference orbit through the wiggler interior. ZLOC is updated by
+    SDELEREF's LOCSET call inside the body. }
+  FIT X_FIT;
+    LOCSET 0 NEG_L1 0 0 0 0;
+    SDELEREF NEG_L1 X_FIT K/500 K/10 K D;
+    WI_FOM := ABS(ZLOC - L);
+  ENDFIT L*1E-5 100 1 WI_FOM;
+  XLOC0 := XLOC;
+  ZLOC0 := ZLOC;
+  PLOC0 := PLOC;
+  SLOC0 := SLOC;
+  LOCSET 0 NEG_L1 0 0 0 0;
+  SDELE 0 LS K/500 K/10 K D;
+  UPDATEMAP MSC MS_WI MSC SSCR SM_WI SSCR;
+  NEG_ZLOC_L := -(ZLOC - L);
+  DLACT MSC NEG_ZLOC_L;
+  LOCSET XLOC0 ZLOC0 PLOC0 SLOC0 0 0;
+  UPDATE 1 1;
+  PS D;
+ENDPROCEDURE;
+
 { ----- M6.22: MSEM — bend magnet with E-multipoles for g-2 (cosy.fox L3826-3870)
   MSEM(R, PHI, DM, NB, DE, EV, N, CI): combined-function bending magnet
   with both magnetic multipole (NB[I] strengths up to N) and electric
