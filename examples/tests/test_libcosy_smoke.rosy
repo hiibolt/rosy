@@ -538,6 +538,20 @@ WRITE 6 MSC[1];
 WRITE 6 'After SIELE octupole, MSC[2] (octupole p_x should pick up x^3 kick):';
 WRITE 6 MSC[2];
 
+{ ----- M6.11: WF balanced Wien filter (electric + magnetic dipole) -----
+  Balanced Wien filter has equal electric and magnetic bend radii so
+  the net force on the reference particle is zero (H_LOCAL = 1/RM -
+  1/RE = 0). The map should show combined E + B effects but no net
+  bend.                                                                 }
+WRITE 6 ' ----- M6.11: WF balanced Wien filter -----';
+OV 3 2 0;
+RPP 100;
+FR 0;
+UM;
+WF 2.0 2.0 0.5 0.05;     { RE=RM=2m balanced, L=0.5m, D=5cm }
+WRITE 6 'After WF balanced 2m/2m, MAP[1]:';
+WRITE 6 MAP[1];
+
 { ----- M6.8: DC — accelerating static homogeneous E-field via SDELE NSDP=11 -----
   DC creates a constant-gradient accelerating E-field over length L.
   Voltage V is the integrated accelerating potential. NSDP=11 uses

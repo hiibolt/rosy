@@ -339,6 +339,63 @@ PROCEDURE CEA V_VOLT (RE) D_AP (RE) L_GAP (RE) C_SPACE (RE);
   DSDED 15*D_AP+C_SPACE+L_GAP/2 0 1E-4*D_AP D_AP 10*D_AP D_AP;
 ENDPROCEDURE;
 
+{ ----- WC — combined-function Wien filter (cosy.fox L3816-3822) -----
+  WC(RE_RAD, RM_RAD, L, D, NE, NM, NT) sets up a Wien filter with
+  electric bend radius RE_RAD, magnetic bend radius RM_RAD, length L,
+  aperture D. NE/NM are normal-multipole strength arrays for the
+  electric / magnetic components beyond dipole (NT entries each).
+
+  PPOL setup:
+    PPOL[1] = -CHIE/RE_RAD/1000  (electric dipole, MPOL=-1)
+    PPOL[2] = +CHIM/RM_RAD       (magnetic dipole, MPOL=+1)
+    PPOL[2+I]   = PPOL[1]·NE[I]/(I+1)   (elec multipole I+1, MPOL=-(I+1))
+    PPOL[2+I+NT]= PPOL[2]·NM[I]         (mag  multipole I+1, MPOL=+(I+1))
+
+  H_LOCAL = 1/RM - 1/RE  is the net curvature for the LOCSET.
+
+  libcosy v1: only LFR=0 path works (LFR≠0 would need POTXZ NSDP=-1/-2
+  for bend-element Cartesian fringe fields, deferred).               }
+PROCEDURE WC RE_RAD (RE) RM_RAD (RE) L (RE) D_AP (RE)
+            NE_ARR (RE 16) NM_ARR (RE 16) NT (RE);
+  VARIABLE (RE) I;
+  VARIABLE (RE) H_LOCAL;
+  VARIABLE (RE) PE_DIP;
+  VARIABLE (RE) PM_DIP;
+  VARIABLE (RE) NEG1;
+  VARIABLE (RE) NEG2;
+  NEG1 := -1;
+  NEG2 := -2;
+  NPOL := 2 + 2*NT;
+  PE_DIP := -CONS(CHIE)/RE_RAD/1000;
+  PM_DIP := CONS(CHIM)/RM_RAD;
+  PPOL[1] := PE_DIP + 0*DD[1];
+  MPOL[1] := -1;
+  PPOL[2] := PM_DIP + 0*DD[1];
+  MPOL[2] := 1;
+  LOOP I 1 NT;
+    PPOL[2+I] := PE_DIP*NE_ARR[I]/(I+1) + 0*DD[1];
+    MPOL[2+I] := -I-1;
+    PPOL[2+I+NT] := PM_DIP*NM_ARR[I] + 0*DD[1];
+    MPOL[2+I+NT] := I+1;
+  ENDLOOP;
+  LOFF := 2;
+  H_LOCAL := 1/RM_RAD - 1/RE_RAD;
+  FFELE L D_AP H_LOCAL NEG1 NEG2 'WC';
+ENDPROCEDURE;
+
+{ ----- WF — homogeneous Wien filter (cosy.fox L3824) -----
+  Convenience wrapper: WC with NT=0 (no multipoles).                   }
+PROCEDURE WF RE_RAD (RE) RM_RAD (RE) L (RE) D_AP (RE);
+  VARIABLE (RE 16) NE_ZEROS;
+  VARIABLE (RE 16) NM_ZEROS;
+  VARIABLE (RE) I;
+  LOOP I 1 16;
+    NE_ZEROS[I] := 0;
+    NM_ZEROS[I] := 0;
+  ENDLOOP;
+  WC RE_RAD RM_RAD L D_AP NE_ZEROS NM_ZEROS 0;
+ENDPROCEDURE;
+
 { EMS: skew electric multipole — VA normal, VS skew (cosy.fox L3753-3759). }
 PROCEDURE EMS L (RE) VA (RE 5) VS (RE 5) NV_PARAM (RE) D (RE);
   VARIABLE (RE) I;
