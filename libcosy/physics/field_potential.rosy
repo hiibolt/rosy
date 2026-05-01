@@ -304,6 +304,33 @@ PROCEDURE DIST X (DA) Z (DA) XP_PT (DA) ZP_PT (DA) XC_PT (DA) ZC_PT (DA)
   ENDIF;
 ENDPROCEDURE;
 
+{ ----- CENT: bend-center detail polynomial (cosy.fox L2525-2534) -----
+  Returns a quartic-in-PH / cubic-in-DR fit using PPOL[21..36] as the
+  16 coefficients. PH = atan2(Z, X) - PHI0/2 is the rotated angle from
+  the bend center. Used by BENDIST IC=2 (NSDP=-7 detailed-center bend).
+
+  ATAN(Z/X) is undefined at X=0 — handled via three-way IF on CONS(X). }
+FUNCTION (DA) CENT X (DA) Z (DA) DR_PARAM (DA) PHI0 (RE);
+  VARIABLE (DA) PH;
+  IF CONS(X) = 0;
+    PH := 0.5*PI + 0*DD[1];
+    IF CONS(Z) < 0;
+      PH := -0.5*PI + 0*DD[1];
+    ENDIF;
+  ELSEIF CONS(X) > 0;
+    PH := ATAN(Z/X);
+  ELSE;
+    PH := ATAN(Z/X) + PI;
+  ENDIF;
+  PH := PH - 0.5*PHI0;
+  CENT := PPOL[21] + PH*(PPOL[22] + PH*(PPOL[23] + PH*PPOL[24]))
+        + DR_PARAM*(PPOL[25] + PH*(PPOL[26] + PH*(PPOL[27] + PH*PPOL[28])));
+  CENT := CENT
+        + DR_PARAM*DR_PARAM*(PPOL[29] + PH*(PPOL[30] + PH*(PPOL[31] + PH*PPOL[32])))
+        + DR_PARAM*DR_PARAM*DR_PARAM
+            *(PPOL[33] + PH*(PPOL[34] + PH*(PPOL[35] + PH*PPOL[36])));
+ENDFUNCTION;
+
 { ----- ENGESIDES: ENGE-modulated distance combo (cosy.fox L2517-2524) -----
   Uses two DIST calls (one per bend edge) with PPOL[5..14] as the
   edge geometry, then combines via ENGE for soft-edge fringe.        }
@@ -356,8 +383,7 @@ FUNCTION (DA) BENDIST X (DA) Z (DA) IC (RE);
   ABS_R := ABS(CONS(PPOL[2]));
   XR0 := SQRT(SQR(XF_LOCAL-PPOL[2]) + SQR(ZF_LOCAL-PPOL[3])) - ABS_R;
   IF IC = 2;
-    WRITE 6 ' *** ERROR in BENDIST, IC=2 (CENT-driven) not yet ported in libcosy v1';
-    QUIT 0;
+    BENDIST := CENT(XF_LOCAL-PPOL[2], ZF_LOCAL-PPOL[3], XR0, CONS(PPOL[20]));
   ELSE;
     XR := XR0/ABS_R;
     XRR := 1 + 0*DD[1];
@@ -430,6 +456,10 @@ PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
     { Magnetic dipole with bend geometry (cosy.fox L2656). BENDIST IC=1
       gives the standard polynomial radial profile.                      }
     BFY := BENDIST(X_F, Z_F, 1);
+  ELSEIF NSDP = -7;
+    { Magnetic dipole with detailed center (cosy.fox L2667). BENDIST
+      IC=2 routes through CENT for refined angular-radial profile.      }
+    BFY := BENDIST(X_F, Z_F, 2);
   ELSEIF NSDP = -11;
     { Electrostatic deflector (cosy.fox L2674). BENDIST IC=-1 gives the
       linear-in-XR0 profile multiplied by Σ multipole correction.        }
