@@ -172,4 +172,119 @@ PROCEDURE MSK L (RE) K (RE) D (RE);
   MH L K*CONS(CHIM)*D*D D;
 ENDPROCEDURE;
 
+{ ----- M6.3: SIELE-driven multipole magnets (cosy.fox L3178-3206) -----
+  These all set up PPOL/MPOL/NPOL with the multipole content, then call
+  FFELE which (for libcosy v1) only supports LFR=0 — no fringe field,
+  pure analytical kick of length L applied via SIELE.
+
+  MO = octupole (4-pole), MD = decapole (5-pole), MZ = dodecapole (6-pole),
+  M5 = combined quad+sext+oct+dec+dodec, MM = arbitrary normal multipole
+  list, MMS = MM + skew components.
+
+  All gated on LFR=0 since FFELE LFR≠0 needs SDELE/RK (deferred). For
+  high-order magnets (e.g. octupole MO with NOC<3), the lazy init of
+  PMM/PEM in POTFLD won't have populated the needed entries — user
+  must call OV with NO ≥ multipole order.                             }
+PROCEDURE MO L (RE) B (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := B/D/D/D + 0*DD[1];
+  MPOL[1] := 4;
+  LOFF := 1;
+  FFELE L D 0 1 2 'MO';
+ENDPROCEDURE;
+
+PROCEDURE MD L (RE) B (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := B/D/D/D/D + 0*DD[1];
+  MPOL[1] := 5;
+  LOFF := 1;
+  FFELE L D 0 1 2 'MD';
+ENDPROCEDURE;
+
+PROCEDURE MZ L (RE) B (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := B/D/D/D/D/D + 0*DD[1];
+  MPOL[1] := 6;
+  LOFF := 1;
+  FFELE L D 0 1 2 'MZ';
+ENDPROCEDURE;
+
+{ M5: 5-pole bundle. Sets quadrupole through dodecapole strengths in
+  one call. Cosy.fox L3187-3193.                                       }
+PROCEDURE M5 L (RE) BQ (RE) BH (RE) BO (RE) BD (RE) BZ (RE) D (RE);
+  PPOL[1] := BQ/D + 0*DD[1];                MPOL[1] := 2;
+  PPOL[2] := BH/D/D + 0*DD[1];              MPOL[2] := 3;
+  PPOL[3] := BO/D/D/D + 0*DD[1];            MPOL[3] := 4;
+  PPOL[4] := BD/D/D/D/D + 0*DD[1];          MPOL[4] := 5;
+  PPOL[5] := BZ/D/D/D/D/D + 0*DD[1];        MPOL[5] := 6;
+  LOFF := 1;
+  NPOL := 5;
+  FFELE L D 0 1 2 'M5';
+ENDPROCEDURE;
+
+{ MM: arbitrary normal multipole array (cosy.fox L3195-3199).
+  BA[I] is the I-th multipole strength (I=1 quad, I=2 sext, ...);
+  NBA is the number of provided strengths.                            }
+PROCEDURE MM L (RE) BA (RE 5) NBA (RE) D (RE);
+  VARIABLE (RE) I;
+  VARIABLE (DA) DP;
+  DP := 1 + 0*DD[1];
+  LOOP I 1 NBA;
+    DP := DP/D;
+    PPOL[I] := BA[I]*DP;
+    MPOL[I] := I+1;
+  ENDLOOP;
+  LOFF := 1;
+  NPOL := NBA;
+  FFELE L D 0 1 2 'MM';
+ENDPROCEDURE;
+
+{ MMS: skew multipole — adds skew components on top of MM (cosy.fox L3201-3206).
+  NB is count of provided pairs; BA is normal strengths, BS is skew.   }
+PROCEDURE MMS L (RE) BA (RE 5) BS (RE 5) NB (RE) D (RE);
+  VARIABLE (RE) I;
+  VARIABLE (DA) DP;
+  DP := 1 + 0*DD[1];
+  LOOP I 1 NB;
+    DP := DP/D;
+    PPOL[I] := BA[I]*DP;
+    MPOL[I] := I+1;
+  ENDLOOP;
+  DP := 1 + 0*DD[1];
+  LOOP I 1 NB;
+    DP := DP/D;
+    PPOL[I+NB] := BS[I]*DP/(I+1);
+    MPOL[I+NB] := I+1+20;
+  ENDLOOP;
+  LOFF := 1;
+  NPOL := 2*NB;
+  FFELE L D 0 1 2 'MMS';
+ENDPROCEDURE;
+
+{ K-variants: replace the explicit field strengths with integrated K
+  values, scaled by χ_m ≈ 1/(B·ρ) for magnetic rigidity normalisation. }
+PROCEDURE MOK L (RE) K (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := K*CONS(CHIM) + 0*DD[1];
+  MPOL[1] := 4;
+  LOFF := 1;
+  FFELE L D 0 1 2 'MOK';
+ENDPROCEDURE;
+
+PROCEDURE MDK L (RE) K (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := K*CONS(CHIM) + 0*DD[1];
+  MPOL[1] := 5;
+  LOFF := 1;
+  FFELE L D 0 1 2 'MDK';
+ENDPROCEDURE;
+
+PROCEDURE MZK L (RE) K (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := K*CONS(CHIM) + 0*DD[1];
+  MPOL[1] := 6;
+  LOFF := 1;
+  FFELE L D 0 1 2 'MZK';
+ENDPROCEDURE;
+
 END;

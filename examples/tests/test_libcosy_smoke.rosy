@@ -520,6 +520,41 @@ WRITE 6 MSC[1];
 WRITE 6 'After SIELE 0.1 sextupole, MSC[2] (should pick up x^2-type kick):';
 WRITE 6 MSC[2];
 
+{ ----- M6.3: SIELE-driven octupole (direct SIELE call) -----
+  Use ND=1 to verify the SIELE → ODE → POTFLD chain on octupole. With
+  ND=1 NV<3, the FFELE → UPDATE → UPDATEMAP path has a NV-mismatch
+  POLVAL issue (deferred). Direct SIELE bypasses UPDATE.                 }
+WRITE 6 ' ----- M6.3: octupole via direct SIELE (ND=1) -----';
+OV 3 1 0;
+RPP 100;
+UM;
+NPOL := 1;
+PPOL[1] := 1.0 + 0*DD[1];
+MPOL[1] := 4;
+LOFF := 1;
+SIELE 0.1 0.05;
+WRITE 6 'After SIELE octupole, MSC[1] (should pick up cubic terms):';
+WRITE 6 MSC[1];
+WRITE 6 'After SIELE octupole, MSC[2] (octupole p_x should pick up x^3 kick):';
+WRITE 6 MSC[2];
+
+{ ----- M6.3: full FFELE → SIELE → UPDATE chain (ND=2 sextupole) -----
+  For ND=2, NV=4 ≥ 3, so UPDATEMAP's POLVAL composition works cleanly.
+  Use a sextupole through MM (an array-of-strengths magnet wrapper).    }
+WRITE 6 ' ----- M6.3: ND=2 sextupole via MM/FFELE/SIELE/UPDATE -----';
+OV 3 2 0;
+RPP 100;
+UM;
+VARIABLE (RE 5) BA_VEC;
+BA_VEC[1] := 0;        { quad strength = 0 }
+BA_VEC[2] := 1.0;      { sext strength = 1 }
+BA_VEC[3] := 0; BA_VEC[4] := 0; BA_VEC[5] := 0;
+MM 0.1 BA_VEC 2 0.05;     { L=0.1m, NBA=2 strengths, D=5cm }
+WRITE 6 'After MM (sextupole), MAP[1]:';
+WRITE 6 MAP[1];
+WRITE 6 'After MM (sextupole), MAP[2] (should pick up x²-y² kick):';
+WRITE 6 MAP[2];
+
 { ----- M6.1: LEN2 / NORMAL / HAMILTONIAN (field_potential.rosy primitives) -----
   LEN2 — Euclidean norm of a DA 2-vector.
   NORMAL — point-to-line distance + foot-of-perpendicular.

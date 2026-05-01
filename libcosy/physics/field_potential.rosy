@@ -395,4 +395,47 @@ PROCEDURE SIELE L (RE) D (RE);
   ENDIF;
 ENDPROCEDURE;
 
+{ ----- FFELE: fringe-field element wrapper (cosy.fox L3024-3097, partial)
+  FFELE(L, D, H_LOCAL, LF1, LF2, CI) is the dispatch hub for
+  s-dependent / s-independent elements with optional fringe fields.
+  cosy.fox supports many LFR modes (0=no FF, 1=soft edge, 2/1.9=
+  symplectic-scaling, 3/2.5=high precision, -1/-2=half fringe, -10=RK
+  no FF).
+
+  libcosy v1 ports only LFR=0 (no fringe field), which delegates to
+  SIELE then sets the local-axis state via LOCSET and refreshes derived
+  globals via UPDATE. Other LFR modes need SDELE (RK-driven) — deferred
+  to a later sub-milestone.
+
+  Parameters:
+    L       physical length [m]
+    D       aperture / characteristic radius [m]
+    H_LOCAL caller-supplied curvature override (RE); separate from the
+            global H curvature accumulator that POTFLD computes
+    LF1     entrance fringe-field NSDP code (used for LFR≠0)
+    LF2     exit fringe-field NSDP code (used for LFR≠0)
+    CI      element name (string) for diagnostics                       }
+PROCEDURE FFELE L (RE) D (RE) H_LOCAL (RE) LF1 (RE) LF2 (RE) CI (ST);
+  VARIABLE (RE) ARG_X;
+  VARIABLE (RE) ARG_Z;
+  VARIABLE (RE) ARG_PHI;
+  CE := CI;
+  DR := D;
+  IF LFR = 0;
+    SIELE L D;
+    IF H_LOCAL = 0;
+      LOCSET 0 L 0 L 0 0;
+    ELSE;
+      ARG_X := (COS(H_LOCAL*L) - 1)/H_LOCAL;
+      ARG_Z := SIN(H_LOCAL*L)/H_LOCAL;
+      ARG_PHI := H_LOCAL*L;
+      LOCSET ARG_X ARG_Z ARG_PHI L 0 0;
+    ENDIF;
+    UPDATE 1 1;
+  ELSE;
+    WRITE 6 ' *** ERROR in FFELE, only LFR=0 (no fringe field) supported in libcosy v1';
+    QUIT 0;
+  ENDIF;
+ENDPROCEDURE;
+
 END;
