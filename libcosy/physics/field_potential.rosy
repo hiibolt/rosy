@@ -796,8 +796,70 @@ PROCEDURE FFELE L (RE) D_AP (RE) H_LOCAL (RE) LF1 (RE) LF2 (RE) CI (ST);
       LOCSET ARG_X ARG_Z ARG_PHI L 0 0;
     ENDIF;
     UPDATE 1 1;
+  ELSEIF LFR = 3;
+    { LFR=3: high-precision soft-edge fringe (cosy.fox L3068-3078).
+      Wider 8*D drift extension than LFR=1's 4*D, single SDELE per
+      side for higher RK accuracy. Step sizes D/200 (min) / D / 7*D
+      give very fine adaptive control.                                }
+    VARIABLE (RE) NEG8D;
+    VARIABLE (RE) NEG6D;
+    VARIABLE (RE) SIX_D;
+    VARIABLE (RE) EIGHT_D;
+    VARIABLE (RE) STEP_MIN;
+    VARIABLE (RE) STEP_MAX;
+    VARIABLE (RE) BODY_L_HP;
+    NEG8D := -8*D_AP;
+    NEG6D := -6*D_AP;
+    SIX_D := 6*D_AP;
+    EIGHT_D := 8*D_AP;
+    STEP_MIN := D_AP/200;
+    STEP_MAX := 7*D_AP;
+    BODY_L_HP := L - 12*D_AP;
+    UMS;
+    DLACT MSC NEG8D;
+    SNM MSC MS;
+    SSNM SSCR SM;
+    LOCSET 0 NEG8D 0 NEG8D 0 0;
+    NSDP := LF1;
+    SDELE NEG8D SIX_D STEP_MIN D_AP STEP_MAX D_AP;
+    UPDATEMAP MSC MS MS SSCR SM SM;
+    SIELE BODY_L_HP D_AP;
+    UPDATEMAP MSC MS MS SSCR SM SM;
+    NSDP := LF2;
+    IF H_LOCAL = 0;
+      LOCSET 0 NEG6D 0 NEG6D 0 0;
+    ELSE;
+      ARG_X := (COS(6*H_LOCAL*D_AP)-1)/H_LOCAL;
+      ARG_Z := -SIN(6*H_LOCAL*D_AP)/H_LOCAL;
+      ARG_PHI := -6*H_LOCAL*D_AP;
+      LOCSET ARG_X ARG_Z ARG_PHI NEG6D 0 0;
+    ENDIF;
+    SDELE NEG6D EIGHT_D STEP_MIN D_AP STEP_MAX D_AP;
+    UPDATEMAP MSC MS MSC SSCR SM SSCR;
+    DLACT MSC NEG8D;
+    IF H_LOCAL = 0;
+      LOCSET 0 L 0 L 0 0;
+    ELSE;
+      ARG_X := (COS(H_LOCAL*L) - 1)/H_LOCAL;
+      ARG_Z := SIN(H_LOCAL*L)/H_LOCAL;
+      ARG_PHI := H_LOCAL*L;
+      LOCSET ARG_X ARG_Z ARG_PHI L 0 0;
+    ENDIF;
+    UPDATE 1 1;
+  ELSEIF LFR = -10;
+    { LFR=-10: no fringe field, but use RK for the entire element
+      (cosy.fox L3093-3094). Gives fine-grained accuracy when the user
+      doesn't want the fringe-field smearing — useful for measured-data
+      elements where the field profile is computed externally.        }
+    VARIABLE (RE) STEP_MIN_M10;
+    VARIABLE (RE) STEP_MAX_M10;
+    STEP_MIN_M10 := D_AP/200;
+    STEP_MAX_M10 := 7*D_AP;
+    LOCSET 0 0 0 0 0 0;
+    SDELE 0 L STEP_MIN_M10 D_AP STEP_MAX_M10 D_AP;
+    UPDATE 1 1;
   ELSE;
-    WRITE 6 ' *** ERROR in FFELE, only LFR=0 and LFR=1 supported in libcosy v1';
+    WRITE 6 ' *** ERROR in FFELE, LFR mode not supported (libcosy v1: 0, 1, 3, -10)';
     QUIT 0;
   ENDIF;
 ENDPROCEDURE;
