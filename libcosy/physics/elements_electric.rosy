@@ -303,6 +303,42 @@ PROCEDURE CEG V_VOLT (RE) D_AP (RE);
   DSDED 5*D_AP 0 1E-4*D_AP D_AP 10*D_AP D_AP;
 ENDPROCEDURE;
 
+{ ----- CEL — three-tube electric lens (cosy.fox L3876-3884) -----
+  V/D characterise the central tube; L is the gap length, C the tube
+  spacing. Uses NSDP=6 (three-tube cosh/log profile) with the
+  characteristic-length scaling DR := D/O where O = 1.315 (Jiye
+  empirical constant).                                                }
+PROCEDURE CEL V_VOLT (RE) D_AP (RE) L_GAP (RE) C_SPACE (RE);
+  VARIABLE (RE) O;
+  O := 1.315;
+  NPOL := 1;
+  MPOL[1] := -20;
+  NSDP := 6;
+  DR := D_AP/O;
+  LOFF := 1;
+  CE := 'CEL';
+  PPOL[1] := -V_VOLT/(2*O/D_AP*C_SPACE) + 0*DD[1];
+  PPOL[2] := O*L_GAP/2/D_AP + 0*DD[1];
+  PPOL[3] := O*(C_SPACE+L_GAP/2)/D_AP + 0*DD[1];
+  DSDED 5*D_AP+C_SPACE+L_GAP/2 0 1E-4*D_AP D_AP 10*D_AP D_AP/O;
+ENDPROCEDURE;
+
+{ ----- CEA — three-aperture electric einzel lens (cosy.fox L3886-3891) -----
+  V/D/L/C parameters as for CEL. Uses NSDP=9 (atan-product profile).
+  DSDED extends 15D + C + L/2 in each direction since the atan field
+  decay is slower than the cosh of CEL.                                }
+PROCEDURE CEA V_VOLT (RE) D_AP (RE) L_GAP (RE) C_SPACE (RE);
+  NPOL := 1;
+  MPOL[1] := -20;
+  NSDP := 9;
+  LOFF := 1;
+  CE := 'CEA';
+  PPOL[1] := V_VOLT/(PI*C_SPACE) + 0*DD[1];
+  PPOL[2] := L_GAP/2 + 0*DD[1];
+  PPOL[3] := C_SPACE+L_GAP/2 + 0*DD[1];
+  DSDED 15*D_AP+C_SPACE+L_GAP/2 0 1E-4*D_AP D_AP 10*D_AP D_AP;
+ENDPROCEDURE;
+
 { EMS: skew electric multipole — VA normal, VS skew (cosy.fox L3753-3759). }
 PROCEDURE EMS L (RE) VA (RE 5) VS (RE 5) NV_PARAM (RE) D (RE);
   VARIABLE (RE) I;

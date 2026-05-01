@@ -281,6 +281,18 @@ PROCEDURE POTFLD X (DA 30) S (RE);
     ELSEIF NSDP = 4;
       { Linear s-profile (cosy.fox L2557) }
       P := PPOL[I]*(S + DD[2]);
+    ELSEIF NSDP = 6;
+      { Three-tube electric lens (cosy.fox L2559-2562) }
+      P := LOG(COSH((S+DD[2])/DR+PPOL[2])/COSH((S+DD[2])/DR+PPOL[3]));
+      P := P + LOG(COSH((S+DD[2])/DR-PPOL[2])/COSH((S+DD[2])/DR-PPOL[3]));
+      P := P * PPOL[1];
+    ELSEIF NSDP = 9;
+      { Three-aperture electric lens (cosy.fox L2572-2577) }
+      P := (S+DD[2]+PPOL[3])*ATAN((S+DD[2]+PPOL[3])/DR);
+      P := P + (S+DD[2]-PPOL[3])*ATAN((S+DD[2]-PPOL[3])/DR);
+      P := P - (S+DD[2]+PPOL[2])*ATAN((S+DD[2]+PPOL[2])/DR);
+      P := P - (S+DD[2]-PPOL[2])*ATAN((S+DD[2]-PPOL[2])/DR);
+      P := P * PPOL[1];
     ELSEIF NSDP = 7;
       { Glaser lens profile: PPOL[1]·DR·atan(s/DR) (cosy.fox L2563) }
       P := PPOL[1]*DR*ATAN((S + DD[2])/DR);
