@@ -105,8 +105,11 @@ VARIABLE (RE) NSDP; VARIABLE (RE) LCCT; VARIABLE (RE) LOFF;
 VARIABLE (RE 20 2 2 6) ENGEC;
 VARIABLE (RE) LE;
 
-{ Symplectic-scaling fringe-field arrays }
-VARIABLE (RE 40 2 6 10) GFF2; VARIABLE (RE 400 2 6 10) LFF2;
+{ Symplectic-scaling fringe-field arrays.
+  cosy.fox: GFF2 NM1 2 6 10 / LFF2 NM2 2 6 10 — NM1/NM2 are
+  DA-monomial-count placeholders. libcosy stores them as DA 3D arrays.
+  DATFF2 stores reference parameters — pure RE per FC2 usage.       }
+VARIABLE (DA 2 6 10) GFF2; VARIABLE (DA 2 6 10) LFF2;
 VARIABLE (RE 2 6 10) DATFF2;
 
 { Measured-field interpolation buffers }

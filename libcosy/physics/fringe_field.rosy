@@ -218,4 +218,64 @@ PROCEDURE SYSCFL IU (RE) AA (RE 10) FF (DA 10) LL (DA 10) INOR (RE);
   ENDLOOP;
 ENDPROCEDURE;
 
+{ ----- FC2: per-element symplectic-scaling reader (cosy.fox L2303-2308) -----
+  FC2(POL, IEE, FILENAME) reads a SYSCA-format file and copies into
+  GFF2[IEE, POL, J] / LFF2[IEE, POL, J] / DATFF2[IEE, POL, J] for J=1..10.
+  POL = multipole order (1..6 typically), IEE = entrance/exit (1/2),
+  FILENAME = path to SYSCA-format data.                              }
+PROCEDURE FC2 POL (RE) IEE (RE) FILENAME (ST);
+  VARIABLE (RE) J;
+  VARIABLE (RE 10) AA;
+  VARIABLE (DA 10) FF;
+  VARIABLE (DA 10) LL;
+  VARIABLE (RE) NEG_ONE_FC2;
+  NEG_ONE_FC2 := -1;
+  OPENF 99 FILENAME 'OLD';
+  SYSCFL 99 AA FF LL NEG_ONE_FC2;
+  CLOSEF 99;
+  NOC := NOC + 1;
+  DANOT NOC;
+  LOOP J 1 10;
+    GFF2[IEE, POL, J] := FF[J];
+    LFF2[IEE, POL, J] := LL[J];
+    DATFF2[IEE, POL, J] := AA[J];
+  ENDLOOP;
+  NOC := NOC - 1;
+  DANOT NOC;
+ENDPROCEDURE;
+
+{ ----- FD2: load default symplectic-scaling arrays (cosy.fox L2310-2317) ----
+  Reads SYSCA.DAT — a 12-block file containing the default symplectic-
+  scaling fringe-field representations for 6 multipole orders × 2
+  edges. Each block follows the SYSCFL format. Result goes into
+  GFF2/LFF2/DATFF2 globals at all (J, I, K) for J=1..2, I=1..6, K=1..10.
+
+  Pre-condition: SYSCA.DAT must exist in the working directory.       }
+PROCEDURE FD2;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) K;
+  VARIABLE (RE 10) AA;
+  VARIABLE (DA 10) FF;
+  VARIABLE (DA 10) LL;
+  VARIABLE (RE) NEG_ONE_FD2;
+  NEG_ONE_FD2 := -1;
+  NOC := NOC + 1;
+  DANOT NOC;
+  OPENF 99 'SYSCA.DAT' 'OLD';
+  LOOP I 1 6;
+    LOOP J 1 2;
+      SYSCFL 99 AA FF LL NEG_ONE_FD2;
+      LOOP K 1 10;
+        GFF2[J, I, K] := FF[K];
+        LFF2[J, I, K] := LL[K];
+        DATFF2[J, I, K] := AA[K];
+      ENDLOOP;
+    ENDLOOP;
+  ENDLOOP;
+  CLOSEF 99;
+  NOC := NOC - 1;
+  DANOT NOC;
+ENDPROCEDURE;
+
 END;
