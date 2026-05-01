@@ -170,4 +170,25 @@ PROCEDURE SBE EX (RE) EY (RE) ET (RE);
      X_VEC[3] A_VEC[3] R_VEC[3] 0 0;
 ENDPROCEDURE;
 
+{ ----- MAKEINV: normal-form invariant from emittances (cosy.fox L4155-4158)
+  MAKEINV(A, E, INV) computes a normal-form invariant
+    INV = ∑_{i=1..ND} ( A(2i-1)² + A(2i)² ) / E(i)
+  given a change-of-basis A (typically the output of NF / DANF) and
+  per-plane emittances E. The DA-typed INV is a polynomial invariant
+  of the dynamics: along any trajectory, INV stays constant up to the
+  computational order's truncation.
+
+  Used by ring optics studies for "what's the dynamic-aperture footprint"
+  where E is set per-plane. CO NOC+1 / CO NOC-1 brackets the high-order
+  truncation needed for the DA arithmetic in the squared sum.            }
+PROCEDURE MAKEINV A (DA 8) E (RE 3) INV (DA);
+  VARIABLE (RE) I;
+  CO NOC+1;
+  INV := 0*DD[1];
+  LOOP I 1 ND;
+    INV := INV + (SQR(A[2*I-1]) + SQR(A[2*I]))/E[I];
+  ENDLOOP;
+  CO NOC-1;
+ENDPROCEDURE;
+
 END;
