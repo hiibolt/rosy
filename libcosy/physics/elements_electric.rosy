@@ -97,4 +97,102 @@ PROCEDURE RF V (RE 3 3) N (RE) W (RE) PHI (RE) D (RE);
   UPDATE 0 1;
 ENDPROCEDURE;
 
+{ ----- M6.4: SIELE-driven electric multipoles (cosy.fox L3724-3759) -----
+  Parallel to the magnetic multipoles but with negative MPOL (identifying
+  them as electric in POTFLD's POTS path) and PPOL holding voltages
+  (kV) rather than fields (T). All delegate to FFELE which uses LFR=0
+  for libcosy v1 (no fringe field).
+
+  EQ = electric quadrupole, EH = electric sextupole (hexapole),
+  EO = electric octupole, ED = electric decapole, EZ = electric
+  dodecapole. E5 bundles the 5 lowest electric multipoles into one
+  call. EM/EMS are array-of-strengths normal/skew forms.              }
+PROCEDURE EQ L (RE) VV (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := VV/D/D + 0*DD[1];
+  MPOL[1] := -2;
+  LOFF := 1;
+  FFELE L D 0 1 2 'EQ';
+ENDPROCEDURE;
+
+PROCEDURE EH L (RE) VV (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := VV/D/D/D + 0*DD[1];
+  MPOL[1] := -3;
+  LOFF := 1;
+  FFELE L D 0 1 2 'EH';
+ENDPROCEDURE;
+
+PROCEDURE EO L (RE) VV (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := VV/D/D/D/D + 0*DD[1];
+  MPOL[1] := -4;
+  LOFF := 1;
+  FFELE L D 0 1 2 'EO';
+ENDPROCEDURE;
+
+PROCEDURE ED L (RE) VV (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := VV/D/D/D/D/D + 0*DD[1];
+  MPOL[1] := -5;
+  LOFF := 1;
+  FFELE L D 0 1 2 'ED';
+ENDPROCEDURE;
+
+PROCEDURE EZ L (RE) VV (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := VV/D/D/D/D/D/D + 0*DD[1];
+  MPOL[1] := -6;
+  LOFF := 1;
+  FFELE L D 0 1 2 'EZ';
+ENDPROCEDURE;
+
+{ E5: 5-pole electric bundle (cosy.fox L3739-3745). }
+PROCEDURE E5 L (RE) VQ (RE) VH (RE) VO (RE) VD (RE) VZ (RE) D (RE);
+  NPOL := 5;
+  PPOL[1] := VQ/D/D + 0*DD[1];                MPOL[1] := -2;
+  PPOL[2] := VH/D/D/D + 0*DD[1];              MPOL[2] := -3;
+  PPOL[3] := VO/D/D/D/D + 0*DD[1];            MPOL[3] := -4;
+  PPOL[4] := VD/D/D/D/D/D + 0*DD[1];          MPOL[4] := -5;
+  PPOL[5] := VZ/D/D/D/D/D/D + 0*DD[1];        MPOL[5] := -6;
+  LOFF := 1;
+  FFELE L D 0 1 2 'E5';
+ENDPROCEDURE;
+
+{ EM: arbitrary normal electric multipole array (cosy.fox L3747-3751). }
+PROCEDURE EM L (RE) VA (RE 5) NVA (RE) D (RE);
+  VARIABLE (RE) I;
+  VARIABLE (DA) DP;
+  DP := 1/D + 0*DD[1];
+  LOOP I 1 NVA;
+    DP := DP/D;
+    PPOL[I] := VA[I]*DP;
+    MPOL[I] := -(I+1);
+  ENDLOOP;
+  LOFF := 1;
+  NPOL := NVA;
+  FFELE L D 0 1 2 'EM';
+ENDPROCEDURE;
+
+{ EMS: skew electric multipole — VA normal, VS skew (cosy.fox L3753-3759). }
+PROCEDURE EMS L (RE) VA (RE 5) VS (RE 5) NV_PARAM (RE) D (RE);
+  VARIABLE (RE) I;
+  VARIABLE (DA) DP;
+  DP := 1/D + 0*DD[1];
+  LOOP I 1 NV_PARAM;
+    DP := DP/D;
+    PPOL[I] := VA[I]*DP;
+    MPOL[I] := -(I+1);
+  ENDLOOP;
+  DP := 1/D + 0*DD[1];
+  LOOP I 1 NV_PARAM;
+    DP := DP/D;
+    PPOL[I+NV_PARAM] := -VS[I]*DP*(I+1);
+    MPOL[I+NV_PARAM] := -(I+1+20);
+  ENDLOOP;
+  LOFF := 1;
+  NPOL := 2*NV_PARAM;
+  FFELE L D 0 1 2 'EMS';
+ENDPROCEDURE;
+
 END;

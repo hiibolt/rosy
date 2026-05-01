@@ -538,6 +538,20 @@ WRITE 6 MSC[1];
 WRITE 6 'After SIELE octupole, MSC[2] (octupole p_x should pick up x^3 kick):';
 WRITE 6 MSC[2];
 
+{ ----- M6.4: Electric multipoles via FFELE → SIELE → UPDATE -----
+  Electric quadrupole EQ: same machinery as MQ but with negative MPOL
+  (electric) and PPOL holding voltage (kV). Should produce a focusing
+  (or defocusing) kick on x' depending on V's sign.                    }
+WRITE 6 ' ----- M6.4: EQ electric quadrupole (FFELE/SIELE chain) -----';
+OV 3 2 0;
+RPP 100;
+UM;
+EQ 0.1 50 0.05;        { L=0.1m, V=50 kV pole-tip, D=5cm }
+WRITE 6 'After EQ 0.1 50 0.05, MAP[1]:';
+WRITE 6 MAP[1];
+WRITE 6 'After EQ, MAP[2] (electric quad p_x kick):';
+WRITE 6 MAP[2];
+
 { ----- M6.3: full FFELE → SIELE → UPDATE chain (ND=2 sextupole) -----
   For ND=2, NV=4 ≥ 3, so UPDATEMAP's POLVAL composition works cleanly.
   Use a sextupole through MM (an array-of-strengths magnet wrapper).    }
