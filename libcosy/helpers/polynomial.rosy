@@ -28,6 +28,30 @@ FUNCTION (RE) POLY X (RE) Y (RE) P (RE 3 3) IS_ (RE);
   ENDLOOP;
 ENDFUNCTION;
 
+{ ----- POLY_DA: 2D polynomial evaluation with DA inputs (cosy.fox L239-243)
+  Same math as POLY but accepts and returns DA. Required by RF (and a
+  forthcoming WL port) where the polynomial is evaluated symbolically
+  on DA components of the active MAP — POLY's RE-only signature won't
+  accept those inputs.
+
+  X1, Y1 are lifted into DA via `+ 0*DD[1]` so the running-power loop
+  multiplies cleanly with the DA argument. The coefficient table P
+  stays RE (cosy.fox usage is always real-valued tables).               }
+FUNCTION (DA) POLY_DA X (DA) Y (DA) P (RE 3 3) IS_ (RE);
+  VARIABLE (RE) I; VARIABLE (RE) J;
+  VARIABLE (DA) X1; VARIABLE (DA) Y1;
+  POLY_DA := 0*DD[1];
+  X1 := 1 + 0*DD[1];
+  LOOP I 1 IS_+1;
+    Y1 := 1 + 0*DD[1];
+    LOOP J 1 IS_+1;
+      POLY_DA := POLY_DA + P[I, J]*X1*Y1;
+      Y1 := Y*Y1;
+    ENDLOOP;
+    X1 := X*X1;
+  ENDLOOP;
+ENDFUNCTION;
+
 { ----- 1D Gaussian interpolation (cosy.fox L261-272) ----------------------
   Smooths a measured-field column at fractional index X using a Gaussian
   kernel of width SIGMA. Boundary clamping fires when the kernel window

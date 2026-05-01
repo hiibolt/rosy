@@ -491,6 +491,26 @@ MT M_OTHER M_SAVE 0.0;    { rotate by 0 degrees → no change }
 WRITE 6 'MT 0-deg roundtrip diff (M_OTHER vs MT(M_OTHER, 0), expect ~0):';
 DMAP M_OTHER M_SAVE 6;
 
+{ ----- RF cavity (analytical, no FFELE — cosy.fox L3899-3916) -----
+  RF in libcosy v1 supports the kick-only path (no spin, no rays).
+  After RP, the cosy.fox semantics put XX[6] = (E0-CONS(E0))/CONS(E0)
+  into MAP[6] — i.e., energy slot starts at zero (not DD[6]). For our
+  trivial DC kick (W=0, PHI=90deg, V[1,1]=1), there's no time-of-
+  flight modulation, so MAP[6] stays at zero — the smoke check is just
+  that RF runs without crashing and updates the side-effect globals. }
+WRITE 6 ' ----- RF: thin-lens RF cavity in 3D phase space -----';
+OV 2 3 0;
+RPP 100;
+UM;
+VARIABLE (RE 3 3) RFV;
+RFV[1, 1] := 1;             { 1 kV DC profile (flat) }
+RFV[1, 2] := 0; RFV[1, 3] := 0;
+RFV[2, 1] := 0; RFV[2, 2] := 0; RFV[2, 3] := 0;
+RFV[3, 1] := 0; RFV[3, 2] := 0; RFV[3, 3] := 0;
+RF RFV 0 0 90 0.05;        { N=0, W=0, PHI=90deg, D=5cm }
+WRITE 6 'After RF, CE = ''' CE '''   [expect ''RF'']';
+WRITE 6 'After RF, DR = ' DR '   [expect 0.05]';
+
 { ----- MC / MS / MSL / MPL (combined-function magnet wrappers) -----
   MC takes caller-supplied N/S1/S2 arrays; MS/MSL/MPL build them from
   five scalar multipole strengths.

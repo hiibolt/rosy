@@ -16,9 +16,10 @@ INCLUDE 'normal_form.rosy';         { M5 (DANF / NF normal-form pipeline) }
 INCLUDE 'twiss_tune.rosy';          { M5 (SIGMA beam-envelope helper) }
 INCLUDE 'bend.rosy';                { M5 (BEND dipole — BENDFF0 path only) }
 INCLUDE 'spin_su2.rosy';            { M5 (SO3_IN_SU2 spin SO3→SU2 converter) }
+INCLUDE 'elements_electric.rosy';   { M5 (RF cavity — analytical, no FFELE) }
 
-{ Future: M5 will add 'spin_su2.rosy'.
-  M6 will INCLUDE 'field_potential.rosy', and the rest of elements_basic.
-  M7-M9 will INCLUDE the remaining elements_*.rosy and 'tracking.rosy'. }
+{ Future: M6 will INCLUDE 'field_potential.rosy', and the rest of
+  elements_basic + the FFELE-blocked electric/magnetic multipoles.
+  M7-M9 will INCLUDE 'tracking.rosy'. }
 
 END;

@@ -1,0 +1,100 @@
+{ ============================================================================
+  libcosy/physics/elements_electric.rosy — Electric-field elements
+
+  Initial port covers RF (RF cavity), the only fully-analytical electric
+  element in cosy.fox. The remaining electric-multipole family (EQ, EH,
+  EO, ED, EZ, E5, EM, EMS) and the electrostatic deflectors (EBEND, EC,
+  ES, ECL, ESP, EC, ECL, ESP, etc.) all delegate to FFELE / SDELE — they
+  land in M6 alongside POTFLD.
+
+  The Wien-filter pair (WC, WF) and electrostatic lens family (CEG,
+  CEL, CEA, DC) are similarly FFELE-blocked and deferred.
+
+  RF Cavity (cosy.fox L3899-3916)
+  -------------------------------
+  RF(V, N, W, PHI, D) applies a thin-lens RF cavity to the active MAP
+  (and the scratch MSC if rays are enabled). Inputs:
+    * V : (RE 3 3) polynomial coefficients of the on-axis voltage
+                   profile V(x, y) = sum_{ij} V[i,j] · x^(i-1) · y^(j-1)
+    * N : (RE)     polynomial degree (N+1 terms per axis)
+    * W : (RE)     RF frequency [Hz]
+    * PHI: (RE)    RF phase at the longitudinal reference [degrees]
+    * D : (RE)     pole-tip aperture [m]
+
+  The cavity is treated as a thin lens: time-of-flight T translates to
+  a phase, the polynomial V evaluated at (x, y) gives the energy kick,
+  and the post-kick momenta are scaled by the new-to-old momentum ratio.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- RF: thin-lens RF cavity (cosy.fox L3899-3916) ----------------------
+  Algorithm:
+    1. Save EE0 = CONS(E0), PP0 = CONS(P0) (energy/momentum BEFORE kick).
+    2. Compute VV0 = POLY(0, 0, V, N) · sin(PHI·DEGRAD) · 0.001 · Z0
+       (the constant-axis kick at reference; .001 factor converts kV→MeV
+       per cosy.fox's electrical convention; Z0 is the charge state).
+    3. Update reference particle to E0+VV0 via RP — this rebuilds
+       P0/V0/CHIM/CHIE for the new kinetic energy.
+    4. Apply RFM to MAP and (if rays enabled) MSC.
+    5. Reset axis state and refresh derived globals (UPDATE 0 1 — the
+       second 1 says rays were touched).
+
+  RFM operates per-component:
+    T  := M[5] · (-PP0/EE0/CLIGHT)        time-of-flight at origin
+    VV := POLY(M[1], M[3], V, N) · sin(W·2π·T + PH) · (1+M[8]) · .001 · Z0
+    M[2] := M[2] · PP0/CONS(P0)            scale x' to new momentum
+    M[4] := M[4] · PP0/CONS(P0)            scale y' (only for ND>1)
+    M[5] := T · (-CONS(E0)/CONS(P0)) · CLIGHT     restate t-of-flight
+    M[6] := (M[6] + (VV-CONS(VV0))/EE0) / (1 + CONS(VV0)/EE0)   energy
+
+  Pre-conditions: RP must have been called (LRP=1) and the new-energy
+  check (CONS(E0)<1E-10 → "RF too high") guards against runaway. }
+PROCEDURE RF V (RE 3 3) N (RE) W (RE) PHI (RE) D (RE);
+  VARIABLE (RE) PP0;
+  VARIABLE (RE) EE0;
+  VARIABLE (RE) VV0;
+  VARIABLE (RE) PH;
+
+  PROCEDURE RFM M (DA 8);
+    VARIABLE (DA) T;
+    VARIABLE (DA) VV;
+    T := M[5]*(-PP0/EE0/CLIGHT);
+    VV := POLY_DA(M[1], M[3], V, N)*SIN(W*2*PI*T + PH)*(1 + M[8])*0.001*Z0;
+    M[2] := M[2]*PP0/CONS(P0);
+    IF ND > 1;
+      M[4] := M[4]*PP0/CONS(P0);
+    ENDIF;
+    IF ND > 2;
+      M[5] := T*(-CONS(E0)/CONS(P0))*CLIGHT;
+      M[6] := (M[6] + (VV - VV0)/EE0)/(1 + VV0/EE0);
+    ENDIF;
+  ENDPROCEDURE;
+
+  IF LRP # 1;
+    WRITE 6 ' *** ERROR, call RP before RF';
+    QUIT 0;
+  ENDIF;
+  PP0 := CONS(P0);
+  EE0 := CONS(E0);
+  PH := PHI*DEGRAD;
+  VV0 := POLY(0, 0, V, N)*SIN(PH)*0.001*CONS(Z0);
+  RP CONS(E0)+VV0 CONS(M0) CONS(Z0);
+  IF CONS(E0) < 1E-10;
+    WRITE 6 ' *** RF TOO HIGH';
+    QUIT 0;
+  ENDIF;
+  RFM MAP;
+  IF NRAY # 0;
+    UMS;
+    RFM MSC;
+  ENDIF;
+  LOCSET 0 0 0 0 0 0;
+  DR := D;
+  CE := 'RF';
+  UPDATE 0 1;
+ENDPROCEDURE;
+
+END;

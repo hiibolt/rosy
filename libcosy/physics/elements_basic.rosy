@@ -61,6 +61,21 @@ PROCEDURE DL L (RE);
   DR := 0;
 ENDPROCEDURE;
 
+{ ----- PS: Poincaré-section marker (cosy.fox L2907-2908) -----------------
+  PS(D) marks a Poincaré-section boundary in the beamline. It sets the
+  global drift-radius scalar DR := D, zeros the local Cartesian axis
+  state via LOCSET, and calls UPDATE 0 0 to refresh derived state.
+
+  In cosy.fox this also triggers a graphics display of the section
+  contents. libcosy v1 has no graphics, so PS is purely a state
+  marker — useful for users who want to break a long element chain
+  into "stations" without actually advancing the map.                    }
+PROCEDURE PS D (RE);
+  DR := D;
+  LOCSET 0 0 0 0 0 0;
+  UPDATE 0 0;
+ENDPROCEDURE;
+
 { ----- CB: change bending direction (cosy.fox L3098-3106) -----------------
   CB negates the x-position and x-momentum components of the active MAP.
   Used to flip a magnet's bending direction (e.g. before a RIGHT-bend
