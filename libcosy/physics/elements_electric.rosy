@@ -274,6 +274,35 @@ PROCEDURE ESP R (RE) PHID (RE) D (RE);
   EBEND R PHID*DEGRAD D N_VEC NT_LOCAL 'ESP';
 ENDPROCEDURE;
 
+{ ----- M6.7+: DC + CEG — accelerator + Gaussian electric lens -----
+  DC (cosy.fox L3893-3897): static homogeneous E-field accelerator
+  with potential P = -V/L · s. Uses NSDP=11, MPOL=-20 (skew/no-mult
+  marker), LOFF=1. SDELE drives the integration over [0, L].
+
+  CEG (cosy.fox L3872-3874): Gaussian electric lens. Uses NSDP=3
+  (Gaussian s-profile), DSDED for the negative-drift wrap.            }
+PROCEDURE DC V_VOLT (RE) D_AP (RE) L (RE);
+  NPOL := 1;
+  MPOL[1] := -20;
+  NSDP := 11;
+  LOFF := 1;
+  CE := 'DC';
+  PPOL[1] := -V_VOLT/L + 0*DD[1];
+  LOCSET 0 0 0 0 0 0;
+  SDELE 0 L 1E-4*D_AP D_AP 10*D_AP D_AP;
+  UPDATE 1 1;
+ENDPROCEDURE;
+
+PROCEDURE CEG V_VOLT (RE) D_AP (RE);
+  NPOL := 1;
+  PPOL[1] := V_VOLT + 0*DD[1];
+  MPOL[1] := -20;
+  NSDP := 3;
+  CE := 'CEG';
+  LOFF := 1;
+  DSDED 5*D_AP 0 1E-4*D_AP D_AP 10*D_AP D_AP;
+ENDPROCEDURE;
+
 { EMS: skew electric multipole — VA normal, VS skew (cosy.fox L3753-3759). }
 PROCEDURE EMS L (RE) VA (RE 5) VS (RE 5) NV_PARAM (RE) D (RE);
   VARIABLE (RE) I;

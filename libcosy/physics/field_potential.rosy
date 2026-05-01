@@ -275,8 +275,20 @@ PROCEDURE POTFLD X (DA 30) S (RE);
       P := PPOL[I]*ENGE(MOD(JPOL, 20), 1, JEM, -(S + DD[2])/DR/2);
     ELSEIF NSDP = 2;
       P := PPOL[I]*ENGE(MOD(JPOL, 20), 2, JEM, (S + DD[2])/DR/2);
+    ELSEIF NSDP = 3;
+      { Gaussian s-profile (cosy.fox L2556) }
+      P := PPOL[I]*EXP(-SQR((S + DD[2])/DR));
+    ELSEIF NSDP = 4;
+      { Linear s-profile (cosy.fox L2557) }
+      P := PPOL[I]*(S + DD[2]);
+    ELSEIF NSDP = 7;
+      { Glaser lens profile: PPOL[1]·DR·atan(s/DR) (cosy.fox L2563) }
+      P := PPOL[1]*DR*ATAN((S + DD[2])/DR);
+    ELSEIF NSDP = 11;
+      { Accelerating static homogeneous E-field: PPOL[1]·s (cosy.fox L2581-2582) }
+      P := PPOL[1]*(S + DD[2]);
     ELSE;
-      WRITE 6 ' *** ERROR in POTFLD, NSDP>2 modes (Gaussian/Solenoid/etc.) not yet ported in libcosy v1';
+      WRITE 6 ' *** ERROR in POTFLD, NSDP not in {0,1,2,3,4,7,11} not yet ported in libcosy v1';
       QUIT 0;
     ENDIF;
     IF MPOL[I] = 1;
@@ -578,6 +590,50 @@ PROCEDURE SDELE S1 (RE) S2 (RE) H1 (RE) H2 (RE) H3 (RE) D_AP (RE);
         MSC[6] := MSC[6]*(EE0/CONS(E0));
       ENDIF;
     ENDIF;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- DSDED: SDELE between negative drifts (cosy.fox L2945-2953) -----
+  DSDED(LDL, L, H1, H2, H3, D_AP) wraps SDELE with a backward drift
+  by LDL on either side. Used by short-element wrappers (CEG, CEL,
+  CEA, DC) where the element occupies [0, L] but the integration
+  needs to extend ±LDL into adjacent drift space for the fringe-field
+  decay.
+
+  Algorithm:
+    UMS — reset MSC to identity
+    DLACT MSC -LDL — backward drift
+    SNM MSC MS — save state
+    SSNM SSCR SM — save spin
+    LOCSET 0 -LDL 0 -LDL 0 0
+    SDELE -LDL L+LDL H1 H2 H3 D_AP — integrate full extended interval
+    UPDATEMAP MSC MS MSC SSCR SM SSCR — compose into the live MSC
+    DLACT MSC -LDL — backward drift again
+    LOCSET / UPDATE 1 1 — finalise                                     }
+PROCEDURE DSDED LDL (RE) L (RE) H1 (RE) H2 (RE) H3 (RE) D_AP (RE);
+  VARIABLE (DA 8) MS;
+  VARIABLE (DA 3 3) SM;
+  VARIABLE (RE) SCE;
+  VARIABLE (RE) NEG_LDL;
+  VARIABLE (RE) L_PLUS_LDL;
+  SCE := 2E-5;
+  NEG_LDL := -LDL;
+  L_PLUS_LDL := L + LDL;
+  UMS;
+  DLACT MSC NEG_LDL;
+  SNM MSC MS;
+  SSNM SSCR SM;
+  LOCSET 0 NEG_LDL 0 NEG_LDL 0 0;
+  SDELE NEG_LDL L_PLUS_LDL H1 H2 H3 D_AP;
+  UPDATEMAP MSC MS MSC SSCR SM SSCR;
+  DLACT MSC NEG_LDL;
+  IF L < 1E-5;
+    LOCSET 0 L 0 L+SCE 0 0;
+    UPDATE 1 1;
+    SPOS := SPOS - SCE;
+  ELSE;
+    LOCSET 0 L 0 L 0 0;
+    UPDATE 1 1;
   ENDIF;
 ENDPROCEDURE;
 
