@@ -828,11 +828,11 @@ PROCEDURE FFELE L (RE) D_AP (RE) H_LOCAL (RE) LF1 (RE) LF2 (RE) CI (ST);
       LOCSET ARG_X ARG_Z ARG_PHI L 0 0;
     ENDIF;
     UPDATE 1 1;
-  ELSEIF LFR = 3;
-    { LFR=3: high-precision soft-edge fringe (cosy.fox L3068-3078).
-      Wider 8*D drift extension than LFR=1's 4*D, single SDELE per
-      side for higher RK accuracy. Step sizes D/200 (min) / D / 7*D
-      give very fine adaptive control.                                }
+  ELSEIF (LFR = 3) OR (LFR = 2.5);
+    { LFR=3 (and LFR=2.5 alias from cosy.fox): high-precision soft-edge
+      fringe (cosy.fox L3068-3078). Wider 8*D drift extension than
+      LFR=1's 4*D, single SDELE per side for higher RK accuracy. Step
+      sizes D/200 (min) / D / 7*D give very fine adaptive control.    }
     VARIABLE (RE) NEG8D;
     VARIABLE (RE) NEG6D;
     VARIABLE (RE) SIX_D;

@@ -89,4 +89,37 @@ PROCEDURE FD;
   LE := 1;
 ENDPROCEDURE;
 
+{ ----- ENGEP: derivative of the Enge function (cosy.fox L2486-2497) -------
+  Returns the derivative of ENGE wrt its s argument. Used by POTXZ
+  NSDP=-1/-2 (bend-element fringe fields) for computing E_z component
+  from the curl-free constraint on the electric potential.
+
+  ENGEPP is the derivative of the Enge polynomial; the actual
+  derivative of F = 1/(1+exp(p)) is -dp/ds · exp(p) / (1+exp(p))²
+  = -ENGEPP · exp(ENGE_poly) / (1+exp)² , which simplifies to
+  -ENGEPP/(2 + exp(p) + 1/exp(p)) — what cosy.fox computes.
+
+  Clamps |ENGEP polynomial| ≤ 30 to prevent EXP overflow.               }
+FUNCTION (DA) ENGEP IMP (RE) IEE (RE) IEM (RE) S (DA);
+  VARIABLE (DA) ENGE_POLY;
+  VARIABLE (DA) ENGE_PRIME_POLY;
+  ENGE_POLY :=    ENGEC[IMP, IEE, IEM, 1]
+           + S * (ENGEC[IMP, IEE, IEM, 2]
+           + S * (ENGEC[IMP, IEE, IEM, 3]
+           + S * (ENGEC[IMP, IEE, IEM, 4]
+           + S * (ENGEC[IMP, IEE, IEM, 5]
+           + S *  ENGEC[IMP, IEE, IEM, 6]))));
+  ENGE_PRIME_POLY :=    ENGEC[IMP, IEE, IEM, 2]
+                 + S * (2*ENGEC[IMP, IEE, IEM, 3]
+                 + S * (3*ENGEC[IMP, IEE, IEM, 4]
+                 + S * (4*ENGEC[IMP, IEE, IEM, 5]
+                 + S *  5*ENGEC[IMP, IEE, IEM, 6])));
+  IF ABS(CONS(ENGE_POLY)) > 30;
+    ENGEP := 0*S;
+  ELSE;
+    ENGE_POLY := EXP(ENGE_POLY);
+    ENGEP := -ENGE_PRIME_POLY/(2 + ENGE_POLY + 1/ENGE_POLY);
+  ENDIF;
+ENDFUNCTION;
+
 END;
