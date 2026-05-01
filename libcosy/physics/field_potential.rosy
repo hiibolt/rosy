@@ -198,6 +198,49 @@ FUNCTION (DA) HAMILTONIAN A_VEC (DA) V_SCAL (DA) H_CURV (DA);
   CO NOC-1;
 ENDFUNCTION;
 
+{ ----- POTI: potential to a vector field (cosy.fox L245-253) -------------
+  POTI(F, NF, P) finds a scalar potential P satisfying ∂P/∂x_i = F[i] for
+  i=1..NF (a vector field is conservative if it admits such a potential).
+
+  Moved here from normal_form.rosy in M6.15 so POTXZ's NSDP=-1/-2 path
+  (electric bend fringe) can call it without forward-reference issues.
+  Still used by MLF / MGF in normal_form.rosy for Lie-generator extraction.
+
+  Algorithm (per i):
+    1. Take F[i] as a candidate "antiderivative seed" FF.
+    2. Plug 0 for variables i+1..NF (DAPLU sweep) so FF retains only
+       early-variable dependence.
+    3. Integrate FF along variable i and accumulate into P.
+  After accumulation, check ∂P/∂x_i ≈ F[i] (consistency); warn if the
+  L1 error norm exceeds 1E-5.                                              }
+PROCEDURE POTI F (DA 8) NF (RE) P (DA);
+  VARIABLE (RE) I;
+  VARIABLE (RE) K;
+  VARIABLE (DA 1) FF;
+  VARIABLE (DA 1) SCR_BUF;
+  VARIABLE (RE) SCR;
+
+  P := 0*DD[1];
+  LOOP I 1 NF;
+    FF[1] := F[I];
+    LOOP K I+1 NF;
+      DAPLU FF K 0 SCR_BUF;
+      FF[1] := SCR_BUF[1];
+    ENDLOOP;
+    P := P + INTEG(I, FF[1]);
+  ENDLOOP;
+
+  DANOT NOC-1;
+  SCR := 0;
+  LOOP I 1 NF;
+    SCR := SCR + WABS(DER(I, P) - F[I], WAF);
+  ENDLOOP;
+  IF SCR > 1E-5;
+    WRITE 6 ' --- WARNING in POTI, error norm > 1E-5';
+  ENDIF;
+  DANOT NOC;
+ENDPROCEDURE;
+
 { ----- POTFLD: field-potential evaluator (cosy.fox L2438-2717, partial) ----
   POTFLD(X, S) computes the electric/magnetic potentials V, W and the
   on-axis fields (EFX, EFY, EFZ, BFX, BFY, BFZ) plus curvature H at the
@@ -208,20 +251,96 @@ ENDFUNCTION;
   measured-data, etc.). The libcosy v1 port handles only the simplest
   cases needed for SIELE-driven multipole magnets:
 
-    NSDP =  0  → constant fields                       (handled here)
-    LOFF =  1  → off-plane via PMM/PEM completion      (handled here)
-    NSDP ≠ 0   → fringe/measured/etc.                  ERROR
-    LOFF =  2  → off-plane via DD[1]/DD[3] direct      ERROR
-    LCCT =  1  → FCCT concatenation                    ERROR
+    NSDP ≥ 0  → POTS path (constant + ENGE fringe + multipole profiles)
+    NSDP <  0 → POTXZ path (Cartesian field for bend-like elements)
+    LOFF = 1  → PMM/PEM symmetric multipole completion
+    LOFF = 2  → DD[1]/DD[3] direct off-plane completion
+    LCCT = 1  → FCCT concatenation post-step                          }
+PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
+  { ----- FIELDXZ: Cartesian-frame field evaluator (cosy.fox L2627-2700)
+    Supports a subset of NSDP<0 modes for libcosy v1:
+      NSDP = -1 → entrance bend electric fringe
+      NSDP = -2 → exit bend electric fringe
+      NSDP = -3 → wiggler
+      NSDP = -12 → cylindrical electrostatic
+      NSDP = -13 → spherical electrostatic
+    NSDP = -4/-5/-6/-7/-8/-21 (BENDIST/GAUSS/FOURIERGAUSS/MCSDIST/DIST
+    based) are deferred — they need additional helper ports. }
+  VARIABLE (RE) I;
+  VARIABLE (RE) JPOL;
+  VARIABLE (RE) JEM;
+  VARIABLE (DA) P_F;
+  VARIABLE (DA) ZZ;
+  VARIABLE (DA 20) XPP;
+  VARIABLE (DA 8) F_VEC;
+  VARIABLE (DA) XR0;
+  BFY := 0*DD[1];
+  V := 0*DD[1];
+  IF (NSDP = -1) OR (NSDP = -2);
+    EFX := 0*DD[1];
+    EFZ := 0*DD[1];
+    XPP[1] := 1 + 0*DD[1];
+    LOOP I 2 20;
+      XPP[I] := XPP[I-1]*X_F;
+    ENDLOOP;
+    LOOP I 1 NPOL;
+      JPOL := ABS(MPOL[I]);
+      JEM := (3 - MPOL[I]/JPOL)/2;
+      P_F := XPP[JPOL]*PPOL[I];
+      ZZ := Z_F/DR/2;
+      IF NSDP = -1;
+        ZZ := -ZZ;
+      ENDIF;
+      IF JEM = 1;
+        BFY := BFY + P_F*ENGE(1, 1, JEM, ZZ);
+      ELSEIF JEM = 2;
+        EFX := EFX - 1000*P_F*JPOL*ENGE(1, 1, JEM, ZZ);
+        IF NSDP = -1;
+          P_F := -P_F;
+        ENDIF;
+        EFZ := EFZ - 1000*P_F*X_F*ENGEP(1, 1, JEM, ZZ)/DR/2;
+      ENDIF;
+    ENDLOOP;
+    F_VEC[1] := CPHI*EFX + SPHI*EFZ + 0*DD[1];
+    F_VEC[2] := -SPHI*EFX + CPHI*EFZ + 0*DD[1];
+    POTI F_VEC 2 V;
+    V := -V*0.001;
+  ELSEIF NSDP = -3;
+    BFY := PPOL[1]*COS((PPOL[2] + PPOL[5]*Z_F)*Z_F);
+    BFY := EDGE(Z_F/PPOL[3])*EDGE((-Z_F + PPOL[4])/PPOL[3])*BFY;
+  ELSEIF NSDP = -12;
+    XR0 := SQRT(SQR(X_F - PPOL[2]) + SQR(Z_F));
+    V := PPOL[1]*LOG(-XR0/PPOL[2]);
+  ELSEIF NSDP = -13;
+    XR0 := SQRT(SQR(X_F - PPOL[2]) + SQR(Z_F));
+    V := PPOL[1]*(1 + PPOL[2]/XR0);
+  ELSE;
+    WRITE 6 ' *** ERROR in FIELDXZ, NSDP not in {-1,-2,-3,-12,-13} not yet ported in libcosy v1';
+    QUIT 0;
+  ENDIF;
+  W := BFY*DD[3];
+ENDPROCEDURE;
 
-  The SIELE → ODE → POTFLD path forces NSDP=0 / LCCT=0; multipole
-  setup procedures (MO, MD, MZ, M5, MM, MMS) set LOFF=1. So this
-  partial port suffices to unblock those.
+{ ----- POTXZ: Cartesian-frame potential wrapper (cosy.fox L2625-2705) -----
+  POTXZ rotates the integration position (X[11..13]) through the
+  reference-orbit angle X[13] before calling FIELDXZ in the magnet's
+  Cartesian frame, then POFF V/W for off-plane completion.            }
+PROCEDURE POTXZ X (DA 30);
+  VARIABLE (DA) CPHI;
+  VARIABLE (DA) SPHI;
+  VARIABLE (DA) X_FLD;
+  VARIABLE (DA) Z_FLD;
+  VARIABLE (DA) ZERO_DA_PX;
+  ZERO_DA_PX := 0*DD[1];
+  CPHI := COS(X[13]);
+  SPHI := SIN(X[13]);
+  X_FLD := X[11] + CPHI*DD[1] - SPHI*DD[2];
+  Z_FLD := X[12] + SPHI*DD[1] + CPHI*DD[2];
+  FIELDXZ X_FLD Z_FLD CPHI SPHI;
+  POFF V ZERO_DA_PX 1 3 2;
+  POFF W ZERO_DA_PX 1 3 2;
+ENDPROCEDURE;
 
-  Lazy init: on first call (LM=0), populate PMM[1..NOC+1], PEM[1..NOC+1]
-  and PMM[21..21+NOC], PEM[21..21+NOC] with off-plane symmetric multipole
-  completion polynomials via POFF. Then PMM[20] = PEM[20] = 1 sentinels.
-  DX[I] = DD[1]^I cached for LOFF=2 use (deferred).                        }
 PROCEDURE POTFLD X (DA 30) S (RE);
   VARIABLE (RE) I;
   VARIABLE (RE) JPOL;
@@ -258,9 +377,11 @@ PROCEDURE POTFLD X (DA 30) S (RE);
 
   CO NOC+1;
   IF NSDP < 0;
-    WRITE 6 ' *** ERROR in POTFLD, NSDP<0 (POTXZ Cartesian path) not yet ported';
-    QUIT 0;
-  ENDIF;
+    { POTXZ path: Cartesian-frame field for NSDP<0 modes (bend fringe,
+      wiggler, electrostatic deflectors, etc.). Sets V/W and direct
+      field components; the body below re-derives EFX/etc. from V/W. }
+    POTXZ X;
+  ELSE;
   { POTS path: NSDP = 0 (constant), 1 (entrance fringe), 2 (exit fringe).
     Higher NSDP modes (3=Gaussian, 8=Solenoid, etc.) error out. }
   V := 0*DD[1];
@@ -378,6 +499,7 @@ PROCEDURE POTFLD X (DA 30) S (RE);
     POFF W H 1 3 2;
   ENDIF;
   H := CONS(H) + 0*DD[1];
+  ENDIF;     { close ELSE for NSDP<0 vs NSDP>=0 dispatch }
 
   EFX := -1000*DER(1, V);
   EFY := -1000*DER(3, V);
@@ -385,6 +507,9 @@ PROCEDURE POTFLD X (DA 30) S (RE);
   BFX := DER(1, W);
   BFY := DER(3, W);
   BFZ := DER(2, W);
+  IF NSDP < 0;
+    H := CONS(BFY)/CHIM1 - CONS(EFX)/CHIE1 + 0*DD[1];
+  ENDIF;
   CO NOC-1;
   IF LCCT = 1;
     { FCCT — concatenate field expressions with the integration state X.

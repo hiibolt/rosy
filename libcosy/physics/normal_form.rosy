@@ -345,45 +345,8 @@ FUNCTION (DA) LEXP A (DA) B (DA);
   ENDLOOP;
 ENDFUNCTION;
 
-{ ----- POTI: potential to a vector field (cosy.fox L245-253) -------------
-  POTI(F, NF, P) finds a scalar potential P satisfying ∂P/∂x_i = F[i] for
-  i=1..NF (a vector field is conservative if it admits such a potential).
-  Used by MLF / MGF to extract a Lie generator from a map.
-
-  Algorithm (per i):
-    1. Take F[i] as a candidate "antiderivative seed" FF.
-    2. Plug 0 for variables i+1..NF (DAPLU sweep) so FF retains only
-       early-variable dependence.
-    3. Integrate FF along variable i and accumulate into P.
-  After accumulation, check ∂P/∂x_i ≈ F[i] (consistency); warn if the
-  L1 error norm exceeds 1E-5.                                              }
-PROCEDURE POTI F (DA 8) NF (RE) P (DA);
-  VARIABLE (RE) I;
-  VARIABLE (RE) K;
-  VARIABLE (DA 1) FF;
-  VARIABLE (DA 1) SCR_BUF;
-  VARIABLE (RE) SCR;
-
-  P := 0*DD[1];
-  LOOP I 1 NF;
-    FF[1] := F[I];
-    LOOP K I+1 NF;
-      DAPLU FF K 0 SCR_BUF;
-      FF[1] := SCR_BUF[1];
-    ENDLOOP;
-    P := P + INTEG(I, FF[1]);
-  ENDLOOP;
-
-  DANOT NOC-1;
-  SCR := 0;
-  LOOP I 1 NF;
-    SCR := SCR + WABS(DER(I, P) - F[I], WAF);
-  ENDLOOP;
-  IF SCR > 1E-5;
-    WRITE 6 ' --- WARNING in POTI, error norm > 1E-5';
-  ENDIF;
-  DANOT NOC;
-ENDPROCEDURE;
+{ POTI moved to field_potential.rosy in M6.15 so POTXZ NSDP=-1/-2 path
+  (electric bend fringe) can call it. POTI itself is unchanged. }
 
 { ----- GFM: map from generating function F (cosy.fox L1397-1410) ----------
   GFM(MM, F, IT) reconstructs a symplectic map MM from a scalar generating

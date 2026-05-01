@@ -89,6 +89,27 @@ PROCEDURE FD;
   LE := 1;
 ENDPROCEDURE;
 
+{ ----- EDGE: wiggler edge function (cosy.fox L2498-2502) ------------------
+  Sigmoid F = 1/(1 + exp(p)) where p is a 9-degree polynomial in -X
+  with coefficients PPOL[7..16]. Used by POTXZ NSDP=-3 (wiggler) for
+  the longitudinal end-field profile. Same shape as ENGE but with
+  user-supplied coefficients (ENGE is global ENGEC table, EDGE pulls
+  from PPOL).                                                            }
+FUNCTION (DA) EDGE X (DA);
+  VARIABLE (RE) I;
+  EDGE := 0*X;
+  LOOP I 16 8 -1;
+    EDGE := (EDGE + PPOL[I])*(-X);
+  ENDLOOP;
+  EDGE := EDGE + PPOL[7];
+  IF CONS(EDGE) < -60;
+    EDGE := -60 + 0*DD[1];
+  ELSEIF CONS(EDGE) > 30;
+    EDGE := 30 + 0*DD[1];
+  ENDIF;
+  EDGE := 1/(1 + EXP(EDGE));
+ENDFUNCTION;
+
 { ----- ENGEP: derivative of the Enge function (cosy.fox L2486-2497) -------
   Returns the derivative of ENGE wrt its s argument. Used by POTXZ
   NSDP=-1/-2 (bend-element fringe fields) for computing E_z component
