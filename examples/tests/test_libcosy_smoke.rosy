@@ -552,6 +552,20 @@ MS 1.0 10.0 0.05 0.5 0 0 0 0;     { R=1m, 10deg, 5cm, weak quad N1=0.5 }
 WRITE 6 'After MS, MAP[1] (combined bend + quadrupole):';
 WRITE 6 MAP[1];
 
+{ ----- M6.17: DI dipole with LFR=3 fringe via BENDFF3 + NSDP=-4 -----
+  Curved-edge dipole DI at LFR=3 routes through BEND's BENDFF3 path
+  which sets NSDP=-4 (BENDIST IC=1, polynomial radial profile) and
+  integrates via SDELE over R*PHI + 2*LDL.                          }
+WRITE 6 ' ----- M6.17: DI dipole LFR=3 via BENDFF3 + NSDP=-4 -----';
+OV 3 2 0;
+RPP 100;
+FR 3;
+UM;
+DI 1.0 5.0 0.05 0 0 0 0;     { R=1m, 5deg, 5cm, no edge angles }
+WRITE 6 'After DI LFR=3, MAP[1]:';
+WRITE 6 MAP[1];
+FR 0;
+
 { ----- M6.16: ECL with LFR=3 fringe via POTXZ NSDP=-11 + BENDIST -----
   Cylindrical electrostatic deflector with high-precision soft-edge
   fringe field through the BENDIST → ENGESIDES → DIST chain. The
