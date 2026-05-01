@@ -681,6 +681,48 @@ PROCEDURE DSDED LDL (RE) L (RE) H1 (RE) H2 (RE) H3 (RE) D_AP (RE);
   ENDIF;
 ENDPROCEDURE;
 
+{ ----- SDELEREF: reference-orbit-only s-dependent element (cosy.fox L2934-2943)
+  SDELEREF integrates only the reference orbit (X[11..15] slots) over
+  [S1, S2] without updating MSC or the spin matrix. Used for "preview"
+  of the curved axis without committing the full transfer-map update.
+
+  Differences from SDELE:
+    * Forces LSPN := 0 during the call (saved/restored).
+    * Initializes phase-space slots [1..8] to zero (not XX), so the
+      reference-particle integration is along the actual curved axis.
+    * Doesn't write MSC or SSCR after RK.
+    * LOCSET uses S2 as the arc-length stamp (not S2-S1 like SDELE).
+
+  Used by BENDFF3 (cosy.fox L3284) for the high-precision bend-fringe
+  path to walk the reference axis through the dipole interior before
+  the actual map integration runs.                                     }
+PROCEDURE SDELEREF S1 (RE) S2 (RE) H1 (RE) H2 (RE) H3 (RE) D_AP (RE);
+  VARIABLE (RE) ERREST_LOCAL;
+  VARIABLE (RE) I;
+  VARIABLE (RE) LSPNO;
+  VARIABLE (DA 30 16) RKSCR;
+  VARIABLE (DA 30) MMP;
+  VARIABLE (DA 30) MMQ;
+  LSPNO := LSPN;
+  LSPN := 0;
+  LCCT := 1;
+  DR := D_AP;
+  LOOP I 1 8;
+    MMP[I] := 0*XX[I];
+  ENDLOOP;
+  LOOP I 9 29;
+    MMP[I] := 0*DD[1];
+  ENDLOOP;
+  MMP[11] := XLOC + 0*DD[1];
+  MMP[12] := ZLOC + 0*DD[1];
+  MMP[13] := PLOC + 0*DD[1];
+  MMP[14] := TLOC + 0*DD[1];
+  MMP[15] := VLOC + 0*DD[1];
+  RK 29 S1 S2 MMP H1 H2 H3 EPS EPS*20 RKSCR MMQ ERREST_LOCAL;
+  LOCSET CONS(MMQ[11]) CONS(MMQ[12]) CONS(MMQ[13]) S2 CONS(MMQ[15]) CONS(MMQ[14]);
+  LSPN := LSPNO;
+ENDPROCEDURE;
+
 { ----- SIELE: s-independent element actuator (cosy.fox L2955-2975) -----
   SIELE(L, D) applies an s-independent element of length L and aperture D
   to the active map (via MSC). It works by:
