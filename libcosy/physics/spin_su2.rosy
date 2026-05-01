@@ -514,4 +514,114 @@ PROCEDURE TSS ST (DA) NBAR (DA 3) KEY (RE);
   ST := ST/PI/2;
 ENDPROCEDURE;
 
+{ ----- PARASU2: extract parameter-only part of a DA scalar (cosy.fox L1831)
+  PARASU2(B) plugs 0 for variables 1..TWOND (the phase-space) into B,
+  leaving only the parameter-space residue. This isolates the
+  parameter dependence of B for the TSP "tune-on-parameters" view.
+
+  cosy.fox uses the DAPLU sweep — wrap into 1-element buffers since
+  ROSY's DAPLU expects Vec<DA>.                                          }
+FUNCTION (DA) PARASU2 B (DA);
+  VARIABLE (DA 1) D_BUF;
+  VARIABLE (DA 1) C_BUF;
+  VARIABLE (RE) I;
+  D_BUF[1] := B;
+  LOOP I 1 TWOND;
+    DAPLU D_BUF I 0 C_BUF;
+    D_BUF[1] := C_BUF[1];
+  ENDLOOP;
+  PARASU2 := D_BUF[1];
+ENDFUNCTION;
+
+{ ----- TSP: spin tune + ñ vector on parameters ONLY (cosy.fox L1818-1872)
+  TSP(ST, NBAR, KEY) computes the parameter-dependence-only part of the
+  spin tune ST and rotation-axis NBAR. Unlike TSS (which gives both
+  amplitude AND parameter dependence), TSP strips the phase-space
+  dependence via PARASU2's DAPLU sweep, leaving only how spin observables
+  vary with PARAMETERS (energy, mass, charge offsets).
+
+  KEY=0: derive from TSS output, then PARASU2-strip phase-space deps.
+  KEY≠0: directly extract spin tune via SO3_IN_SU2 → CPOLVAL at fixed
+         point → SU(2) eigenvalue analysis. More robust for
+         strongly-coupled lattices.                                       }
+PROCEDURE TSP ST (DA) NBAR (DA 3) KEY (RE);
+  VARIABLE (CD 2) B;
+  VARIABLE (CD 2) BF;
+  VARIABLE (CM) IU;
+  VARIABLE (CD 2) U1;
+  VARIABLE (CD 2) CU;
+  VARIABLE (CM) K;
+  VARIABLE (CM) L;
+  VARIABLE (DA) D_VAL;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (DA 8) XF;
+  VARIABLE (DA 8) MF;
+  VARIABLE (DA 3) N1;
+  VARIABLE (DA) T1;
+
+  IF KEY = 0;
+    TSS T1 N1 0;
+    ST := PARASU2(T1);
+    NBAR[1] := PARASU2(N1[1]);
+    NBAR[2] := PARASU2(N1[2]);
+    NBAR[3] := PARASU2(N1[3]);
+  ELSE;
+    FM MAP XF MF J;
+    IF J # 0;
+      WRITE 6 ' *** ERROR in TSP, orbital map has no fixed point';
+      QUIT 0;
+    ENDIF;
+    LOOP I 1 TWOND;
+      XF[I] := DD[I] + XF[I];
+    ENDLOOP;
+    LOOP I TWOND+1 NV;
+      XF[I] := DD[I];
+    ENDLOOP;
+    SO3_IN_SU2 SPNR BF 0;
+    { Lift XF (DA) to CD for CPOLVAL ingestion. }
+    VARIABLE (CD 20) XF_CD;
+    IMUNIT IU;
+    LOOP I 1 NV;
+      XF_CD[I] := XF[I] + 0*IU;
+    ENDLOOP;
+    CPOLVAL 1 BF 2 XF_CD NV B 2;
+    IMUNIT IU;
+    U1[1] := PARASU2(REAL(B[1])) + IU*PARASU2(IMAG(B[1]));
+    U1[2] := PARASU2(REAL(B[2])) + IU*PARASU2(IMAG(B[2]));
+    CORRSU2 U1;
+    D_VAL := SQR(REAL(U1[2])) + SQR(IMAG(U1[2]));
+    IF CONS(D_VAL) > 0;
+      D_VAL := SQRT(D_VAL);
+    ENDIF;
+    IF 1 + ABS(CONS(D_VAL)) = 1;
+      L := CONS(REAL(U1[1])) + IU*CONS(IMAG(U1[1]));
+      CU[1] := 1 + IU*0 + 0*DD[1];
+      CU[2] := 0 + IU*0 + 0*DD[1];
+    ELSEIF 1 + ABS(ABS(CONS(REAL(U1[1]))) - 1) = 1;
+      WRITE 6 ' *** ERROR in TSP, multiple eigenvalues. Try TSS instead';
+      QUIT 0;
+    ELSE;
+      D_VAL := REAL(U1[1]);
+      L := CONS(D_VAL) + IU*SQRT(1 - SQR(CONS(D_VAL)));
+      K := CONS(U1[2])/(CONS(U1[1]) - L);
+      CU[1] := K + 0*DD[1];
+      CU[2] := 1 + IU*0 + 0*DD[1];
+      CORRSU2 CU;
+    ENDIF;
+    L := L/SQRT(SQR(REAL(L)) + SQR(IMAG(L)));
+    ST := 2*ACOS(REAL(L)) + 0*DD[1];
+    NBAR[1] := -2*(REAL(CU[1])*REAL(CU[2]) - IMAG(CU[1])*IMAG(CU[2]));
+    NBAR[2] := -2*(REAL(CU[1])*IMAG(CU[2]) + REAL(CU[2])*IMAG(CU[1]));
+    NBAR[3] := SQR(REAL(CU[1])) + SQR(IMAG(CU[1]))
+             - SQR(REAL(CU[2])) - SQR(IMAG(CU[2]));
+    IF CONS(IMAG(L)) < 0;
+      NBAR[1] := -NBAR[1];
+      NBAR[2] := -NBAR[2];
+      NBAR[3] := -NBAR[3];
+    ENDIF;
+    ST := ST/PI/2;
+  ENDIF;
+ENDPROCEDURE;
+
 END;
