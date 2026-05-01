@@ -93,6 +93,40 @@ PROCEDURE PSM IU (RE);
   ENDLOOP;
 ENDPROCEDURE;
 
+{ ----- WM: write the active MAP to unit IU (cosy.fox L669-673) ------------
+  WM(IU) writes the global MAP to file unit IU in the standard COSY
+  transfer-map format: an "L SPOS" header (arc-length), "P (X,0,Z)"
+  position, "A (PLOC,0,0)" axis, then MAP[1..8] with E24.16 precision.
+
+  cosy.fox uses a single I variable both as the format-string holder
+  and the loop counter (loose typing). ROSY needs separate variables —
+  FORM (ST) holds the format spec, I (RE) is the loop counter.        }
+PROCEDURE WM IU (RE);
+  VARIABLE (ST) FORM;
+  VARIABLE (RE) I;
+  FORM := '(E24.16)';
+  WRITE IU ' L  ' & SF(SPOS, FORM);
+  WRITE IU ' P (' & SF(XLOC, FORM) & ',' & SF(0, FORM) & ',' & SF(ZLOC, FORM) & ')';
+  WRITE IU ' A (' & SF(PLOC, FORM) & ',' & SF(0, FORM) & ',' & SF(0, FORM) & ')';
+  LOOP I 1 8;
+    WRITE IU MAP[I] + 0*DD[1];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- WNM: write a saved map NAP to unit IU (cosy.fox L680-684) ----------
+  Like WM but for an arbitrary map NAP (TWOND components, no axis info). }
+PROCEDURE WNM IU (RE) NAP (DA 8);
+  VARIABLE (ST) FORM;
+  VARIABLE (RE) I;
+  FORM := '(E24.16)';
+  WRITE IU ' L  ' & SF(0, FORM);
+  WRITE IU ' P (' & SF(0, FORM) & ',' & SF(0, FORM) & ',' & SF(0, FORM) & ')';
+  WRITE IU ' A (' & SF(0, FORM) & ',' & SF(0, FORM) & ',' & SF(0, FORM) & ')';
+  LOOP I 1 TWOND;
+    WRITE IU NAP[I] + 0*DD[1];
+  ENDLOOP;
+ENDPROCEDURE;
+
 { ----- Print map N to unit (cosy.fox L675-678) ----------------------------
   Same as PM but for an arbitrary parameter map N rather than the global
   active MAP. Used to inspect saved or computed maps without making them
