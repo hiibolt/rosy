@@ -6,12 +6,12 @@
 
 BEGIN;
 
-INCLUDE 'math.rosy';        { v0.36.1 (M2) }
-INCLUDE 'strings.rosy';     { v0.36.1 (M2) }
-INCLUDE 'numerics.rosy';    { v0.36.1 (M2) }
-INCLUDE 'io.rosy';          { v0.36.1 (M2) }
-INCLUDE 'da_helpers.rosy';      { M3 }
+INCLUDE 'math.rosy';            { v0.36.1 (M2) }
+INCLUDE 'strings.rosy';         { v0.36.1 (M2) }
+INCLUDE 'io.rosy';              { v0.36.1 (M2) }
+INCLUDE 'da_helpers.rosy';      { M3 — must be before numerics.rosy (EL uses INTEG) }
 INCLUDE 'polynomial.rosy';      { M3 }
 INCLUDE 'linear_algebra.rosy';  { M4 }
+INCLUDE 'numerics.rosy';        { v0.40.7 — BETHEBLOCH/EODE/RK4/EL added }
 
 END;
