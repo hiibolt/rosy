@@ -743,6 +743,181 @@ PROCEDURE LFM_SCALAR MF (DA 8) C (DA 8) M (DA 8) F (DA) IT (RE);
   ENDLOOP;
 ENDPROCEDURE;
 
+{ ----- MLF (scalar mode): Lie factorization FROM map (cosy.fox L1333-1392)
+  MLF_SCALAR(MF, C, M, F, IT) is the inverse of LFM_SCALAR: given a
+  symplectic map MF, extract the constant offset C, the linearized map
+  M, and the scalar Lie generator F such that MF = C + M ∘ exp(:F:)
+  (or its inverse for IT=-1).
+
+  IT=±1 only — the array-of-generators modes (IT=±2, ±3) need a
+  paired LFM_ARRAY port and the combinatorial PBO accumulator at
+  multiple Lie orders. Errors out cleanly for IT∉{±1}.
+
+  Algorithm:
+    1. Build N = MF - constant by subtracting CONS componentwise.
+    2. Linearize: M[i] = ∑_j (∂N[i]/∂x_j)|_{params=0} · DD[j].
+    3. Invert the linear M via MI to get SN.
+    4. Compose SN with the nonlinear N via POLVAL.
+    5. Per order I = 2..NOM: extract the Hamiltonian part via
+       PB(N - L - PL, …) and POTI to get P[I-1], accumulate F.
+
+  Nested PBO computes the (I-1)-th partition-sum of nested Poisson
+  brackets (BCH-Hadamard-style series) — captures parent's P
+  (the per-order generator accumulator) via 3-deep nesting.
+
+  MAX bounds: PBO's A array is (RE 32 8) — fits up through NOC≤5
+  (2^(5-1) = 16 < 32). B is (RE 8 2). Procedures using NOC > 5
+  would need larger bounds.                                              }
+PROCEDURE MLF_SCALAR MF (DA 8) C (DA 8) M (DA 8) F (DA) IT (RE);
+  VARIABLE (DA 20) P_GEN;
+  VARIABLE (RE) IE;
+  VARIABLE (DA 8) L_DA;
+  VARIABLE (DA 8) NL;
+  VARIABLE (DA) PL;
+  VARIABLE (DA 20) SN;
+  VARIABLE (DA 20) N_DA;
+  VARIABLE (DA) FF;
+  VARIABLE (RE) NF_VAR;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) NOM;
+
+  { PBO: combinatorial Poisson-bracket sum at order I-1, var J. The
+    partition enumeration A[Z1, Z2..] tracks each partition's parts;
+    NEN tracks the partition's denominator (factorial). PL accumulates. }
+  PROCEDURE PBO JL (RE) IL (RE) PL_OUT (DA);
+    VARIABLE (RE 32 8) A;
+    VARIABLE (RE 8 2) B;
+    VARIABLE (RE) Z1;
+    VARIABLE (RE) Z2;
+    VARIABLE (RE) Z3;
+    VARIABLE (RE) Z4;
+    VARIABLE (RE) Z5;
+    VARIABLE (RE) NEN;
+    VARIABLE (DA) PH;
+
+    Z1 := 1;
+    A[1, 1] := IL;
+    B[1, 1] := 1;
+    B[1, 2] := 1;
+    PL_OUT := 0*DD[1];
+    NEN := 1;
+
+    LOOP Z2 2 IL;
+      NEN := NEN*Z2;
+      B[Z2, 1] := Z1 + 1;
+      LOOP Z3 1 IL-Z2+1;
+        LOOP Z4 0 B[Z2-1, 2]-1;
+          IF (A[B[Z2-1, 1] + Z4, 1] - Z3) > 0;
+            Z1 := Z1 + 1;
+            A[Z1, 1] := Z3;
+            A[Z1, 2] := A[B[Z2-1, 1] + Z4, 1] - Z3;
+            LOOP Z5 2 Z2-1;
+              A[Z1, Z5+1] := A[B[Z2-1, 1] + Z4, Z5];
+            ENDLOOP;
+            PH := PB(P_GEN[A[Z1, Z2]], DD[JL]);
+            LOOP Z5 Z2-1 1 -1;
+              PH := PB(P_GEN[A[Z1, Z5]], PH);
+            ENDLOOP;
+            PL_OUT := PL_OUT + PH/NEN;
+          ENDIF;
+        ENDLOOP;
+      ENDLOOP;
+      B[Z2, 2] := Z1 - B[Z2, 1] + 1;
+    ENDLOOP;
+  ENDPROCEDURE;
+
+  NOM := NOC;
+  IF ABS(IT) # 1;
+    WRITE 6 ' *** ERROR in MLF_SCALAR, only IT=±1 supported (use LFM_ARRAY for IT=±2, ±3)';
+    QUIT 0;
+  ENDIF;
+  NF_VAR := 1;
+
+  IF TWOND = NV;
+    { Simple case: no parameter slots. }
+    LOOP I 1 TWOND;
+      C[I] := CONS(MF[I]) + 0*DD[1];
+      N_DA[I] := MF[I] - C[I];
+    ENDLOOP;
+    CO 1;
+    LOOP I 1 TWOND;
+      M[I] := N_DA[I];
+    ENDLOOP;
+    MI M SN NV IE NOC NV NM1;
+    CO NOM;
+  ELSE;
+    { General case: parameter slots present. }
+    LOOP I 1 TWOND;
+      SN[I] := 0*DD[I];
+      M[I] := 0*DD[1];
+    ENDLOOP;
+    LOOP I TWOND+1 NV;
+      SN[I] := DD[I];
+    ENDLOOP;
+    POLVAL 1 MF TWOND SN NV C TWOND;
+    LOOP I 1 TWOND;
+      N_DA[I] := MF[I] - C[I];
+      LOOP J 1 TWOND;
+        L_DA[J] := DER(J, N_DA[I]);
+      ENDLOOP;
+      POLVAL 1 L_DA TWOND SN NV L_DA TWOND;
+      LOOP J 1 TWOND;
+        M[I] := M[I] + L_DA[J]*DD[J];
+      ENDLOOP;
+    ENDLOOP;
+    LOOP I 1 TWOND;
+      SN[I] := M[I];
+    ENDLOOP;
+    MI SN SN NV IE NOC NV NM1;
+  ENDIF;
+
+  IF IE # 0;
+    WRITE 6 ' *** ERROR in MLF_SCALAR, map singular';
+    QUIT 0;
+  ENDIF;
+
+  { IT=±1 branch: extract scalar generator F via order-by-order PBO + POTI. }
+  IF IT = 1;
+    POLVAL 1 N_DA TWOND SN NV SN TWOND;
+  ELSE;
+    LOOP I TWOND+1 NV;
+      N_DA[I] := DD[I];
+    ENDLOOP;
+    POLVAL 1 SN TWOND N_DA NV SN TWOND;
+  ENDIF;
+
+  LOOP I 1 TWOND;
+    N_DA[I] := SN[I] - DD[I];
+    L_DA[I] := 0*DD[I];
+  ENDLOOP;
+
+  LOOP I 2 NOM;
+    LOOP J 1 TWOND;
+      PBO J I-1 PL;
+      CO I;
+      NL[J] := N_DA[J] - L_DA[J] - PL;
+    ENDLOOP;
+    LOOP J 1 TWOND 2;
+      SN[J]   :=  NL[J+1];
+      SN[J+1] := -NL[J];
+    ENDLOOP;
+    LOOP J 1 TWOND;
+      L_DA[J] := N_DA[J];
+    ENDLOOP;
+    CO I+1;
+    POTI SN TWOND FF;
+    P_GEN[I-1] := FF;
+  ENDLOOP;
+  CO NOM+1;
+
+  F := 0*DD[1];
+  LOOP J 1 NOM-1;
+    F := F + P_GEN[J];
+  ENDLOOP;
+  CO NOM;
+ENDPROCEDURE;
+
 { ----- TS: tune dependence on parameters AND amplitude (cosy.fox L1608-1625)
   TS(MU) computes the parameter- AND amplitude-dependence of the tunes
   from the active MAP, returning per-plane tune polynomials in MU.
