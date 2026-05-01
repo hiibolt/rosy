@@ -135,6 +135,48 @@ PROCEDURE POFF P (DA) H_PARAM (DA) IX (RE) IY (RE) IS (RE);
   ENDLOOP;
 ENDPROCEDURE;
 
+{ ----- PMFF: Cartesian off-plane multipole completion (cosy.fox L2452-2461)
+  PMFF(P, L_ORDER, IX, IY, IS) extends in-plane potential P to off-plane
+  using Cartesian Laplacian recursion appropriate for an L-pole field
+  with the rotational symmetry of the multipole order.
+
+  Algorithm:
+    R² := DD[IX]² + DD[IY]²    (transverse radius squared)
+    R²ⁿ := 1                   (running power of R²)
+    S   := P                    (running corrected potential)
+    LOOP K = L+2, L+4, ..., NOC+1 (even orders):
+      S    := ∂²S/∂IS² / (L² - K²)
+      R²ⁿ  := R²ⁿ * R²
+      P    := P + S * R²ⁿ
+
+  Special case: L=20 marks "skew multipole" — reset L→0 in the loop
+  bounds. Otherwise we'd start at L+2 = 22 which is past NOC+1 for any
+  practical NOC, giving zero correction.
+
+  Used by POTFLD's NSDP≠0 path when LOFF=1: after multiplying P by
+  PMM[JPOL] / PEM[JPOL], PMFF adds higher-order curvature/fringe-field
+  corrections to make the polynomial satisfy ∇²P = 0 in Cartesian
+  space.                                                                  }
+PROCEDURE PMFF P (DA) L_PARAM (RE) IX (RE) IY (RE) IS_PARAM (RE);
+  VARIABLE (DA) S_LOCAL;
+  VARIABLE (DA) R2;
+  VARIABLE (DA) R2N;
+  VARIABLE (RE) K;
+  VARIABLE (RE) L_LOCAL;
+  L_LOCAL := L_PARAM;
+  IF L_LOCAL = 20;
+    L_LOCAL := 0;
+  ENDIF;
+  R2 := DD[IX]*DD[IX] + DD[IY]*DD[IY];
+  R2N := 1 + 0*DD[1];
+  S_LOCAL := P;
+  LOOP K L_LOCAL+2 NOC+1 2;
+    S_LOCAL := DER(IS_PARAM, DER(IS_PARAM, S_LOCAL))/(L_LOCAL*L_LOCAL - K*K);
+    R2N := R2N*R2;
+    P := P + S_LOCAL*R2N;
+  ENDLOOP;
+ENDPROCEDURE;
+
 FUNCTION (DA) HAMILTONIAN A_VEC (DA) V_SCAL (DA) H_CURV (DA);
   VARIABLE (DA) ETA_LOCAL;
   VARIABLE (DA) PREL;
@@ -215,39 +257,53 @@ PROCEDURE POTFLD X (DA 30) S (RE);
   ENDIF;
 
   CO NOC+1;
-  IF NSDP = 0;
-    { POTS path with NSDP=0 only. Initialise V/W/H, then accumulate
-      multipole contributions. }
-    V := 0*DD[1];
-    W := 0*DD[2];
-    H := 0 + 0*DD[1];
-    LOOP I 1 NPOL;
-      JPOL := ABS(MPOL[I]);
-      JEM := (3 - MPOL[I]/JPOL)/2;
-      P := PPOL[I];
-      IF MPOL[I] = 1;
-        H := H + P/CHIM1;
-      ELSEIF MPOL[I] = -1;
-        H := H + 1000*P/CHIE1;
-      ENDIF;
-      IF LOFF = 1;
-        IF JEM = 1;
-          P := P*PMM[JPOL];
-          W := W + P;
-        ELSEIF JEM = 2;
-          P := P*PEM[JPOL];
-          V := V + P;
-        ENDIF;
-      ELSE;
-        WRITE 6 ' *** ERROR in POTFLD, only LOFF=1 supported in libcosy v1';
-        QUIT 0;
-      ENDIF;
-    ENDLOOP;
-    H := CONS(H) + 0*DD[1];
-  ELSE;
-    WRITE 6 ' *** ERROR in POTFLD, only NSDP=0 supported in libcosy v1';
+  IF NSDP < 0;
+    WRITE 6 ' *** ERROR in POTFLD, NSDP<0 (POTXZ Cartesian path) not yet ported';
     QUIT 0;
   ENDIF;
+  { POTS path: NSDP = 0 (constant), 1 (entrance fringe), 2 (exit fringe).
+    Higher NSDP modes (3=Gaussian, 8=Solenoid, etc.) error out. }
+  V := 0*DD[1];
+  W := 0*DD[2];
+  H := 0 + 0*DD[1];
+  LOOP I 1 NPOL;
+    JPOL := ABS(MPOL[I]);
+    JEM := (3 - MPOL[I]/JPOL)/2;
+    IF NSDP = 0;
+      P := PPOL[I];
+    ELSEIF NSDP = 1;
+      P := PPOL[I]*ENGE(MOD(JPOL, 20), 1, JEM, -(S + DD[2])/DR/2);
+    ELSEIF NSDP = 2;
+      P := PPOL[I]*ENGE(MOD(JPOL, 20), 2, JEM, (S + DD[2])/DR/2);
+    ELSE;
+      WRITE 6 ' *** ERROR in POTFLD, NSDP>2 modes (Gaussian/Solenoid/etc.) not yet ported in libcosy v1';
+      QUIT 0;
+    ENDIF;
+    IF MPOL[I] = 1;
+      H := H + P/CHIM1;
+    ELSEIF MPOL[I] = -1;
+      H := H + 1000*P/CHIE1;
+    ENDIF;
+    IF LOFF = 1;
+      IF JEM = 1;
+        P := P*PMM[JPOL];
+        IF NSDP # 0;
+          PMFF P JPOL 1 3 2;
+        ENDIF;
+        W := W + P;
+      ELSEIF JEM = 2;
+        P := P*PEM[JPOL];
+        IF NSDP # 0;
+          PMFF P JPOL 1 3 2;
+        ENDIF;
+        V := V + P;
+      ENDIF;
+    ELSE;
+      WRITE 6 ' *** ERROR in POTFLD, only LOFF=1 supported in libcosy v1';
+      QUIT 0;
+    ENDIF;
+  ENDLOOP;
+  H := CONS(H) + 0*DD[1];
 
   EFX := -1000*DER(1, V);
   EFY := -1000*DER(3, V);
@@ -584,14 +640,67 @@ ENDPROCEDURE;
     LF1     entrance fringe-field NSDP code (used for LFR≠0)
     LF2     exit fringe-field NSDP code (used for LFR≠0)
     CI      element name (string) for diagnostics                       }
-PROCEDURE FFELE L (RE) D (RE) H_LOCAL (RE) LF1 (RE) LF2 (RE) CI (ST);
+PROCEDURE FFELE L (RE) D_AP (RE) H_LOCAL (RE) LF1 (RE) LF2 (RE) CI (ST);
   VARIABLE (RE) ARG_X;
   VARIABLE (RE) ARG_Z;
   VARIABLE (RE) ARG_PHI;
+  VARIABLE (DA 8) MS;
+  VARIABLE (DA 3 3) SM;
   CE := CI;
-  DR := D;
+  DR := D_AP;
   IF LFR = 0;
-    SIELE L D;
+    SIELE L D_AP;
+    IF H_LOCAL = 0;
+      LOCSET 0 L 0 L 0 0;
+    ELSE;
+      ARG_X := (COS(H_LOCAL*L) - 1)/H_LOCAL;
+      ARG_Z := SIN(H_LOCAL*L)/H_LOCAL;
+      ARG_PHI := H_LOCAL*L;
+      LOCSET ARG_X ARG_Z ARG_PHI L 0 0;
+    ENDIF;
+    UPDATE 1 1;
+  ELSEIF LFR = 1;
+    { LFR=1: soft-edge fringe field, two-step (cosy.fox L3043-3055).
+      Entrance fringe via SDELE NSDP=LF1, body via SIELE NSDP=0,
+      exit fringe via SDELE NSDP=LF2.                                 }
+    { Pre-compute step parameters as RE temps to avoid ROSY's
+      parser tripping on space-separated negative literals.            }
+    VARIABLE (RE) NEG4D;
+    VARIABLE (RE) NEG2D;
+    VARIABLE (RE) FOUR_D;
+    VARIABLE (RE) TWO_D;
+    VARIABLE (RE) BODY_L;
+    NEG4D := -4*D_AP;
+    NEG2D := -2*D_AP;
+    FOUR_D := 4*D_AP;
+    TWO_D := 2*D_AP;
+    BODY_L := L - 4*D_AP;
+    UMS;
+    DLACT MSC NEG4D;
+    SNM MSC MS;
+    SSNM SSCR SM;
+    LOCSET 0 NEG4D 0 NEG4D 0 0;
+    NSDP := LF1;
+    SDELE NEG4D 0 FOUR_D FOUR_D FOUR_D D_AP;
+    UPDATEMAP MSC MS MS SSCR SM SM;
+    SDELE 0 TWO_D TWO_D TWO_D TWO_D D_AP;
+    UPDATEMAP MSC MS MS SSCR SM SM;
+    SIELE BODY_L D_AP;
+    UPDATEMAP MSC MS MS SSCR SM SM;
+    NSDP := LF2;
+    IF H_LOCAL = 0;
+      LOCSET 0 NEG2D 0 NEG2D 0 0;
+    ELSE;
+      ARG_X := (COS(2*H_LOCAL*D_AP)-1)/H_LOCAL;
+      ARG_Z := -SIN(2*H_LOCAL*D_AP)/H_LOCAL;
+      ARG_PHI := -2*H_LOCAL*D_AP;
+      LOCSET ARG_X ARG_Z ARG_PHI NEG2D 0 0;
+    ENDIF;
+    SDELE NEG2D 0 TWO_D TWO_D TWO_D D_AP;
+    UPDATEMAP MSC MS MS SSCR SM SM;
+    SDELE 0 FOUR_D FOUR_D FOUR_D FOUR_D D_AP;
+    UPDATEMAP MSC MS MSC SSCR SM SSCR;
+    DLACT MSC NEG4D;
     IF H_LOCAL = 0;
       LOCSET 0 L 0 L 0 0;
     ELSE;
@@ -602,7 +711,7 @@ PROCEDURE FFELE L (RE) D (RE) H_LOCAL (RE) LF1 (RE) LF2 (RE) CI (ST);
     ENDIF;
     UPDATE 1 1;
   ELSE;
-    WRITE 6 ' *** ERROR in FFELE, only LFR=0 (no fringe field) supported in libcosy v1';
+    WRITE 6 ' *** ERROR in FFELE, only LFR=0 and LFR=1 supported in libcosy v1';
     QUIT 0;
   ENDIF;
 ENDPROCEDURE;

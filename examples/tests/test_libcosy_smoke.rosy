@@ -538,6 +538,21 @@ WRITE 6 MSC[1];
 WRITE 6 'After SIELE octupole, MSC[2] (octupole p_x should pick up x^3 kick):';
 WRITE 6 MSC[2];
 
+{ ----- M6.6: FFELE LFR=1 soft-edge fringe with octupole through MO -----
+  Set fringe-field mode 1 (soft edge), apply MO octupole. The FFELE
+  path runs SDELE entrance fringe (NSDP=1) → SIELE body (NSDP=0) →
+  SDELE exit fringe (NSDP=2). Should produce a non-trivial map with
+  octupole-like x³ kick + fringe-field corrections on MAP[2].         }
+WRITE 6 ' ----- M6.6: MO octupole with LFR=1 fringe field -----';
+OV 4 2 0;             { NO=4 for octupole, ND=2 for ND>=2 (POLVAL OK) }
+RPP 100;
+FR 1;                 { LFR=1 soft-edge fringe mode }
+UM;
+MO 0.5 1.0 0.05;      { L=0.5m octupole, B=1T pole tip, D=5cm aperture }
+WRITE 6 'After MO (LFR=1 fringe), MAP[1] (drift + fringe corrections):';
+WRITE 6 MAP[1];
+FR 0;                 { reset to no-fringe mode for subsequent tests }
+
 { ----- M6.5: SDELE — RK-driven s-dependent element (drift baseline) -----
   With NPOL=0 (no fields) and NSDP=0, the RK integration over [0, 0.5]
   should produce drift behavior matching SIELE 0.5. SDELE drives the
