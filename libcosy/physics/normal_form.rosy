@@ -1468,4 +1468,27 @@ PROCEDURE RS RES (CD);
   DANF MAP MN_LOCAL MA_LOCAL 1 RES EPS;
 ENDPROCEDURE;
 
+{ ----- LFLF: Lie-factorization-to-Lie-factorization round-trip (cosy.fox L1394)
+  LFLF takes an existing Lie factorization F (in mode IA), reconstructs the
+  intermediate map ML via LFM, then re-factorizes ML into a new
+  factorization P (in mode IT). Useful for converting between symplectic-
+  factorization conventions (Dragt-Finn vs. exponential-Lie vs. Iwasawa)
+  without going through the underlying physics map.
+
+  cosy.fox has a single LFLF that polymorphically handles scalar/array F
+  and P; libcosy splits into LFLF_SCALAR (single-DA F+P) and LFLF_ARRAY
+  (DA-8 F+P) since ROSY's static typing requires concrete shape per call.
+  In practice users always have F-shape = P-shape, so the split is benign. }
+PROCEDURE LFLF_SCALAR C (DA 8) M (DA 8) F (DA) P (DA) IA (RE) IT (RE);
+  VARIABLE (DA 8) ML;
+  LFM_SCALAR ML C M F IA;
+  MLF_SCALAR ML C M P IT;
+ENDPROCEDURE;
+
+PROCEDURE LFLF_ARRAY C (DA 8) M (DA 8) F (DA 8) P (DA 8) IA (RE) IT (RE);
+  VARIABLE (DA 8) ML;
+  LFM_ARRAY ML C M F IA;
+  MLF_ARRAY ML C M P IT;
+ENDPROCEDURE;
+
 END;
