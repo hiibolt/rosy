@@ -31,4 +31,43 @@ PROCEDURE COPYF FN1 (ST) FN2 (ST);
   CLOSEF 78;
 ENDPROCEDURE;
 
+{ ----- MFFLDIN: read measured-field data from MFFLD.DAT (cosy.fox L3656-3662)
+  Inverse of MFFLD's "create field data" output. Reads the standard
+  4-line header (XMIN/ZMIN, XMAX/ZMAX, DX/DZ, NX/NZ) plus the body of
+  NX × NZ RE values into the user-provided A array.
+
+  Output A is fixed-shape (RE 700 30) — generous enough for typical
+  measured-field grids. NX ≤ 700, NZ ≤ 30.
+
+  Header format (cosy.fox L3649-3652):
+    line 1: ' MIN (X,Z) = (... , ...)'   skipped
+    line 2: ' MAX (X,Z) = (... , ...)'   skipped
+    line 3: ' DX = ' + 16-wide G + ',  DZ = ' + 16-wide G
+            → DX from chars 7..22, DZ from chars 31..46
+    line 4: ' NX = ' + 6-wide I + ',  NZ = ' + 6-wide I
+            → NX from chars 7..12, NZ from chars 21..26
+    body:   NX*NZ lines, one RE each via READ                          }
+PROCEDURE MFFLDIN A_OUT (RE 700 30) NX (RE) NZ (RE) DX (RE) DZ (RE);
+  VARIABLE (ST) STR;
+  VARIABLE (RE) IX;
+  VARIABLE (RE) IZ;
+  VARIABLE (RE) ADT;
+  OPENF 98 'MFFLD.DAT' 'OLD';
+  READ 98 STR;
+  READ 98 STR;
+  READ 98 STR;
+  DX := R(STR, 7, 22);
+  DZ := R(STR, 31, 46);
+  READ 98 STR;
+  NX := R(STR, 7, 12);
+  NZ := R(STR, 21, 26);
+  LOOP IX 1 NX;
+    LOOP IZ 1 NZ;
+      READ 98 ADT;
+      A_OUT[IX, IZ] := ADT;
+    ENDLOOP;
+  ENDLOOP;
+  CLOSEF 98;
+ENDPROCEDURE;
+
 END;
