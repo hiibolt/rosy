@@ -531,10 +531,54 @@ PROCEDURE MGF MM (DA 8) F (DA) IT (RE) IE (RE);
     ENDIF;
   ENDPROCEDURE;
 
+  { BESTGF (cosy.fox L1433-1440): try each generating-function type 1..4
+    via MGFF, round-trip-rebuild via GFM, and pick the type whose
+    reconstruction is closest to MM. The "robust" extraction mode IT=-2.
+
+    Captures parent's MM (CD-typed input), F (DA output), IT (mutated
+    parameter). NAP is local DA scratch since GFM expects DA-typed
+    output map.                                                            }
+  PROCEDURE BESTGF IEB (RE);
+    VARIABLE (DA 8) NAP;
+    VARIABLE (RE) IT_LOCAL;
+    VARIABLE (RE) J_LOCAL;
+    VARIABLE (RE) DIF;
+    VARIABLE (DA) G_BEST;
+    VARIABLE (RE) ER;
+    VARIABLE (RE) IBEST;
+
+    IEB := 0;
+    ER := 1E36;
+    IBEST := 0;
+    LOOP IT_LOCAL 1 4;
+      IT := IT_LOCAL;
+      MGFF J_LOCAL;
+      IF J_LOCAL = 0;
+        GFM NAP F IT;
+        DIF := 0;
+        LOOP J_LOCAL 1 TWOND;
+          DIF := DIF + ABS(MM[J_LOCAL] - NAP[J_LOCAL]);
+        ENDLOOP;
+        IF DIF < ER;
+          IBEST := IT_LOCAL;
+          CO NOC+1;
+          G_BEST := F;
+          CO NOC-1;
+          ER := DIF;
+        ENDIF;
+      ENDIF;
+    ENDLOOP;
+    IF IBEST = 0;
+      IEB := 1;
+    ENDIF;
+    IT := IBEST;
+    CO NOC+1;
+    F := G_BEST;
+    CO NOC-1;
+  ENDPROCEDURE;
+
   IF IT = -2;
-    WRITE 6 ' *** ERROR in MGF, IT=-2 (BESTGF mode) needs round-trip GFM';
-    WRITE 6 '     comparison — not yet ported. Use IT∈{1,2,3,4,-1}.';
-    QUIT 0;
+    BESTGF IE;
   ELSE;
     MGFF IE;
   ENDIF;
