@@ -677,6 +677,17 @@ PROCEDURE POTFLD X (DA 30) S (RE);
     ELSEIF NSDP = 11;
       { Accelerating static homogeneous E-field: PPOL[1]·s (cosy.fox L2581-2582) }
       P := PPOL[1]*(S + DD[2]);
+    ELSEIF NSDP = 12;
+      { General multipole by Gaussians (cosy.fox L2583-2585). MFD[I, IS]
+        is a measured-on-grid amplitude for pole I at grid point IS;
+        GAUSS1_DA Gaussian-smooths along s with width PPOL[3].
+          PPOL[1] = NS (grid count), PPOL[2] = DS (spacing), PPOL[3] = σ.
+        IS_GAUSS is the boundary-error flag — accumulate into MFP[1] so
+        callers can detect kernel-window-touched-end conditions.       }
+      VARIABLE (RE) IS_GAUSS;
+      P := GAUSS1_DA(S+DD[2], CONS(PPOL[1]), CONS(PPOL[2]),
+                     CONS(PPOL[3]), I, MFD, IS_GAUSS);
+      MFP[1] := MFP[1] + IS_GAUSS;
     ELSEIF NSDP = 13;
       { Thick solenoid (cosy.fox L2587-2595). Two-piece sqrt-log
         potential with derivatives at s=0 and s=PPOL[2].               }
@@ -725,7 +736,7 @@ PROCEDURE POTFLD X (DA 30) S (RE);
                  + MFD[IS_PIECE, 3]*P1_TMP14);
       ENDLOOP;
     ELSE;
-      WRITE 6 ' *** ERROR in POTFLD, NSDP not in {0..4,6,7,8,9,10,11,13} not yet ported in libcosy v1';
+      WRITE 6 ' *** ERROR in POTFLD, NSDP not in {0..4,6..14} not yet ported in libcosy v1';
       QUIT 0;
     ENDIF;
     IF MPOL[I] = 1;

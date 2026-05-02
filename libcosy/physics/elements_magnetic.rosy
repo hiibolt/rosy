@@ -287,6 +287,53 @@ PROCEDURE MZK L (RE) K (RE) D (RE);
   FFELE L D 0 1 2 'MZK';
 ENDPROCEDURE;
 
+{ ----- M6.27: MGE — general magnetic multipole by Gaussians (cosy.fox L3231-3238)
+  MGE(NP, A, NS, DS, SIGMA, D): for each pole I=1..NP, copies the
+  caller's coefficient column A[I, 1..NS] (after dividing by the
+  aperture power D^I) into the global MFD[I, 1..NS] table, then
+  integrates SDELE over [0, (NS-1)*DS] with NSDP=12. Inside POTFLD →
+  POTS path NSDP=12, GAUSS1_DA Gaussian-smooths each pole's measured
+  s-axis amplitudes with kernel width SIGMA.
+
+  Parameters:
+    NP    : number of multipole orders (≤ 30 — bounded by MFD's dim 1)
+    A     : (RE 30 30) coefficient table — A[I, IS] = pole-I amplitude
+            at grid point IS, prior to D^I normalisation
+    NS    : number of s-grid samples (≤ 30 — bounded by MFD's dim 2)
+    DS    : s-grid spacing [m]
+    SIGMA : Gaussian-kernel width in grid units (analogue of MF's SIGMA)
+    D     : aperture / characteristic length [m]                       }
+PROCEDURE MGE NP (RE) A (RE 30 30) NS (RE) DS (RE) SIGMA (RE) D (RE);
+  VARIABLE (RE) I;
+  VARIABLE (RE) IS_GRID;
+  VARIABLE (RE) S2;
+  VARIABLE (RE) D_AP;
+  VARIABLE (RE) DPOW;
+  D_AP := D;
+  LOOP I 1 NP;
+    MPOL[I] := I + 1;
+    DPOW := 1;
+    LOOP IS_GRID 1 I;
+      DPOW := DPOW*D_AP;
+    ENDLOOP;
+    LOOP IS_GRID 1 NS;
+      MFD[I, IS_GRID] := A[I, IS_GRID]/DPOW;
+    ENDLOOP;
+  ENDLOOP;
+  PPOL[1] := NS + 0*DD[1];
+  PPOL[2] := DS + 0*DD[1];
+  PPOL[3] := SIGMA + 0*DD[1];
+  NSDP := 12;
+  LOFF := 1;
+  NPOL := NP;
+  S2 := (NS - 1)*DS;
+  LOCSET 0 0 0 0 0 0;
+  CE := 'MGE';
+  DR := D_AP;
+  SDELE 0 S2 D_AP/200 D_AP 7*D_AP D_AP;
+  UPDATE 1 1;
+ENDPROCEDURE;
+
 { ----- M6.25: MF — magnet from measured field data (cosy.fox L3627-3640)
   MF(L, A, NX, NZ, DX, DZ, SIGMA, D, SX, SZ, SPHI): copies the user's
   2D field grid A into the global MFD table, sets up NSDP=-5 + LOFF=2,

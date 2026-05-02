@@ -866,4 +866,28 @@ TRCA M_TRP M_BACK 1.0;
 WRITE 6 'CATR-then-TRCA round-trip diff (canonical original vs reconstructed, expect ~0):';
 DMAP M_OTHER M_BACK 6;
 
+{ ----- M6.27: MGE — general multipole by Gaussians (NSDP=12 + GAUSS1_DA) -----
+  Build a 1-pole (quadrupole), 5-grid-point measured field. The amplitudes
+  step from 0 -> 1 -> 1 -> 1 -> 0 across s, simulating a flat-top
+  measurement with soft entry/exit. MGE Gaussian-smooths along s with σ=1.5
+  and integrates SDELE over [0, 4*DS]. Should produce a non-trivial focusing
+  map dominated by the quadrupole-like middle. }
+WRITE 6 ' ----- M6.27: MGE general multipole-by-Gaussians (NSDP=12) -----';
+OV 2 2 0;
+RPP 100;
+FR 0;
+UM;
+VARIABLE (RE 30 30) MGE_A;
+{ pole=1 (quadrupole), 5 grid points: 0, 1, 1, 1, 0 }
+MGE_A[1, 1] := 0;
+MGE_A[1, 2] := 1;
+MGE_A[1, 3] := 1;
+MGE_A[1, 4] := 1;
+MGE_A[1, 5] := 0;
+MGE 1 MGE_A 5 0.05 1.5 0.05;     { NP=1, NS=5, DS=5cm, σ=1.5, D=5cm }
+WRITE 6 'After MGE quadrupole, MAP[1] (focusing-plane x map):';
+WRITE 6 MAP[1];
+WRITE 6 'After MGE quadrupole, MAP[3] (defocusing-plane y map):';
+WRITE 6 MAP[3];
+
 END;

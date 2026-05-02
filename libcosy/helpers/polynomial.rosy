@@ -84,6 +84,38 @@ FUNCTION (RE) GAUSS1 X (RE) NX (RE) DX (RE) SIGMA (RE) IP (RE) MFD_ (RE 700 30) 
   GAUSS1 := GAUSS1/(SQRT(PI)*SIGMA);
 ENDFUNCTION;
 
+{ ----- GAUSS1_DA: DA-propagating 1D Gaussian interpolation (cosy.fox L261-272)
+  Same kernel as GAUSS1 but X is DA-typed and the result is DA — proper
+  DA propagation through the Gaussian smoother is needed for NSDP=12
+  (MGE general multipole-by-Gaussians) where s = S+DD[2] is symbolic.
+  IP and IX still use CONS for grid indexing (must be RE), but the
+  EXP(-SQR((IX-1-X/DX)/SIGMA)) term carries DA-X through naturally.    }
+FUNCTION (DA) GAUSS1_DA X (DA) NX (RE) DX (RE) SIGMA (RE) IP (RE) MFD_ (RE 700 30) ERR (RE);
+  VARIABLE (RE) NG;
+  VARIABLE (RE) IXN;
+  VARIABLE (RE) IX;
+  VARIABLE (RE) IXM;
+  NG := NINT(8*SIGMA);
+  GAUSS1_DA := 0*DD[1];
+  IXN := NINT(1 + CONS(X)/DX);
+  IF (IXN-NG < 1) OR (IXN+NG > NX);
+    ERR := 1;
+    LOOP IX IXN-NG IXN+NG;
+      IXM := IX;
+      IF IX < 1; IXM := 1;
+      ELSEIF IX > NX; IXM := NX;
+      ENDIF;
+      GAUSS1_DA := GAUSS1_DA + MFD_[IP, IXM]*EXP(-SQR((IX-1-X/DX)/SIGMA));
+    ENDLOOP;
+  ELSE;
+    ERR := 0;
+    LOOP IX IXN-NG IXN+NG;
+      GAUSS1_DA := GAUSS1_DA + MFD_[IP, IX]*EXP(-SQR((IX-1-X/DX)/SIGMA));
+    ENDLOOP;
+  ENDIF;
+  GAUSS1_DA := GAUSS1_DA/(SQRT(PI)*SIGMA);
+ENDFUNCTION;
+
 { ----- 2D Gaussian interpolation (cosy.fox L274-290) ---------------------- }
 FUNCTION (RE) GAUSS X (RE) Z (RE) NX (RE) NZ (RE) DX (RE) DZ (RE) SIGMA (RE) MFD_ (RE 700 30) ERR (RE);
   VARIABLE (RE) NG;
