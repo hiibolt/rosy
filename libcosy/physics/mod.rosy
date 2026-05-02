@@ -19,6 +19,7 @@ INCLUDE 'twiss_tune.rosy';          { M5 (SIGMA beam-envelope helper) }
 INCLUDE 'bend.rosy';                { M5 (BEND dipole — BENDFF0 path only) }
 INCLUDE 'spin_su2.rosy';            { M5 (SO3_IN_SU2 spin SO3→SU2 converter) }
 INCLUDE 'elements_electric.rosy';   { M5 (RF cavity — analytical, no FFELE) }
+INCLUDE 'elements_glass.rosy';      { M8.1 (SA / TA / RA axis manipulators) }
 INCLUDE 'tracking.rosy';            { M5 (TR* state setters — TR itself in M7+) }
 
 { Future: M6 will expand POTFLD with more NSDP modes (ENGE fringe,

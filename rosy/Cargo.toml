@@ -1,6 +1,6 @@
 [package]
 name = "rosy"
-version = "0.40.48"
+version = "0.40.49"
 edition = "2024"
 
 [lib]

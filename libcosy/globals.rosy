@@ -78,7 +78,11 @@ VARIABLE (RE 1000) ETRA; VARIABLE (RE 200) SYS0; VARIABLE (ST) TRTST;
 
 { Picture-related sizing }
 VARIABLE (RE) LSCR; VARIABLE (RE) LSCT;
-VARIABLE (RE 20 3) LTRA; VARIABLE (RE 20 3) GTRA;
+{ Local-axis transform DA arrays: cosy.fox `LTRA 20 3` is 1-D-of-3
+  DA cells (leading 20 = per-cell DA storage hint, not a data dim).
+  LOCTRA writes DA polynomials in DD[1..3] for the position-only
+  rotation/translation; RA/SA/TA consume them as such.                 }
+VARIABLE (DA 3) LTRA; VARIABLE (DA 3) GTRA;
 
 { Field arrays — DA expansions of the on-axis fields }
 VARIABLE (DA) EFX; VARIABLE (DA) EFY; VARIABLE (DA) EFZ; VARIABLE (DA) V;

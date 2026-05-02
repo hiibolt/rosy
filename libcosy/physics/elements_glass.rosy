@@ -1,0 +1,110 @@
+{ ============================================================================
+  libcosy/physics/elements_glass.rosy — glass-optics axis manipulators
+
+  M8.1: opens the glass-elements file with the three axis-state primitives
+  SA / TA / RA (cosy.fox L4038-4069). These don't need GLASS itself, just
+  UMS / LOCSET / LOCTRA / UPDATE — all earlier-INCLUDEd. They're also useful
+  in non-glass-optical contexts (steering, rotation, alignment).
+
+  Big glass-optics body (GLASS + GLS / GL / GP / GMS / GMP / GMF / GM
+  wrappers, plus WL / EL / WA) is a separate milestone — GLASS itself
+  carries 4 nested helpers (TRANS1, TRANS2, LL, ANG) and is ~75 lines.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- SA: shift the local axis by (DX, DY) (cosy.fox L4038-4040)
+  Rebuilds MSC from scratch via UMS, then offsets MSC[1] / MSC[3] by
+  the requested displacement. LOCSET 0 0 0 0 0 0 + DR := 0 marks "no
+  curvature, no length" so the axis-tracker doesn't accumulate drift.
+
+  Param names DX_OFF / DY_OFF dodge the global DX (DA basis-power
+  cache) shadow that would corrupt downstream auto-captures.            }
+PROCEDURE SA DX_OFF (RE) DY_OFF (RE);
+  UMS;
+  MSC[1] := MSC[1] - DX_OFF;
+  MSC[3] := MSC[3] - DY_OFF;
+  LOCSET 0 0 0 0 0 0;
+  DR := 0;
+  CE := 'SA';
+  UPDATE 1 1;
+ENDPROCEDURE;
+
+{ ----- TA: tilt the local axis by (AX, AY) [degrees] (cosy.fox L4042-4059)
+  Two-step rotation: TAX rotates about the y-axis by AXR, TAY rotates
+  about the x-axis by AYR. Each transform reads PF (relativistic factor
+  squared = (P/CONS(P))²) and writes back into the active map.
+
+  Nested helpers TAX / TAY share TA's enclosing PF / AXR / AYR / A / SCR
+  via ROSY's nested-procedure scope sharing (verified working in BEND
+  and elsewhere in libcosy).                                              }
+PROCEDURE TA AX (RE) AY (RE);
+  VARIABLE (RE) AXR;
+  VARIABLE (RE) AYR;
+  VARIABLE (DA) PF;
+  VARIABLE (DA) A;
+  VARIABLE (DA) SCR;
+  PROCEDURE TAX M (DA 8);
+    A := ATAN(M[2]*ISRT(PF - SQR(M[2]) - SQR(M[4])));
+    SCR := -SIN(AXR)/COS(A - AXR)*ISRT(PF - SQR(M[4]))*M[1];
+    M[3] := M[3] + M[4]*SCR;
+    IF ND > 2;
+      M[5] := M[5] - SCR*(P0/CONS(P0))*(TFAC/V0);
+    ENDIF;
+    M[2] := SQRT(PF - SQR(M[4]))*SIN(A - AXR);
+    M[1] := M[1]*(COS(AXR) - SIN(AXR)*TAN(A - AXR));
+  ENDPROCEDURE;
+  PROCEDURE TAY M (DA 8);
+    A := ATAN(M[4]*ISRT(PF - SQR(M[2]) - SQR(M[4])));
+    SCR := -SIN(AYR)/COS(A - AYR)*ISRT(PF - SQR(M[2]))*M[3];
+    M[1] := M[1] + M[2]*SCR;
+    IF ND > 2;
+      M[5] := M[5] - SCR*(P0/CONS(P0))*(TFAC/V0);
+    ENDIF;
+    M[4] := SQRT(PF - SQR(M[2]))*SIN(A - AYR);
+    M[3] := M[3]*(COS(AYR) - SIN(AYR)*TAN(A - AYR));
+  ENDPROCEDURE;
+  AXR := AX*DEGRAD;
+  AYR := AY*DEGRAD;
+  PF := SQR(P0/CONS(P0));
+  TAX MAP;
+  TAY MAP;
+  IF NRAY # 0;
+    UMS;
+    TAX MSC;
+    TAY MSC;
+  ENDIF;
+  LOCSET 0 0 0 0 0 0;
+  DR := 0;
+  CE := 'TA';
+  UPDATE 0 1;
+ENDPROCEDURE;
+
+{ ----- RA: rotate the local axis by PHI [degrees] (cosy.fox L4061-4069)
+  In-place rotation of the (x, y) phase-space pair by ANG = PHI*DEGRAD.
+  Mixes DD[1]/DD[3] for positions and DD[2]/DD[4] for momenta. After
+  the mix, LOCTRA captures the rotation into LTRA so subsequent axis-
+  aware machinery (drift calculations, geometry) sees the rotated
+  frame. PTY warning fires if pictures-y graphics state is active —
+  libcosy's graphics is stubbed so LPG should always be 0.                }
+PROCEDURE RA PHI (RE);
+  VARIABLE (RE) ANG;
+  IF LPG # 0;
+    WRITE 6 ' --- WARNING in RA, PTY # 0';
+  ENDIF;
+  ANG := PHI*DEGRAD;
+  UMS;
+  MSC[1] :=  COS(ANG)*DD[1] + SIN(ANG)*DD[3];
+  MSC[3] := -SIN(ANG)*DD[1] + COS(ANG)*DD[3];
+  MSC[2] :=  COS(ANG)*DD[2] + SIN(ANG)*DD[4];
+  MSC[4] := -SIN(ANG)*DD[2] + COS(ANG)*DD[4];
+  LOCSET 0 0 0 0 0 0;
+  LOCTRA 0 0 0 0 0 ANG LTRA;
+  DR := 0;
+  CE := 'RA';
+  UPDATE 1 1;
+ENDPROCEDURE;
+
+END;
