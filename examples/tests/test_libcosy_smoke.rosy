@@ -914,6 +914,23 @@ WRITE 6 'After SSR, NSPN = ' NSPN '   [expect 2]';
 SPI3_TMP := SPI[3];
 WRITE 6 'After SSR, SPI[3][2] = ' SPI3_TMP[2] '   [expect 1]';
 
+{ ----- v2 M12.0: minimal TR — track 1 ray through drift(0.5) -----
+  TY=0 + NF=0 + no spin + no cuts: simplest-case tracking. Push the
+  SR-added ray through MAP (a drift here) for 3 iterations; with
+  LTRR=1, RAY gets baked. After: ray's x has shifted by 3*0.5*p_x = 0
+  since p_x = 0; ray is at (0.001, 0, 0.002, 0, ...).                  }
+WRITE 6 ' ----- v2 M12.0: minimal TR (drift × 3 iterations) -----';
+LCUT := 0;
+NCT := 0;
+UM;
+TRR 1;
+DL 0.5;
+TR 3 0 1 2 1 1 0 0 6;
+WRITE 6 'After TR (drift × 3, p_x=0), TRSC ESC =';
+VARIABLE (RE) TR_ESC;
+TRSC TR_ESC;
+WRITE 6 TR_ESC '   [expect 0 — momentum is zero, no x-shift]';
+
 { ----- v2 M11.2: PRAY roundtrip via WM-style file -----
   Write the active 1-ray pool via PRAY, then re-read via RRAY and
   verify the NRAY count round-trips. }

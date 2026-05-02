@@ -105,43 +105,139 @@ PROCEDURE TRNC E (RE);
   E := ENC;
 ENDPROCEDURE;
 
-{ ----- M9.0: TR family — informative stubs (gated on ray subsystem)
-  The full tracker procedures (TR / TRAPN / TRAPHIST / TRAYPAC) need
-  the ray subsystem (RAY / REMAIN / REMOVE / SPI / NRAY-sized PART
-  arrays). That subsystem is intentionally deferred per the M1
-  plan ("Skipped graphics entirely; ray subsystem deferred until
-  v2"). Call paths that would land here include CR / SR / PR / WRAY
-  / RRAY / DRAY / ARAY / ADDRAYS, plus the SPI-companions (PSPI /
-  WSPI / RSPI / DSPI / ASPI / ADDSPIS).
+{ ----- v2 M12.0: TR — minimal ray tracker (cosy.fox L1993-2203)
+  Pushes the active RAY pool through the active MAP for N iterations.
+  The cosy.fox TR is a 210-line behemoth with 5 nested helpers; M12.0
+  ports the *minimal* path: TY=0 (no symplectification correction),
+  NF=0 (no normal-form transform), no spin tracking (IID1/IID2 ≥ 0),
+  no aperture cuts (LCUT=0, NCT=0), no graphics output.
 
-  The stubs below let user code that *names* TR / TRAPN / etc.
-  parse cleanly, but emit an unambiguous error if actually called.
-  This is preferable to "procedure undefined" — users see exactly
-  why the call fails.                                                   }
+  Algorithm:
+    1. Snapshot RAY into a local PART (VE 8) so we can run tracking
+       without disturbing the master pool when LTRR=0.
+    2. For each iteration IT = 1..N:
+       For each ray J = 2..NRAY (skipping the placeholder reference):
+         a. Build a (DA TWOND) ARG_DA from PART[1..TWOND][J].
+         b. POLVAL -5 to evaluate TMAP at ARG_DA → RES_DA.
+         c. VELSET PART[I][J] := CONS(RES_DA[I]) for I=1..TWOND.
+       Track ESC = Σ |Δcomponent| for diagnostics.
+    3. If LTRR > 0, write PART back to RAY (bake the tracking).
+
+  Per-ray POLVAL replaces cosy.fox's "all-rays-as-DA-coefficients"
+  trick which conflates VE-of-NRAY with DA-storage. ROSY's strict
+  typing makes the per-ray loop natural at the cost of speed.
+
+  Future M12.x will add: TY > -1 fixed-point symplectification,
+  TY < -1 Newton symplectification, TY=-12/-13 linear-only paths,
+  NF=1 normal-form transformation, spin tracking, aperture cuts.
+  Graphics output (OUTPIC) needs the deferred GR* primitives.            }
 PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
             D1 (RE) D2 (RE) TY (RE) NF (RE) IU (RE);
-  WRITE 6 ' *** ERROR: TR not yet ported in libcosy v1';
-  WRITE 6 '     Reason: depends on the ray subsystem (RAY / SPI /';
-  WRITE 6 '     REMAIN / REMOVE), which is deferred from libcosy v1.';
-  WRITE 6 '     See cosy.fox L1993-2218 for the full TR algorithm.';
-  QUIT 0;
+  VARIABLE (RE) IT;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) IMP;
+  VARIABLE (RE) NOM;
+  VARIABLE (RE) PRE_X;
+  VARIABLE (DA 8) TMAP;
+  VARIABLE (DA 16) ARG_DA;
+  VARIABLE (DA 16) RES_DA;
+  VARIABLE (VE 8) PART;
+  VARIABLE (VE) PART_I_TMP;
+  IF TY # 0;
+    WRITE 6 ' *** ERROR in TR (v2 M12.0): TY # 0 not yet ported';
+    WRITE 6 '     symplectification (CGF/MGF/SYMP) deferred to M12.x';
+    QUIT 0;
+  ENDIF;
+  IF NF # 0;
+    WRITE 6 ' *** ERROR in TR (v2 M12.0): NF=1 (normal-form transform) not yet ported';
+    QUIT 0;
+  ENDIF;
+  IF (IID1 < 0) OR (IID2 < 0);
+    WRITE 6 ' *** ERROR in TR (v2 M12.0): spin tracking not yet ported';
+    QUIT 0;
+  ENDIF;
+  IF (LCUT # 0) OR (NCT > 0);
+    WRITE 6 ' *** ERROR in TR (v2 M12.0): aperture cuts not yet ported';
+    QUIT 0;
+  ENDIF;
+  IF NRAY < 2;
+    WRITE 6 ' --- WARNING in TR, no rays to track (NRAY < 2); skipping';
+  ELSE;
+  NOM := NOC;
+  IMP := TWOND;
+  ESC := 0;
+  ENC := 0;
+  LWNTR := 0;
+  { Copy MAP into TMAP for tracking. }
+  LOOP I 1 TWOND;
+    TMAP[I] := MAP[I];
+  ENDLOOP;
+  { Snapshot RAY into PART. }
+  LOOP I 1 8;
+    PART[I] := RAY[I];
+  ENDLOOP;
+  { Main tracking loop: per-iteration, per-ray POLVAL push through TMAP. }
+  LOOP IT 1 N;
+    LTRI := LTRI + 1;
+    LOOP J 2 NRAY;
+      { Build (DA TWOND) ARG_DA from ray J's coords in PART.
+        cosy.fox's `vec|J` extract returns the J-th element of a VE
+        as RE — the natural way to read a single ray's component
+        out of PART[I] (a NRAY-element VE).                          }
+      LOOP I 1 TWOND;
+        PART_I_TMP := PART[I];
+        ARG_DA[I] := (PART_I_TMP|J) + 0*DD[1];
+      ENDLOOP;
+      { Push through the active map. POLVAL flag -5 = "tree-evaluation
+        of preserved structure" mode used by cosy.fox's tracker.       }
+      POLVAL -5 TMAP IMP ARG_DA TWOND RES_DA IMP;
+      { Write back into PART[I][J] and accumulate ESC diagnostic. }
+      LOOP I 1 TWOND;
+        PART_I_TMP := PART[I];
+        PRE_X := PART_I_TMP|J;
+        VELSET PART_I_TMP J CONS(RES_DA[I]);
+        PART[I] := PART_I_TMP;
+        ESC := ESC + ABS(CONS(RES_DA[I]) - PRE_X);
+      ENDLOOP;
+    ENDLOOP;
+  ENDLOOP;
+  { Normalize ESC: average per-ray, per-component, per-iteration. }
+  IF (NRAY > 1) AND (N > 0) AND (TWOND > 0);
+    ESC := ESC/N/(NRAY-1)/TWOND;
+  ENDIF;
+  { Bake final state into RAY only when LTRR is set. }
+  IF LTRR > 0;
+    LOOP I 1 TWOND;
+      RAY[I] := PART[I];
+    ENDLOOP;
+  ENDIF;
+  ENDIF;
 ENDPROCEDURE;
 
+{ ----- M9.0 → v2 M12.0: TRAPN / TRAPHIST / TRAYPAC stubs unchanged
+  These three need the cut-tracking REMOVE/REMAIN bookkeeping that
+  TR's full version maintains. M12.0's minimal TR doesn't run cuts,
+  so the post-tracking accounting they expect isn't in place yet.
+  Will be unblocked alongside the LCUT≠0 / NCT>0 path in M12.1.        }
 PROCEDURE TRAPN N (RE);
-  WRITE 6 ' *** ERROR: TRAPN not yet ported in libcosy v1';
-  WRITE 6 '     Reason: ray-subsystem dependency (REMAIN / NRAY).';
+  WRITE 6 ' *** ERROR: TRAPN not yet ported in libcosy v2 M12.0';
+  WRITE 6 '     Reason: aperture-cut accounting (REMAIN / REMOVE) not';
+  WRITE 6 '     yet wired through TR; deferred to M12.1.';
   QUIT 0;
 ENDPROCEDURE;
 
 PROCEDURE TRAPHIST FN (ST) LT (RE);
-  WRITE 6 ' *** ERROR: TRAPHIST not yet ported in libcosy v1';
-  WRITE 6 '     Reason: ray-subsystem dependency (REMAIN / REMOVE).';
+  WRITE 6 ' *** ERROR: TRAPHIST not yet ported in libcosy v2 M12.0';
+  WRITE 6 '     Reason: cut-history (REMAIN-REMOVE) not yet wired';
+  WRITE 6 '     through TR; deferred to M12.1.';
   QUIT 0;
 ENDPROCEDURE;
 
 PROCEDURE TRAYPAC;
-  WRITE 6 ' *** ERROR: TRAYPAC not yet ported in libcosy v1';
-  WRITE 6 '     Reason: ray-subsystem dependency (RAY / SPI).';
+  WRITE 6 ' *** ERROR: TRAYPAC not yet ported in libcosy v2 M12.0';
+  WRITE 6 '     Reason: needs survival-record packing — depends on';
+  WRITE 6 '     cut-tracking from M12.1.';
   QUIT 0;
 ENDPROCEDURE;
 
