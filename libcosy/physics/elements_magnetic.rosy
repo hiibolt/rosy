@@ -287,6 +287,229 @@ PROCEDURE MZK L (RE) K (RE) D (RE);
   FFELE L D 0 1 2 'MZK';
 ENDPROCEDURE;
 
+{ ----- M6.29: K-strength multipole array variants (cosy.fox L3221-3229) -----
+  MMK / MMSK are sister wrappers to MM/MMS that take integrated K
+  values scaled by χ_m, mirroring the MOK/MDK/MZK relationship for
+  array-of-strengths magnets.                                          }
+PROCEDURE MMK L (RE) BA (RE 5) NBA (RE) D (RE);
+  VARIABLE (RE) I;
+  LOOP I 1 NBA;
+    PPOL[I] := BA[I]*CONS(CHIM) + 0*DD[1];
+    MPOL[I] := I + 1;
+  ENDLOOP;
+  LOFF := 1;
+  NPOL := NBA;
+  FFELE L D 0 1 2 'MMK';
+ENDPROCEDURE;
+
+{ MMSK: skew-K multipole. cosy.fox combines a normal-K vector KA with
+  an angle vector TA into a single MMS call by computing the skew
+  partner BS := KA[I]·sin((I+1)·TA[I]·deg→rad) and rotating KA by
+  cos. Mutates KA / TA in place — semantics match cosy.fox.           }
+PROCEDURE MMSK L (RE) KA (RE 5) TA (RE 5) NA (RE) D (RE);
+  VARIABLE (RE) I;
+  VARIABLE (RE) DP;
+  VARIABLE (RE) BS;
+  DP := 1;
+  LOOP I 1 NA;
+    DP := DP*D;
+    KA[I] := KA[I]*CONS(CHIM)*DP;
+    BS := KA[I]*SIN((I+1)*TA[I]*DEGRAD);
+    KA[I] := KA[I]*COS((I+1)*TA[I]*DEGRAD);
+    TA[I] := BS;
+  ENDLOOP;
+  MMS L KA TA NA D;
+ENDPROCEDURE;
+
+{ ----- M6.29: CM* family — axial-symmetric magnetic devices (cosy.fox L3520-3601) -----
+  All set NPOL=1 + MPOL[1]=20 (axial-symmetric pole flag) and route
+  through DSDED (default-stepping s-dependent integrator) using NSDP
+  modes 3, 5, 7, 8, 10, 13, or 14 from POTFLD's POTS path.
+
+  μ ≈ 1.2566×10⁻⁶ is COSY's vacuum-permeability convention (μ₀/π in
+  amp-meter units), used by CMR/CMSI/CMST/CMSTP for current-driven
+  field strengths.                                                       }
+
+PROCEDURE CMR I (RE) D (RE);
+  VARIABLE (RE) MU;
+  VARIABLE (RE) D_AP;
+  D_AP := D;
+  MU := 1.2566E-6;
+  CE := 'CMR';
+  NPOL := 1;
+  PPOL[1] := MU*I/(2*D_AP) + 0*DD[1];
+  MPOL[1] := 20;
+  NSDP := 5;
+  LOFF := 1;
+  DSDED 5E4*D_AP 0 1E-4*D_AP 1E4*D_AP 1E4*D_AP D_AP;
+ENDPROCEDURE;
+
+PROCEDURE CMG B (RE) D (RE);
+  VARIABLE (RE) D_AP;
+  D_AP := D;
+  NPOL := 1;
+  PPOL[1] := B + 0*DD[1];
+  MPOL[1] := 20;
+  NSDP := 3;
+  CE := 'CMG';
+  LOFF := 1;
+  DSDED 5*D_AP 0 D_AP/40 D_AP 10*D_AP D_AP;
+ENDPROCEDURE;
+
+PROCEDURE CML B (RE) D (RE);
+  VARIABLE (RE) D_AP;
+  D_AP := D;
+  NPOL := 1;
+  PPOL[1] := B + 0*DD[1];
+  MPOL[1] := 20;
+  NSDP := 7;
+  CE := 'CML';
+  LOFF := 1;
+  DSDED 5E4*D_AP 0 1E-4*D_AP 1E4*D_AP 1E4*D_AP D_AP;
+ENDPROCEDURE;
+
+PROCEDURE CMSI I (RE) N (RE) D (RE) L (RE);
+  VARIABLE (RE) MU;
+  VARIABLE (RE) D_AP;
+  D_AP := D;
+  MU := 1.2566E-6;
+  CE := 'CMSI';
+  NPOL := 1;
+  PPOL[1] := MU*I*N/2 + 0*DD[1];
+  PPOL[2] := L + 0*DD[1];
+  MPOL[1] := 20;
+  NSDP := 10;
+  LOFF := 1;
+  DSDED 200*D_AP L 1E-4*D_AP D_AP 3*D_AP D_AP;
+ENDPROCEDURE;
+
+PROCEDURE CMS B (RE) D (RE) L (RE);
+  VARIABLE (RE) D_AP;
+  D_AP := D;
+  NPOL := 1;
+  PPOL[1] := B*D_AP/2/TANH(L/2/D_AP) + 0*DD[1];
+  PPOL[2] := L + 0*DD[1];
+  MPOL[1] := 20;
+  NSDP := 8;
+  LOFF := 1;
+  CE := 'CMS';
+  DSDED 25*D_AP L 1E-4*D_AP D_AP 3*D_AP D_AP;
+ENDPROCEDURE;
+
+{ CMSP: a slice [S1, S2] of an otherwise-full magnetic solenoid of
+  length L. Uses the SNM / DLACT / LOCSET / SDELE / UPDATEMAP dance
+  so fringe-field effects of the *full* solenoid carry into the slice.
+  Pads the SDELE integration with 20·D backward/forward drifts when
+  S1≈0 or S2≈L (entrance/exit slices) so the entry/exit fringe is
+  fully captured.                                                         }
+PROCEDURE CMSP B (RE) D (RE) L (RE) S1 (RE) S2 (RE);
+  VARIABLE (RE) D_AP;
+  VARIABLE (RE) DS1;
+  VARIABLE (RE) DS2;
+  VARIABLE (RE) BACKDRIFT;
+  VARIABLE (RE) H2_STEP;
+  VARIABLE (DA 8) MS_BUF;
+  VARIABLE (DA 3 3) SM_BUF;
+  D_AP := D;
+  NPOL := 1;
+  PPOL[1] := B*D_AP/2/TANH(L/2/D_AP) + 0*DD[1];
+  PPOL[2] := L + 0*DD[1];
+  MPOL[1] := 20;
+  NSDP := 8;
+  LOFF := 1;
+  CE := 'CMSP';
+  UMS;
+  SNM MSC MS_BUF;
+  SSNM SSCR SM_BUF;
+  DS1 := 0;
+  IF ABS(S1) < 1E-5;
+    DS1 := L/2 - 20*D_AP;
+  ENDIF;
+  IF ABS(S1) < 1E-5;
+    DLACT MS_BUF DS1;
+  ELSE;
+    DS1 := S1;
+  ENDIF;
+  IF ABS(S2 - L) < 1E-5;
+    DS2 := 20*D_AP + L/2;
+  ELSE;
+    DS2 := S2;
+  ENDIF;
+  LOCSET 0 DS1 0 DS1 0 0;
+  H2_STEP := (20*D_AP - L/2)/100;
+  SDELE DS1 DS2 1E-4*D_AP H2_STEP 3*D_AP D_AP;
+  UPDATEMAP MSC MS_BUF MSC SSCR SM_BUF SSCR;
+  IF ABS(S2 - L) < 1E-5;
+    BACKDRIFT := L/2 - 20*D_AP;
+    DLACT MSC BACKDRIFT;
+    ZLOC := ZLOC - BACKDRIFT;
+  ENDIF;
+  SLOC := S2 - S1;
+  UPDATE 1 1;
+ENDPROCEDURE;
+
+PROCEDURE CMST NI (RE) R1 (RE) R2 (RE) L (RE);
+  VARIABLE (RE) MU;
+  MU := 1.2566E-6;
+  IF (R1 < 0) OR (R1 = 0);
+    WRITE 6 ' *** ERROR in CMST, R1 < 0 or R1 = 0';
+    QUIT 0;
+  ELSEIF (R2 < R1) OR (R2 = R1);
+    WRITE 6 ' *** ERROR in CMST, R2 < R1 or R2 = R1';
+    QUIT 0;
+  ENDIF;
+  CE := 'CMST';
+  NPOL := 1;
+  PPOL[1] := MU*NI/4/(R2 - R1) + 0*DD[1];
+  PPOL[2] := L + 0*DD[1];
+  PPOL[3] := R1 + 0*DD[1];
+  PPOL[4] := R2 + 0*DD[1];
+  MPOL[1] := 20;
+  NSDP := 13;
+  LOFF := 1;
+  DSDED 200*R2 L 1E-4*R1 R1 3*R1 R1;
+ENDPROCEDURE;
+
+{ CMSTP: superposition of N thick magnetic solenoids. Each piece IS
+  contributes (NI[IS], L[IS], R1[IS], R2[IS]) starting at X[IS]; the
+  piece data lands in MFD[IS, 1..5] for NSDP=14 to consume. The S1/S2
+  slice arguments cap the integration window, mirroring CMSP.         }
+PROCEDURE CMSTP N (RE) NI (RE 30) R1 (RE 30) R2 (RE 30) L (RE 30)
+                X (RE 30) S1 (RE) S2 (RE);
+  VARIABLE (RE) MU;
+  VARIABLE (RE) DMIN;
+  VARIABLE (RE) IS_GRID;
+  CE := 'CMSTP';
+  MU := 1.2566E-6;
+  DMIN := 1E8;
+  PPOL[1] := N + 0*DD[1];
+  LOOP IS_GRID 1 N;
+    DMIN := MIN(DMIN, R1[IS_GRID]);
+    IF (R2[IS_GRID] < R1[IS_GRID]) OR (R2[IS_GRID] = R1[IS_GRID]) OR (L[IS_GRID] < 0);
+      PPOL[1] := -1 + 0*DD[1];
+    ENDIF;
+    MFD[IS_GRID, 1] := MU*NI[IS_GRID]/4/(R2[IS_GRID] - R1[IS_GRID]);
+    MFD[IS_GRID, 2] := L[IS_GRID];
+    MFD[IS_GRID, 3] := R1[IS_GRID];
+    MFD[IS_GRID, 4] := R2[IS_GRID];
+    MFD[IS_GRID, 5] := X[IS_GRID];
+  ENDLOOP;
+  IF (DMIN < 0) OR (DMIN = 0) OR (DMIN = 1E8);
+    WRITE 6 ' *** ERROR in CMSTP, R1<0 or R1=0 or R1 too large';
+    QUIT 0;
+  ELSEIF CONS(PPOL[1]) = -1;
+    WRITE 6 ' *** ERROR in CMSTP, R2<R1 or R2=R1 or L<0';
+    QUIT 0;
+  ENDIF;
+  NPOL := 1;
+  MPOL[1] := 20;
+  NSDP := 14;
+  LOFF := 1;
+  LOCSET 0 S1 0 S1 0 0;
+  SDELE S1 S2 1E-4*DMIN DMIN 3*DMIN DMIN;
+  UPDATE 1 1;
+ENDPROCEDURE;
+
 { ----- M6.27: MGE — general magnetic multipole by Gaussians (cosy.fox L3231-3238)
   MGE(NP, A, NS, DS, SIGMA, D): for each pole I=1..NP, copies the
   caller's coefficient column A[I, 1..NS] (after dividing by the
