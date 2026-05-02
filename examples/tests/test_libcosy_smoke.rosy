@@ -890,6 +890,20 @@ WRITE 6 MAP[1];
 WRITE 6 'After MGE quadrupole, MAP[3] (defocusing-plane y map):';
 WRITE 6 MAP[3];
 
+{ ----- M8.2: GLASS via GMS spherical mirror -----
+  Reflects from a 0.5m-radius spherical mirror with 5cm aperture. The
+  IS0=-1 (mirror) + IS1=0 (sphere) path exercises GLASS's nested
+  TRANS1/LL/ANG/TRANS2 helpers and the scalar-radius-at-P[1,1] convention.
+  Map should reflect (TANA → -TANA, TANB → -TANB). }
+WRITE 6 ' ----- M8.2: GMS spherical mirror via GLASS -----';
+OV 2 2 0;
+RPP 100;
+FR 0;
+UM;
+GMS 0.5 0.05;
+WRITE 6 'After GMS, MAP[1] (post-reflection x):';
+WRITE 6 MAP[1];
+
 { ----- M6.28: NSDP=5 algebraic-saturation s-profile -----
   Drive a single sextupole (MPOL[1]=3) directly through SDELE with
   NSDP=5 and a small length. The s-profile  P = PPOL[1]·s/√(1+(s/DR)²)

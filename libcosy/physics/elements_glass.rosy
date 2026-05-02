@@ -107,4 +107,378 @@ PROCEDURE RA PHI (RE);
   UPDATE 1 1;
 ENDPROCEDURE;
 
+{ ----- M8.2: GLASS — central glass-optics engine (cosy.fox L3921-3994)
+  Refracts/reflects ray (X, A, Y, B) through one or two surfaces with
+  shapes IS1 / IS2:
+    IS = 0  → spherical surface, P1/P2 carry the radius at P[1,1]
+    IS > 0  → polynomial-described surface of order IS, P[i+1,j+1] is
+              the X^i·Y^j coefficient
+
+  IS0 selects mode:
+    IS0 > 0 → lens (refraction at IS1 surface, traverse medium of length
+              D, refraction at IS2 surface, exit). N is refractive index.
+    IS0 < 0 → mirror (reflection at IS1 surface only). P2 / IS2 unused.
+
+  Four nested helpers mirror cosy.fox's structure:
+    TRANS1 (a, b → tan-a, tan-b)        : direction-cosine → tangent
+    TRANS2 (tan-a, tan-b → a, b)        : inverse
+    LL    (X, TANA, Y, TANB, P, L, IS)  : drift to surface, write L
+    ANG   (X, TANA, Y, TANB, N, P, L, IS, IS0) : compute refraction/
+                                                 reflection of TANA, TANB
+
+  Polymorphism note: cosy.fox lets P1/P2 be either scalar or matrix.
+  ROSY-strict requires fixed type — port uses (RE 3 3) for both, with
+  scalar-radius callers (GLS, GMS) packing R into P[1,1].               }
+PROCEDURE GLASS IS0 (RE) P1 (RE 3 3) IS1 (RE) P2 (RE 3 3) IS2 (RE)
+                N (RE) D (RE) AA (DA 8);
+  VARIABLE (DA) X;
+  VARIABLE (DA) A;
+  VARIABLE (DA) Y;
+  VARIABLE (DA) B;
+  VARIABLE (DA) TANA;
+  VARIABLE (DA) TANB;
+  VARIABLE (DA) L;
+  VARIABLE (RE) NOM;
+  VARIABLE (RE) XL;
+  VARIABLE (RE) ZL;
+  VARIABLE (RE) PL;
+  PROCEDURE TRANS1 A_LOC (DA) B_LOC (DA) TANA_OUT (DA) TANB_OUT (DA);
+    VARIABLE (DA) SCR;
+    SCR := ISRT(1 - A_LOC*A_LOC - B_LOC*B_LOC);
+    TANA_OUT := A_LOC*SCR;
+    TANB_OUT := B_LOC*SCR;
+  ENDPROCEDURE;
+  PROCEDURE TRANS2 TANA_IN (DA) TANB_IN (DA) A_OUT (DA) B_OUT (DA);
+    VARIABLE (DA) SCR;
+    SCR := ISRT(1 + TANA_IN*TANA_IN + TANB_IN*TANB_IN);
+    A_OUT := TANA_IN*SCR;
+    B_OUT := TANB_IN*SCR;
+  ENDPROCEDURE;
+  PROCEDURE LL X_RAY (DA) TANA_RAY (DA) Y_RAY (DA) TANB_RAY (DA)
+              P (RE 3 3) L_OUT (DA) IS (RE);
+    VARIABLE (DA) C1;
+    VARIABLE (DA) C2;
+    VARIABLE (DA) C3;
+    VARIABLE (DA) L1;
+    VARIABLE (DA) L2;
+    VARIABLE (DA) CS;
+    VARIABLE (DA) Z1;
+    VARIABLE (RE) P_RAD;
+    IF IS = 0;
+      { Spherical surface: scalar radius lives at P[1,1]. }
+      P_RAD := P[1, 1];
+      C1 := 1 + TANA_RAY*TANA_RAY + TANB_RAY*TANB_RAY;
+      C2 := TANA_RAY*X_RAY + TANB_RAY*Y_RAY - P_RAD;
+      C3 := X_RAY*X_RAY + Y_RAY*Y_RAY;
+      CS := C2*C2 - C1*C3;
+      IF CONS(C2)*P_RAD > 0;
+        WRITE 6 ' @@@ COSY CODE ERROR in GLASS, contact programer';
+      ENDIF;
+      IF CONS(CS) < 0;
+        WRITE 6 ' *** RAY CANNOT TOUCH THE LENS ';
+      ENDIF;
+      L1 := (-C2 - SQRT(CS))/C1;
+      L2 := (-C2 + SQRT(CS))/C1;
+      L_OUT := L1;
+      IF ABS(CONS(L1)) > ABS(CONS(L2));
+        L_OUT := L2;
+      ENDIF;
+      X_RAY := X_RAY + TANA_RAY*L_OUT;
+      Y_RAY := Y_RAY + TANB_RAY*L_OUT;
+    ELSE;
+      { Polynomial surface: fixed-point iteration. }
+      Z1 := 0*DD[1];
+      L_OUT := POLY_DA(X_RAY, Y_RAY, P, IS);
+      WHILE ABS(CONS(L_OUT - Z1)) > 1E-13;
+        X_RAY := X_RAY + TANA_RAY*(L_OUT - Z1);
+        Y_RAY := Y_RAY + TANB_RAY*(L_OUT - Z1);
+        Z1 := L_OUT;
+        L_OUT := POLY_DA(X_RAY, Y_RAY, P, IS);
+      ENDWHILE;
+    ENDIF;
+  ENDPROCEDURE;
+  PROCEDURE ANG X_RAY (DA) TANA_RAY (DA) Y_RAY (DA) TANB_RAY (DA)
+               N_REFR (RE) P (RE 3 3) L_HIT (DA) IS (RE) IS0_M (RE);
+    VARIABLE (DA) CA1;
+    VARIABLE (DA) CA2;
+    VARIABLE (DA) CA3;
+    VARIABLE (DA) CB1;
+    VARIABLE (DA) CB2;
+    VARIABLE (DA) CB3;
+    VARIABLE (DA) CC1;
+    VARIABLE (DA) CC2;
+    VARIABLE (DA) CC3;
+    VARIABLE (DA) C1;
+    VARIABLE (DA) C2;
+    VARIABLE (DA) CD;
+    VARIABLE (DA) S1;
+    VARIABLE (DA) S2;
+    VARIABLE (DA) S3;
+    VARIABLE (DA) S4;
+    VARIABLE (RE) I;
+    VARIABLE (RE) J;
+    VARIABLE (RE 3 3) P0;
+    VARIABLE (RE) P_RAD;
+    IF IS = 0;
+      P_RAD := P[1, 1];
+      CA1 := X_RAY/ABS(P_RAD);
+      CB1 := Y_RAY/ABS(P_RAD);
+      CC1 := (L_HIT - P_RAD)/ABS(P_RAD);
+    ELSE;
+      LOOP I 1 IS;
+        LOOP J 1 IS;
+          P0[I, J] := P[I+1, J]*I;
+        ENDLOOP;
+      ENDLOOP;
+      CA1 := POLY_DA(X_RAY, Y_RAY, P0, IS-1);
+      LOOP I 1 IS;
+        LOOP J 1 IS;
+          P0[I, J] := P[I, J+1]*J;
+        ENDLOOP;
+      ENDLOOP;
+      CB1 := POLY_DA(X_RAY, Y_RAY, P0, IS-1);
+      C1 := ISRT(CA1*CA1 + CB1*CB1 + 1);
+      CC1 := -1*C1;
+      CA1 := CA1*C1;
+      CB1 := CB1*C1;
+    ENDIF;
+    CC2 := ISRT(TANA_RAY*TANA_RAY + TANB_RAY*TANB_RAY + 1);
+    CA2 := TANA_RAY*CC2;
+    CB2 := TANB_RAY*CC2;
+    S1 := CC1*CB2 - CC2*CB1;
+    S2 := CC1*CA2 - CC2*CA1;
+    C1 := (S1*CB1 + S2*CA1)/N_REFR;
+    C2 := (S1*S1 + S2*S2)/N_REFR/N_REFR - CC1*CC1;
+    CD := C1*C1 - C2;
+    IF CONS(CD) < 0;
+      WRITE 6 ' *** TOT REFLECTION';
+    ENDIF;
+    CC3 := -C1 + SQRT(CD);
+    CB3 := (S1/N_REFR + CB1*CC3)/CC1;
+    CA3 := (S2/N_REFR + CA1*CC3)/CC1;
+    S3 := CA2*CA3 + CB2*CB3 + CC2*CC3;
+    TANA_RAY := CA3/CC3;
+    TANB_RAY := CB3/CC3;
+    CC3 := -C1 - SQRT(CD);
+    CB3 := (S1/N_REFR + CB1*CC3)/CC1;
+    CA3 := (S2/N_REFR + CA1*CC3)/CC1;
+    S4 := CA2*CA3 + CB2*CB3 + CC2*CC3;
+    CA3 := CA3/CC3;
+    CB3 := CB3/CC3;
+    IF IS0_M < 0;
+      IF CONS(S3) > CONS(S4);
+        TANA_RAY := CA3;
+        TANB_RAY := CB3;
+      ENDIF;
+    ENDIF;
+    IF IS0_M > 0;
+      IF CONS(S3) < CONS(S4);
+        TANA_RAY := CA3;
+        TANB_RAY := CB3;
+      ENDIF;
+    ENDIF;
+  ENDPROCEDURE;
+  NOM := NOC;
+  IF IS1 + IS2 > 0;
+    CO NOM+1;
+  ENDIF;
+  X := AA[1];
+  A := AA[2];
+  Y := AA[3];
+  B := AA[4];
+  TRANS1 A B TANA TANB;
+  LL X TANA Y TANB P1 L IS1;
+  ANG X TANA Y TANB N P1 L IS1 IS0;
+  IF IS0 > 0;
+    X := X + TANA*(D - L);
+    Y := Y + TANB*(D - L);
+    LL X TANA Y TANB P2 L IS2;
+    ANG X TANA Y TANB 1/N P2 L IS2 IS0;
+    PL := ATAN(CONS(TANA));
+    ZL := CONS(L);
+    XL := CONS(X);
+    X := (X - XL) - TANA*(L - ZL);
+    Y := Y - TANB*(L - ZL);
+  ELSEIF IS0 < 0;
+    TANA := -TANA;
+    TANB := -TANB;
+    X := X + TANA*L;
+    Y := Y + TANB*L;
+    PL := ATAN(CONS(TANA));
+    ZL := CONS(L);
+  ENDIF;
+  TRANS2 TANA TANB A B;
+  TANB := B*ISRT(1 - SQR(B))/COS(ATAN(TANA) - PL);
+  A := SQRT(1 - SQR(B))*SIN(ATAN(TANA) - PL);
+  Y := Y - X*SIN(PL)*TANB;
+  X := X*(COS(PL) - SIN(PL)*TAN(ATAN(TANA) - PL));
+  AA[1] := X;
+  AA[2] := A;
+  AA[3] := Y;
+  AA[4] := B;
+  CO NOM;
+ENDPROCEDURE;
+
+{ ----- M8.2 wrappers (cosy.fox L3996-4036): user-facing glass elements
+  All call GLASS with (RE 3 3) buffers; scalar-radius callers (GLS, GMS)
+  pack R into P[1,1] via the helper INIT_P3_SCALAR pattern.            }
+
+{ GLS: spherical glass lens (cosy.fox L3996-3999) }
+PROCEDURE GLS R1 (RE) R2 (RE) N (RE) L (RE) D (RE);
+  VARIABLE (RE 3 3) P1_BUF;
+  VARIABLE (RE 3 3) P2_BUF;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      P1_BUF[I, J] := 0;
+      P2_BUF[I, J] := 0;
+    ENDLOOP;
+  ENDLOOP;
+  P1_BUF[1, 1] := R1;
+  P2_BUF[1, 1] := R2;
+  GLASS 1 P1_BUF 0 P2_BUF 0 N L MAP;
+  IF NRAY # 0;
+    UMS;
+    GLASS 1 P1_BUF 0 P2_BUF 0 N L MSC;
+  ENDIF;
+  LOCSET 0 L 0 L 0 0;
+  DR := D;
+  CE := 'GLS';
+  UPDATE 0 1;
+ENDPROCEDURE;
+
+{ GL: general glass lens with user-supplied surface polynomials (L4001-4004) }
+PROCEDURE GL P1 (RE 3 3) I1 (RE) P2 (RE 3 3) I2 (RE)
+            N (RE) L (RE) D (RE);
+  GLASS 1 P1 I1 P2 I2 N L MAP;
+  IF NRAY # 0;
+    UMS;
+    GLASS 1 P1 I1 P2 I2 N L MSC;
+  ENDIF;
+  LOCSET 0 L 0 L 0 0;
+  DR := D;
+  CE := 'GL';
+  UPDATE 0 1;
+ENDPROCEDURE;
+
+{ GP: glass prism with two flat-tilted surfaces (L4006-4012) }
+PROCEDURE GP PHI1 (RE) PHI2 (RE) N (RE) L (RE) D (RE);
+  VARIABLE (RE 3 3) P_BUF;
+  VARIABLE (RE 3 3) Q_BUF;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      P_BUF[I, J] := 0;
+      Q_BUF[I, J] := 0;
+    ENDLOOP;
+  ENDLOOP;
+  P_BUF[2, 1] := TAN(PHI1*DEGRAD);
+  Q_BUF[2, 1] := TAN(PHI2*DEGRAD);
+  GLASS 2 P_BUF 1 Q_BUF 1 N L MAP;
+  IF NRAY # 0;
+    UMS;
+    GLASS 2 P_BUF 1 Q_BUF 1 N L MSC;
+  ENDIF;
+  LOCSET 0 L 0 L 0 0;
+  DR := D;
+  CE := 'GP';
+  UPDATE 0 1;
+ENDPROCEDURE;
+
+{ GMS: spherical mirror (L4014-4017) }
+PROCEDURE GMS R (RE) D (RE);
+  VARIABLE (RE 3 3) P_BUF;
+  VARIABLE (RE 3 3) Q_BUF;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      P_BUF[I, J] := 0;
+      Q_BUF[I, J] := 0;
+    ENDLOOP;
+  ENDLOOP;
+  P_BUF[1, 1] := R;
+  GLASS -1 P_BUF 0 Q_BUF 0 1 0 MAP;
+  IF NRAY # 0;
+    UMS;
+    GLASS -1 P_BUF 0 Q_BUF 0 1 0 MSC;
+  ENDIF;
+  LOCSET 0 0 0 0 0 0;
+  DR := D;
+  CE := 'GMS';
+  UPDATE 0 1;
+ENDPROCEDURE;
+
+{ GMP: parabolic mirror (L4019-4024). 3x3 P with quadratic xy diagonal. }
+PROCEDURE GMP R (RE) D (RE);
+  VARIABLE (RE 3 3) P_BUF;
+  VARIABLE (RE 3 3) Q_BUF;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      P_BUF[I, J] := 0;
+      Q_BUF[I, J] := 0;
+    ENDLOOP;
+  ENDLOOP;
+  P_BUF[3, 1] := 0.5/R;
+  P_BUF[1, 3] := 0.5/R;
+  GLASS -1 P_BUF 2 Q_BUF 0 1 0 MAP;
+  IF NRAY # 0;
+    UMS;
+    GLASS -1 P_BUF 2 Q_BUF 0 1 0 MSC;
+  ENDIF;
+  LOCSET 0 0 0 0 0 0;
+  DR := D;
+  CE := 'GMP';
+  UPDATE 0 1;
+ENDPROCEDURE;
+
+{ GMF: flat tilted mirror (L4026-4031). 2x2 P_BUF embedded in 3x3.  }
+PROCEDURE GMF PHI (RE) D (RE);
+  VARIABLE (RE 3 3) P_BUF;
+  VARIABLE (RE 3 3) Q_BUF;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      P_BUF[I, J] := 0;
+      Q_BUF[I, J] := 0;
+    ENDLOOP;
+  ENDLOOP;
+  P_BUF[2, 1] := TAN((90 - PHI)*DEGRAD);
+  GLASS -1 P_BUF 1 Q_BUF 0 1 0 MAP;
+  IF NRAY # 0;
+    UMS;
+    GLASS -1 P_BUF 1 Q_BUF 0 1 0 MSC;
+  ENDIF;
+  LOCSET 0 0 0 0 0 0;
+  DR := D;
+  CE := 'GMF';
+  UPDATE 0 1;
+ENDPROCEDURE;
+
+{ GM: general mirror with user-supplied surface polynomial (L4033-4036) }
+PROCEDURE GM P (RE 3 3) N (RE) D (RE);
+  VARIABLE (RE 3 3) Q_BUF;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      Q_BUF[I, J] := 0;
+    ENDLOOP;
+  ENDLOOP;
+  GLASS -1 P N Q_BUF 0 1 0 MAP;
+  IF NRAY # 0;
+    UMS;
+    GLASS -1 P N Q_BUF 0 1 0 MSC;
+  ENDIF;
+  LOCSET 0 0 0 0 0 0;
+  DR := D;
+  CE := 'GM';
+  UPDATE 0 1;
+ENDPROCEDURE;
+
 END;
