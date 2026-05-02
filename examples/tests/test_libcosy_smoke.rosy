@@ -931,6 +931,21 @@ VARIABLE (RE) TR_ESC;
 TRSC TR_ESC;
 WRITE 6 TR_ESC '   [expect 0 — momentum is zero, no x-shift]';
 
+{ ----- v2 M12.1: TRAP cut + TRAPN survival count -----
+  Add a second ray that's WAY outside any reasonable aperture, then
+  TRAP ELLIPTIC 1mm × 1mm and run TR. The far-out ray should be
+  cut on the very first iteration; TRAPN should report 1 survivor. }
+WRITE 6 ' ----- v2 M12.1: TR with TRAP cut + TRAPN -----';
+SR 0.1 0 0.1 0 0 0 0 0 1;     { ray at x=10cm, y=10cm — way outside }
+WRITE 6 'After 2nd SR, NRAY = ' NRAY '   [expect 3]';
+TRAP 0.005 0.005 1;             { 5mm × 5mm ELLIPTIC; small ray inside, far ray outside }
+TRR 1;
+TR 1 0 1 2 1 1 0 0 6;
+VARIABLE (RE) N_SURV;
+TRAPN N_SURV;
+WRITE 6 'After TR with cut, TRAPN survivor count = ' N_SURV '   [expect 1 — far ray cut]';
+TRAP 0 0 0;                     { reset cut state for downstream tests }
+
 { ----- v2 M11.2: PRAY roundtrip via WM-style file -----
   Write the active 1-ray pool via PRAY, then re-read via RRAY and
   verify the NRAY count round-trips. }

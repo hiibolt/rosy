@@ -105,6 +105,71 @@ PROCEDURE TRNC E (RE);
   E := ENC;
 ENDPROCEDURE;
 
+{ ----- M12.1: CUT_LCUT — apply TRAP-style aperture cut to a ray pool
+  Per-ray equivalent of cosy.fox's nested CUT helper for the LCUT≠0,
+  NCT=0 path. For each surviving ray J (REMAIN|J = 1), tests:
+    LCND=1 (elliptic):     (X/XCUT[1])² + (Y/XCUT[2])² > 1
+    LCND=2 (rectangular):  (X/XCUT[1])² > 1 OR (Y/XCUT[2])² > 1
+    TWOND=2 (1D phase):    just (X/XCUT[1])² > 1
+  Where LCND := ABS(LCUT). If cut, sets REMAIN[J] := 0 and adds LTRI
+  to REMOVE[J] (storing the cut step for TRAPHIST consumption).
+
+  Because libcosy's per-ray loop computes the cut metric directly (no
+  cosy.fox VEZERO/CLIM/CADD machinery), the threshold is just 1, the
+  unit-ellipse/box test. CLIM0 is unused.                              }
+PROCEDURE CUT_LCUT PART_INPUT (VE 8);
+  VARIABLE (RE) J;
+  VARIABLE (RE) CUT_FLAG;
+  VARIABLE (RE) LCND;
+  VARIABLE (VE) REMAIN_VE;
+  VARIABLE (VE) REMOVE_VE;
+  VARIABLE (VE) PART_X;
+  VARIABLE (VE) PART_Y;
+  VARIABLE (RE) XV;
+  VARIABLE (RE) YV;
+  VARIABLE (RE) REMOVE_J_VAL;
+  REMAIN_VE := REMAIN;
+  REMOVE_VE := REMOVE;
+  PART_X := PART_INPUT[1];
+  IF TWOND > 2;
+    PART_Y := PART_INPUT[3];
+  ELSE;
+    PART_Y := VE(0);
+  ENDIF;
+  LCND := ABS(LCUT);
+  LOOP J 2 NRAY;
+    IF (REMAIN_VE|J) = 1;
+      XV := PART_X|J;
+      CUT_FLAG := 0;
+      IF TWOND = 2;
+        IF SQR(XV/XCUT[1]) > 1;
+          CUT_FLAG := 1;
+        ENDIF;
+      ELSE;
+        YV := PART_Y|J;
+        IF LCND = 1;
+          IF SQR(XV/XCUT[1]) + SQR(YV/XCUT[2]) > 1;
+            CUT_FLAG := 1;
+          ENDIF;
+        ELSE;
+          IF SQR(XV/XCUT[1]) > 1;
+            CUT_FLAG := 1;
+          ELSEIF SQR(YV/XCUT[2]) > 1;
+            CUT_FLAG := 1;
+          ENDIF;
+        ENDIF;
+      ENDIF;
+      IF CUT_FLAG = 1;
+        VELSET REMAIN_VE J 0;
+        REMOVE_J_VAL := REMOVE_VE|J;
+        VELSET REMOVE_VE J REMOVE_J_VAL + LTRI;
+      ENDIF;
+    ENDIF;
+  ENDLOOP;
+  REMAIN := REMAIN_VE;
+  REMOVE := REMOVE_VE;
+ENDPROCEDURE;
+
 { ----- v2 M12.0: TR — minimal ray tracker (cosy.fox L1993-2203)
   Pushes the active RAY pool through the active MAP for N iterations.
   The cosy.fox TR is a 210-line behemoth with 5 nested helpers; M12.0
@@ -157,8 +222,9 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
     WRITE 6 ' *** ERROR in TR (v2 M12.0): spin tracking not yet ported';
     QUIT 0;
   ENDIF;
-  IF (LCUT # 0) OR (NCT > 0);
-    WRITE 6 ' *** ERROR in TR (v2 M12.0): aperture cuts not yet ported';
+  IF NCT > 0;
+    WRITE 6 ' *** ERROR in TR (v2 M12.1): NCT (multi-AP) cuts not yet ported';
+    WRITE 6 '     NCT > 0 needs PREAP/APCOPY infrastructure deferred to M12.2';
     QUIT 0;
   ENDIF;
   IF NRAY < 2;
@@ -177,6 +243,15 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   LOOP I 1 8;
     PART[I] := RAY[I];
   ENDLOOP;
+  { Initial cut: if LCUT > 0 (positive) AND NCT = 0, cut even the
+    starting particles. Negative LCUT skips this and only cuts
+    particles that drift outside the aperture during tracking.   }
+  IF LTRR = 0;
+    LTRI := 0;
+    IF (LCUT > 0) AND (NCT = 0);
+      CUT_LCUT PART;
+    ENDIF;
+  ENDIF;
   { Main tracking loop: per-iteration, per-ray POLVAL push through TMAP. }
   LOOP IT 1 N;
     LTRI := LTRI + 1;
@@ -201,6 +276,12 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
         ESC := ESC + ABS(CONS(RES_DA[I]) - PRE_X);
       ENDLOOP;
     ENDLOOP;
+    { Per-iteration aperture cut. LCUT can be ±1 / ±2; ABS gives the
+      cut shape. Negative LCUT means skip-initial-particles only;
+      both positive and negative do per-iteration cuts.            }
+    IF LCUT # 0;
+      CUT_LCUT PART;
+    ENDIF;
   ENDLOOP;
   { Normalize ESC: average per-ray, per-component, per-iteration. }
   IF (NRAY > 1) AND (N > 0) AND (TWOND > 0);
@@ -220,25 +301,149 @@ ENDPROCEDURE;
   TR's full version maintains. M12.0's minimal TR doesn't run cuts,
   so the post-tracking accounting they expect isn't in place yet.
   Will be unblocked alongside the LCUT≠0 / NCT>0 path in M12.1.        }
+{ ----- M12.1: TRAPN — count of survived particles after TR (cosy.fox L2221-2223)
+  ABS(REMAIN) sums all survival flags (each is 0=cut or 1=alive). The
+  -1 excludes the placeholder reference particle slot.
+  Unblocked once TR's LCUT cut path lands (this milestone) so REMAIN
+  can hold non-trivial values.                                          }
 PROCEDURE TRAPN N (RE);
-  WRITE 6 ' *** ERROR: TRAPN not yet ported in libcosy v2 M12.0';
-  WRITE 6 '     Reason: aperture-cut accounting (REMAIN / REMOVE) not';
-  WRITE 6 '     yet wired through TR; deferred to M12.1.';
-  QUIT 0;
+  N := ABS(REMAIN) - 1;
 ENDPROCEDURE;
 
+{ ----- M12.1: TRAPHIST — output particle survival history (cosy.fox L2225-2242)
+  HIST = REMAIN - REMOVE encodes each ray's removal step (0 if alive,
+  -k if cut at step k). The histogram counts how many rays were cut at
+  each step; the running total of survivors is written one line per
+  step where any cuts occurred.
+
+  L = VMAX(-HIST) is the latest step where a cut happened; if LT is
+  larger (typically LTRI = the last TR call's iteration count), an
+  extra line is appended to bracket the survival count up to LT.
+
+  cosy.fox uses `VARIABLE DATA 1 L+2` (runtime size). libcosy uses a
+  bounded (RE 10000) buffer — covers any realistic TR.N up to 10k
+  iterations with no extra alloc cost.                                  }
 PROCEDURE TRAPHIST FN (ST) LT (RE);
-  WRITE 6 ' *** ERROR: TRAPHIST not yet ported in libcosy v2 M12.0';
-  WRITE 6 '     Reason: cut-history (REMAIN-REMOVE) not yet wired';
-  WRITE 6 '     through TR; deferred to M12.1.';
-  QUIT 0;
+  VARIABLE (VE) HIST;
+  VARIABLE (RE) L;
+  VARIABLE (RE 10000) DATA;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) K;
+  VARIABLE (VE) NEG_HIST;
+  IF NRAY < 2;
+    WRITE 6 ' *** ERROR in TRAPHIST, no rays.';
+    QUIT 0;
+  ENDIF;
+  HIST := REMAIN - REMOVE;
+  NEG_HIST := 0*HIST - HIST;
+  L := VMAX(NEG_HIST);
+  IF L+2 > 10000;
+    WRITE 6 ' *** ERROR in TRAPHIST, history exceeds 10000-step buffer';
+    QUIT 0;
+  ENDIF;
+  LOOP J 1 L+2;
+    DATA[J] := 0;
+  ENDLOOP;
+  LOOP I 2 NRAY;
+    J := NEG_HIST|I;
+    DATA[J+2] := DATA[J+2] + 1;
+  ENDLOOP;
+  OPENF 77 FN 'UNKNOWN';
+  K := NRAY - 1;
+  WRITE 77 '#     step   number of survived particles    (the intial number at step=-1)';
+  WRITE 77 SF(-1, '(I10)') & ' ' & SF(K, '(I10)');
+  LOOP J 2 L+2;
+    IF DATA[J] > 0;
+      K := K - DATA[J];
+      WRITE 77 SF(J-2, '(I10)') & ' ' & SF(K, '(I10)');
+    ENDIF;
+  ENDLOOP;
+  IF L < LT;
+    WRITE 77 SF(LTRI, '(I10)') & ' ' & SF(K, '(I10)');
+  ENDIF;
+  CLOSEF 77;
 ENDPROCEDURE;
 
+{ ----- M12.1: TRAYPAC — pack RAY/SPI to keep only survived particles (cosy.fox L2244-2264)
+  After TR with cuts, REMAIN holds 1 for survivors and 0 for cut
+  particles. TRAYPAC compacts RAY[1..8] / SPI[1..3] / REMAIN to drop
+  the cut entries — useful before re-tracking with a smaller pool.
+
+  Algorithm:
+    1. L = ABS(REMAIN) = number of survivors. If L = NRAY, nothing to do.
+    2. Snapshot RAY into PART, SPI into TSPI; reset REMAIN to [1].
+    3. For each J = 2..L0 (original ray index), if REMAIN0|J = 1:
+       Append PART[I]|J onto RAY[I] for I=1..8; same for SPI/TSPI.
+       Bump K (live count). Append 1 to REMAIN.
+    4. Final NRAY := L; NSPN := L (if spin tracking active).             }
 PROCEDURE TRAYPAC;
-  WRITE 6 ' *** ERROR: TRAYPAC not yet ported in libcosy v2 M12.0';
-  WRITE 6 '     Reason: needs survival-record packing — depends on';
-  WRITE 6 '     cut-tracking from M12.1.';
-  QUIT 0;
+  VARIABLE (RE) L0;
+  VARIABLE (RE) L;
+  VARIABLE (RE) SPIN;
+  VARIABLE (VE 8) PART;
+  VARIABLE (VE 3) TSPI;
+  VARIABLE (VE) REMAIN0;
+  VARIABLE (VE) RAY_I_TMP;
+  VARIABLE (VE) SPI_I_TMP;
+  VARIABLE (VE) PART_I_TMP;
+  VARIABLE (VE) TSPI_I_TMP;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) K;
+  L0 := LENGTH(RAY[1]);
+  IF L0 # NRAY;
+    WRITE 6 ' *** ERROR in TRAYPAC, RAY length wrong.';
+    QUIT 0;
+  ENDIF;
+  L := ABS(REMAIN);
+  IF L < NRAY;
+    REMAIN0 := REMAIN;
+    REMAIN := VE(1);
+    LOOP I 1 8;
+      PART[I] := RAY[I];
+      RAY_I_TMP := PART[I];
+      RAY[I] := VE(RAY_I_TMP|1);
+    ENDLOOP;
+    SPIN := 0;
+    SPI_I_TMP := SPI[1];
+    IF LENGTH(SPI_I_TMP) = L0;
+      SPIN := 1;
+    ENDIF;
+    IF SPIN = 1;
+      LOOP I 1 3;
+        TSPI[I] := SPI[I];
+        TSPI_I_TMP := TSPI[I];
+        SPI[I] := VE(TSPI_I_TMP|1);
+      ENDLOOP;
+    ENDIF;
+    K := 1;
+    LOOP J 2 L0;
+      IF (REMAIN0|J) = 1;
+        K := K + 1;
+        REMAIN := REMAIN & 1;
+        LOOP I 1 8;
+          PART_I_TMP := PART[I];
+          RAY[I] := RAY[I] & (PART_I_TMP|J);
+        ENDLOOP;
+        IF SPIN = 1;
+          LOOP I 1 3;
+            TSPI_I_TMP := TSPI[I];
+            SPI[I] := SPI[I] & (TSPI_I_TMP|J);
+          ENDLOOP;
+        ENDIF;
+      ENDIF;
+    ENDLOOP;
+    IF K # L;
+      WRITE 6 ' *** ERROR in TRAYPAC, REMAIN length wrong.';
+      QUIT 0;
+    ENDIF;
+  ENDIF;
+  NRAY := L;
+  IF SPIN = 1;
+    NSPN := L;
+  ENDIF;
+  REMOVE := 0*REMAIN;
 ENDPROCEDURE;
 
 END;
