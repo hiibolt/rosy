@@ -481,4 +481,261 @@ PROCEDURE GM P (RE 3 3) N (RE) D (RE);
   UPDATE 0 1;
 ENDPROCEDURE;
 
+{ ----- M8.3: WL — wave-front through a refractive surface (cosy.fox L4160-4193)
+  Computes the s-coordinate map (FNL[2, 1..3]) at the entrance/exit faces
+  of a refractive layer described by SS1 / SS2 polynomial coefficients.
+
+  Algorithm:
+    1. Build FLOW = XX + DD-extension (drift FLOW by DD[NV] for arc-
+       length awareness; LCO=1 path linearizes the drift).
+    2. For each of S1 (entrance) and S2 (exit):
+       a. Evaluate FLOW at ARG = (DD[1..NV-1], DD[NV] + L) → RES.
+       b. CSTR := POLY_DA(DD[1], DD[3], SS) - DD[NV] + L: deviation
+          from the polynomial surface.
+       c. Substitute CSTR into RES (POLVAL), invert via MI → ARG[NV].
+       d. POLVAL FLOW[1, 3, NV] at the corrected ARG → FNL[J, 1..3].
+    3. LF := √(Σ (FNL[2,i] - FNL[1,i])²) — Euclidean surface-shape
+       length between entrance and exit positions.
+
+  Pre-conditions: WAS 1 + RP must precede; SS1/SS2[1,1] must be 0 (the
+  polynomial constant term defines the reference surface position);
+  S2 ≠ S1.
+
+  cosy.fox declares ARG/RES sized by NV (dynamic). libcosy uses (DA 16)
+  to handle typical NV ≤ 11 with headroom — POLVAL/MI only touch the
+  first NV entries, so oversize is safe.                                 }
+PROCEDURE WL
+            SS1 (RE 3 3)
+            SS2 (RE 3 3)
+            N_ORD (RE)
+            S1 (RE)
+            S2 (RE)
+            LF (DA);
+  VARIABLE (DA 8) FLOW;
+  VARIABLE (DA 16) ARG;
+  VARIABLE (DA 16) RES;
+  VARIABLE (DA 1) CSTR;
+  VARIABLE (DA 1) RES_NV_BUF;
+  VARIABLE (DA 1) SCR_BUF;
+  VARIABLE (DA 2 3) FNL;
+  VARIABLE (DA) SCR;
+  VARIABLE (DA) DLACT_LP0PZ;
+  VARIABLE (DA) DLACT_L_DA;
+  VARIABLE (RE 2) L_S;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) IER;
+  IF LWA # 1;
+    WRITE 6 ' *** ERROR in WL, call WAS 1 before OV';
+    QUIT 0;
+  ELSEIF LRP = 0;
+    WRITE 6 ' *** ERROR, call RP before WL';
+    QUIT 0;
+  ELSEIF (SS1[1, 1] # 0) OR (SS2[1, 1] # 0);
+    WRITE 6 ' *** ERROR in WL, SS1(1,1) and SS2(1,1) must be 0';
+    QUIT 0;
+  ELSEIF ABS(S2 - S1) < 1E-12;
+    WRITE 6 ' *** ERROR in WL, S2-S1 must be non zero';
+    QUIT 0;
+  ENDIF;
+  CO NO+1;
+  IF LCO = 0;
+    LOOP I 1 8;
+      FLOW[I] := XX[I] + 0*DD[1];
+    ENDLOOP;
+    { Inline DLACT FLOW DD[NV] (DA-typed length) — sister to elements_basic
+      DLACT but with DA L. The DA L is required for arc-length awareness. }
+    DLACT_L_DA := DD[NV];
+    DLACT_LP0PZ := CONS(ETA) + 0*DD[1];
+    DLACT_LP0PZ := (1 + FLOW[6])*(2*(1 + FLOW[7])
+                    + (1 + FLOW[6])*DLACT_LP0PZ)/(2 + DLACT_LP0PZ);
+    IF LKC = 0;
+      DLACT_LP0PZ := DLACT_L_DA*ISRT(DLACT_LP0PZ - SQR(FLOW[2]) - SQR(FLOW[4]));
+    ELSEIF LKC = 1;
+      DLACT_LP0PZ := DLACT_L_DA*ISRT(DLACT_LP0PZ);
+    ENDIF;
+    FLOW[1] := FLOW[1] + DLACT_LP0PZ*FLOW[2];
+    IF ND > 1;
+      FLOW[3] := FLOW[3] + DLACT_LP0PZ*FLOW[4];
+    ENDIF;
+    IF ND > 2;
+      DLACT_LP0PZ := (1 + FLOW[7] + (1 + FLOW[6])*CONS(ETA))*DLACT_LP0PZ
+                     /(1 + CONS(ETA)) - DLACT_L_DA;
+      FLOW[5] := FLOW[5] - DLACT_LP0PZ*(1 + CONS(ETA))/(2 + CONS(ETA));
+    ENDIF;
+  ELSEIF LCO = 1;
+    LOOP I 1 8;
+      FLOW[I] := XX[I] + 0*DD[1];
+    ENDLOOP;
+    FLOW[1] := FLOW[1] + FLOW[2]*DD[NV];
+    FLOW[3] := FLOW[3] + FLOW[4]*DD[NV];
+  ENDIF;
+  LOOP I MIN(9, NV) NV;
+    FLOW[I] := DD[I];
+  ENDLOOP;
+  LOOP I 1 NV-1;
+    ARG[I] := DD[I];
+  ENDLOOP;
+  L_S[1] := S1;
+  L_S[2] := S2;
+  LOOP J 1 2;
+    ARG[NV] := DD[NV] + L_S[J];
+    POLVAL 1 FLOW NV ARG NV RES NV;
+    IF J = 1;
+      CSTR[1] := POLY_DA(DD[1], DD[3], SS1, N_ORD);
+    ELSE;
+      CSTR[1] := -POLY_DA(DD[1], DD[3], SS2, N_ORD);
+    ENDIF;
+    CSTR[1] := CSTR[1] - DD[NV] + L_S[J];
+    POLVAL 1 CSTR 1 RES NV CSTR 1;
+    ARG[NV] := CSTR[1];
+    MI ARG RES NV IER NOC NV NM1;
+    IF IER # 0;
+      WRITE 6 ' *** ERROR in WL, inversion failed';
+      QUIT 0;
+    ENDIF;
+    { DAPLU expects (DA n) vector; copy single element through (DA 1) buf. }
+    RES_NV_BUF[1] := RES[NV];
+    DAPLU RES_NV_BUF NV 0 SCR_BUF;
+    SCR := SCR_BUF[1];
+    ARG[NV] := SCR + L_S[J];
+    RES[1] := FLOW[1];
+    RES[2] := FLOW[3];
+    RES[3] := FLOW[NV];
+    POLVAL 1 RES 3 ARG NV RES 3;
+    LOOP I 1 3;
+      FNL[J, I] := RES[I];
+    ENDLOOP;
+  ENDLOOP;
+  CO NO;
+  LF := 0*DD[1];
+  LOOP I 1 3;
+    LF := LF + SQR(FNL[2, I] - FNL[1, I]);
+  ENDLOOP;
+  LF := SQRT(LF);
+ENDPROCEDURE;
+
+{ ----- M8.3: WA — wedge-absorber through SS1/SS2 surfaces (cosy.fox L4271-4305)
+  Treats a wedge-shaped absorber: SS1 entrance face, SS2 exit face, with
+  energy-loss integration over each half via WL + EL + COSY2TR + MI.
+
+  Pre-conditions: ND=3 (must run with full 6D phase space), LUM=1 (UM
+  must be called first), L > 0.
+
+  Algorithm:
+    1. Build SS0 = zero polynomial (mid-plane reference).
+    2. WL SS1 SS0 → LF1 (entrance-half surface length); WL SS0 SS2 → LF2.
+       LCO=1 forces linearized drift inside both WL calls.
+    3. EL E0 DD[5] L → EF, TF (energy and time-of-flight after absorber).
+    4. Substitute polynomial-LF dependence into EF/TF via POLVAL.
+    5. Build XX0 = TRANSPORT-coordinate map (positions, momenta scaled,
+       new energy/time slots).
+    6. COSY2TR + MI + POLVAL: convert TRANSPORT map back to COSY
+       coordinates, write into MSC.
+    7. RP CONS(EF) — refresh reference particle to post-absorber energy.
+
+  cosy.fox SS0 sized 1 N+1 N+1: leading 1 = scalar DA storage, N+1 N+1
+  is the data shape. libcosy uses (RE 3 3) (matches WL's SS1/SS2 cap of
+  order ≤ 2). N is bounded accordingly.                                  }
+PROCEDURE WA SS1IN (RE 3 3) SS2IN (RE 3 3) N (RE) L (RE) D (RE);
+  VARIABLE (RE 3 3) SS0;
+  VARIABLE (DA 16) XX0;
+  VARIABLE (DA 16) MC;
+  VARIABLE (DA) LF;
+  VARIABLE (DA) LF1;
+  VARIABLE (DA) LF2;
+  VARIABLE (DA) TF;
+  VARIABLE (DA) EF;
+  VARIABLE (RE) IER;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) NPOLY;
+  VARIABLE (RE) HALF_L;
+  VARIABLE (RE) ZERO_S;
+  VARIABLE (RE 3 3) SS1L;
+  VARIABLE (RE 3 3) SS2L;
+  VARIABLE (RE) S1_VAR;
+  VARIABLE (RE) S2_VAR;
+  IF L < 1E-12;
+    WRITE 6 ' *** ERROR in WA, L must be positive';
+    QUIT 0;
+  ELSEIF LUM # 1;
+    WRITE 6 ' *** ERROR, call UM before WA';
+    QUIT 0;
+  ELSEIF ND # 3;
+    WRITE 6 ' *** ERROR in WA, call OV with phase space dimension 3';
+    QUIT 0;
+  ENDIF;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      SS0[I, J] := 0;
+    ENDLOOP;
+  ENDLOOP;
+  LCO := 1;
+  NPOLY := N;
+  HALF_L := 0.5*L;
+  ZERO_S := 0;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      SS1L[I, J] := SS1IN[I, J];
+      SS2L[I, J] := SS2IN[I, J];
+    ENDLOOP;
+  ENDLOOP;
+  S1_VAR := 0;
+  S2_VAR := HALF_L;
+  WL SS1L SS0 NPOLY S1_VAR S2_VAR LF1;
+  S1_VAR := HALF_L;
+  S2_VAR := L;
+  WL SS0 SS2L NPOLY S1_VAR S2_VAR LF2;
+  LCO := 0;
+  LF := LF1 + LF2;
+  EL E0 DD[5] L EF TF;
+  MC[1] := TF;
+  MC[2] := EF;
+  LOOP I 1 NV-1;
+    XX0[I] := DD[I];
+  ENDLOOP;
+  XX0[NV] := LF - CONS(LF);
+  POLVAL 1 MC 2 XX0 NV MC 2;
+  EF := MC[2];
+  TF := MC[1];
+  LF := 0.5*L*SQRT(1 + SQR(XX[2]) + SQR(XX[4]));
+  TF := TF + (LF - LF1)/VELC(CONS(E0)) + (LF - LF2)/VELC(CONS(EF));
+  XX0[1] := XX[1] + L*XX[2];
+  XX0[2] := XX[2];
+  XX0[3] := XX[3] + L*XX[4];
+  XX0[4] := XX[4];
+  XX0[5] := TF - CONS(TF);
+  XX0[6] := (EF - CONS(EF))/CONS(EF);
+  LOOP I 7 NV;
+    XX0[I] := DD[I];
+  ENDLOOP;
+  COSY2TR MC;
+  LOOP I 7 NV;
+    MC[I] := DD[I];
+  ENDLOOP;
+  POLVAL 1 XX0 NV MC NV XX0 NV;
+  RP CONS(EF) CONS(M0) CONS(Z0);
+  COSY2TR MC;
+  LOOP I 7 NV;
+    MC[I] := DD[I];
+  ENDLOOP;
+  MI MC MC NV IER NOC NV NM1;
+  IF IER # 0;
+    WRITE 6 ' *** ERROR in WA, MI inversion failed';
+    QUIT 0;
+  ENDIF;
+  POLVAL 1 MC NV XX0 NV XX0 NV;
+  LOOP I 1 6;
+    MSC[I] := XX0[I];
+  ENDLOOP;
+  LOOP I 7 8;
+    MSC[I] := XX[I];
+  ENDLOOP;
+  LOCSET 0 L 0 L 0 0;
+  DR := D;
+  CE := 'WA';
+  UPDATE 1 1;
+ENDPROCEDURE;
+
 END;
