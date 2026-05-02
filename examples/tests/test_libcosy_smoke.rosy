@@ -914,6 +914,20 @@ WRITE 6 'After SSR, NSPN = ' NSPN '   [expect 2]';
 SPI3_TMP := SPI[3];
 WRITE 6 'After SSR, SPI[3][2] = ' SPI3_TMP[2] '   [expect 1]';
 
+{ ----- v2 M11.2: PRAY roundtrip via WM-style file -----
+  Write the active 1-ray pool via PRAY, then re-read via RRAY and
+  verify the NRAY count round-trips. }
+WRITE 6 ' ----- v2 M11.2: PRAY/RRAY roundtrip -----';
+OPENF 88 'libcosy_pray_test.dat' 'UNKNOWN';
+PRAY 88;
+CLOSEF 88;
+CR;
+WRITE 6 'After CR, NRAY = ' NRAY '   [expect 0]';
+OPENF 88 'libcosy_pray_test.dat' 'OLD';
+RRAY 88;
+CLOSEF 88;
+WRITE 6 'After RRAY, NRAY = ' NRAY '   [expect 2]';
+
 { ----- M8.2: GLASS via GMS spherical mirror -----
   Reflects from a 0.5m-radius spherical mirror with 5cm aperture. The
   IS0=-1 (mirror) + IS1=0 (sphere) path exercises GLASS's nested

@@ -201,6 +201,205 @@ ENDPROCEDURE;
 
   Emittances per axis: π·PHSP[1]·PHSP[2]·√(1-PHSR[1]²) (X), and
   π·PHSP[3]·PHSP[4]·√(1-PHSR[2]²) (Y). cosy.fox comment line.            }
+{ ----- M11.2: PR — print RAY columns to a unit (cosy.fox L942-943)
+  Trivial: writes each RAY[I] as a vector, one component per line block.
+  cosy.fox uses the VE->stream auto-formatting; ROSY's WRITE on VE
+  emits the same column-per-element layout.                              }
+PROCEDURE PR IU (RE);
+  VARIABLE (RE) I;
+  LOOP I 1 8;
+    WRITE IU RAY[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- M11.2: PRAY — print rays in single-line-per-ray format (cosy.fox L945-959)
+  One ray per line with all 8 components + REMAIN + REMOVE columns.
+  The first ray is the reference; subsequent rays are user-added via SR.
+
+  NR = LENGTH(RAY[1]); after CR + N SR calls, RAY[1] holds N+1 elements
+  (placeholder + N actual). The IF NR=1 special-case treats "only the
+  placeholder" as zero rays — matches cosy.fox's CR-NRAY=0 invariant.
+
+  Header line ' #   X    A    Y    B    T    D    G    Z    REMAIN    REMOVE'
+  is written once; data rows follow with E15.7 formatting for components
+  and I10 for the integer remain/remove flags.                           }
+PROCEDURE PRAY IU (RE);
+  VARIABLE (RE) NR;
+  VARIABLE (ST) STR;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (VE) VE_TMP;
+  NR := LENGTH(RAY[1]);
+  IF NR = 1;
+    NR := 0;
+  ENDIF;
+  WRITE IU '# number of rays:' & SF(NR, '(I8)') & '  (including the reference)';
+  IF NR > 0;
+    WRITE IU '#   X              A              Y              B              T              D              G              Z              REMAIN    REMOVE';
+    LOOP J 1 NR;
+      VE_TMP := RAY[1];
+      STR := SF(VE_TMP[J], '(E15.7)');
+      LOOP I 2 8;
+        VE_TMP := RAY[I];
+        STR := STR & SF(VE_TMP[J], '(E15.7)');
+      ENDLOOP;
+      VE_TMP := REMAIN;
+      STR := STR & SF(VE_TMP[J], '(I10)');
+      VE_TMP := REMOVE;
+      STR := STR & SF(VE_TMP[J], '(I10)');
+      WRITE IU STR;
+    ENDLOOP;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- M11.2: WRAY — print rays in column-per-component format (cosy.fox L961-975)
+  Alternative output: one section per phase-space component (X, A, Y, B,
+  T, D, G, Z), each with NR values one-per-line. Then a REMAIN/REMOVE
+  section with I10-formatted integer flags.
+
+  Useful when post-processing wants to consume one component at a time
+  (e.g., plot all X values across rays).                                  }
+PROCEDURE WRAY IU (RE);
+  VARIABLE (RE) NR;
+  VARIABLE (ST 8) LABL;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (VE) VE_TMP;
+  LABL[1] := 'X';
+  LABL[2] := 'A';
+  LABL[3] := 'Y';
+  LABL[4] := 'B';
+  LABL[5] := 'T';
+  LABL[6] := 'D';
+  LABL[7] := 'G';
+  LABL[8] := 'Z';
+  NR := LENGTH(RAY[1]);
+  IF NR = 1;
+    NR := 0;
+  ENDIF;
+  WRITE IU '# number of rays:' & SF(NR, '(I8)') & '  (including the reference)';
+  IF NR > 0;
+    LOOP I 1 8;
+      WRITE IU '# ' & LABL[I];
+      LOOP J 1 NR;
+        VE_TMP := RAY[I];
+        WRITE IU VE_TMP[J];
+      ENDLOOP;
+      WRITE IU '';
+    ENDLOOP;
+    WRITE IU '#   REMAIN    REMOVE';
+    LOOP J 1 NR;
+      VE_TMP := REMAIN;
+      WRITE IU SF(VE_TMP[J], '(I10)') & SF(REMOVE[J], '(I10)');
+    ENDLOOP;
+    WRITE IU '';
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- M11.2: RRAY — read rays from unit (cosy.fox L977-1016)
+  Reads files produced by PRAY (single-line-per-ray) OR WRAY (column-
+  per-component). Format detected by inspecting the second line: if it
+  starts with '#   X' (PRAY header), parse fixed-width columns; if it
+  starts with '# X' (WRAY label), parse one-value-per-line sections.
+
+  Pre-condition: caller must have called CR; RRAY overwrites NRAY,
+  RAY, RSC, RCOL, REMAIN, REMOVE.
+
+  PRAY-format reads use R(STR, start, end) substring-as-RE per the 15-
+  wide column layout. WRAY-format reads use RE-typed READ directly to
+  pull one number per line.
+
+  The LRR (read-remain-remove) flag detects whether the source file has
+  REMAIN/REMOVE columns (PRAY ending in 'MOVE' or WRAY's terminal section);
+  if not, defaults are REMAIN := 1+0*VE, REMOVE := 0*VE.                  }
+PROCEDURE RRAY IU (RE);
+  VARIABLE (ST) STR;
+  VARIABLE (ST 8) LABL;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) LHEAD;
+  VARIABLE (RE) LRR;
+  VARIABLE (RE) X_TMP;
+  VARIABLE (VE) VE_TMP;
+  READ IU STR;
+  NRAY := R(STR, 18, 25);
+  LRR := 0;
+  IF NRAY > 0;
+    READS IU STR;
+    LHEAD := LENGTH(STR);
+    IF LHEAD > 3;
+      { PRAY format: header is "#   X  A  Y  B ..." ending in REMOVE if LRR }
+      IF SS(STR, LHEAD-3, LHEAD) = 'MOVE';
+        LRR := 1;
+      ENDIF;
+      READ IU STR;
+      LOOP I 1 8;
+        RAY[I] := VE(R(STR, 15*(I-1)+1, 15*I));
+      ENDLOOP;
+      IF LRR = 1;
+        REMAIN := VE(R(STR, 121, 130));
+        REMOVE := VE(R(STR, 131, 140));
+      ENDIF;
+      LOOP J 2 NRAY;
+        READ IU STR;
+        LOOP I 1 8;
+          RAY[I] := RAY[I] & R(STR, 15*(I-1)+1, 15*I);
+        ENDLOOP;
+        IF LRR = 1;
+          REMAIN := REMAIN & R(STR, 121, 130);
+          REMOVE := REMOVE & R(STR, 131, 140);
+        ENDIF;
+      ENDLOOP;
+    ELSE;
+      { WRAY format: 8 column-per-component sections + optional REMAIN/REMOVE. }
+      LABL[1] := 'X'; LABL[2] := 'A'; LABL[3] := 'Y'; LABL[4] := 'B';
+      LABL[5] := 'T'; LABL[6] := 'D'; LABL[7] := 'G'; LABL[8] := 'Z';
+      IF STR # ('# ' & LABL[1]);
+        WRITE 6 ' *** ERROR in RRAY, the wrong line is input:' STR;
+        QUIT 0;
+      ENDIF;
+      LOOP I 1 8;
+        IF I > 1;
+          READS IU STR;
+          IF STR # ('# ' & LABL[I]);
+            WRITE 6 ' *** ERROR in RRAY, the wrong line is input:' STR;
+            QUIT 0;
+          ENDIF;
+        ENDIF;
+        READ IU X_TMP;
+        RAY[I] := VE(X_TMP);
+        LOOP J 2 NRAY;
+          READ IU X_TMP;
+          RAY[I] := RAY[I] & X_TMP;
+        ENDLOOP;
+        READS IU STR;
+      ENDLOOP;
+      READS IU STR;
+      IF STR = '#   REMAIN    REMOVE';
+        LRR := 1;
+        READS IU STR;
+        REMAIN := VE(R(STR, 1, 10));
+        REMOVE := VE(R(STR, 11, 20));
+        LOOP J 2 NRAY;
+          READS IU STR;
+          REMAIN := REMAIN & R(STR, 1, 10);
+          REMOVE := REMOVE & R(STR, 11, 20);
+        ENDLOOP;
+      ENDIF;
+    ENDIF;
+  ENDIF;
+  IF LRR = 0;
+    VE_TMP := RAY[1];
+    REMOVE := 0*VE_TMP;
+    REMAIN := 1 + REMOVE;
+  ENDIF;
+  LOOP I 1 8;
+    RSC[I] := RAY[I];
+  ENDLOOP;
+  VE_TMP := RAY[1];
+  RCOL := 1 + 0*VE_TMP;
+ENDPROCEDURE;
+
 PROCEDURE SCDE;
   VARIABLE (RE) I;
   VARIABLE (RE) FAC;
