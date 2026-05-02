@@ -78,6 +78,211 @@ PROCEDURE NORMAL X (RE) Z (RE) X0 (RE) Z0 (RE) X1 (RE) Z1 (RE)
   ZS := Z - DIS*NZ;
 ENDPROCEDURE;
 
+{ ----- NORMAL_DA: DA-aware variant of NORMAL (cosy.fox L2339-2345)
+  Same algorithm but accepts DA-typed input position (X, Z) and emits
+  DA-typed outputs. The line geometry (X0..Z1) stays RE since BX1BOXP
+  always stores constants. Required by EDGESEC's DA-input call path
+  (MCSDIST → EDGESEC → NORMAL with X, Z carrying the symbolic
+  beam-coordinate DA pair).                                              }
+PROCEDURE NORMAL_DA X (DA) Z (DA) X0 (RE) Z0 (RE) X1 (RE) Z1 (RE)
+                    DIS (DA) XS (DA) ZS (DA);
+  VARIABLE (RE) NX;
+  VARIABLE (RE) NZ;
+  VARIABLE (RE) SCR;
+  NX := -(Z1 - Z0);
+  NZ := X1 - X0;
+  SCR := SQRT(SQR(NX) + SQR(NZ));
+  NX := NX/SCR;
+  NZ := NZ/SCR;
+  DIS := (X - X0)*NX + (Z - Z0)*NZ;
+  XS := X - DIS*NX;
+  ZS := Z - DIS*NZ;
+ENDPROCEDURE;
+
+{ ----- EDGESEC: edge-section closest-approach (cosy.fox L2347-2363)
+  For point (X, Z) and box-edge IB.IE, compute closest point (XS, ZS)
+  on that edge and signed distance DIS.
+
+  The edge runs from corner IE to corner IS=IE+1 (mod 4) of box IB.
+  Parameter t = ((X-X0)·(X1-X0) + (Z-Z0)·(Z1-Z0)) / |X1-X0|² is the
+  projection coordinate. If t < 0 → clamp to corner X0; t > 1 → clamp
+  to corner X1; else → perpendicular foot via NORMAL_DA. Sign of DIS
+  comes from the cross-product orientation.                             }
+PROCEDURE EDGESEC X (DA) Z (DA) IB (RE) IE (RE)
+                  XS (DA) ZS (DA) DIS (DA);
+  VARIABLE (RE) X0;
+  VARIABLE (RE) Z0;
+  VARIABLE (RE) X1;
+  VARIABLE (RE) Z1;
+  VARIABLE (RE) XC;
+  VARIABLE (RE) ZC;
+  VARIABLE (DA) T;
+  VARIABLE (RE) IS_EDGE;
+  VARIABLE (RE) SIDE;
+  VARIABLE (RE) N_EDGE;
+  VARIABLE (RE) DENOM;
+  N_EDGE := BX1BOXPN[IB, IE];
+  IF N_EDGE = 1;
+    IS_EDGE := IE + 1;
+    IF IS_EDGE > 4;
+      IS_EDGE := 1;
+    ENDIF;
+    X0 := BX1BOXP[IB, IE, 1, 1];
+    Z0 := BX1BOXP[IB, IE, 2, 1];
+    X1 := BX1BOXP[IB, IS_EDGE, 1, 1];
+    Z1 := BX1BOXP[IB, IS_EDGE, 2, 1];
+    DENOM := SQR(X1 - X0) + SQR(Z1 - Z0);
+    T := ((X - X0)*(X1 - X0) + (Z - Z0)*(Z1 - Z0))/DENOM;
+    IF CONS(T) < 0;
+      XS := X0 + 0*DD[1];
+      ZS := Z0 + 0*DD[1];
+      XC := CONS(X);
+      ZC := CONS(Z);
+      SIDE := SIG(-(XC - X0)*(Z1 - Z0) + (ZC - Z0)*(X1 - X0));
+      DIS := SIDE*LEN2(X - XS, Z - ZS);
+    ELSEIF CONS(T) > 1;
+      XS := X1 + 0*DD[1];
+      ZS := Z1 + 0*DD[1];
+      XC := CONS(X);
+      ZC := CONS(Z);
+      SIDE := SIG(-(XC - X1)*(Z1 - Z0) + (ZC - Z1)*(X1 - X0));
+      DIS := SIDE*LEN2(X - XS, Z - ZS);
+    ELSE;
+      NORMAL_DA X Z X0 Z0 X1 Z1 DIS XS ZS;
+    ENDIF;
+  ELSE;
+    WRITE 6 ' *** ERROR in EDGESEC, N#1 -- not supported.';
+    QUIT 0;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- PTBOX: point-vs-box geometry (cosy.fox L2365-2378)
+  Tests whether the *constant* part of point (X, Z) is inside box IB
+  and reports per-edge {distance, side} arrays. INSIDE flag = 1 iff
+  the point lies on the "inside" side of all four edges (sign vote).
+
+  CONS(X), CONS(Z) is intentional — PTBOX answers a topological
+  question that only depends on the central trajectory. The DA part
+  is irrelevant here and gets stripped on entry.                         }
+PROCEDURE PTBOX X (DA) Z (DA) IB (RE)
+                INSIDE (RE) DISE (RE 4) SIDE_OUT (RE 4);
+  VARIABLE (RE) XC;
+  VARIABLE (RE) ZC;
+  VARIABLE (RE) I;
+  VARIABLE (DA) XS_DA;
+  VARIABLE (DA) ZS_DA;
+  VARIABLE (DA) DIS_DA;
+  VARIABLE (DA) XC_DA;
+  VARIABLE (DA) ZC_DA;
+  XC := CONS(X);
+  ZC := CONS(Z);
+  XC_DA := XC + 0*DD[1];
+  ZC_DA := ZC + 0*DD[1];
+  INSIDE := 0;
+  LOOP I 1 4;
+    EDGESEC XC_DA ZC_DA IB I XS_DA ZS_DA DIS_DA;
+    DISE[I] := ABS(CONS(DIS_DA));
+    SIDE_OUT[I] := SIG(CONS(DIS_DA));
+    INSIDE := INSIDE + SIDE_OUT[I];
+  ENDLOOP;
+  IF NINT(INSIDE) = 4;
+    INSIDE := 1;
+  ELSE;
+    INSIDE := 0;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- POLB_BD: Horner evaluation of one row of a 2D RE table (BX*-style)
+  cosy.fox's MCSDIST defines POLB as a nested fn that reverses a row of
+  P[IB, 1..N+1] via Horner. ROSY can't nest fns inside procs cleanly, so
+  POLB_BD is hoisted to a top-level FUNCTION that takes the 2D table P
+  + row index IB + order N. Both BXBDT and BXDDT have shape (RE 5 7), so
+  one signature handles both call sites.                                  }
+FUNCTION (DA) POLB_BD X (DA) P (RE 5 7) IB (RE) N_ORDER (RE);
+  VARIABLE (RE) I;
+  POLB_BD := P[IB, N_ORDER + 1] + 0*DD[1];
+  LOOP I N_ORDER 1 -1;
+    POLB_BD := POLB_BD*X + P[IB, I];
+  ENDLOOP;
+ENDFUNCTION;
+
+{ ----- MCSDIST: superimposed combined-function-magnet field (cosy.fox L2380-2413)
+  Sums per-box BY contributions for all BXIBOX boxes. For each box IM:
+   * If point (X, Z) is inside the box → evaluate BY = POLB_BD(R, BXBDT, ...)
+     with R = |X, Z|, then attenuate by 4 ENGE soft-edge factors (one per
+     edge) using DH = POLB_BD(RS, BXDDT, ...) as the per-edge fall-off.
+   * If point is outside but the worst signed distance < 10·DMAX, find the
+     closest edge and evaluate at that edge's foot, attenuated by ENGE
+     factors for any edge within 6·DMAX of the point.
+
+  cosy.fox's LHE=1 hard-edge branch is dead in normal operation (LHE=0
+  hardcoded); not ported.                                                 }
+FUNCTION (DA) MCSDIST X (DA) Z (DA);
+  VARIABLE (RE) IM;
+  VARIABLE (RE) IM0;
+  VARIABLE (RE) INSIDE;
+  VARIABLE (DA) R;
+  VARIABLE (RE 4) DISE;
+  VARIABLE (RE) SDIS;
+  VARIABLE (RE) SIE;
+  VARIABLE (RE 4) SIDE_VEC;
+  VARIABLE (RE) IE;
+  VARIABLE (DA) BY;
+  VARIABLE (DA) DH;
+  VARIABLE (DA) DIS;
+  VARIABLE (DA) XS;
+  VARIABLE (DA) ZS;
+  VARIABLE (DA) RS;
+  VARIABLE (DA) ENGE_ARG;
+  MCSDIST := 0*DD[1];
+  LOOP IM 1 BXIBOX;
+    PTBOX X Z IM INSIDE DISE SIDE_VEC;
+    BY := 0*DD[1];
+    IF INSIDE = 1;
+      IM0 := BXBOXID[IM];
+      R := LEN2(X, Z);
+      BY := POLB_BD(R, BXBDT, IM0, BXNOB[IM0]);
+      LOOP IE 1 4;
+        EDGESEC X Z IM IE XS ZS DIS;
+        RS := LEN2(XS, ZS);
+        DH := POLB_BD(RS, BXDDT, IM0, BXNOD[IM0]);
+        ENGE_ARG := -DIS/(2*DH);
+        BY := BY*ENGE(1, 1, 1, ENGE_ARG);
+      ENDLOOP;
+    ELSE;
+      SDIS := -SIDE_VEC[1]*DISE[1];
+      LOOP IE 2 4;
+        SDIS := MAX(SDIS, -SIDE_VEC[IE]*DISE[IE]);
+      ENDLOOP;
+      IF SDIS <= 10*DMAX;
+        IM0 := BXBOXID[IM];
+        LOOP IE 1 4;
+          IF IE = 1;
+            SDIS := DISE[IE];
+            SIE := IE;
+          ELSEIF DISE[IE] < SDIS;
+            SDIS := DISE[IE];
+            SIE := IE;
+          ENDIF;
+        ENDLOOP;
+        EDGESEC X Z IM SIE XS ZS DIS;
+        RS := LEN2(XS, ZS);
+        BY := POLB_BD(RS, BXBDT, IM0, BXNOB[IM0]);
+        LOOP IE 1 4;
+          IF SIDE_VEC[IE]*DISE[IE] < 6*DMAX;
+            EDGESEC X Z IM IE XS ZS DIS;
+            RS := LEN2(XS, ZS);
+            DH := POLB_BD(RS, BXDDT, IM0, BXNOD[IM0]);
+            ENGE_ARG := -DIS/(2*DH);
+            BY := BY*ENGE(1, 1, 1, ENGE_ARG);
+          ENDIF;
+        ENDLOOP;
+      ENDIF;
+    ENDIF;
+    MCSDIST := MCSDIST + BY;
+  ENDLOOP;
+ENDFUNCTION;
+
 { ----- HAMILTONIAN: H(A, V, H) in particle-optical coordinates
         (cosy.fox L2767-2780) ---
   Computes the on-shell Hamiltonian
@@ -408,8 +613,10 @@ PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
       NSDP = -3 → wiggler
       NSDP = -12 → cylindrical electrostatic
       NSDP = -13 → spherical electrostatic
-    NSDP = -4/-5/-6/-7/-8/-21 (BENDIST/GAUSS/FOURIERGAUSS/MCSDIST/DIST
-    based) are deferred — they need additional helper ports. }
+    NSDP = -4 (BENDIST polynomial-radial), -5 (GAUSS measured field),
+    -7 (BENDIST detailed-center), -8 (MCSDIST superimposed combined),
+    -21 (MSEM g-2 magnet) all wired. NSDP = -6 (FOURIERGAUSS) deferred
+    — needs 3D MFD with `|K` syntax. }
   VARIABLE (RE) I;
   VARIABLE (RE) JPOL;
   VARIABLE (RE) JEM;
@@ -470,6 +677,13 @@ PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
     { Magnetic dipole with detailed center (cosy.fox L2667). BENDIST
       IC=2 routes through CENT for refined angular-radial profile.      }
     BFY := BENDIST(X_F, Z_F, 2);
+  ELSEIF NSDP = -8;
+    { Superimposed combined-function magnets (cosy.fox L2668-2673).
+      MCSDIST sums per-box BY contributions over BXIBOX boxes, each
+      with Cauchy-style PTBOX inside/outside test plus ENGE soft-edge
+      attenuation. The MFP[2]=1 / WRITE-to-unit-98 MFFLD-writer branch
+      is skipped — that's part of the deferred MFFLD-writer machinery. }
+    BFY := MCSDIST(X_F, Z_F);
   ELSEIF NSDP = -11;
     { Electrostatic deflector (cosy.fox L2674). BENDIST IC=-1 gives the
       linear-in-XR0 profile multiplied by Σ multipole correction.        }
