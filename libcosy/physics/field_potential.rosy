@@ -640,6 +640,13 @@ PROCEDURE POTFLD X (DA 30) S (RE);
     ELSEIF NSDP = 4;
       { Linear s-profile (cosy.fox L2557) }
       P := PPOL[I]*(S + DD[2]);
+    ELSEIF NSDP = 5;
+      { Algebraic-saturation profile (cosy.fox L2558).
+          P = PPOL[I] · (s+DD[2]) / sqrt(1 + ((s+DD[2])/DR)²)
+        Linear near s=0, saturates to ±PPOL[I]·DR for |s|≫DR — useful
+        for short-magnet field profiles where Gaussian tails (NSDP=3)
+        are too aggressive. ISRT is the native 1/√x intrinsic.        }
+      P := PPOL[I]*(S + DD[2])*ISRT(1 + SQR((S + DD[2])/DR));
     ELSEIF NSDP = 6;
       { Three-tube electric lens (cosy.fox L2559-2562) }
       P := LOG(COSH((S+DD[2])/DR+PPOL[2])/COSH((S+DD[2])/DR+PPOL[3]));
@@ -736,7 +743,7 @@ PROCEDURE POTFLD X (DA 30) S (RE);
                  + MFD[IS_PIECE, 3]*P1_TMP14);
       ENDLOOP;
     ELSE;
-      WRITE 6 ' *** ERROR in POTFLD, NSDP not in {0..4,6..14} not yet ported in libcosy v1';
+      WRITE 6 ' *** ERROR in POTFLD, NSDP not in {0..14} not yet ported in libcosy v1';
       QUIT 0;
     ENDIF;
     IF MPOL[I] = 1;
