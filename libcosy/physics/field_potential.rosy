@@ -615,8 +615,13 @@ PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
       NSDP = -13 → spherical electrostatic
     NSDP = -4 (BENDIST polynomial-radial), -5 (GAUSS measured field),
     -7 (BENDIST detailed-center), -8 (MCSDIST superimposed combined),
-    -21 (MSEM g-2 magnet) all wired. NSDP = -6 (FOURIERGAUSS) deferred
-    — needs 3D MFD with `|K` syntax. }
+    -21 (MSEM g-2 magnet) all wired. NSDP = -6 (FOURIERGAUSS) is
+    *permanently deferred* — its data source FGDATIN is itself
+    commented-out in cosy.fox 10.2 (L3664), so NSDP=-6 is unreachable
+    in cosy.fox too. Porting it would require 3D MFD with cosy's
+    `|K` DA-component-extraction operator, which ROSY doesn't have
+    in its grammar. No business case until COSY upstream re-enables
+    FGDATIN. }
   VARIABLE (RE) I;
   VARIABLE (RE) JPOL;
   VARIABLE (RE) JEM;
