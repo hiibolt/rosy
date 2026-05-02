@@ -47,6 +47,43 @@ ENDPROCEDURE;
     line 4: ' NX = ' + 6-wide I + ',  NZ = ' + 6-wide I
             → NX from chars 7..12, NZ from chars 21..26
     body:   NX*NZ lines, one RE each via READ                          }
+{ ----- M6.31: MFFLD — measured-field-data writer (cosy.fox L3642-3654)
+  Companion to MFFLDIN. Writes a header with grid extents to MFFLD.DAT
+  on unit 98 and arms MFP[2]=1 so the next POTFLD/POTXZ field-eval call
+  (NSDP=-7 BENDIST or NSDP=-8 MCSDIST) sweeps the full grid and dumps
+  field values to unit 98. Also stores grid bounds in MFP[3..8] for the
+  writer loops to consume.
+
+  Pre-condition: FR 3 (LFR=3) must be active so the field model is the
+  high-precision detailed-center / multi-magnet form that MFFLD captures.
+  Mismatch emits a warning but does not abort.                          }
+PROCEDURE MFFLD XMIN (RE) ZMIN (RE) XMAX (RE) ZMAX (RE)
+                DX_GRID (RE) DZ_GRID (RE);
+  VARIABLE (RE) NX;
+  VARIABLE (RE) NZ;
+  NX := INT((XMAX - XMIN)/DX_GRID + 1.00001);
+  NZ := INT((ZMAX - ZMIN)/DZ_GRID + 1.00001);
+  IF (NX < 2) OR (NZ < 2);
+    WRITE 6 ' *** ERROR in MFFLD, NX < 2 or NZ < 2';
+    QUIT 0;
+  ENDIF;
+  IF LFR # 3;
+    WRITE 6 ' *** ERROR in MFFLD, call FR 3 before MFFLD';
+  ENDIF;
+  MFP[2] := 1;
+  OPENF 98 'MFFLD.DAT' 'UNKNOWN';
+  WRITE 98 ' MIN (X,Z) = (' & SF(XMIN, '(G16.9)') & ',' & SF(ZMIN, '(G16.9)') & ')';
+  WRITE 98 ' MAX (X,Z) = (' & SF(XMAX, '(G16.9)') & ',' & SF(ZMAX, '(G16.9)') & ')';
+  WRITE 98 ' DX = ' & SF(DX_GRID, '(D16.9)') & ',  DZ = ' & SF(DZ_GRID, '(D16.9)');
+  WRITE 98 ' NX = ' & SF(NX, '(I6)') & ',  NZ = ' & SF(NZ, '(I6)');
+  MFP[3] := XMIN;
+  MFP[4] := XMAX;
+  MFP[5] := DX_GRID;
+  MFP[6] := ZMIN;
+  MFP[7] := ZMAX;
+  MFP[8] := DZ_GRID;
+ENDPROCEDURE;
+
 PROCEDURE MFFLDIN A_OUT (RE 700 30) NX (RE) NZ (RE) DX (RE) DZ (RE);
   VARIABLE (ST) STR;
   VARIABLE (RE) IX;

@@ -674,15 +674,53 @@ PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
                  CONS(PPOL[5]), MFD, GAUSS_ERR) + 0*DD[1];
     MFP[1] := MFP[1] + GAUSS_ERR;
   ELSEIF NSDP = -7;
-    { Magnetic dipole with detailed center (cosy.fox L2667). BENDIST
-      IC=2 routes through CENT for refined angular-radial profile.      }
+    { Magnetic dipole with detailed center (cosy.fox L2663-2667). BENDIST
+      IC=2 routes through CENT for refined angular-radial profile. If
+      MFP[2]=1 (armed by MFFLD), first sweep the full grid and dump
+      field values to unit 98 — one-shot trigger that resets MFP[2].   }
+    IF MFP[2] = 1;
+      VARIABLE (RE) NX_GRID7;
+      VARIABLE (RE) NZ_GRID7;
+      VARIABLE (RE) IX7;
+      VARIABLE (RE) IZ7;
+      VARIABLE (DA) I_GRID7;
+      VARIABLE (DA) J_GRID7;
+      MFP[2] := 0;
+      NX_GRID7 := INT((MFP[4] - MFP[3])/MFP[5] + 1.00001);
+      NZ_GRID7 := INT((MFP[7] - MFP[6])/MFP[8] + 1.00001);
+      LOOP IX7 1 NX_GRID7;
+        I_GRID7 := MFP[3] + (IX7 - 1)*MFP[5] + 0*DD[1];
+        LOOP IZ7 1 NZ_GRID7;
+          J_GRID7 := MFP[6] + (IZ7 - 1)*MFP[8] + 0*DD[1];
+          WRITE 98 SF(CONS(BENDIST(I_GRID7, J_GRID7, 2)), '(G23.16)');
+        ENDLOOP;
+      ENDLOOP;
+      CLOSEF 98;
+    ENDIF;
     BFY := BENDIST(X_F, Z_F, 2);
   ELSEIF NSDP = -8;
     { Superimposed combined-function magnets (cosy.fox L2668-2673).
-      MCSDIST sums per-box BY contributions over BXIBOX boxes, each
-      with Cauchy-style PTBOX inside/outside test plus ENGE soft-edge
-      attenuation. The MFP[2]=1 / WRITE-to-unit-98 MFFLD-writer branch
-      is skipped — that's part of the deferred MFFLD-writer machinery. }
+      MCSDIST sums per-box BY contributions over BXIBOX boxes. Same
+      MFFLD-writer trigger pattern as NSDP=-7.                          }
+    IF MFP[2] = 1;
+      VARIABLE (RE) NX_GRID8;
+      VARIABLE (RE) NZ_GRID8;
+      VARIABLE (RE) IX8;
+      VARIABLE (RE) IZ8;
+      VARIABLE (DA) I_GRID8;
+      VARIABLE (DA) J_GRID8;
+      MFP[2] := 0;
+      NX_GRID8 := INT((MFP[4] - MFP[3])/MFP[5] + 1.00001);
+      NZ_GRID8 := INT((MFP[7] - MFP[6])/MFP[8] + 1.00001);
+      LOOP IX8 1 NX_GRID8;
+        I_GRID8 := MFP[3] + (IX8 - 1)*MFP[5] + 0*DD[1];
+        LOOP IZ8 1 NZ_GRID8;
+          J_GRID8 := MFP[6] + (IZ8 - 1)*MFP[8] + 0*DD[1];
+          WRITE 98 SF(CONS(MCSDIST(I_GRID8, J_GRID8)), '(G23.16)');
+        ENDLOOP;
+      ENDLOOP;
+      CLOSEF 98;
+    ENDIF;
     BFY := MCSDIST(X_F, Z_F);
   ELSEIF NSDP = -11;
     { Electrostatic deflector (cosy.fox L2674). BENDIST IC=-1 gives the
