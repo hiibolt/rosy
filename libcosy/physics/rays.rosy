@@ -104,22 +104,127 @@ PROCEDURE SR X (RE) A (RE) Y (RE) B (RE) T (RE)
   REMOVE := REMOVE & 0;
 ENDPROCEDURE;
 
-{ ----- SSR: set spin for the most-recent ray (cosy.fox L904-???)
-  Append (X, Y, Z) spin-vector triple to SPI[1..3] and sync SSC.
-  Bumps NSPN. Typically called immediately after SR to associate a
-  spin direction with the just-added ray.                                 }
+{ ----- SSR: set spin for the most-recent ray (cosy.fox L904-915)
+  Validates LOV/LPI, bumps NSPN with the 0→2 boost, builds the (X,Y,Z)
+  triple as a temp VE, validates non-zero + matching ray-count, then
+  VEUNIT-normalizes and appends each component to SPI[1..3].
+
+  Pre-condition: NSPN must equal NRAY after the bump — i.e., user
+  called SSR exactly once per SR. cosy.fox aborts on mismatch.           }
 PROCEDURE SSR X (RE) Y (RE) Z (RE);
   VARIABLE (RE) I;
+  VARIABLE (VE) SCR;
+  IF LOV = 0;
+    WRITE 6 ' *** ERROR, call OV before SSR';
+    QUIT 0;
+  ENDIF;
+  IF LPI = 1;
+    WRITE 6 ' *** ERROR, call SSR before BP';
+    QUIT 0;
+  ENDIF;
   NSPN := NSPN + 1;
   IF NSPN = 1;
     NSPN := 2;
   ENDIF;
-  SPI[1] := SPI[1] & X;
-  SPI[2] := SPI[2] & Y;
-  SPI[3] := SPI[3] & Z;
+  SCR := X & Y & Z;
+  IF NSPN # NRAY;
+    WRITE 6 ' *** ERROR, call SSR after each matching SR';
+    QUIT 0;
+  ENDIF;
+  IF (SCR[1] = 0) AND (SCR[2] = 0) AND (SCR[3] = 0);
+    WRITE 6 ' *** ERROR in SSR, give non zero spin vector.';
+    QUIT 0;
+  ENDIF;
+  VEUNIT SCR SCR;
   LOOP I 1 3;
+    SPI[I] := SPI[I] & SCR[I];
     SSC[I] := SPI[I];
   ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- M11.1: ENVEL — set the beam envelope ray (cosy.fox L877-882)
+  Adds a single placeholder ray via SR (8-zero with COL=1), then
+  populates ERAY[1..4] / EMAX[1..2] from the PHSP / PHSR globals (set
+  by a prior SB call). LENV=1 marks the envelope as active for
+  later TR / tracking output.                                             }
+PROCEDURE ENVEL;
+  VARIABLE (RE) I;
+  SR 0 0 0 0 0 0 0 0 1;
+  IF LOV = 0;
+    WRITE 6 ' *** ERROR, call OV before ENVEL';
+    QUIT 0;
+  ENDIF;
+  ERAY[1] := PHSP[1];
+  EMAX[1] := PHSP[1];
+  ERAY[2] := PHSR[1]*PHSP[2];
+  ERAY[3] := PHSP[3];
+  EMAX[2] := PHSP[3];
+  ERAY[4] := PHSR[2]*PHSP[4];
+  LOOP I 1 4;
+    ERSC[I] := ERAY[I];
+  ENDLOOP;
+  LENV := 1;
+ENDPROCEDURE;
+
+{ ----- M11.1: ENCL — set energy-dependent closed orbit (cosy.fox L884-890)
+  Computes the fixed point of the active MAP at ND=2 (TWOND=5 mode),
+  shifts by the user-supplied energy DISP, and adds two rays:
+  one zero (placeholder) and one at the dispersion-shifted closed orbit.
+
+  TWOND swap dance: FM expects TWOND=5 internally; we swap it before
+  the call and restore after. POLVAL substitutes MF (the energy
+  perturbation vector) into XF (the fixed-point map) to produce the
+  shifted orbit coordinates.                                              }
+PROCEDURE ENCL DISP (RE);
+  VARIABLE (RE) I;
+  VARIABLE (DA 8) MF;
+  VARIABLE (DA 8) XF;
+  VARIABLE (RE) IER;
+  TWOND := 5;
+  FM MAP XF MF IER;
+  TWOND := 2*ND;
+  LOOP I 1 NV;
+    MF[I] := 0*DD[1];
+  ENDLOOP;
+  MF[6] := DISP + 0*DD[1];
+  POLVAL 1 XF NV MF NV MF NV;
+  SR 0 0 0 0 0 0 0 0 1;
+  SR CONS(MF[1]) CONS(MF[2]) CONS(MF[3]) CONS(MF[4])
+     CONS(MF[5]) CONS(MF[6]) 0 0 1;
+ENDPROCEDURE;
+
+{ ----- M11.1: SCDE — set sin/cos/dispersion/envelope rays (cosy.fox L892-902)
+  Builds the four sin/cos phase-space rays plus a dispersion ray from
+  the PHSP / PHSR globals. Each ray uses the SQRT(1 - PHSR²) factor to
+  pre-compensate Twiss correlation. Then populates ERAY/EMAX/ERSC like
+  ENVEL and marks LENV=1.
+
+  Emittances per axis: π·PHSP[1]·PHSP[2]·√(1-PHSR[1]²) (X), and
+  π·PHSP[3]·PHSP[4]·√(1-PHSR[2]²) (Y). cosy.fox comment line.            }
+PROCEDURE SCDE;
+  VARIABLE (RE) I;
+  VARIABLE (RE) FAC;
+  IF LOV = 0;
+    WRITE 6 ' *** ERROR, call OV before SCDE';
+    QUIT 0;
+  ENDIF;
+  FAC := SQRT(1 - SQR(PHSR[1]));
+  SR PHSP[1]*FAC 0 0 0 0 0 0 0 1;
+  SR 0 PHSP[2]*FAC 0 0 0 0 0 0 1;
+  FAC := SQRT(1 - SQR(PHSR[2]));
+  SR 0 0 PHSP[3]*FAC 0 0 0 0 0 1;
+  SR 0 0 0 PHSP[4]*FAC 0 0 0 0 1;
+  SR 0 0 0 0 0 PHSP[6] 0 0 2;
+  ERAY[1] := PHSP[1];
+  EMAX[1] := PHSP[1];
+  ERAY[2] := PHSR[1]*PHSP[2];
+  ERAY[3] := PHSP[3];
+  EMAX[2] := PHSP[3];
+  ERAY[4] := PHSR[2]*PHSP[4];
+  LOOP I 1 4;
+    ERSC[I] := ERAY[I];
+  ENDLOOP;
+  LENV := 1;
 ENDPROCEDURE;
 
 END;
