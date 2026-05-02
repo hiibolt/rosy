@@ -41,7 +41,7 @@ use crate::resolve::{ExprRecipe, ScopeContext, TypeResolver, TypeSlot};
 use crate::rosy_lib::{RosyBaseType, RosyType};
 use crate::transpile::{
     ExprFunctionCallResult, TranspilationInputContext, TranspilationOutput,
-    Transpile, TranspileableExpr, ValueKind,
+    Transpile, TranspileableExpr, ValueKind, VariableScope,
 };
 use anyhow::{Context, Error, Result};
 use std::collections::BTreeSet;
@@ -142,18 +142,37 @@ impl TranspileableExpr for ConcatExpr {
         let mut requested_variables = BTreeSet::new();
         requested_variables.extend(right_output.requested_variables.iter().cloned());
 
+        // Resolve target_var's scope so generated `target.push(...)` /
+        // `target.extend_from_slice(...)` autoderefs correctly. Higher-scope
+        // (auto-captured global) and Arg-scope (procedure parameter) vars
+        // arrive as `&mut Vec<_>` / `&mut Vec<DA>` etc., so the method call
+        // needs a `(*target).` deref. Local vars resolve to bare names.
+        let target_deref = match context
+            .variables
+            .get(target_var)
+            .map(|v| &v.scope)
+        {
+            Some(VariableScope::Local) => "",
+            Some(VariableScope::Arg) => "*",
+            Some(VariableScope::Higher) => {
+                requested_variables.insert(target_var.to_string());
+                "*"
+            }
+            None => "",
+        };
+
         let needs_clone = matches!(right_type.base_type, RosyBaseType::DA | RosyBaseType::CD);
 
         let code = if is_push {
             let val = right_output.as_value();
             if needs_clone {
-                format!("{{ let __v = {val}.clone(); {target_var}.push(__v); }}")
+                format!("{{ let __v = {val}.clone(); ({target_deref}{target_var}).push(__v); }}")
             } else {
-                format!("{{ let __v = {val}; {target_var}.push(__v); }}")
+                format!("{{ let __v = {val}; ({target_deref}{target_var}).push(__v); }}")
             }
         } else {
             let val_ref = right_output.as_ref();
-            format!("{{ let __v: Vec<_> = ({val_ref}).to_vec(); {target_var}.extend_from_slice(&__v); }}")
+            format!("{{ let __v: Vec<_> = ({val_ref}).to_vec(); ({target_deref}{target_var}).extend_from_slice(&__v); }}")
         };
 
         Some(Ok(TranspilationOutput {

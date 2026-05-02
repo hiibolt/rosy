@@ -983,9 +983,7 @@ ENDPROCEDURE;
     5. SDELE over [S[1], S[N]] integrates the field via POTFLD's POTS
        branch which now dispatches NSDP=20 → INTERP.                       }
 PROCEDURE GE N (RE) M (RE) S (RE 100) H_TBL (DA 100) V_TBL (DA 100) W_TBL (DA 100);
-  VARIABLE (VE) PN_LOCAL;
   VARIABLE (RE) I;
-  VARIABLE (RE) NPN;
   VARIABLE (RE) S1;
   VARIABLE (RE) S2;
   VARIABLE (RE) DELS;
@@ -995,14 +993,7 @@ PROCEDURE GE N (RE) M (RE) S (RE 100) H_TBL (DA 100) V_TBL (DA 100) W_TBL (DA 10
   IF M < NOC;
     WRITE 6 ' --- WARNING in GE, M < calculation order';
   ENDIF;
-  { INTPOL writes a (2M+2)-element VE; copy element-by-element to global
-    PN since INTPOL's transpiler emits over-dereferenced Rust when its
-    VE output is a Higher-scope (global) variable. }
-  INTPOL PN_LOCAL M;
-  NPN := 2*M + 2;
-  LOOP I 1 NPN;
-    PN[I] := PN_LOCAL[I];
-  ENDLOOP;
+  INTPOL PN M;
   LOOP I 1 N;
     SN[I] := S[I];
     HN[I] := H_TBL[I];

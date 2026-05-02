@@ -449,8 +449,8 @@ lt          = { "<" }
 gt          = { ">" }
 lte         = { "<=" }
 gte         = { ">=" }
-and_op      = { ^"AND" }
-or_op       = { ^"OR" }
+and_op      = { ^"AND" ~ !(ASCII_ALPHANUMERIC | "_") }
+or_op       = { ^"OR"  ~ !(ASCII_ALPHANUMERIC | "_") }
 
 variable_identifier = { variable_name ~ paren_group* ~ bracket_index? }
 paren_group = { "(" ~ expr ~ ("," ~ expr)* ~ ")" }
