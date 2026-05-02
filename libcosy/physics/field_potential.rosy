@@ -831,6 +831,59 @@ PROCEDURE POTXZ X (DA 30);
   POFF W ZERO_DA_PX 1 3 2;
 ENDPROCEDURE;
 
+{ ----- INTERP: support-point polynomial blend (cosy.fox L2470-2485)
+  Used by NSDP=20 (general s-dependent element via GE). Walks SN[1..NN]
+  to find the segment INP containing S, then blends two POLVAL'd
+  polynomials evaluated at the segment basis (one per endpoint) with a
+  PN-defined Horner weight P. The two endpoint contributions average
+  with weights (1 - P) and (1 + P) so the blend transitions smoothly.
+
+  HN/VN/WN are now (DA 100) per cosy.fox semantics — each cell stores
+  a polynomial in (DD[1], DD[2], DD[3]) describing the curvature /
+  scalar-electric / scalar-magnetic potentials at that support point.
+  POLVAL 1 AC 3 BC 3 AC 3 evaluates the AC poly-array at BC's offset.   }
+PROCEDURE INTERP V_OUT (DA) W_OUT (DA) H_OUT (DA) S (RE);
+  VARIABLE (DA 3) AC;
+  VARIABLE (DA 3) BC;
+  VARIABLE (DA) P_BLEND;
+  VARIABLE (DA) X_NORM;
+  VARIABLE (RE) I;
+  VARIABLE (RE) DENOM;
+  LOOP I NN 2 -1;
+    IF S < SN[I];
+      INP := I - 1;
+    ENDIF;
+  ENDLOOP;
+  DENOM := SN[INP+1] - SN[INP];
+  X_NORM := (2*(S + DD[2]) - SN[INP] - SN[INP+1])/DENOM;
+  P_BLEND := PN[2*NPG + 2] + 0*DD[1];
+  LOOP I 2*NPG+1 1 -1;
+    P_BLEND := P_BLEND*X_NORM + PN[I];
+  ENDLOOP;
+  BC[1] := DD[1];
+  BC[2] := S - SN[INP] + DD[2];
+  BC[3] := DD[3];
+  P_BLEND := 1 - P_BLEND;
+  AC[1] := HN[INP] + 0*DD[2];
+  AC[2] := VN[INP] + 0*DD[2];
+  AC[3] := WN[INP] + 0*DD[2];
+  POLVAL 1 AC 3 BC 3 AC 3;
+  H_OUT := AC[1]*P_BLEND;
+  V_OUT := AC[2]*P_BLEND;
+  W_OUT := AC[3]*P_BLEND;
+  BC[1] := DD[1];
+  BC[2] := S - SN[INP+1] + DD[2];
+  BC[3] := DD[3];
+  P_BLEND := 2 - P_BLEND;
+  AC[1] := HN[INP+1] + 0*DD[2];
+  AC[2] := VN[INP+1] + 0*DD[2];
+  AC[3] := WN[INP+1] + 0*DD[2];
+  POLVAL 1 AC 3 BC 3 AC 3;
+  H_OUT := (H_OUT + AC[1]*P_BLEND)/2;
+  V_OUT := (V_OUT + AC[2]*P_BLEND)/2;
+  W_OUT := (W_OUT + AC[3]*P_BLEND)/2;
+ENDPROCEDURE;
+
 PROCEDURE POTFLD X (DA 30) S (RE);
   VARIABLE (RE) I;
   VARIABLE (RE) JPOL;
@@ -877,6 +930,11 @@ PROCEDURE POTFLD X (DA 30) S (RE);
   V := 0*DD[1];
   W := 0*DD[2];
   H := 0 + 0*DD[1];
+  IF NSDP = 20;
+    { General s-dependent element via INTERP — uses HN/VN/WN
+      support-point tables seeded by GE. }
+    INTERP V W H S;
+  ENDIF;
   LOOP I 1 NPOL;
     JPOL := ABS(MPOL[I]);
     JEM := (3 - MPOL[I]/JPOL)/2;

@@ -112,11 +112,17 @@ VARIABLE (RE) LE;
 VARIABLE (DA 2 6 10) GFF2; VARIABLE (DA 2 6 10) LFF2;
 VARIABLE (RE 2 6 10) DATFF2;
 
-{ Measured-field interpolation buffers }
+{ Measured-field interpolation buffers — retyped from cosy.fox L72-73.
+  cosy.fox's `VARIABLE HN 25 100` declares a 1-D array of 100 DA cells
+  with up to 25 polynomial coefficients each. ROSY-strict interpretation
+  is `(DA 100)` (the leading "25" is per-cell DA-storage hint, not a
+  data dimension). HN/VN/WN store DA polynomials per support point so
+  INTERP / GE can POLVAL them at off-axis (DD[1], DD[2], DD[3]).
+  SN stores scalar s-positions (RE), one per support point.            }
 VARIABLE (RE) INP; VARIABLE (RE) NN;
-VARIABLE (RE 10 100) SN; VARIABLE (RE 25 100) HN;
-VARIABLE (RE 25 100) VN; VARIABLE (RE 25 100) WN;
-VARIABLE (RE 40) PN;     VARIABLE (RE) NPG;
+VARIABLE (RE 100) SN;    VARIABLE (DA 100) HN;
+VARIABLE (DA 100) VN;    VARIABLE (DA 100) WN;
+VARIABLE (VE) PN;        VARIABLE (RE) NPG;
 VARIABLE (RE) DR;        VARIABLE (RE) DMAX;
 { Measured-field data table — cosy.fox declares `MFD 6 700 30` (3D);
   libcosy collapses to 2D (RE 700 30) which handles the dominant

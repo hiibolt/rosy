@@ -838,4 +838,70 @@ PROCEDURE MSEM R (RE) PHI (RE) DM (RE) NB (RE 16) DE (RE) EV (RE 16) N (RE) CI (
   ENDIF;
 ENDPROCEDURE;
 
+{ ----- M6.32: GE — general s-dependent element via support-point tables (cosy.fox L3108-3121)
+  GE(N, M, S, H, V, W): integrates a custom field model defined by N
+  support points, each carrying M derivatives of curvature H, electric
+  potential V, and magnetic potential W as DA polynomials.
+
+  Args
+    N : number of support points (≤ 100, bounded by HN/VN/WN dim)
+    M : number of derivatives stored per support point (used to size
+        the PN blending polynomial via INTPOL)
+    S : (RE 100) — array of N s-positions
+    H : (DA 100) — curvature DA polynomials at each support point
+    V : (DA 100) — scalar electric potential DA polynomials
+    W : (DA 100) — scalar magnetic potential DA polynomials
+
+  Workflow
+    1. Bump NOC by 1 so all DA arithmetic in INTERP carries one extra
+       order of precision (cosy.fox idiom for bracket-and-restore).
+    2. INTPOL PN M generates the (2M+2)-coefficient blending polynomial
+       used by INTERP's reverse-Horner step.
+    3. Copy caller arrays into globals SN/HN/VN/WN.
+    4. Set NSDP=20, NPOL=0 (no multipoles), LOFF=2 (POTXZ-style routing).
+    5. SDELE over [S[1], S[N]] integrates the field via POTFLD's POTS
+       branch which now dispatches NSDP=20 → INTERP.                       }
+PROCEDURE GE N (RE) M (RE) S (RE 100) H_TBL (DA 100) V_TBL (DA 100) W_TBL (DA 100);
+  VARIABLE (VE) PN_LOCAL;
+  VARIABLE (RE) I;
+  VARIABLE (RE) NPN;
+  VARIABLE (RE) S1;
+  VARIABLE (RE) S2;
+  VARIABLE (RE) DELS;
+  NOC := NOC + 1;
+  DANOT NOC;
+  NSDP := 20;
+  IF M < NOC;
+    WRITE 6 ' --- WARNING in GE, M < calculation order';
+  ENDIF;
+  { INTPOL writes a (2M+2)-element VE; copy element-by-element to global
+    PN since INTPOL's transpiler emits over-dereferenced Rust when its
+    VE output is a Higher-scope (global) variable. }
+  INTPOL PN_LOCAL M;
+  NPN := 2*M + 2;
+  LOOP I 1 NPN;
+    PN[I] := PN_LOCAL[I];
+  ENDLOOP;
+  LOOP I 1 N;
+    SN[I] := S[I];
+    HN[I] := H_TBL[I];
+    VN[I] := V_TBL[I];
+    WN[I] := W_TBL[I];
+  ENDLOOP;
+  INP := 1;
+  NN := N;
+  NPOL := 0;
+  NPG := M;
+  S1 := CONS(S[1]);
+  S2 := CONS(S[N]);
+  LOCSET 0 0 0 0 0 0;
+  CE := 'GE';
+  LOFF := 2;
+  DELS := S2 - S1;
+  SDELE S1 S2 DELS/100 DELS/10 DELS 0.1;
+  UPDATE 1 1;
+  NOC := NOC - 1;
+  DANOT NOC;
+ENDPROCEDURE;
+
 END;
