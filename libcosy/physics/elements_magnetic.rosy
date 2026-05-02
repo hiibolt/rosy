@@ -838,6 +838,127 @@ PROCEDURE MSEM R (RE) PHI (RE) DM (RE) NB (RE 16) DE (RE) EV (RE 16) N (RE) CI (
   ENDIF;
 ENDPROCEDURE;
 
+{ ----- M7.2: MSS — magnetic sector with center-detail field (cosy.fox L3480-3518)
+  MSS(R, PHID, D, E1D, H1, E2D, H2, W): a sector dipole of bending
+  radius R, deflection angle PHID (degrees), aperture D, with arbitrary
+  edge angles (E1D/E2D, deg) and pole-tip curvatures (H1/H2). The W[4,4]
+  matrix carries center-detail multipole correction coefficients passed
+  through to PPOL[21..36] for CENT to consume during NSDP=-7 BENDIST.
+
+  Forces LFR=3 internally (high-precision soft-edge fringe), saves and
+  restores caller's LFR via FR. Pads the SDELE integration window by
+  ±10·D drift on each side so soft-edge fringe tails are captured.
+
+  cosy.fox's NT=0 hardcoding makes the multipole-presence check dead
+  code; libcosy port omits it for clarity.                                }
+PROCEDURE MSS R (RE) PHID (RE) D (RE) E1D (RE) H1 (RE)
+              E2D (RE) H2 (RE) W_MAT (RE 4 4);
+  VARIABLE (RE) E1N;
+  VARIABLE (RE) E2N;
+  VARIABLE (RE) H1N;
+  VARIABLE (RE) H2N;
+  VARIABLE (RE) NTS;
+  VARIABLE (RE) LDL;
+  VARIABLE (RE) PHI;
+  VARIABLE (RE) E1;
+  VARIABLE (RE) E2;
+  VARIABLE (DA 8) MS_BUF;
+  VARIABLE (DA 3 3) SM_BUF;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) LFT;
+  VARIABLE (RE) NEG_LDL;
+  VARIABLE (RE) ARC_TOTAL;
+  VARIABLE (RE) STEP_MIN;
+  VARIABLE (RE) STEP_MID;
+  VARIABLE (RE) STEP_MAX;
+  LFT := LFR;
+  LFR := 3;
+  CE := 'MSS';
+  PHI := PHID*DEGRAD;
+  E1 := E1D*DEGRAD;
+  E2 := E2D*DEGRAD;
+  IF R < 0;
+    WRITE 6 ' *** ERROR in MSS, negative radius';
+    QUIT 0;
+  ELSEIF PHID < 0;
+    WRITE 6 ' *** ERROR in MSS, negative angle';
+    QUIT 0;
+  ELSEIF PHID > 360;
+    WRITE 6 ' *** ERROR in MSS, too big angle > 360';
+    QUIT 0;
+  ENDIF;
+  NSDP := -7;
+  LOFF := 2;
+  DR := D;
+  LOOP I 1 8;
+    MSC[I] := DD[I];
+  ENDLOOP;
+  IF (NRAY = 0) AND (LSPN = 0);
+    LOOP I 1 TWOND;
+      MSC[I] := MAP[I];
+    ENDLOOP;
+  ENDIF;
+  NTS := NOC;
+  E1N := E1;
+  H1N := H1;
+  E2N := E2;
+  H2N := H2;
+  PPOL[1] := CONS(CHIM)/R + 0*DD[1];
+  PPOL[2] := -R + 0*DD[1];
+  PPOL[3] := 0 + 0*DD[1];
+  PPOL[4] := D + 0*DD[1];
+  PPOL[5] := 0 + 0*DD[1];
+  PPOL[6] := 0 + 0*DD[1];
+  PPOL[7] := SIN(-E1N) + 0*DD[1];
+  PPOL[8] := COS(-E1N) + 0*DD[1];
+  IF H1N # 0;
+    PPOL[7] := SIN(-E1N)/H1N + 0*DD[1];
+    PPOL[8] := COS(-E1N)/H1N + 0*DD[1];
+  ENDIF;
+  PPOL[9] := R*(COS(PHI) - 1) + 0*DD[1];
+  PPOL[10] := R*SIN(PHI) + 0*DD[1];
+  PPOL[11] := SIN(PHI - E2N) + 0*DD[1];
+  PPOL[12] := -COS(E2N - PHI) + 0*DD[1];
+  IF H2N # 0;
+    PPOL[11] := SIN(PHI - E2N)/H2N + 0*DD[1];
+    PPOL[12] := -COS(E2N - PHI)/H2N + 0*DD[1];
+  ENDIF;
+  PPOL[11] := CONS(PPOL[11]) + CONS(PPOL[9]) + 0*DD[1];
+  PPOL[12] := CONS(PPOL[12]) + CONS(PPOL[10]) + 0*DD[1];
+  PPOL[13] := H1N + 0*DD[1];
+  PPOL[14] := H2N + 0*DD[1];
+  PPOL[20] := PHI + 0*DD[1];
+  LOOP I 1 4;
+    LOOP J 1 4;
+      PPOL[20 + 4*(I-1) + J] := W_MAT[I, J] + 0*DD[1];
+    ENDLOOP;
+  ENDLOOP;
+  LDL := 10*D;
+  NEG_LDL := -LDL;
+  LOCSET 0 NEG_LDL 0 0 0 0;
+  IF LFT = 3;
+    LOCSET R*(COS(0.5*PHI)-1) R*SIN(0.5*PHI) 0.5*PHI 0.5*R*PHI 0 0;
+    SDELEREF 0.5*R*PHI NEG_LDL D/200 D 7*D D;
+  ENDIF;
+  UMS;
+  DLACT MSC NEG_LDL;
+  SNM MSC MS_BUF;
+  SSNM SSCR SM_BUF;
+  ARC_TOTAL := R*PHI + 2*LDL;
+  STEP_MIN := MIN(R/10000, D/200);
+  STEP_MID := MIN(R/20, D);
+  STEP_MAX := MIN(R, 7*D);
+  SDELE 0 ARC_TOTAL STEP_MIN STEP_MID STEP_MAX D;
+  UPDATEMAP MSC MS_BUF MSC SSCR SM_BUF SSCR;
+  DLACT MSC NEG_LDL;
+  SLOC := R*PHI;
+  XLOC := XLOC + LDL*SIN(PLOC);
+  ZLOC := ZLOC - LDL*COS(PLOC);
+  UPDATE 1 1;
+  FR LFT;
+ENDPROCEDURE;
+
 { ----- M6.32: GE — general s-dependent element via support-point tables (cosy.fox L3108-3121)
   GE(N, M, S, H, V, W): integrates a custom field model defined by N
   support points, each carrying M derivatives of curvature H, electric

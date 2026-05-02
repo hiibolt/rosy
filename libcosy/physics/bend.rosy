@@ -592,4 +592,34 @@ PROCEDURE MPL L (RE) PHI (RE) D (RE)
   ENDIF;
 ENDPROCEDURE;
 
+{ ----- M7.1: MCLK — combined-function magnet K-variant (cosy.fox L3471-3478)
+  Sister to MC but takes integrated K-strengths instead of physical
+  fields. For non-zero PHI, scales K[I] by R^(I+1) (powers of bend
+  radius) before delegating to MC. For PHI≈0 (straight magnet),
+  reduces to MMSK with zero skew angles.
+
+  Lives in bend.rosy (not elements_magnetic.rosy) because MC is defined
+  here, and MCLK calls MC. Forward-decl ordering matters in ROSY.       }
+PROCEDURE MCLK L (RE) PHI (RE) D (RE) K (RE 5) S1 (RE 5) S2 (RE 5) NT (RE);
+  VARIABLE (RE) I;
+  VARIABLE (RE) RPOW;
+  VARIABLE (RE) R;
+  VARIABLE (RE 5) KN;
+  VARIABLE (RE 5) TA;
+  IF ABS(PHI) > 1E-9;
+    R := L/(PHI*DEGRAD);
+    RPOW := R;
+    LOOP I 1 NT;
+      RPOW := RPOW*R;
+      KN[I] := -K[I]*RPOW;
+    ENDLOOP;
+    MC R PHI D KN S1 S2 NT;
+  ELSE;
+    LOOP I 1 NT;
+      TA[I] := 0;
+    ENDLOOP;
+    MMSK L K TA NT D;
+  ENDIF;
+ENDPROCEDURE;
+
 END;
