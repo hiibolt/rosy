@@ -890,6 +890,30 @@ WRITE 6 MAP[1];
 WRITE 6 'After MGE quadrupole, MAP[3] (defocusing-plane y map):';
 WRITE 6 MAP[3];
 
+{ ----- v2 M11.0: CR / SR / SSR ray-pool primitives -----
+  Exercise the foundational ray subsystem: CR clears the ray pool, SR
+  appends a single ray, SSR adds spin to the most-recent ray. After
+  this sequence, NRAY=2 (cosy.fox bumped-from-1 quirk) and RAY[1..8]
+  each carry a 2-element vector (placeholder + the SR-added ray).    }
+WRITE 6 ' ----- v2 M11.0: CR / SR / SSR exercising ray pool -----';
+OV 2 2 0;
+RPP 100;
+CR;
+WRITE 6 'After CR, NRAY = ' NRAY '   [expect 0]';
+SR 0.001 0 0.002 0 0 0 0 0 1;
+WRITE 6 'After SR, NRAY = ' NRAY '   [expect 2 — cosy 0→2 boost]';
+VARIABLE (VE) RAY1_TMP;
+VARIABLE (VE) RAY3_TMP;
+VARIABLE (VE) SPI3_TMP;
+RAY1_TMP := RAY[1];
+RAY3_TMP := RAY[3];
+WRITE 6 'After SR, RAY[1][2] = ' RAY1_TMP[2] '   [expect 0.001]';
+WRITE 6 'After SR, RAY[3][2] = ' RAY3_TMP[2] '   [expect 0.002]';
+SSR 0 0 1;
+WRITE 6 'After SSR, NSPN = ' NSPN '   [expect 2]';
+SPI3_TMP := SPI[3];
+WRITE 6 'After SSR, SPI[3][2] = ' SPI3_TMP[2] '   [expect 1]';
+
 { ----- M8.2: GLASS via GMS spherical mirror -----
   Reflects from a 0.5m-radius spherical mirror with 5cm aperture. The
   IS0=-1 (mirror) + IS1=0 (sphere) path exercises GLASS's nested

@@ -44,9 +44,15 @@ VARIABLE (RE) LSPN;
 VARIABLE (DA 20) MCT;
 
 { Rays }
-VARIABLE (RE 10001 8) RAY;  VARIABLE (RE 10001 8) RSC;  VARIABLE (RE 10001) RCOL;
-VARIABLE (RE 10001 3) SPI;  VARIABLE (RE 10001 3) SSC;
-VARIABLE (RE 10001) REMAIN; VARIABLE (RE 10001) REMOVE;
+{ Ray-subsystem arrays (v2 retype): cosy.fox `RAY 10001 8` is an array
+  of 8 vectors each up to 10001 long — i.e. one vector per phase-space
+  component (x, p_x, y, p_y, t, dE, dM, ?). Concatenation operator `&`
+  grows each vector at SR-call time. Same for RSC scratch + 3-component
+  SPI/SSC spin pairs. RCOL/REMAIN/REMOVE are single VEs of ray-slot
+  flags. Original (RE 10001 8) declaration was wrong v1 transcription.   }
+VARIABLE (VE 8) RAY;  VARIABLE (VE 8) RSC;  VARIABLE (VE) RCOL;
+VARIABLE (VE 3) SPI;  VARIABLE (VE 3) SSC;
+VARIABLE (VE) REMAIN; VARIABLE (VE) REMOVE;
 VARIABLE (RE) NRAY; VARIABLE (RE) NSPN;
 VARIABLE (RE 2) XCUT;       VARIABLE (RE) LCUT;
 VARIABLE (RE) NCT;          VARIABLE (RE) NCCT;
