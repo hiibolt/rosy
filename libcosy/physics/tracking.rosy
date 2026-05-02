@@ -105,4 +105,44 @@ PROCEDURE TRNC E (RE);
   E := ENC;
 ENDPROCEDURE;
 
+{ ----- M9.0: TR family — informative stubs (gated on ray subsystem)
+  The full tracker procedures (TR / TRAPN / TRAPHIST / TRAYPAC) need
+  the ray subsystem (RAY / REMAIN / REMOVE / SPI / NRAY-sized PART
+  arrays). That subsystem is intentionally deferred per the M1
+  plan ("Skipped graphics entirely; ray subsystem deferred until
+  v2"). Call paths that would land here include CR / SR / PR / WRAY
+  / RRAY / DRAY / ARAY / ADDRAYS, plus the SPI-companions (PSPI /
+  WSPI / RSPI / DSPI / ASPI / ADDSPIS).
+
+  The stubs below let user code that *names* TR / TRAPN / etc.
+  parse cleanly, but emit an unambiguous error if actually called.
+  This is preferable to "procedure undefined" — users see exactly
+  why the call fails.                                                   }
+PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
+            D1 (RE) D2 (RE) TY (RE) NF (RE) IU (RE);
+  WRITE 6 ' *** ERROR: TR not yet ported in libcosy v1';
+  WRITE 6 '     Reason: depends on the ray subsystem (RAY / SPI /';
+  WRITE 6 '     REMAIN / REMOVE), which is deferred from libcosy v1.';
+  WRITE 6 '     See cosy.fox L1993-2218 for the full TR algorithm.';
+  QUIT 0;
+ENDPROCEDURE;
+
+PROCEDURE TRAPN N (RE);
+  WRITE 6 ' *** ERROR: TRAPN not yet ported in libcosy v1';
+  WRITE 6 '     Reason: ray-subsystem dependency (REMAIN / NRAY).';
+  QUIT 0;
+ENDPROCEDURE;
+
+PROCEDURE TRAPHIST FN (ST) LT (RE);
+  WRITE 6 ' *** ERROR: TRAPHIST not yet ported in libcosy v1';
+  WRITE 6 '     Reason: ray-subsystem dependency (REMAIN / REMOVE).';
+  QUIT 0;
+ENDPROCEDURE;
+
+PROCEDURE TRAYPAC;
+  WRITE 6 ' *** ERROR: TRAYPAC not yet ported in libcosy v1';
+  WRITE 6 '     Reason: ray-subsystem dependency (RAY / SPI).';
+  QUIT 0;
+ENDPROCEDURE;
+
 END;
