@@ -738,4 +738,50 @@ PROCEDURE WA SS1IN (RE 3 3) SS2IN (RE 3 3) N (RE) L (RE) D (RE);
   UPDATE 1 1;
 ENDPROCEDURE;
 
+{ ----- M8.4: CRSYSCA — generate SYSCA reference file (cosy.fox L4097-4122)
+  Walks a fixed sequence of magnet types (DI, MQ, MH, MO, MD, MZ) at
+  both LFR=-1 and LFR=-2 fringe modes, dumping each one's symplectic
+  representation to unit 99 ('SYSCA.DAT') via WSM. Output is the canonical
+  SYSCA reference table that RSM consumes for symplectic-scaling map
+  reconstruction.
+
+  Lives in elements_glass.rosy because it calls DI (in bend.rosy) — must
+  be defined after bend in the include chain. The placement is just a
+  forward-declaration consequence; the procedure itself is conceptually
+  symplectic-scaling tooling.
+
+  Caveat: this procedure runs MANY heavy element evaluations sequentially
+  (12 magnet builds + 12 MGF/MLF dumps each at NO=5 or NO=6). Expect
+  multi-minute runtime. WRITE 6 prefix message warns the user.            }
+PROCEDURE CRSYSCA;
+  VARIABLE (RE) C_FACTOR;
+  WRITE 6 ' This is going to take very long, do you really want to do this?';
+  WRITE 6 ' If you only need the fringe fields of selected multipoles, it';
+  WRITE 6 ' would be faster to compute and store them separately in a';
+  WRITE 6 ' reference file using WSM and RSM.';
+  OPENF 99 'SYSCA.DAT' 'NEW';
+  C_FACTOR := CONS(P0/Z0)/CLIGHT*1E6/2;
+  OV 5 3 1; RP 400 16 3;
+  UM; FR -1; ESET 1E-12; WSET 1;
+  DI 2 30 0.0254 0 0 0 0; WSM 99 0 C_FACTOR 0.0254;
+  UM; FR -2; ESET 1E-12; WSET 1;
+  DI 2 30 0.0254 0 0 0 0; WSM 99 0 C_FACTOR 0.0254;
+  OV 6 3 1; RP 400 16 3;
+  UM; FR -1; ESET 1E-12; WSET 1; MQ 0 1 0.0254; WSM 99 0 1 0.0254;
+  UM; FR -2; ESET 1E-12; WSET 1; MQ 0 1 0.0254; WSM 99 0 1 0.0254;
+  OV 6 3 1; RP 400 16 3;
+  UM; FR -1; ESET 1E-12; WSET 1; MH 0 0.5 0.0254; WSM 99 0 0.5 0.0254;
+  UM; FR -2; ESET 1E-12; WSET 1; MH 0 0.5 0.0254; WSM 99 0 0.5 0.0254;
+  OV 6 3 1; RP 400 16 3;
+  UM; FR -1; ESET 1E-12; WSET 1; MO 0 0.25 0.0254; WSM 99 0 0.25 0.0254;
+  UM; FR -2; ESET 1E-12; WSET 1; MO 0 0.25 0.0254; WSM 99 0 0.25 0.0254;
+  OV 6 3 1; RP 400 16 3;
+  UM; FR -1; ESET 1E-12; WSET 1; MD 0 0.125 0.0254; WSM 99 0 0.125 0.0254;
+  UM; FR -2; ESET 1E-12; WSET 1; MD 0 0.125 0.0254; WSM 99 0 0.125 0.0254;
+  OV 6 3 1; RP 400 16 3;
+  UM; FR -1; ESET 1E-12; WSET 1; MZ 0 0.25 0.0254; WSM 99 0 0.25 0.0254;
+  UM; FR -2; ESET 1E-12; WSET 1; MZ 0 0.25 0.0254; WSM 99 0 0.25 0.0254;
+  CLOSEF 99;
+ENDPROCEDURE;
+
 END;

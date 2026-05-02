@@ -173,4 +173,104 @@ PROCEDURE RSM IU (RE) L0 (RE) B0 (DA) D0 (DA);
   UPDATE 1 1;
 ENDPROCEDURE;
 
+{ ----- M8.4: WSM — write symplectic-representation map (cosy.fox L4071-4095)
+  Companion writer to RSM/SYSCFL. Dumps the active MAP plus a header
+  block (OV/RP/UM/FR/ESET/WSET/CE) and a generating-function +
+  Lie-exponent expansion to the given file unit, in the SYSCA file
+  format that RSM understands.
+
+  Header lines describe the (NOC, ND, NP) basis, (E0, M0, Z0) reference
+  particle, (LFR, EPS, WAF) flags, and the (L, B, A) reference geometry
+  identifying this map.
+
+  Map decomposition:
+    MLF_SCALAR NAP C ML P -1   → Lie generator P (single DA)
+    MGF        ML F MGF_TY J   → generating function F (single DA),
+                                  type MGF_TY (varies by ND)
+  DAPEW writes F[var=J, order=I] and P[var=J, order=I] coefficients
+  for I=0..NOC.
+
+  ND=3 case uses J=TWOND+1 (the e/dE slot); ND<3 uses J=TWOND+2
+  (parameter slot). The (ND<3, NP<2) and (ND>2, NP<1) configurations
+  are rejected — too few DA variables for the symplectic decomposition. }
+PROCEDURE WSM IU (RE) L (RE) B (RE) A (RE);
+  VARIABLE (ST) LIN;
+  VARIABLE (DA 8) NAP;
+  VARIABLE (DA 8) C;
+  VARIABLE (DA 8) ML;
+  VARIABLE (DA) P;
+  VARIABLE (DA) F;
+  VARIABLE (DA 1) NAP_BUF;
+  VARIABLE (DA 1) F_BUF;
+  VARIABLE (DA 1) F_VEC;
+  VARIABLE (DA 1) P_VEC;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) MGF_TY;
+  VARIABLE (RE) NEG_ONE_WSM;
+  VARIABLE (ST) FMT_E;
+  IF (ND > 2) AND (NP < 1);
+    WRITE 6 ' *** ERROR in WSM, too few parameters';
+    QUIT 0;
+  ELSEIF (ND < 3) AND (NP < 2);
+    WRITE 6 ' *** ERROR in WSM, too few parameters';
+    QUIT 0;
+  ENDIF;
+  LOOP I 1 NV;
+    NAP[I] := MAP[I];
+  ENDLOOP;
+  VARIABLE (DA) L_DA;
+  L_DA := L + 0*DD[1];
+  IF ND > 2;
+    EDEP NAP L_DA PARA(1);
+  ELSEIF ND < 3;
+    EDEP NAP L_DA PARA(2);
+    LOOP I 1 TWOND;
+      NAP_BUF[1] := NAP[I];
+      DAPLU NAP_BUF TWOND+1 0 F_BUF;
+      NAP[I] := F_BUF[1];
+    ENDLOOP;
+  ENDIF;
+  FMT_E := '(E23.16)';
+  LIN := '     OV' & SF(NOC, '(I3)') & SF(ND, '(I3)') & SF(NP, '(I3)') & ' ;';
+  WRITE IU LIN;
+  LIN := '     RP' & SF(CONS(E0), FMT_E) & SF(CONS(M0), FMT_E)
+         & SF(CONS(Z0), FMT_E) & ' ;';
+  WRITE IU LIN;
+  LIN := '     UM ; FR' & SF(LFR, '(I3)') & ' ; ESET' & SF(EPS, FMT_E)
+         & ' ; WSET' & SF(WAF, FMT_E) & ' ;';
+  WRITE IU LIN;
+  LIN := '     CE' & SF(L, FMT_E) & SF(B, FMT_E) & SF(A, FMT_E) & ' ;';
+  WRITE IU LIN;
+  WRITE IU '  ';
+  NEG_ONE_WSM := -1;
+  MLF_SCALAR NAP C ML P NEG_ONE_WSM;
+  MGF_TY := -1;
+  MGF ML F MGF_TY J;
+  IF J # 0;
+    WRITE 6 ' *** ERROR in WSM, no gen. f.';
+    QUIT 0;
+  ENDIF;
+  LIN := '     GENERATING FUNCTION OF TYPE  ' & SF(MGF_TY, '(I2)');
+  WRITE IU LIN;
+  LIN := '     LIE EXPONENT        OF TYPE  ' & SF(NEG_ONE_WSM, '(I2)');
+  WRITE IU LIN;
+  WRITE IU '  ';
+  NOC := NOC + 1;
+  DANOT NOC;
+  IF ND = 3;
+    J := TWOND + 1;
+  ELSE;
+    J := TWOND + 2;
+  ENDIF;
+  F_VEC[1] := F;
+  P_VEC[1] := P;
+  LOOP I 0 NOC-1;
+    DAPEW IU F_VEC J I;
+    DAPEW IU P_VEC J I;
+  ENDLOOP;
+  NOC := NOC - 1;
+  DANOT NOC;
+ENDPROCEDURE;
+
 END;
