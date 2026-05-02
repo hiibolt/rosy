@@ -77,7 +77,7 @@ WRITE 6 INTEG(1, DER(1, F));
   Uses [i,j] indexed-assignment syntax (parens are reserved for fn calls). }
 VARIABLE (RE 3 3) PCOEFS;
 VARIABLE (RE) ERR_DUMMY;
-VARIABLE (RE 25 100) MFD_DUMMY;
+VARIABLE (RE 700 30) MFD_DUMMY;
 PCOEFS[1, 1] := 1;     PCOEFS[1, 2] := 2;     PCOEFS[1, 3] := 0;     { 1 + 2y          }
 PCOEFS[2, 1] := 3;     PCOEFS[2, 2] := 0;     PCOEFS[2, 3] := 0;     { + 3x            }
 PCOEFS[3, 1] := 0;     PCOEFS[3, 2] := 0;     PCOEFS[3, 3] := 0;
@@ -85,9 +85,9 @@ RESULT := POLY(2, 5, PCOEFS, 2);
 WRITE 6 'POLY(2, 5, [[1,2,0],[3,0,0],[0,0,0]], order=2) = ' RESULT '   [expect 1+2*5+3*2 = 17]';
 
 { Drive GAUSS1 / GAUSS inference too. Use MFD-shaped 25x100 dummy. }
-RESULT := GAUSS1(0, 100, 1, 2, 1, MFD_DUMMY, ERR_DUMMY);
+RESULT := GAUSS1(0, 30, 1, 2, 1, MFD_DUMMY, ERR_DUMMY);
 WRITE 6 'GAUSS1 on zero MFD (sanity) = ' RESULT '   [expect 0]';
-RESULT := GAUSS(0, 0, 25, 100, 1, 1, 2, MFD_DUMMY, ERR_DUMMY);
+RESULT := GAUSS(0, 0, 700, 30, 1, 1, 2, MFD_DUMMY, ERR_DUMMY);
 WRITE 6 'GAUSS  on zero MFD (sanity) = ' RESULT '   [expect 0]';
 
 { M3: exercise physics/fringe_field.rosy

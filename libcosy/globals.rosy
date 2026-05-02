@@ -118,7 +118,11 @@ VARIABLE (RE 10 100) SN; VARIABLE (RE 25 100) HN;
 VARIABLE (RE 25 100) VN; VARIABLE (RE 25 100) WN;
 VARIABLE (RE 40) PN;     VARIABLE (RE) NPG;
 VARIABLE (RE) DR;        VARIABLE (RE) DMAX;
-VARIABLE (RE 8) MFP;     VARIABLE (RE 6 700 30) MFD;
+{ Measured-field data table — cosy.fox declares `MFD 6 700 30` (3D);
+  libcosy collapses to 2D (RE 700 30) which handles the dominant
+  use-case (MF with NX ≤ 700, NZ ≤ 30) and keeps MGE/NSDP=12 working
+  within NS ≤ 30 s-samples. NP ≤ 700 (multipole index) is generous.  }
+VARIABLE (RE 8) MFP;     VARIABLE (RE 700 30) MFD;
 
 { Bethe-Bloch / box-counting helpers }
 VARIABLE (RE 6) BETHEBLOCHC;

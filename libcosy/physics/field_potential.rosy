@@ -456,6 +456,16 @@ PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
     { Magnetic dipole with bend geometry (cosy.fox L2656). BENDIST IC=1
       gives the standard polynomial radial profile.                      }
     BFY := BENDIST(X_F, Z_F, 1);
+  ELSEIF NSDP = -5;
+    { Measured magnetic field data (cosy.fox L2657-2659). 2D Gaussian
+      smoother on the global MFD table, with PPOL[1..5] holding NX,
+      NZ, DX, DZ, SIGMA. MFP[1] accumulates "out-of-range" warnings.  }
+    VARIABLE (RE) GAUSS_ERR;
+    BFY := GAUSS(CONS(X_F), CONS(Z_F),
+                 CONS(PPOL[1]), CONS(PPOL[2]),
+                 CONS(PPOL[3]), CONS(PPOL[4]),
+                 CONS(PPOL[5]), MFD, GAUSS_ERR) + 0*DD[1];
+    MFP[1] := MFP[1] + GAUSS_ERR;
   ELSEIF NSDP = -7;
     { Magnetic dipole with detailed center (cosy.fox L2667). BENDIST
       IC=2 routes through CENT for refined angular-radial profile.      }
@@ -680,6 +690,40 @@ PROCEDURE POTFLD X (DA 30) S (RE);
       P1_TMP := SQRT(SQR(S-PPOL[2]+DD[2])+SQR(PPOL[3]));
       P := P + SQR(S-PPOL[2]+DD[2])*LOG(PPOL[3]+P1_TMP) + PPOL[3]*P1_TMP;
       P := P*PPOL[1];
+    ELSEIF NSDP = 14;
+      { Multi-piece thick solenoid (cosy.fox L2596-2608). PPOL[1] = N
+        (count of pieces). For each IS=1..N, MFD[IS, 1..5] holds the
+        piece data: amplitude, length, inner radius, outer radius, s-
+        offset. Sum the per-piece thick-solenoid potentials.            }
+      VARIABLE (DA) P1_TMP14;
+      VARIABLE (DA) SL_TMP;
+      VARIABLE (RE) IS_PIECE;
+      VARIABLE (RE) NPIECE;
+      P := 0*DD[1];
+      NPIECE := CONS(PPOL[1]);
+      LOOP IS_PIECE 1 NPIECE;
+        SL_TMP := S - MFD[IS_PIECE, 5] + 0*DD[1];
+        P1_TMP14 := SQRT(SQR(SL_TMP+DD[2]) + SQR(MFD[IS_PIECE, 4]));
+        P := P + MFD[IS_PIECE, 1]
+               *(SQR(SL_TMP+DD[2])*LOG(MFD[IS_PIECE, 4] + P1_TMP14)
+                 + MFD[IS_PIECE, 4]*P1_TMP14);
+        P1_TMP14 := SQRT(SQR(SL_TMP+DD[2]) + SQR(MFD[IS_PIECE, 3]));
+        P := P - MFD[IS_PIECE, 1]
+               *(SQR(SL_TMP+DD[2])*LOG(MFD[IS_PIECE, 3] + P1_TMP14)
+                 + MFD[IS_PIECE, 3]*P1_TMP14);
+        P1_TMP14 := SQRT(SQR(SL_TMP-MFD[IS_PIECE, 2]+DD[2])
+                       + SQR(MFD[IS_PIECE, 4]));
+        P := P - MFD[IS_PIECE, 1]
+               *(SQR(SL_TMP-MFD[IS_PIECE, 2]+DD[2])
+                 *LOG(MFD[IS_PIECE, 4] + P1_TMP14)
+                 + MFD[IS_PIECE, 4]*P1_TMP14);
+        P1_TMP14 := SQRT(SQR(SL_TMP-MFD[IS_PIECE, 2]+DD[2])
+                       + SQR(MFD[IS_PIECE, 3]));
+        P := P + MFD[IS_PIECE, 1]
+               *(SQR(SL_TMP-MFD[IS_PIECE, 2]+DD[2])
+                 *LOG(MFD[IS_PIECE, 3] + P1_TMP14)
+                 + MFD[IS_PIECE, 3]*P1_TMP14);
+      ENDLOOP;
     ELSE;
       WRITE 6 ' *** ERROR in POTFLD, NSDP not in {0..4,6,7,8,9,10,11,13} not yet ported in libcosy v1';
       QUIT 0;

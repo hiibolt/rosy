@@ -287,6 +287,63 @@ PROCEDURE MZK L (RE) K (RE) D (RE);
   FFELE L D 0 1 2 'MZK';
 ENDPROCEDURE;
 
+{ ----- M6.25: MF — magnet from measured field data (cosy.fox L3627-3640)
+  MF(L, A, NX, NZ, DX, DZ, SIGMA, D, SX, SZ, SPHI): copies the user's
+  2D field grid A into the global MFD table, sets up NSDP=-5 + LOFF=2,
+  and integrates SDELE over [0, L]. Inside POTFLD → POTXZ → FIELDXZ
+  NSDP=-5, GAUSS evaluates BFY at (X, Z) using a 2D Gaussian kernel of
+  width SIGMA over the MFD grid.
+
+  Parameters:
+    L     : magnet length [m]
+    A     : (RE 700 30) field grid (caller-allocated, NX × NZ)
+    NX/NZ : grid counts
+    DX/DZ : grid spacing [m]
+    SIGMA : Gaussian-kernel width in grid units (0.5 ≤ SIGMA ≤ 5.0)
+    D     : aperture / characteristic length [m]
+    SX/SZ : axis offsets (LOCSET first/second args)
+    SPHI  : axis angle [deg] — passed to LOCSET as -SPHI*DEGRAD
+
+  Pre-condition: SIGMA in [0.5, 5.0], DX > 0, DZ > 0.                    }
+PROCEDURE MF L (RE) A_GRID (RE 700 30) NX (RE) NZ (RE)
+            DX_GRID (RE) DZ_GRID (RE) SIGMA (RE) D_AP (RE)
+            SX (RE) SZ (RE) SPHI (RE);
+  VARIABLE (RE) DS1;
+  VARIABLE (RE) IX;
+  VARIABLE (RE) IZ;
+  VARIABLE (RE) NEG_SPHI_RAD;
+  IF (SIGMA < 0.5) OR (SIGMA > 5.0);
+    WRITE 6 ' *** ERROR in MF, SIGMA outside [0.5, 5.0]';
+    QUIT 0;
+  ENDIF;
+  IF (DX_GRID <= 0) OR (DZ_GRID <= 0);
+    WRITE 6 ' *** ERROR in MF, DX <= 0 or DZ <= 0';
+    QUIT 0;
+  ENDIF;
+  MFP[1] := 0;
+  LOOP IX 1 NX;
+    LOOP IZ 1 NZ;
+      MFD[IX, IZ] := A_GRID[IX, IZ];
+    ENDLOOP;
+  ENDLOOP;
+  PPOL[1] := NX + 0*DD[1];
+  PPOL[2] := NZ + 0*DD[1];
+  PPOL[3] := DX_GRID + 0*DD[1];
+  PPOL[4] := DZ_GRID + 0*DD[1];
+  PPOL[5] := SIGMA + 0*DD[1];
+  NSDP := -5;
+  LOFF := 2;
+  DS1 := MIN(DX_GRID, DZ_GRID);
+  NEG_SPHI_RAD := -SPHI*DEGRAD;
+  LOCSET SX SZ NEG_SPHI_RAD 0 0 0;
+  CE := 'MF';
+  SDELE 0 L DS1/100 SQRT(DS1*L/5) L/5 D_AP;
+  UPDATE 1 1;
+  IF MFP[1] > 0;
+    WRITE 6 ' --- WARNING in MF, out of range of data at ' MFP[1] ' points';
+  ENDIF;
+ENDPROCEDURE;
+
 { ----- M6.23: WI — wiggler magnet (cosy.fox L3603-3625)
   WI(B, K, L, D, K1, IA, A): a wiggler with field profile
     BFY(z) = EDGE(z/D) · EDGE((-z+L)/D) · B · cos((2π/K + K1·z)·z)

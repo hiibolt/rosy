@@ -58,7 +58,7 @@ ENDFUNCTION;
   touches either end (ERR=1 in that case). MFD_ is the field array;
   untyped so the call site's MFD shape (typically 2D 25×100 or similar)
   drives inference.                                                       }
-FUNCTION (RE) GAUSS1 X (RE) NX (RE) DX (RE) SIGMA (RE) IP (RE) MFD_ (RE 25 100) ERR (RE);
+FUNCTION (RE) GAUSS1 X (RE) NX (RE) DX (RE) SIGMA (RE) IP (RE) MFD_ (RE 700 30) ERR (RE);
   VARIABLE (RE) NG;
   VARIABLE (RE) IXN;
   VARIABLE (RE) IX;
@@ -85,7 +85,7 @@ FUNCTION (RE) GAUSS1 X (RE) NX (RE) DX (RE) SIGMA (RE) IP (RE) MFD_ (RE 25 100) 
 ENDFUNCTION;
 
 { ----- 2D Gaussian interpolation (cosy.fox L274-290) ---------------------- }
-FUNCTION (RE) GAUSS X (RE) Z (RE) NX (RE) NZ (RE) DX (RE) DZ (RE) SIGMA (RE) MFD_ (RE 25 100) ERR (RE);
+FUNCTION (RE) GAUSS X (RE) Z (RE) NX (RE) NZ (RE) DX (RE) DZ (RE) SIGMA (RE) MFD_ (RE 700 30) ERR (RE);
   VARIABLE (RE) NG;
   VARIABLE (RE) IXN; VARIABLE (RE) IZN;
   VARIABLE (RE) SUMZ;
