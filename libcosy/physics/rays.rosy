@@ -400,6 +400,144 @@ PROCEDURE RRAY IU (RE);
   RCOL := 1 + 0*VE_TMP;
 ENDPROCEDURE;
 
+{ ----- M11.3: SRAY — save active ray pool to a user-supplied (VE 8) (cosy.fox L1018-1019)
+  Trivial 8-element copy of RAY into the caller's R buffer. Useful for
+  snapshotting ray state before a destructive transform (TR / cuts).   }
+PROCEDURE SRAY R_OUT (VE 8);
+  VARIABLE (RE) I;
+  LOOP I 1 8;
+    R_OUT[I] := RAY[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- M11.3: LRAY — load rays from a (VE 8) snapshot (cosy.fox L1021-1027)
+  Inverse of SRAY: copies R_IN[1..8] into RAY/RSC and resets NRAY,
+  RCOL, REMAIN, REMOVE from the loaded length. Caller should call CR
+  before to ensure the ray pool starts clean.
+
+  REMOVE := 0*RAY[1] is cosy.fox shorthand for "VE of zeros sized
+  like RAY[1]"; REMAIN := 1+REMOVE then turns it into ones-like.       }
+PROCEDURE LRAY R_IN (VE 8);
+  VARIABLE (RE) I;
+  VARIABLE (VE) VE_TMP;
+  VE_TMP := R_IN[1];
+  NRAY := LENGTH(VE_TMP);
+  IF NRAY = 1;
+    NRAY := 0;
+  ENDIF;
+  LOOP I 1 8;
+    RAY[I] := R_IN[I];
+    RSC[I] := R_IN[I];
+  ENDLOOP;
+  VE_TMP := RAY[1];
+  REMOVE := 0*VE_TMP;
+  REMAIN := 1 + REMOVE;
+  RCOL := REMAIN;
+ENDPROCEDURE;
+
+{ ----- M11.3: DRAY — output difference of two ray sets (cosy.fox L1029-1033)
+  For each phase-space component I = 1..TWOND, computes RAYA[I]-RAYB[I]
+  and writes either the diff (if abs > AC) or '    ---' (else). Useful
+  for "did this lattice change anything?" diagnostics.
+
+  ABS on VE in libcosy returns sum-of-abs-values (per rosy_lib
+  intrinsics/abs.rs). cosy.fox semantics are identical for the
+  threshold test: any non-trivial diff makes ABS exceed AC.            }
+PROCEDURE DRAY IU (RE) RAYA (VE 8) RAYB (VE 8) AC (RE);
+  VARIABLE (RE) I;
+  VARIABLE (VE) SCR;
+  VARIABLE (VE) RAYA_I;
+  VARIABLE (VE) RAYB_I;
+  LOOP I 1 TWOND;
+    RAYA_I := RAYA[I];
+    RAYB_I := RAYB[I];
+    SCR := RAYA_I - RAYB_I;
+    IF ABS(SCR) > AC;
+      WRITE IU SCR;
+    ELSE;
+      WRITE IU '    ---';
+    ENDIF;
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- M11.3: ARAY — append rays from unit IU to existing pool (cosy.fox L1035-1054)
+  Snapshot the current state (RAY0/RSC0/RCOL0/REMAIN0/REMOVE0), call
+  RRAY which overwrites the live state with the file's rays, then
+  concatenate the snapshot's rays 2..NRAY0 (skipping its placeholder)
+  back onto the now-live state.
+
+  cosy.fox uses range-slice `RAY0(I)|RANGE` where RANGE = 2&NRAY0;
+  libcosy doesn't have a sub-vector slice operator, so we manually
+  loop K = 2..NRAY0 and concat element-by-element. Hoist the VE temp
+  outside each inner loop to avoid re-reading the global per iter.    }
+PROCEDURE ARAY IU (RE);
+  VARIABLE (RE) NRAY0;
+  VARIABLE (RE) I;
+  VARIABLE (RE) K;
+  VARIABLE (VE 8) RAY0;
+  VARIABLE (VE 8) RSC0;
+  VARIABLE (VE) RCOL0;
+  VARIABLE (VE) REMAIN0;
+  VARIABLE (VE) REMOVE0;
+  VARIABLE (VE) VE_TMP;
+  NRAY0 := NRAY;
+  RCOL0 := RCOL;
+  REMAIN0 := REMAIN;
+  REMOVE0 := REMOVE;
+  LOOP I 1 8;
+    RAY0[I] := RAY[I];
+    RSC0[I] := RSC[I];
+  ENDLOOP;
+  RRAY IU;
+  IF NRAY = 0;
+    { File had no rays; restore snapshot. }
+    NRAY := NRAY0;
+    LOOP I 1 8;
+      RAY[I] := RAY0[I];
+      RSC[I] := RSC0[I];
+    ENDLOOP;
+    RCOL := RCOL0;
+    REMAIN := REMAIN0;
+    REMOVE := REMOVE0;
+  ELSE;
+    IF NRAY0 > 0;
+      NRAY := NRAY + NRAY0 - 1;
+      LOOP I 1 8;
+        VE_TMP := RAY0[I];
+        LOOP K 2 NRAY0;
+          RAY[I] := RAY[I] & VE_TMP[K];
+        ENDLOOP;
+        VE_TMP := RSC0[I];
+        LOOP K 2 NRAY0;
+          RSC[I] := RSC[I] & VE_TMP[K];
+        ENDLOOP;
+      ENDLOOP;
+      LOOP K 2 NRAY0;
+        RCOL := RCOL & RCOL0[K];
+        REMAIN := REMAIN & REMAIN0[K];
+        REMOVE := REMOVE & REMOVE0[K];
+      ENDLOOP;
+    ENDIF;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- M11.3: ADDRAYS — concatenate two ray files into a third (cosy.fox L1056-1060)
+  Convenience wrapper: clear the pool, read FN2, append FN1 (which
+  inverts the perceived order — FN1's reference becomes the master),
+  then write the merged pool to FN. cosy.fox order matches.            }
+PROCEDURE ADDRAYS FN1 (ST) FN2 (ST) FN (ST);
+  CR;
+  OPENF 77 FN2 'OLD';
+  RRAY 77;
+  CLOSEF 77;
+  OPENF 77 FN1 'OLD';
+  ARAY 77;
+  CLOSEF 77;
+  OPENF 77 FN 'UNKNOWN';
+  PRAY 77;
+  CLOSEF 77;
+ENDPROCEDURE;
+
 PROCEDURE SCDE;
   VARIABLE (RE) I;
   VARIABLE (RE) FAC;
