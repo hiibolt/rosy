@@ -538,6 +538,221 @@ PROCEDURE ADDRAYS FN1 (ST) FN2 (ST) FN (ST);
   CLOSEF 77;
 ENDPROCEDURE;
 
+{ ----- M11.4: PSPI — print spin vectors single-line-per-spin (cosy.fox L1062-1074)
+  3-component analog of PRAY. NS = LENGTH(SPI[1]) - placeholder
+  adjustment. Each spin row formats as 3×E15.7 fields. The first
+  spin vector is the (zero) reference per cosy.fox SSR convention. }
+PROCEDURE PSPI IU (RE);
+  VARIABLE (RE) NS;
+  VARIABLE (ST) STR;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (VE) VE_TMP;
+  NS := LENGTH(SPI[1]);
+  IF NS = 1;
+    NS := 0;
+  ENDIF;
+  WRITE IU '# number of spin vectors:' & SF(NS, '(I8)') & '  (including the reference)';
+  IF NS > 0;
+    WRITE IU '# S_X            S_Y            S_Z';
+    LOOP J 1 NS;
+      VE_TMP := SPI[1];
+      STR := SF(VE_TMP[J], '(E15.7)');
+      LOOP I 2 3;
+        VE_TMP := SPI[I];
+        STR := STR & SF(VE_TMP[J], '(E15.7)');
+      ENDLOOP;
+      WRITE IU STR;
+    ENDLOOP;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- M11.4: WSPI — print spin vectors column-per-component (cosy.fox L1076-1087)
+  3-component analog of WRAY. Three sections labeled '# S_X', '# S_Y',
+  '# S_Z', each with NS values one-per-line.                            }
+PROCEDURE WSPI IU (RE);
+  VARIABLE (RE) NS;
+  VARIABLE (ST 3) LABL;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (VE) VE_TMP;
+  LABL[1] := 'X';
+  LABL[2] := 'Y';
+  LABL[3] := 'Z';
+  NS := LENGTH(SPI[1]);
+  IF NS = 1;
+    NS := 0;
+  ENDIF;
+  WRITE IU '# number of spin vectors:' & SF(NS, '(I8)') & '  (including the reference)';
+  IF NS > 0;
+    LOOP I 1 3;
+      WRITE IU '# S_' & LABL[I];
+      LOOP J 1 NS;
+        VE_TMP := SPI[I];
+        WRITE IU VE_TMP[J];
+      ENDLOOP;
+      WRITE IU '';
+    ENDLOOP;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- M11.4: RSPI — read spin vectors from unit (cosy.fox L1089-1114)
+  Reads files produced by PSPI (single-line-per-spin) or WSPI (column-
+  per-component). Format detected by whether the second line is short
+  (PSPI's data row, length ≤ 5 means a numeric line) or long (WSPI's
+  '# S_X' label).
+
+  Pre-condition: caller must call CR first; RSPI overwrites NSPN, SPI,
+  SSC.                                                                   }
+PROCEDURE RSPI IU (RE);
+  VARIABLE (ST) STR;
+  VARIABLE (ST 3) LABL;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) X_TMP;
+  READ IU STR;
+  NSPN := R(STR, 26, 33);
+  IF NSPN > 0;
+    READ IU STR;
+    IF LENGTH(STR) > 5;
+      { PSPI format: data line follows. }
+      READ IU STR;
+      LOOP I 1 3;
+        SPI[I] := VE(R(STR, 15*(I-1)+1, 15*I));
+      ENDLOOP;
+      LOOP J 2 NSPN;
+        READ IU STR;
+        LOOP I 1 3;
+          SPI[I] := SPI[I] & R(STR, 15*(I-1)+1, 15*I);
+        ENDLOOP;
+      ENDLOOP;
+    ELSE;
+      { WSPI format: column sections. }
+      LABL[1] := 'X'; LABL[2] := 'Y'; LABL[3] := 'Z';
+      IF STR # ('# S_' & LABL[1]);
+        WRITE 6 ' *** ERROR in RSPI, the wrong line is input:' STR;
+        QUIT 0;
+      ENDIF;
+      LOOP I 1 3;
+        IF I > 1;
+          READ IU STR;
+          IF STR # ('# S_' & LABL[I]);
+            WRITE 6 ' *** ERROR in RSPI, the wrong line is input:' STR;
+            QUIT 0;
+          ENDIF;
+        ENDIF;
+        READ IU X_TMP;
+        SPI[I] := VE(X_TMP);
+        LOOP J 2 NSPN;
+          READ IU X_TMP;
+          SPI[I] := SPI[I] & X_TMP;
+        ENDLOOP;
+        IF I < 3;
+          READ IU STR;
+        ENDIF;
+      ENDLOOP;
+    ENDIF;
+  ENDIF;
+  LOOP I 1 3;
+    SSC[I] := SPI[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- M11.4: SSPI — save spin vectors to a (VE 3) (cosy.fox L1116-1117) }
+PROCEDURE SSPI S_OUT (VE 3);
+  VARIABLE (RE) I;
+  LOOP I 1 3;
+    S_OUT[I] := SPI[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- M11.4: LSPI — load spin vectors from a (VE 3) (cosy.fox L1119-1124) }
+PROCEDURE LSPI S_IN (VE 3);
+  VARIABLE (RE) I;
+  VARIABLE (VE) VE_TMP;
+  VE_TMP := S_IN[1];
+  NSPN := LENGTH(VE_TMP);
+  IF NSPN = 1;
+    NSPN := 0;
+  ENDIF;
+  LOOP I 1 3;
+    SPI[I] := S_IN[I];
+    SSC[I] := S_IN[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- M11.4: DSPI — output difference of two spin sets (cosy.fox L1126-1130) }
+PROCEDURE DSPI IU (RE) SA (VE 3) SB (VE 3) AC (RE);
+  VARIABLE (RE) I;
+  VARIABLE (VE) SCR;
+  VARIABLE (VE) SA_I;
+  VARIABLE (VE) SB_I;
+  LOOP I 1 3;
+    SA_I := SA[I];
+    SB_I := SB[I];
+    SCR := SA_I - SB_I;
+    IF ABS(SCR) > AC;
+      WRITE IU SCR;
+    ELSE;
+      WRITE IU '    ---';
+    ENDIF;
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- M11.4: ASPI — append spin vectors from unit (cosy.fox L1132-1146)
+  3-component analog of ARAY. Snapshot SPI/SSC into local SPI0/SSC0,
+  call RSPI to overwrite, then concat snapshot's 2..NSPN0 entries
+  back via the same range-slice unrolling pattern.                      }
+PROCEDURE ASPI IU (RE);
+  VARIABLE (RE) NSPN0;
+  VARIABLE (RE) I;
+  VARIABLE (RE) K;
+  VARIABLE (VE 3) SPI0;
+  VARIABLE (VE 3) SSC0;
+  VARIABLE (VE) VE_TMP;
+  NSPN0 := NSPN;
+  LOOP I 1 3;
+    SPI0[I] := SPI[I];
+    SSC0[I] := SSC[I];
+  ENDLOOP;
+  RSPI IU;
+  IF NSPN = 0;
+    NSPN := NSPN0;
+    LOOP I 1 3;
+      SPI[I] := SPI0[I];
+      SSC[I] := SSC0[I];
+    ENDLOOP;
+  ELSE;
+    IF NSPN0 > 0;
+      NSPN := NSPN + NSPN0 - 1;
+      LOOP I 1 3;
+        VE_TMP := SPI0[I];
+        LOOP K 2 NSPN0;
+          SPI[I] := SPI[I] & VE_TMP[K];
+        ENDLOOP;
+        VE_TMP := SSC0[I];
+        LOOP K 2 NSPN0;
+          SSC[I] := SSC[I] & VE_TMP[K];
+        ENDLOOP;
+      ENDLOOP;
+    ENDIF;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- M11.4: ADDSPIS — concatenate two spin files into a third (cosy.fox L1148-1152) }
+PROCEDURE ADDSPIS FN1 (ST) FN2 (ST) FN (ST);
+  CR;
+  OPENF 77 FN2 'OLD';
+  RSPI 77;
+  CLOSEF 77;
+  OPENF 77 FN1 'OLD';
+  ASPI 77;
+  CLOSEF 77;
+  OPENF 77 FN 'UNKNOWN';
+  PSPI 77;
+  CLOSEF 77;
+ENDPROCEDURE;
+
 PROCEDURE SCDE;
   VARIABLE (RE) I;
   VARIABLE (RE) FAC;
