@@ -1,0 +1,176 @@
+{ ============================================================================
+  libcosy/physics/sym_scaling.rosy — Symplectically-scaled fringe-field map
+
+  M6.26: Ports SYSCLM (cosy.fox L2977-3017) and RSM (L3019-3022). These
+  are the consumers of the SYSCFL/FC2/FD2 file readers — together they
+  enable users to read pre-computed symplectic-scaling representations
+  of fringe fields and apply them as transfer maps.
+
+  Lives in a separate file (INCLUDEd after normal_form.rosy) so it can
+  call LFM_SCALAR / GFM / LEXP / DLACT / CATR / TRCA / BDEP / RP / MT,
+  all of which are defined earlier in the include chain.
+
+  Note: the corresponding FFELE LFR=1.9/2 dispatch path (which uses
+  the nested SYSCFF helper that calls SYSCLM) is NOT ported here —
+  FFELE lives in field_potential.rosy which is INCLUDEd before
+  normal_form.rosy, so it can't see SYSCLM's definition. Users who
+  want symplectic-scaling fringe fields call SYSCLM / RSM directly.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- SYSCLM: compute symplectically-scaled map (cosy.fox L2977-3017)
+  Given reference parameters AA[1..10] and the GF-expansion FF[1..NOR+1] /
+  Lie-generator-expansion LL[1..NOR+1] from a SYSCFL-parsed file, computes
+  the transfer map IAP for a magnet of effective length L0, field B0,
+  aperture D0.
+
+  AA layout (per cosy.fox L2296):
+    AA[1] = L (reference length)        AA[2] = B (reference field)
+    AA[3] = D (reference aperture)      AA[4] = E (reference energy)
+    AA[5] = M (reference mass)          AA[6] = Z (reference charge)
+    AA[7] = TYPE OF GF (Goldstein-style 1..4)
+    AA[8] = ORDER (highest scaling-expansion order)
+
+  Algorithm:
+    1. Edge cases: B0=0 or Z0=0 → no scaling, just DLACT drift over L0.
+    2. Compatibility check: P0/B/Z/D ratio vs reference's PE(E,M)/B/Z/D
+       must agree to within 100× (else warn).
+    3. Compute scaling parameters: MAG (length ratio), BT (field-momentum
+       product ratio).
+    4. Build FAC[1..AA[8]] = (BT/B - 1)^k powers for the expansion.
+    5. Sum LL · FAC into P (Lie generator), FF · FAC into F (GF).
+    6. GFM IAP F AA[7] — convert GF F to map IAP.
+    7. LFM_SCALAR IAP C IAP P -1 — apply Lie operator P to map.
+    8. CATR / scale by MAG / restore ref particle / TRCA back.
+
+  Type juggling: cosy.fox treats BT as RE in the LIN branch and DA in
+  the !LIN branch. libcosy declares BT as DA throughout — RE multiplies
+  promote naturally.                                                    }
+PROCEDURE SYSCLM IAP (DA 8) L0 (RE) B0 (DA) D0 (DA)
+                 AA (RE 10) FF (DA 10) LL (DA 10);
+  VARIABLE (DA 21) FAC;
+  VARIABLE (DA) MAG;
+  VARIABLE (RE) I;
+  VARIABLE (DA 8) C_IC;
+  VARIABLE (RE) LIN_FLAG;
+  VARIABLE (DA) P_LIE;
+  VARIABLE (RE) PR;
+  VARIABLE (DA 20) COP;
+  VARIABLE (DA) BT;
+  VARIABLE (DA) EP;
+  VARIABLE (DA) MP;
+  VARIABLE (DA) ZP;
+  VARIABLE (DA) F_GF;
+  VARIABLE (RE) RATIO_I;
+  VARIABLE (RE) RATIO_J;
+  VARIABLE (RE) NORD;
+  VARIABLE (RE) NEG_ONE_LFM;
+  NEG_ONE_LFM := -1;
+  IF (CONS(B0) = 0) OR (CONS(Z0) = 0);
+    LOOP I 1 NV;
+      IAP[I] := XX[I];
+    ENDLOOP;
+    DLACT IAP L0;
+  ELSE;
+    EP := E0;
+    MP := M0;
+    ZP := Z0;
+    RATIO_I := CONS(P0)/CONS(B0)/CONS(Z0)/CONS(D0);
+    PR := SQRT(AA[4]*(AA[4] + 2*AMUMEV*AA[5]));
+    RATIO_J := PR/AA[2]/AA[6]/AA[3];
+    IF ABS(RATIO_I) > 100*ABS(RATIO_J);
+      LOOP I 1 NV;
+        IAP[I] := XX[I];
+      ENDLOOP;
+      DLACT IAP L0;
+    ELSE;
+      IF ABS(RATIO_I)*100 < ABS(RATIO_J);
+        WRITE 6 ' --- WARNING in SYSCLM, large deviation from scaling map: ' ABS((RATIO_I-RATIO_J)/(RATIO_I+RATIO_J));
+      ENDIF;
+      MAG := D0/AA[3];
+      BT := PR/SQRT(CONS(E0)*(CONS(E0) + 2*AMUMEV*CONS(M0))) + 0*DD[1];
+      LIN_FLAG := 0;
+      IF (ND < 3) AND (NV # TWOND);
+        LIN_FLAG := 1;
+      ENDIF;
+      IF LIN_FLAG = 1;
+        BT := BT*CONS(Z0)/AA[6]*CONS(MAG)*CONS(B0)*PARA(1);
+      ELSE;
+        BT := BT*Z0/AA[6]*MAG*B0;
+      ENDIF;
+      FAC[1] := BT/AA[2] - 1;
+      NORD := AA[8];
+      LOOP I 2 NORD;
+        FAC[I] := FAC[I-1]*FAC[1];
+      ENDLOOP;
+      NOC := NOC + 1;
+      DANOT NOC;
+      F_GF := FF[1];
+      P_LIE := LL[1];
+      LOOP I 1 NORD;
+        F_GF := F_GF + FF[I+1]*FAC[I];
+        P_LIE := P_LIE + LL[I+1]*FAC[I];
+      ENDLOOP;
+      NOC := NOC - 1;
+      DANOT NOC;
+      GFM IAP F_GF AA[7];
+      LOOP I 1 TWOND;
+        C_IC[I] := 0*DD[1];
+      ENDLOOP;
+      IF LFR = 1.9;
+        LOOP I 1 TWOND;
+          IAP[I] := DD[I];
+        ENDLOOP;
+      ENDIF;
+      LFM_SCALAR IAP C_IC IAP P_LIE NEG_ONE_LFM;
+      { Scale map: rebuild ref particle at AA's reference, CATR,
+        scale phase-space by MAG, restore ref particle, TRCA back. }
+      RP AA[4] AA[5] AA[6];
+      CATR IAP IAP AA[1];
+      LOOP I 1 NV;
+        COP[I] := DD[I];
+      ENDLOOP;
+      LOOP I 1 TWOND 2;
+        COP[I] := DD[I]/MAG;
+      ENDLOOP;
+      POLVAL 1 IAP TWOND COP NV IAP TWOND;
+      LOOP I 1 TWOND 2;
+        IAP[I] := MAG*IAP[I];
+      ENDLOOP;
+      IF LIN_FLAG = 1;
+        RP CONS(EP) CONS(MP) CONS(ZP);
+      ELSE;
+        RP CONS(EP) CONS(MP) CONS(ZP);
+      ENDIF;
+      IF LFR < 0;
+        TRCA IAP IAP 0;
+      ELSE;
+        TRCA IAP IAP L0;
+      ENDIF;
+      IF LIN_FLAG = 1;
+        RP CONS(EP) CONS(MP) CONS(ZP);
+        BDEP IAP L0+0*DD[1] 1+0*DD[1];
+      ENDIF;
+    ENDIF;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- RSM: read symplectically-scaled map (cosy.fox L3019-3022)
+  Convenience wrapper: open file IU, parse via SYSCFL, run SYSCLM into
+  MSC, set up axis, finalize via UPDATE.                              }
+PROCEDURE RSM IU (RE) L0 (RE) B0 (DA) D0 (DA);
+  VARIABLE (DA 10) FF;
+  VARIABLE (DA 10) LL;
+  VARIABLE (RE 10) AA;
+  VARIABLE (RE) NEG_ONE_RSM;
+  NEG_ONE_RSM := -1;
+  SYSCFL IU AA FF LL NEG_ONE_RSM;
+  SYSCLM MSC L0 B0 D0 AA FF LL;
+  LOCSET 0 L0 0 L0 0 0;
+  UPDATE 1 1;
+ENDPROCEDURE;
+
+END;
