@@ -315,9 +315,13 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
   ENDIF;
   NTS := NOC;
 
-  IF (LSPN = 0) AND ((LFR = 0) OR (LFR = 3) OR (LFR = 2.5) OR (LFR = -1) OR (LFR = -2));
-    IF (LFR = 0) AND (NT = 0);
-      { Pure dipole, no fringe: DIPOLEY entrance + body + exit edge }
+  IF (LFR = 0) OR (LFR = 3) OR (LFR = 2.5) OR (LFR = -1) OR (LFR = -2);
+    IF (LFR = 0) AND (NT = 0) AND (LSPN = 0);
+      { Pure dipole, no fringe, no spin (cosy.fox L3380): DIPOLEY
+        entrance + body + exit edge. cosy.fox gates this fast path
+        on LSPN=0 since the analytical DIPOLEY doesn't propagate the
+        spin matrix; LSPN=1 falls through to the SIELE multipole
+        path below which runs SPNFLO. }
       DIPOLEY R PHI E1 H1 E2 H2 MSC MSC LGH;
       LOOP I 1 TWOND;
         MAP[I] := MSC[I];
@@ -449,7 +453,7 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
       CE := 'BEND';
     ENDIF;
   ELSE;
-    WRITE 6 ' *** ERROR in BEND, LSPN=1 or unsupported LFR (libcosy v1: 0, 3, 2.5, -1, -2)';
+    WRITE 6 ' *** ERROR in BEND, unsupported LFR (libcosy supports 0, 3, 2.5, -1, -2)';
     QUIT 0;
   ENDIF;
 ENDPROCEDURE;

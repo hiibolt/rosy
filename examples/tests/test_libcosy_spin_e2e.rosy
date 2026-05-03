@@ -36,4 +36,11 @@ WRITE 6 'After MQ 0.1 0.5 0.05 (LSPN=1), SPNR[1,1] now reflects';
 WRITE 6 'the through-element spin rotation:';
 WRITE 6 SPNR[1, 1];
 
+{ Apply a small dipole bend — exercises the BEND LSPN=1 path which
+  falls through to the SIELE-multipole branch (NT=0 LSPN=1 triggers
+  the same NPOL=1 dipole-as-multipole as cosy.fox L3380). }
+DP 1 0.1 0.05;
+WRITE 6 'After DP (LSPN=1), SPNR[1,1] after dipole:';
+WRITE 6 SPNR[1, 1];
+
 END;
