@@ -436,7 +436,10 @@ impl TypeResolver {
                 };
 
                 if is_unused {
-                    // Default unresolved variables and arguments to RE (standard COSY behavior)
+                    // Default unresolved variables and arguments to RE (standard COSY behavior).
+                    // Fall through to the dependents-decrement block below so any node
+                    // depending on this slot (e.g. a function body that references an
+                    // uncalled function's argument) still progresses through the queue.
                     let node = self.nodes.get_mut(&slot).unwrap();
                     let default_type = RosyType::RE();
                     node.resolved = Some(default_type.clone());
@@ -445,11 +448,9 @@ impl TypeResolver {
                         reason: "untyped variables default to RE".to_string(),
                     };
                     warned_slots.insert(slot.clone());
-                    resolved_count += 1;
-                    continue;
+                } else {
+                    self.resolve_node(&slot)?;
                 }
-
-                self.resolve_node(&slot)?;
             }
             resolved_count += 1;
 

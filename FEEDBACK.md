@@ -167,29 +167,29 @@ Split into separate variables: MAP1_DA and MAP1_DA
 
 # Summary
 
-## Issue 1: Unused functions with untyped parameters fail to compile
+## ~~Issue 1: Unused functions with untyped parameters fail to compile~~ (Fixed in v0.42.14)
 **Severity: Medium**
 
-The type resolver infers function parameter types from call sites. If a function is never called, untyped parameters have no inference source and remain unresolved. Options: require explicit types on function parameters (matching COSY behavior), or default unused untyped parameters to RE.
+Root cause: in the topological resolver loop (`resolve.rs:topological_resolve`), when a slot was defaulted to RE via the unused-variable fallback, the code `continue`d without decrementing dependent slots' in-degrees. So an untyped function-return variable depending on an unused argument stayed stuck. Fix: removed the early `continue`, letting the dependents block run after defaulting. Verified by `examples/tests/test_issue1_unused_function.rosy`.
 
-## Issue 2: Concat (`&`) doesn't support DA operands
+## ~~Issue 2: Concat (`&`) doesn't support DA operands~~ (Fixed pre-v0.34.0)
 **Severity: High — blocks DA vector construction**
 
-The `CONCAT_REGISTRY` in `rosy/src/rosy_lib/operators/concat.rs` only defines rules for RE, VE, and ST combinations. DA is entirely absent. In COSY, DA arrays (vectors of Taylor series) are common for phase-space maps. New `TypeRule` entries and trait impls need to be added for DA & DA, DA & VE-of-DA, etc. No upcasting is involved — this is strictly about adding missing type rules.
+`CONCAT_REGISTRY` in `rosy/src/rosy_lib/operators/concat.rs:33-48` now defines full DA × DA, DA × Vec<DA>, CD × CD, and CD × Vec<CD> rules. The original FEEDBACK reproducer (`COORD(1) := COORD(1) & Y`) was actually a correctly-rejected dimensional mismatch (LHS-indexed concat builds 2D-of-DA), not a missing operator rule. The intended pattern is `COORD := COORD & Y` (no LHS index → flat 1D-of-DA).
 
 ## ~~Issue 3: Case sensitivity~~ (Intentional — not a bug)
 
 ## Issue 4: Error messages not sorted by source order
-**Severity: Low**
+**Severity: Low — open**
 
-The resolver uses topological sort (Kahn's algorithm), so errors surface in dependency-graph order, not source order. Sorting errors by source location before display would improve readability.
+The resolver uses topological sort (Kahn's algorithm), so errors surface in dependency-graph order, not source order. Sorting errors by source location before display would improve readability. Partial fix landed (`resolve.rs:512` sorts no-info slots by `declared_at`), but cycle slots are still emitted in graph-traversal order. Cosmetic only.
 
-## Issue 5: Inference chain through untyped variables can fail
-**Severity: Medium — needs investigation**
+## ~~Issue 5: Inference chain through untyped variables can fail~~ (Fixed)
+**Severity: Medium**
 
-When multiple untyped variables form a chain (`gamma0 := 2.06; P0 := gamma0 * V0; K0 := gamma0 - 1;`), the resolver may fail to propagate types through the chain even though the root (`gamma0`) has a literal assignment. Could be a dependency-graph edge issue or a topological-sort ordering problem.
+Verified by `examples/tests/test_issue5_inference_chain.rosy` — the chain `GAMMA0 := 2.06; V0 := 0.87; P0 := GAMMA0*V0; K0 := GAMMA0 - 1;` now resolves cleanly with all four variables untyped. Likely fixed alongside the topological-resolver hardening.
 
-## Issue 6: Indexed array conflict check doesn't account for LHS dimensions
-**Severity: High — blocks multi-element DA arrays**
+## ~~Issue 6: Indexed array conflict check doesn't account for LHS dimensions~~ (Fixed)
+**Severity: High — was blocking multi-element DA arrays**
 
-When checking for conflicting types on a second indexed assignment (e.g. `MAP1(2) := DA(2)/P0` after `MAP1(1) := DA(1)`), the conflict check at `assign/mod.rs:304` evaluates the new recipe *without* the `WithDimensions` wrapper that accounts for LHS indexing. The first assignment correctly infers `(DA 1D)` via `WithDimensions` at line 425, but the conflict check compares against the raw RHS type `(DA)`, causing a false mismatch. The fix: wrap the new recipe with `WithDimensions` (using `num_index_dimensions()`) before comparing.
+The conflict check at `rosy/src/program/statements/core/assign/mod.rs:268-273` now wraps the new recipe with `WithDimensions(num_index_dimensions())` before comparing against the existing recipe's evaluated type. Verified by `examples/tests/test_issue6_da_array.rosy` — the FEEDBACK reproducer `MAP1(1) := DA(1); MAP1(2) := DA(2)/P0;` compiles and runs.

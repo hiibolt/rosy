@@ -1,0 +1,16 @@
+{ Issue 1: function defined but never called, with untyped parameters. }
+
+BEGIN;
+
+FUNCTION DOUBLE X;
+  DOUBLE := 2*X;
+ENDFUNCTION;
+
+PROCEDURE RUN;
+  VARIABLE (RE) Y;
+  Y := 5;
+  WRITE 6 Y;
+ENDPROCEDURE;
+
+RUN;
+END;

@@ -1,0 +1,27 @@
+{ Issue 2: DA & DA concatenation. Builds a 1D-of-DA via repeated concat
+  in the canonical pattern (no LHS index → flat 1D). The FEEDBACK
+  reproducer `COORD(1) := COORD(1) & Y` is rejected (correctly) because
+  the LHS index forces a 2D output; the right pattern below works. }
+
+BEGIN;
+
+PROCEDURE RUN;
+  VARIABLE (DA) X;
+  VARIABLE (DA) Y;
+  VARIABLE (DA 1) COORD;
+  VARIABLE (RE) I;
+  VARIABLE (RE) NP;
+
+  X := DA(1);
+  Y := DA(2);
+  NP := 3;
+  COORD := X & Y;
+  LOOP I 3 NP;
+    COORD := COORD & Y;
+  ENDLOOP;
+  WRITE 6 'COORD built — first slot:';
+  WRITE 6 COORD[1];
+ENDPROCEDURE;
+
+RUN;
+END;
