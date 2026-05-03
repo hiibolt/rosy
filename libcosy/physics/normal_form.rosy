@@ -1554,15 +1554,23 @@ ENDPROCEDURE;
 { ----- TP: tune dependence on parameters (cosy.fox L1627-1637) ------------
   TP(MU) computes the parameter-dependence of the tunes from the active
   MAP. For decoupled planes (LC=0), this is just GT MAP F MU A B G R.
-  For coupled planes (LC=1), it falls back to TS — currently deferred
-  because TS needs the full DA→CD→DA flow that DANF wrestles with.
+  For coupled planes (LC=1), cosy.fox calls TS then DAPLU-strips the
+  canonical-pair (amplitude) variables so MU reflects only the linear
+  parameter-dependence.
 
   The LC test scans the off-diagonal blocks of the linear matrix:
   if any (I1, K), (I2, K), (K, I1), or (K, I2) entry is non-zero for
   K beyond the same-pair indices, the planes are coupled.
 
   Matrix-element extraction via DER+CONS (not ME) since ROSY's TRANSPORT
-  id encoding is left-to-right (id=K only addresses x_1^K, not x_K). }
+  id encoding is left-to-right (id=K only addresses x_1^K, not x_K).
+
+  ROSY-vs-cosy.fox typing note: cosy.fox's loose MU holds DA in the
+  decoupled case and silently absorbs CD in the coupled case. ROSY
+  preserves the DA-typed MU and uses an internal CD scratch (MU_CD)
+  for the TS call, then REAL-casts back into MU. A residual-imaginary
+  diagnostic warns if the cast would lose tune-relevant data (signals
+  the user should call TS directly with a CD buffer).                  }
 PROCEDURE TP MU (DA 4);
   VARIABLE (DA 3) A;
   VARIABLE (DA 3) B;
@@ -1592,14 +1600,34 @@ PROCEDURE TP MU (DA 4);
   IF LC = 0;
     GT MAP F MU A B G R;
   ELSE;
-    { Coupled planes: defer to TS, then strip parameter dependence
-      via DAPLU sweep so the result reflects only the linear-tune
-      dependence on parameters (not amplitude). }
-    WRITE 6 ' *** ERROR in TP, LC=1 (coupled-planes path) requires';
-    WRITE 6 '     a CD-typed MU output to share with TS. The current';
-    WRITE 6 '     TP signature uses DA-typed MU. Call TS directly';
-    WRITE 6 '     with a (CD 4) MU buffer for coupled-plane analysis.';
-    QUIT 0;
+    { Coupled planes — cosy.fox L1635-1636 path. }
+    VARIABLE (CD 4) MU_CD;
+    VARIABLE (DA 1) BUF_IN;
+    VARIABLE (DA 1) BUF_OUT;
+    VARIABLE (RE)   RES_IMAG;
+    TS MU_CD;
+    RES_IMAG := 0;
+    LOOP I 1 ND;
+      { Track imaginary residue before lossy cast. }
+      LOOP K 1 TWOND;
+        RES_IMAG := RES_IMAG + ABS(IMAG(MU_CD[I]|K));
+      ENDLOOP;
+      MU[I] := REAL(MU_CD[I]);
+      { Strip canonical-pair (amplitude) variables via DAPLU sweep —
+        zero each var K in MU[I], leaving only parameter-dependence. }
+      LOOP K 1 TWOND;
+        BUF_IN[1] := MU[I];
+        DAPLU BUF_IN K 0 BUF_OUT;
+        MU[I] := BUF_OUT[1];
+      ENDLOOP;
+    ENDLOOP;
+    IF RES_IMAG > 1E-9;
+      WRITE 6 ' --- WARNING in TP, LC=1 path discarded';
+      WRITE 6 '     non-trivial imaginary tune residue:';
+      WRITE 6 RES_IMAG;
+      WRITE 6 '     Hyperbolic / unstable plane detected — call TS';
+      WRITE 6 '     directly with a (CD 4) buffer for full information.';
+    ENDIF;
   ENDIF;
 ENDPROCEDURE;
 
