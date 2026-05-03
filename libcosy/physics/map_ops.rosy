@@ -1152,4 +1152,92 @@ PROCEDURE RNM IU (RE) NAP (DA 8);
   ENDLOOP;
 ENDPROCEDURE;
 
+{ ----- COCR: COSY → circular representation (cosy.fox L740-749) ----------
+  Builds the circular-coordinate substitution
+        z₊ = x + i·a,   z₋ = x - i·a   (for each (x,a) plane)
+  and applies it to the input map IAP via CPOLVAL.
+
+  The COSY canonical pairs are (1,2)=(x,px) and (3,4)=(y,py). Circular
+  representation diagonalizes the linear rotation: a stable plane with
+  tune μ becomes a phase-multiply z₊ ↦ e^(iμ)z₊, z₋ ↦ e^(-iμ)z₋.
+
+  In cosy.fox the local `I` is reused first as IMUNIT then as a loop
+  counter — ROSY strict typing splits these into `IM` (CM) and `I` (RE).
+  All DA-valued globals (DD) lift to CD via `+ 0*IM` since LAP/COD live
+  in CD-arithmetic for the CPOLVAL substitution.                          }
+PROCEDURE COCR IAP (CD 8) NAP (CD 8);
+  VARIABLE (CD 8)  LAP;
+  VARIABLE (CD 20) COD;
+  VARIABLE (CM)    IM;
+  VARIABLE (RE)    I;
+  IMUNIT IM;
+  IF ND < 2;
+    WRITE 6 ' *** ERROR in COCR, ND too small';
+    QUIT 0;
+  ENDIF;
+  COD[1] := (DD[1] + DD[2])/2 + 0*IM;
+  COD[3] := (DD[1] - DD[2])/(2*IM);
+  COD[2] := (DD[3] + DD[4])/2 + 0*IM;
+  COD[4] := (DD[3] - DD[4])/(2*IM);
+  LAP[1] := IAP[1] + IM*IAP[3];
+  LAP[2] := IAP[1] - IM*IAP[3];
+  LAP[3] := IAP[2] + IM*IAP[4];
+  LAP[4] := IAP[2] - IM*IAP[4];
+  LOOP I 5 TWOND;
+    COD[I] := DD[I] + 0*IM;
+    LAP[I] := IAP[I];
+  ENDLOOP;
+  LOOP I TWOND+1 NV;
+    COD[I] := DD[I] + 0*IM;
+  ENDLOOP;
+  CPOLVAL 1 LAP TWOND COD NV NAP TWOND;
+ENDPROCEDURE;
+
+{ ----- CRCO: circular representation → COSY (cosy.fox L751-764) ----------
+  Inverse of COCR. Builds
+        x = (z₊ + z₋)/2,   a = (z₊ - z₋)/(2i)
+  and applies via CPOLVAL. The result should be purely real (zero imag
+  part) up to numerical noise — we strip the imag part in-place and warn
+  if the residual exceeds 1e-12 (matches cosy.fox's diagnostic).
+
+  Note the in-place `NAP[I] := REAL(NAP[I])` keeps NAP CD-typed (REAL of
+  a CM gives RE which auto-lifts back to CD with zero imag) — same effect
+  as cosy.fox's loose-typed write-back, just written explicitly.          }
+PROCEDURE CRCO IAP (CD 8) NAP (CD 8);
+  VARIABLE (CD 8)  LAP;
+  VARIABLE (CD 20) COD;
+  VARIABLE (CM)    IM;
+  VARIABLE (RE)    I;
+  VARIABLE (RE)    DUM;
+  IMUNIT IM;
+  IF ND < 2;
+    WRITE 6 ' *** ERROR in CRCO, ND too small';
+    QUIT 0;
+  ENDIF;
+  COD[1] := DD[1] + IM*DD[3];
+  COD[2] := DD[1] - IM*DD[3];
+  COD[3] := DD[2] + IM*DD[4];
+  COD[4] := DD[2] - IM*DD[4];
+  LAP[1] := (IAP[1] + IAP[2])/2;
+  LAP[3] := (IAP[1] - IAP[2])/(2*IM);
+  LAP[2] := (IAP[3] + IAP[4])/2;
+  LAP[4] := (IAP[3] - IAP[4])/(2*IM);
+  LOOP I 5 TWOND;
+    COD[I] := DD[I] + 0*IM;
+    LAP[I] := IAP[I];
+  ENDLOOP;
+  LOOP I TWOND+1 NV;
+    COD[I] := DD[I] + 0*IM;
+  ENDLOOP;
+  CPOLVAL 1 LAP TWOND COD NV NAP TWOND;
+  DUM := 0;
+  LOOP I 1 TWOND;
+    DUM := DUM + ABS(IMAG(NAP[I]));
+    NAP[I] := REAL(NAP[I]) + 0*IM;
+  ENDLOOP;
+  IF DUM > 1E-12;
+    WRITE 6 ' --- WARNING in CRCO, map not in circular representation';
+  ENDIF;
+ENDPROCEDURE;
+
 END;

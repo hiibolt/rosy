@@ -158,13 +158,12 @@ FUNCTION (RE) GAUSS X (RE) Z (RE) NX (RE) NZ (RE) DX (RE) DZ (RE) SIGMA (RE) MFD
 ENDFUNCTION;
 
 { ----- Complex polynomial evaluation (cosy.fox L230-237) ------------------
-  DEFERRED: CPOLVAL declares scratch buffers `RIPOL NM1 2*NPOL` and
-  `RIRES 2*NM1 2*NRES` whose ROSY equivalents need NM1 (a global DA-poly
-  size sentinel) to be a known constant at parse time. The function body
-  also bridges between (CM) input arrays and (RE) interleaved real/imag
-  arrays for the underlying POLVAL intrinsic — that bridge is correct
-  COSY semantics but needs explicit coordination with the POLVAL call
-  signature in ROSY. Will port alongside the modules that actually call
-  it (lie_normalform / spin_su2 in M5).                                   }
+  CPOLVAL is a transpiler intrinsic in ROSY (see
+  rosy/src/program/statements/math/cpolval/) — no libcosy proxy needed.
+  The cosy.fox version manually splits CD coefficients into interleaved
+  real/imag pairs for the RE-only POLVAL; ROSY's CPOLVAL operates on CD
+  arrays directly and is wired to rosy_polval_da via the CD-array
+  dispatch path. Call sites: normal_form.rosy (DANF), spin_su2.rosy
+  (TSS, TSP, NORMSU2), and map_ops.rosy (COCR / CRCO).                    }
 
 END;
