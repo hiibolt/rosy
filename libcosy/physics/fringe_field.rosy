@@ -12,11 +12,12 @@
   electric kind. F transitions from ~1 (deep inside the magnet) to ~0
   (deep outside) over a normalized arclength s ∈ [-3, 5].
 
-  Deferred from this milestone:
-    * FP — visualization of the Enge profile (graphics, skipped per scope)
-    * FC2 / FD2 / SYSCFL — symplectic-scaling fringe-field mode setup;
-      depends on file I/O patterns plus GFF2/LFF2/DATFF2 globals that
-      will be exercised first by the procedures consuming them.
+  Status (post-M6.18-M6.22):
+    * ENGE / FC / FD landed in M3 (analytical Enge function + coefficient
+      seeders).
+    * FC2 / FD2 / SYSCFL — symplectic-scaling fringe-field mode setup
+      via file I/O — landed M6.19 / M6.21.
+    * FP (graphics) is permanently out of scope per the libcosy v2 plan.
   ============================================================================ }
 
 BEGIN;

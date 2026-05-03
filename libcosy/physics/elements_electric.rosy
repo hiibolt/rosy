@@ -1,14 +1,14 @@
 { ============================================================================
   libcosy/physics/elements_electric.rosy — Electric-field elements
 
-  Initial port covers RF (RF cavity), the only fully-analytical electric
-  element in cosy.fox. The remaining electric-multipole family (EQ, EH,
-  EO, ED, EZ, E5, EM, EMS) and the electrostatic deflectors (EBEND, EC,
-  ES, ECL, ESP, EC, ECL, ESP, etc.) all delegate to FFELE / SDELE — they
-  land in M6 alongside POTFLD.
-
-  The Wien-filter pair (WC, WF) and electrostatic lens family (CEG,
-  CEL, CEA, DC) are similarly FFELE-blocked and deferred.
+  Status (post-M6): the full electric-element family is ported.
+    * RF                                — analytical thin-lens cavity.
+    * EQ / EH / EO / ED / EZ / E5 / EM /
+      EMS                               — multipoles via FFELE.
+    * EBEND / EC / ES / ECL / ESP / DC  — electrostatic deflectors and
+                                          drift-cell helpers via FFELE.
+    * CEG / CEL / CEA                   — Einzel-lens family via FFELE.
+    * WC / WF                           — Wien-filter pair.
 
   RF Cavity (cosy.fox L3899-3916)
   -------------------------------

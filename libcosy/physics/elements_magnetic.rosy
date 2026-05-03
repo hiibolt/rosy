@@ -181,10 +181,13 @@ ENDPROCEDURE;
   M5 = combined quad+sext+oct+dec+dodec, MM = arbitrary normal multipole
   list, MMS = MM + skew components.
 
-  All gated on LFR=0 since FFELE LFR≠0 needs SDELE/RK (deferred). For
-  high-order magnets (e.g. octupole MO with NOC<3), the lazy init of
-  PMM/PEM in POTFLD won't have populated the needed entries — user
-  must call OV with NO ≥ multipole order.                             }
+  These elements pass LFR=0 (no fringe field) by default; users wanting
+  fringe behavior call MQK / MSK / MOK / etc. variants, which forward
+  the LFR setting through to FFELE. As of M6, FFELE supports LFR ∈
+  {0, 1, -1, -2, -10} via field_potential.rosy:1541+. For high-order
+  magnets (e.g. octupole MO with NOC<3), the lazy init of PMM/PEM
+  in POTFLD won't have populated the needed entries — user must call
+  OV with NO ≥ multipole order.                                       }
 PROCEDURE MO L (RE) B (RE) D (RE);
   NPOL := 1;
   PPOL[1] := B/D/D/D + 0*DD[1];

@@ -4,13 +4,11 @@
   Initial port of cosy.fox L2890-2932. Starts with the drift element DL,
   built on DLACT (the underlying field-free advance of a DA-array map).
 
-  Deferred:
-    * SDELE / SDELEREF / DSDED / SIELE / FFELE / GE / SYSCLM / RSM —
-      depend on the RK Runge-Kutta integrator (cosy.fox L2816), the
-      symplectic-scaling fringe-field globals, and the larger numerics
-      stack that lands in M6.
-    * LOCSET / UPDATE  calls inside DL are graphics-only; permanently
-      out of scope.
+  Status (post-M6 + M16):
+    * DLACT / DL / PS / CB land here. SDELE / SDELEREF / DSDED / SIELE /
+      FFELE / GE / SYSCLM / RSM are now in field_potential.rosy after M6.
+    * DL does not yet route through UPDATE (so SPOS / LTRA / GTRA don't
+      advance through DL the cosy.fox way). M16.5 candidate refactor.
   ============================================================================ }
 
 BEGIN;

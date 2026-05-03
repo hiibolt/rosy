@@ -7,12 +7,30 @@
   Pauli-matrix isomorphism, with half-angle parameters that avoid the
   trig-singularities of Euler angles.
 
-  Procedures landed in this file:
-    SO3_IN_SU2(A, B, KEY): convert a 3×3 SO(3) rotation matrix to SU(2).
+  Procedures landed in this file (M5 + M11 + M17):
+    * SO3_IN_SU2(A, B, KEY) — SO(3) rotation → SU(2) (cosy.fox L1761-1787).
+    * IDENSU2 / MULASU2 / INVRSU2 / CORRSU2 / MEXPSU2 / EHOMSU2 — SU(2)
+      group/algebra primitives (cosy.fox L1789-1856).
+    * MAPINVR / ANALMAP / SOLVSU2 — DA→CD analytic-map and Newton-style
+      solver for SU(2) normal forms (cosy.fox L1857-1909).
+    * NORMSU2(UI, UO, CU, NBAR, STUNE, MN, MA, EPS) — full spin
+      normal-form pipeline (cosy.fox L1643). Three-deep nested helpers
+      land via the CD-scratch + REAL-cast pattern documented in
+      normal_form.rosy.
+    * TSS / TSP / PARASU2 — spin-tune extraction and parameter-dependence
+      utilities (cosy.fox L1911-1979).
 
-  Deferred (NORMSU2 / TSS / TSP family) — they require an 8-fold nested
-  procedure chain with CD-arithmetic that mirrors DANF's complexity, plus
-  CDNFDS which is already implemented but needs careful integration.
+  All CD-typed scratch arrays follow the DANF convention: DA → CD lift
+  via `+ 0*IM`, CD → DA via REAL(...), with imaginary residue tracked
+  for diagnostics where physical interpretation requires it.
+
+  End-to-end status: the spin *analysis* surface (NORMSU2 / TSS / TSP /
+  ANALMAP / SOLVSU2 / ...) compiles and is callable from user code,
+  but you cannot yet build a non-trivial SPNR from libcosy lattice
+  elements. Most magnetic / electric element wrappers (MQ / MH / DI /
+  BEND / EQ / ...) gate on `LSPN = 0` because the SPNVEC and
+  UPDATEMAP-with-spin paths are deferred. Users testing the analyzers
+  today must construct SPNR manually (e.g. SO3_IN_SU2 directly).
   ============================================================================ }
 
 BEGIN;

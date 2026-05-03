@@ -5,38 +5,32 @@
   curved edges, edge angles, optional fringe-field path, and optional
   inhomogeneous (multipole) content.
 
-  Port scope (libcosy v1):
-    * BENDFF0 path: NT=0 (no multipoles), LSPN=0 (no spin), LFR=0 (no
-      fringe field). The "simple sector dipole" case — works for most
+  Port scope (libcosy v2):
+    * BENDFF0 path (LFR=0, NT=0): simple sector dipole — works for most
       teaching examples and basic ring lattices.
-    * BENDFF3 path (fringe-field): DEFERRED. Requires SIELE, UPDATE,
-      FFELE, POTFLD — the M6 milestone.
-    * Multipole content (NT≠0): DEFERRED. Requires SIELE.
-    * Spin tracking (LSPN=1): DEFERRED. Requires UPDATEMAP and
-      reference_particle's spin pipeline.
+    * BENDFF3 path (LFR=3 / LFR=2.5): high-precision soft-edge fringe
+      via NSDP=-4 + BENDIST. Landed M6.18-M6.22.
+    * Multipole content (NT > 0): DIPOLEY entrance + SIELE body +
+      DIPOLEY exit (cosy.fox L3382-3388). Landed M6.x.
+    * LFR=-1 / LFR=-2 half-fringe paths: delegate to FFELE
+      (field_potential.rosy:1665+). Landed M6.20.
+    * Spin tracking (LSPN=1): DEFERRED — needs SPNVEC + LSPN-driven
+      UPDATEMAP spin pipeline. M16 lands SPNVEC scaffolding (warns
+      and skips ray spin push); full integration is M19+.
 
   Convenience wrappers:
     DI   = curved-edge dipole (BEND with E1/E2/H1/H2 in degrees)
     DP   = parallel-faced dipole
     DIL  = DI with L instead of R (computes R = L/PHI)
 
-  cosy.fox structure (4-deep nesting!):
+  cosy.fox structure (4-deep nesting):
     BEND
-      ├─ FK (function)         — circle FK
-      ├─ SNS (procedure)       — SN orders > 3 from poly S
-      ├─ KICK (procedure)      — apply x or y kick
-      ├─ POL (function)        — Horner polynomial
-      ├─ KICKSXYN (procedure)  — both-axis kick for inhomog. magnet
-      ├─ BENDFF3 (procedure)   — fringe-field path [DEFERRED]
-      └─ BENDFF0 (procedure)   — no-fringe path
-            ├─ DIPOLE (procedure) — geometric sector solution
-            │     ├─ RADI (function)    — sqrt(x² + y²)
-            │     ├─ CAPO (procedure)   — atan2-style capture
-            │     ├─ EQ2 (procedure)    — solve Ax² - 2Bx - C = 0
-            │     ├─ LINLIN (procedure) — line × line intersection
-            │     ├─ LINCIR (procedure) — line × circle intersection
-            │     └─ CIRCIR (procedure) — circle × circle intersection
-            └─ DIPOLEY (procedure)      — y-plane KICK + DIPOLE + KICK
+      ├─ FK / SNS / KICK / POL / KICKSXYN — multipole helpers
+      ├─ BENDFF3 (procedure)              — fringe-field path
+      └─ BENDFF0 (procedure)              — no-fringe path
+            ├─ DIPOLE (procedure)
+            │     ├─ RADI / CAPO / EQ2 / LINLIN / LINCIR / CIRCIR
+            └─ DIPOLEY (procedure)        — y-plane KICK + DIPOLE + KICK
 
   ROSY's strict typing means inner procedures need explicit array sizes
   and scalar-vs-vector decisions made up front. The DA arithmetic is the

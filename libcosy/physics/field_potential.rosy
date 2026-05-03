@@ -1517,10 +1517,15 @@ ENDPROCEDURE;
   symplectic-scaling, 3/2.5=high precision, -1/-2=half fringe, -10=RK
   no FF).
 
-  libcosy v1 ports only LFR=0 (no fringe field), which delegates to
-  SIELE then sets the local-axis state via LOCSET and refreshes derived
-  globals via UPDATE. Other LFR modes need SDELE (RK-driven) — deferred
-  to a later sub-milestone.
+  Supported LFR modes (M6 + M18):
+    *  0  — no fringe field (SIELE only, LOCSET + UPDATE).
+    *  1  — soft-edge fringe (SDELE entrance, SIELE body, SDELE exit).
+    * -1  — entrance half-fringe only (delegate via SDELE).
+    * -2  — exit half-fringe only (delegate via SDELE).
+    * -10 — RK-driven fringeless integration.
+  LFR=2 / LFR=2.5 / LFR=3 modes are supported in BEND directly (the
+  symplectic-scaling and high-precision soft-edge paths), not in the
+  generic FFELE wrapper.
 
   Parameters:
     L       physical length [m]
