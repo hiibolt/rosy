@@ -207,6 +207,16 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   VARIABLE (DA 8) AN_NEWTON;
   VARIABLE (RE) IE_NEWTON;
   VARIABLE (RE) ABS_TY;
+  { Spin tracking work-arrays (IID1 < 0 or IID2 < 0 path) }
+  VARIABLE (RE) IS_FLAG;
+  VARIABLE (DA 9) TMAP_SPIN;
+  VARIABLE (DA 9) RES_SPIN;
+  VARIABLE (VE 3) TSPI_LOCAL;
+  VARIABLE (RE) K;
+  VARIABLE (RE) TSSC_1;
+  VARIABLE (RE) TSSC_2;
+  VARIABLE (RE) TSSC_3;
+  VARIABLE (RE) DUM_J;
   IF TY > 0;
     WRITE 6 ' *** ERROR in TR (v2 M12.4): TY > 0 (fixed-point symp) not yet ported';
     WRITE 6 '     Reason: needs CGF (~75-line nested-helper port). Deferred to M12.5.';
@@ -225,10 +235,12 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
     WRITE 6 ' *** ERROR in TR (v2 M12.0): NF=1 (normal-form transform) not yet ported';
     QUIT 0;
   ENDIF;
-  IF (IID1 < 0) OR (IID2 < 0);
-    WRITE 6 ' *** ERROR in TR (v2 M12.0): spin tracking not yet ported';
-    QUIT 0;
-  ENDIF;
+  { Spin tracking is enabled when IID1 or IID2 < 0 (the negative index
+    selects a spin component for plotting; libcosy v1 dropped graphics
+    so the plot-axis selection is moot, but the spin tracking itself
+    still runs to keep TSPI consistent with the orbit). Validate that
+    NSPN matches NRAY (one SSR per SR) and that NF ≠ 1 (normal-form
+    spin tracking is unsupported).                                       }
   IF NCT > 0;
     WRITE 6 ' *** ERROR in TR (v2 M12.1): NCT (multi-AP) cuts not yet ported';
     WRITE 6 '     NCT > 0 needs PREAP/APCOPY infrastructure deferred to M12.2';
@@ -242,10 +254,29 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   ESC := 0;
   ENC := 0;
   LWNTR := 0;
+  IS_FLAG := 0;
   { Copy MAP into TMAP for tracking. }
   LOOP I 1 TWOND;
     TMAP[I] := MAP[I];
   ENDLOOP;
+  { Spin tracking setup: when IID1 < 0 or IID2 < 0, validate spin
+    state and snapshot SPI/SPNR into local TSPI_LOCAL/TMAP_SPIN. The
+    TMAP_SPIN holds the 3x3 spin rotation matrix (flattened) lifted
+    to DA — POLVAL evaluates it at each ray's coords per iteration,
+    giving the rotation matrix at that orbit point.                  }
+  IF (IID1 < 0) OR (IID2 < 0);
+    IF NSPN # NRAY;
+      WRITE 6 ' *** ERROR in TR, the number of SSRs disagrees with SRs.';
+      QUIT 0;
+    ENDIF;
+    IS_FLAG := 1;
+    LOOP I 1 3;
+      TSPI_LOCAL[I] := SPI[I];
+      LOOP K 1 3;
+        TMAP_SPIN[3*(I-1)+K] := SPNR[I, K] + 0*DD[1];
+      ENDLOOP;
+    ENDLOOP;
+  ENDIF;
   { Newton symplectification setup: compute the generating function F
     and its Hessian decomposition (G, H) once before the iteration
     starts. Per-iteration we'll call SYMP with these to refine each
@@ -276,6 +307,12 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   LOOP IT 1 N;
     LTRI := LTRI + 1;
     ABS_TY := ABS(TY);
+    { Reset ENC at the start of each iteration — cosy.fox's
+      `ENC := ABS(DUM-1)` overwrites each iteration too, so the final
+      ENC reflects only the LAST iteration's spin-norm error sum.    }
+    IF IS_FLAG = 1;
+      ENC := 0;
+    ENDIF;
     LOOP J 2 NRAY;
       { Build (DA TWOND) ARG_DA from ray J's coords in PART.
         Chained PART[I][J] reads the J-th element of the I-th VE — the
@@ -295,6 +332,32 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
         PART[I] := PART_I_TMP;
         ESC := ESC + ABS(CONS(RES_DA[I]) - PRE_X);
       ENDLOOP;
+      { Spin-tracking step (IS_FLAG = 1): evaluate the 3x3 spin-rotation
+        matrix at this ray's pushed coords, apply to TSPI_LOCAL[I][J],
+        normalize, accumulate ENC.                                       }
+      IF IS_FLAG = 1;
+        POLVAL 1 TMAP_SPIN 9 ARG_DA TWOND RES_SPIN 9;
+        TSSC_1 := CONS(RES_SPIN[1])*TSPI_LOCAL[1][J]
+                + CONS(RES_SPIN[2])*TSPI_LOCAL[2][J]
+                + CONS(RES_SPIN[3])*TSPI_LOCAL[3][J];
+        TSSC_2 := CONS(RES_SPIN[4])*TSPI_LOCAL[1][J]
+                + CONS(RES_SPIN[5])*TSPI_LOCAL[2][J]
+                + CONS(RES_SPIN[6])*TSPI_LOCAL[3][J];
+        TSSC_3 := CONS(RES_SPIN[7])*TSPI_LOCAL[1][J]
+                + CONS(RES_SPIN[8])*TSPI_LOCAL[2][J]
+                + CONS(RES_SPIN[9])*TSPI_LOCAL[3][J];
+        DUM_J := SQRT(SQR(TSSC_1) + SQR(TSSC_2) + SQR(TSSC_3));
+        ENC := ENC + ABS(DUM_J - 1);
+        PART_I_TMP := TSPI_LOCAL[1];
+        VELSET PART_I_TMP J TSSC_1/DUM_J;
+        TSPI_LOCAL[1] := PART_I_TMP;
+        PART_I_TMP := TSPI_LOCAL[2];
+        VELSET PART_I_TMP J TSSC_2/DUM_J;
+        TSPI_LOCAL[2] := PART_I_TMP;
+        PART_I_TMP := TSPI_LOCAL[3];
+        VELSET PART_I_TMP J TSSC_3/DUM_J;
+        TSPI_LOCAL[3] := PART_I_TMP;
+      ENDIF;
       { Newton symplectification step (TY < -1): refines the just-
         pushed coords using the precomputed G/H Hessian decomposition.
         SYMP iterates until the implicit GF equations are satisfied to
@@ -328,11 +391,17 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   IF (NRAY > 1) AND (N > 0) AND (TWOND > 0);
     ESC := ESC/N/(NRAY-1)/TWOND;
   ENDIF;
-  { Bake final state into RAY only when LTRR is set. }
+  { Bake final state into RAY (and SPI for spin tracking) only when
+    LTRR is set. }
   IF LTRR > 0;
     LOOP I 1 TWOND;
       RAY[I] := PART[I];
     ENDLOOP;
+    IF IS_FLAG = 1;
+      LOOP I 1 3;
+        SPI[I] := TSPI_LOCAL[I];
+      ENDLOOP;
+    ENDIF;
   ENDIF;
   ENDIF;
 ENDPROCEDURE;

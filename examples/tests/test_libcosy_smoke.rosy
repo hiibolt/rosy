@@ -925,6 +925,34 @@ VARIABLE (RE) TR_ESC;
 TRSC TR_ESC;
 WRITE 6 TR_ESC '   [expect 0 — momentum is zero, no x-shift]';
 
+{ ----- v2 M12.3: TR with spin tracking (IID1 = -1) -----
+  After UM + drift + SR + SSR, run TR with IID1 = -1 to enable spin
+  tracking. SPNR is identity (no spin elements were activated), so the
+  spin rotation is identity each iteration: TSPI stays at (0, 0, 1)
+  for the SSR-added ray, and ENC stays at 0 (perfect normalization). }
+WRITE 6 ' ----- v2 M12.3: TR with spin tracking (IID1 = -1) -----';
+LCUT := 0;
+NCT := 0;
+FR 0;
+OV 2 2 0;
+RPP 100;
+LSPN := 1;       { activate spin tracking so UM initializes SPNR to identity }
+UM;
+CR;
+SR 0.0001 0 0.0001 0 0 0 0 0 1;
+SSR 0 0 1;
+WRITE 6 'After SSR, NSPN = ' NSPN '   [expect 2 — matches NRAY]';
+TRR 1;
+DL 0.5;
+VARIABLE (RE) NEG_ONE_TR;
+NEG_ONE_TR := -1;
+TR 1 0 NEG_ONE_TR 2 1 1 0 0 6;
+WRITE 6 'After TR with spin (TY=0, identity spin map), TRNC ENC =';
+VARIABLE (RE) SPIN_ENC;
+TRNC SPIN_ENC;
+WRITE 6 SPIN_ENC '   [expect 0 — identity spin rotation preserves |spin|=1]';
+LSPN := 0;       { reset for downstream tests that don't expect spin tracking }
+
 { ----- v2 M12.4: TR with Newton symplectification (TY=-2) -----
   Builds a sextupole map (MH 0.3 0.5 0.05) and tracks 1 ray with
   TY=-2 (Newton order 2). The MGF + SYMP0 setup runs once before
