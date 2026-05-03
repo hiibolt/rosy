@@ -490,7 +490,7 @@ impl TypeResolver {
     /// Build a detailed error message for unresolved type slots.
     fn build_resolution_error(&self, unresolved: &[&GraphNode]) -> Result<Vec<RosyError>> {
         // Partition into cycle nodes (have unresolved deps) vs no-info nodes
-        let cycle_slots: Vec<&TypeSlot> = unresolved
+        let mut cycle_slots: Vec<&TypeSlot> = unresolved
             .iter()
             .filter(|n| {
                 n.depends_on
@@ -509,17 +509,23 @@ impl TypeResolver {
             })
             .map(|n| &n.slot)
             .collect();
-        // Sort by source location so errors appear in source order
-        no_info_slots.sort_by(|a, b| {
-            let loc_a = self.nodes.get(a).and_then(|n| n.declared_at.as_ref());
-            let loc_b = self.nodes.get(b).and_then(|n| n.declared_at.as_ref());
-            match (loc_a, loc_b) {
-                (Some(a), Some(b)) => a.line.cmp(&b.line).then(a.col.cmp(&b.col)),
-                (Some(_), None) => std::cmp::Ordering::Less,
-                (None, Some(_)) => std::cmp::Ordering::Greater,
-                (None, None) => std::cmp::Ordering::Equal,
-            }
-        });
+
+        // Source-order sorter: prefer `declared_at`, fall back to `assigned_at`
+        // (variables introduced by `:=` only carry `assigned_at`). Slots with no
+        // location go last, in slot-name order so output stays deterministic.
+        let order_key = |slot: &&TypeSlot| -> Option<(usize, usize)> {
+            let node = self.nodes.get(*slot)?;
+            let loc = node.declared_at.as_ref().or(node.assigned_at.as_ref())?;
+            Some((loc.line, loc.col))
+        };
+        let by_source = |a: &&TypeSlot, b: &&TypeSlot| match (order_key(a), order_key(b)) {
+            (Some(a), Some(b)) => a.cmp(&b),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => format!("{}", a).cmp(&format!("{}", b)),
+        };
+        cycle_slots.sort_by(by_source);
+        no_info_slots.sort_by(by_source);
 
         let total = unresolved.len();
         let mut msg = format!(

@@ -179,10 +179,10 @@ Root cause: in the topological resolver loop (`resolve.rs:topological_resolve`),
 
 ## ~~Issue 3: Case sensitivity~~ (Intentional — not a bug)
 
-## Issue 4: Error messages not sorted by source order
-**Severity: Low — open**
+## ~~Issue 4: Error messages not sorted by source order~~ (Fixed in v0.42.15)
+**Severity: Low**
 
-The resolver uses topological sort (Kahn's algorithm), so errors surface in dependency-graph order, not source order. Sorting errors by source location before display would improve readability. Partial fix landed (`resolve.rs:512` sorts no-info slots by `declared_at`), but cycle slots are still emitted in graph-traversal order. Cosmetic only.
+`build_resolution_error` in `rosy/src/resolve.rs` now sorts both `cycle_slots` and `no_info_slots` by source location (`declared_at`, falling back to `assigned_at`, then slot-name for slots with no location). The shared `by_source` comparator + `order_key` extractor mean both partitions emit deterministically in the same line/column order. Verified by `examples/tests/test_issue4_error_order.rosy` (cycle case) — variable `A` (line 8) is now reliably reported before variable `B` (line 11) instead of in HashMap-traversal order.
 
 ## ~~Issue 5: Inference chain through untyped variables can fail~~ (Fixed)
 **Severity: Medium**
