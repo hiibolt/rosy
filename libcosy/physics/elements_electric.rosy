@@ -100,8 +100,8 @@ ENDPROCEDURE;
 { ----- M6.4: SIELE-driven electric multipoles (cosy.fox L3724-3759) -----
   Parallel to the magnetic multipoles but with negative MPOL (identifying
   them as electric in POTFLD's POTS path) and PPOL holding voltages
-  (kV) rather than fields (T). All delegate to FFELE which uses LFR=0
-  for libcosy v1 (no fringe field).
+  (kV) rather than fields (T). All delegate to FFELE which dispatches
+  on LFR (0 / 1 / -1 / -2 / -10 supported per M19).
 
   EQ = electric quadrupole, EH = electric sextupole (hexapole),
   EO = electric octupole, ED = electric decapole, EZ = electric

@@ -1818,7 +1818,7 @@ PROCEDURE FFELE L (RE) D_AP (RE) H_LOCAL (RE) LF1 (RE) LF2 (RE) CI (ST);
     LOCSET 0 0 0 0 0 0;
     UPDATE 1 1;
   ELSE;
-    WRITE 6 ' *** ERROR in FFELE, LFR mode not supported (libcosy v1: 0, 1, 3, -1, -2, -10)';
+    WRITE 6 ' *** ERROR in FFELE, LFR mode not supported (libcosy supports 0, 1, -1, -2, -10)';
     QUIT 0;
   ENDIF;
 ENDPROCEDURE;

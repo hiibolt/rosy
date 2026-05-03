@@ -191,8 +191,9 @@ ENDPROCEDURE;
 
 { ----- M6.3: SIELE-driven multipole magnets (cosy.fox L3178-3206) -----
   These all set up PPOL/MPOL/NPOL with the multipole content, then call
-  FFELE which (for libcosy v1) only supports LFR=0 — no fringe field,
-  pure analytical kick of length L applied via SIELE.
+  FFELE which dispatches on the current LFR setting (0, 1, -1, -2, -10
+  per M19). LFR=0 is the SIELE-only no-fringe path; the rest add
+  fringe-field handling via SDELE.
 
   MO = octupole (4-pole), MD = decapole (5-pole), MZ = dodecapole (6-pole),
   M5 = combined quad+sext+oct+dec+dodec, MM = arbitrary normal multipole
