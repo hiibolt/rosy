@@ -1,10 +1,8 @@
 { ============================================================================
   libcosy/helpers/io.rosy — File I/O utilities
 
-  Ported from cosy.fox L4636-4641 (and partial others).
-
-  M2 ships only COPYF. FILE2VE and RFILT depend on WORDS (deferred —
-  see helpers/strings.rosy), so they will land alongside that fix.
+  Ported from cosy.fox L4636-4641 (COPYF), L3656-3662 (MFFLDIN), and
+  L3642-3654 (MFFLD), plus L4558-4574 (FILE2VE) and L4576-4592 (RFILT).
   ============================================================================ }
 
 BEGIN;
@@ -82,6 +80,97 @@ PROCEDURE MFFLD XMIN (RE) ZMIN (RE) XMAX (RE) ZMAX (RE)
   MFP[6] := ZMIN;
   MFP[7] := ZMAX;
   MFP[8] := DZ_GRID;
+ENDPROCEDURE;
+
+{ ----- FILE2VE: extract numeric columns from a text file (cosy.fox L4558-4574)
+  Reads FN line-by-line, skipping `#`-comment and blank lines. For each
+  data line, calls WORDS to tokenize on whitespace, then pulls the
+  RE values at the column positions listed in COLS into the output
+  vectors VEC[1..NC].
+
+  Renames vs cosy.fox:
+   * Parameter `C` → `COLS` (cosy.fox `C` collides with libcosy's
+     Butcher-tableau global C declared in globals.rosy:155).
+
+  Output shape: VEC is (VE 64) — outer 64-cap row of inner VEs, one
+  inner-VE per requested column. Each call to FILE2VE seeds VEC[I]
+  with the first row's value (single-element VE) then appends one
+  RE per subsequent row via VEC[I] := VEC[I] & TMP.                       }
+PROCEDURE FILE2VE FN (ST) NC (RE) COLS (RE 64) VEC (VE 64);
+  VARIABLE (ST) LIN;
+  VARIABLE (VE 64) WORD;
+  VARIABLE (RE) NW;
+  VARIABLE (RE) N;
+  VARIABLE (RE) I;
+  VARIABLE (RE) TMP;
+  OPENF 77 FN 'OLD';
+  LIN := 'start';
+  N := 0;
+  WHILE LIN # '';
+    READS 77 LIN;
+    IF LIN # '';
+      IF ((LIN|1) # '#') AND (LIN # ' ');
+        WORDS LIN NW WORD ' ';
+        IF NW > 0;
+          IF N = 0;
+            N := MIN(NC, NW);
+            LOOP I 1 N;
+              STCRE (LIN | WORD[COLS[I]]) TMP;
+              VEC[I] := VE(TMP);
+            ENDLOOP;
+          ELSE;
+            LOOP I 1 N;
+              STCRE (LIN | WORD[COLS[I]]) TMP;
+              VEC[I] := VEC[I] & TMP;
+            ENDLOOP;
+          ENDIF;
+        ENDIF;
+      ENDIF;
+    ENDIF;
+  ENDWHILE;
+  CLOSEF 77;
+ENDPROCEDURE;
+
+{ ----- RFILT: copy file FN → FNF keeping only rows inside r ≤ RMAX
+  (cosy.fox L4576-4592). Columns 1 and 2 are taken as x and y; rows
+  with √(x² + y²) ≤ RMAX are emitted. Comment lines (`#`) are passed
+  through verbatim; blank lines and out-of-bounds rows are dropped.
+
+  The √-comparison uses RMAX² with a 1e-8 widening so values exactly
+  on the boundary aren't rejected by floating-point round-off — same
+  trick as cosy.fox.                                                       }
+PROCEDURE RFILT RMAX (RE) FN (ST) FNF (ST);
+  VARIABLE (ST) LIN;
+  VARIABLE (VE 64) WORD;
+  VARIABLE (RE) NW;
+  VARIABLE (RE) X;
+  VARIABLE (RE) Y;
+  VARIABLE (RE) RMAX2;
+  OPENF 77 FN 'OLD';
+  OPENF 78 FNF 'UNKNOWN';
+  WRITE 78 '# The original file: ' & FN;
+  WRITE 78 '# Filter to stay inside the radius RMAX = ' & S(RMAX);
+  RMAX2 := SQR(RMAX*(1 + 1E-8));
+  LIN := 'start';
+  WHILE LIN # '';
+    READS 77 LIN;
+    IF LIN # '';
+      IF (LIN|1) = '#';
+        WRITE 78 LIN;
+      ELSEIF LIN # ' ';
+        WORDS LIN NW WORD ' ';
+        IF NW > 0;
+          STCRE (LIN | WORD[1]) X;
+          STCRE (LIN | WORD[2]) Y;
+          IF (SQR(X) + SQR(Y)) < RMAX2;
+            WRITE 78 LIN;
+          ENDIF;
+        ENDIF;
+      ENDIF;
+    ENDIF;
+  ENDWHILE;
+  CLOSEF 77;
+  CLOSEF 78;
 ENDPROCEDURE;
 
 PROCEDURE MFFLDIN A_OUT (RE 700 30) NX (RE) NZ (RE) DX (RE) DZ (RE);

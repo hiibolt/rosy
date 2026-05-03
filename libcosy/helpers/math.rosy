@@ -95,11 +95,46 @@ FUNCTION (RE) NMON NO_ (RE) NV_ (RE);
 ENDFUNCTION;
 
 { ----- 1D Fourier transform (cosy.fox L196-211) ---------------------------
-  DEFERRED: FOURIERTRANS uses ambiguous VE/RE element typing on its scratch
-  variables (RS, RC) and output arrays (FTA, FTP). cosy.fox declares them as
-  `VARIABLE RS LENGTH(D(1))`, which depends on whether D is 1D-of-RE or
-  2D-with-vector-rows. ROSY requires that type be known up front. Will port
-  in a later milestone alongside the procedures that actually call it.    }
+  Discrete Fourier transform of L evenly-spaced samples on [0, 2π) given
+  in D, returning FTO+1 (amplitude, phase) pairs in FTA / FTP. Each
+  Fourier order k recovers the original signal as
+        D(j) ≈ Σ_k FTA(k) * sin((k-1)*φ_j + FTP(k)).
+
+  cosy.fox's loose declaration `VARIABLE RS LENGTH(D(1))` was intended
+  to make RS / RC polymorphic over D's element type (RE for raw data,
+  DA for symbolic-energy fits). ROSY requires per-call concrete typing,
+  so this port pins to RE — the dominant use case (raw oscilloscope
+  / detector data). A DA variant can land later as FOURIERTRANS_DA
+  when a caller needs symbolic propagation.
+
+  Sizing: D / FTA / FTP capped at 4096 entries. The RE-1D shape gives
+  efficient indexed writes via the post-Issue-6 WithDimensions wrap.    }
+PROCEDURE FOURIERTRANS D (RE 4096) L (RE) FTO (RE) FTA (RE 4096) FTP (RE 4096);
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) DEL;
+  VARIABLE (RE) RS;
+  VARIABLE (RE) RC;
+  RS := 0;
+  LOOP J 1 L;
+    RS := RS + D[J];
+  ENDLOOP;
+  FTA[1] := RS/L;
+  FTP[1] := 0*RS + PI/2;
+  LOOP I 1 FTO;
+    DEL := I*2*PI/L;
+    RS := (D[1] - D[L])*COS(-0.5*DEL);
+    RC := (D[L] - D[1])*SIN(-0.5*DEL);
+    LOOP J 1 L-1;
+      RS := RS + (D[J+1] - D[J])*COS((J - 0.5)*DEL);
+      RC := RC + (D[J] - D[J+1])*SIN((J - 0.5)*DEL);
+    ENDLOOP;
+    RS := RS/(PI*I);
+    RC := RC/(PI*I);
+    FTA[I+1] := SQRT(SQR(RS) + SQR(RC));
+    FTP[I+1] := ATAN2(RC, RS);
+  ENDLOOP;
+ENDPROCEDURE;
 
 { ----- Constant setters (cosy.fox L292-294) ------------------------------- }
 

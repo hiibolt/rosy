@@ -109,11 +109,91 @@ PROCEDURE TRCAP A (ST);
 ENDPROCEDURE;
 
 { ----- Tokenize string by separator (cosy.fox L157-165) -------------------
-  DEFERRED: WORDS / FIELDS build per-token (start, end) position pairs by
-  initially storing a scalar then concatenating a second scalar into the
-  same slot. ROSY's type elision sees this as a RE-1D -> VE-1D conflict.
-  Will revisit when (a) the FEEDBACK Issue 6 fix lets indexed arrays carry
-  composite element types, or (b) we rewrite to use a 2D array with two
-  fixed columns up front.                                                  }
+  WORDS scans A and writes (start, end) character-position pairs of each
+  non-empty token into the output table WORD. cosy.fox stores each pair
+  as a 2-element VE inside a vec-of-vecs `WORD 2 N`; the ROSY port lifts
+  that into `(VE N)` so callers can do `A | WORD[K]` directly via the
+  ST × VE → ST extract rule (rosy_lib/operators/extract.rs:36).
+
+  Construction pattern:
+   * On token start (J=0 → 1), write WORD[N] := VE(I) — single-element
+     VE holding the start index.
+   * On separator after token (J=1 → 0), append the prior char's index
+     as the end: WORD[N] := WORD[N] & (I-1).
+   * Tail clause at line 164 closes the last token if string ended
+     mid-word (no trailing separator).                                    }
+PROCEDURE WORDS A (ST) N (RE) WORD (VE 64) SEP (ST);
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) L;
+  L := ILAST(A, 1, LENGTH(A));
+  N := 0;
+  J := 0;
+  I := 0;
+  WHILE I < L;
+    I := I + 1;
+    IF (J = 0) AND ((A|I) # SEP);
+      J := 1;
+      N := N + 1;
+      WORD[N] := VE(I);
+    ELSEIF (J = 1) AND ((A|I) = SEP);
+      J := 0;
+      WORD[N] := WORD[N] & (I - 1);
+    ENDIF;
+  ENDWHILE;
+  IF J = 0;
+    N := N + 1;
+    WORD[N] := VE(I);
+  ENDIF;
+  WORD[N] := WORD[N] & I;
+ENDPROCEDURE;
+
+{ ----- Field tokenize by separator (cosy.fox L166-174) --------------------
+  Same shape as WORDS but emits *every* field — including empty ones
+  between adjacent separators — using `0&0` as the empty-field sentinel
+  (start=0, end=0). Useful for CSV-like comma-delimited files where
+  trailing commas should produce empty trailing fields.
+
+  Edge cases preserved from cosy.fox:
+   * Run starts with J=1 (not 0 like WORDS) so the first character can
+     immediately close an empty leading field.
+   * Tail handling: if I > J at end-of-string, last region is non-empty
+     [J, I]; else emit [0, 0] as the trailing empty field.
+
+  Faithful-port quirk: cosy.fox's tail uses strict `I > J` rather than
+  `I >= J`, so a trailing *single* character after a separator (e.g.
+  'a,b,c' final 'c') is reported as the empty sentinel [0, 0] instead
+  of [6, 6]. Any single-character no-separator input (e.g. 'a') hits
+  the same path. We replicate this behavior because FGDATIN — the
+  primary FIELDS caller in cosy.fox L3664 — assumes it. Flag for
+  callers: pad inputs with a trailing separator to guarantee proper
+  boundary handling.                                                       }
+PROCEDURE FIELDS A (ST) N (RE) FIELD (VE 64) SEP (ST);
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) L;
+  L := LENGTH(A);
+  N := 0;
+  J := 1;
+  I := 0;
+  WHILE I < L;
+    I := I + 1;
+    IF (A|I) = SEP;
+      N := N + 1;
+      IF I > J;
+        FIELD[N] := J & (I - 1);
+      ELSE;
+        FIELD[N] := 0 & 0;
+      ENDIF;
+      J := I + 1;
+    ENDIF;
+  ENDWHILE;
+  N := N + 1;
+  IF I > J;
+    FIELD[N] := J & I;
+  ELSE;
+    FIELD[N] := 0 & 0;
+  ENDIF;
+ENDPROCEDURE;
 
 END;

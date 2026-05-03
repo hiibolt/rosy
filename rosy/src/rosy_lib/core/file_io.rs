@@ -260,27 +260,60 @@ pub fn rosy_write_to_unit(unit: u64, content: &str) -> Result<()> {
 }
 
 /// Read a line from a file unit (ASCII READ from file).
-/// Returns the trimmed line as a string.
+/// Returns the trimmed line as a string. Bails on EOF — used by READ
+/// (numerical / DA reads) and DAREA / DAPRV header parsing where missing
+/// data is genuinely an error.
 pub fn rosy_read_from_unit(unit: u64) -> Result<String> {
     ensure_registry();
-    
+
     let mut reg = FILE_REGISTRY.lock().unwrap();
     let registry = reg.as_mut().unwrap();
 
     let handle = registry.get_mut(&unit)
         .with_context(|| format!("No file open on unit {}. Use OPENF to open a file first.", unit))?;
-    
+
     let reader = handle.reader.as_mut()
         .with_context(|| format!("File on unit {} is not open for reading (opened as 'unknown'?)", unit))?;
-    
+
     let mut line = String::new();
     let bytes_read = reader.read_line(&mut line)
         .with_context(|| format!("Failed to read from file on unit {}", unit))?;
-    
+
     if bytes_read == 0 {
         bail!("End of file reached on unit {}", unit);
     }
-    
+
+    Ok(line.trim_end_matches('\n').trim_end_matches('\r').to_string())
+}
+
+/// READS variant: returns empty string on EOF instead of bailing.
+///
+/// This matches cosy.fox semantics where the canonical line-by-line read
+/// pattern is `WHILE LIN # ''; READS 77 LIN; ...; ENDWHILE;` — the loop
+/// guard relies on READS yielding an empty string at EOF so the WHILE
+/// terminates gracefully. The strict `rosy_read_from_unit` above bails on
+/// EOF, breaking that idiom; libcosy's COPYF / FILE2VE / RFILT / FGDATIN
+/// all assume the empty-on-EOF semantic.
+pub fn rosy_reads_string_from_unit(unit: u64) -> Result<String> {
+    ensure_registry();
+
+    let mut reg = FILE_REGISTRY.lock().unwrap();
+    let registry = reg.as_mut().unwrap();
+
+    let handle = registry.get_mut(&unit)
+        .with_context(|| format!("No file open on unit {}. Use OPENF to open a file first.", unit))?;
+
+    let reader = handle.reader.as_mut()
+        .with_context(|| format!("File on unit {} is not open for reading (opened as 'unknown'?)", unit))?;
+
+    let mut line = String::new();
+    let bytes_read = reader.read_line(&mut line)
+        .with_context(|| format!("Failed to read from file on unit {}", unit))?;
+
+    if bytes_read == 0 {
+        return Ok(String::new());
+    }
+
     Ok(line.trim_end_matches('\n').trim_end_matches('\r').to_string())
 }
 

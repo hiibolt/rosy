@@ -177,7 +177,7 @@ impl Transpile for ReadsStatement {
                     std::io::stdin().read_line(&mut __line).map_err(|e| anyhow::anyhow!(\"READS stdin error: {{}}\", e))?;\n\
                     __line.trim_end_matches('\\n').trim_end_matches('\\r').to_string()\n\
                 }} else {{\n\
-                    rosy_lib::core::file_io::rosy_read_from_unit(__unit)?\n\
+                    rosy_lib::core::file_io::rosy_reads_string_from_unit(__unit)?\n\
                 }}\n\
             }};",
             deref = dereference,
