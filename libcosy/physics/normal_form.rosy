@@ -540,8 +540,20 @@ PROCEDURE MGF MM (DA 8) F (DA) IT (RE) IE (RE);
     CO NOC-1;
   ENDPROCEDURE;
 
+  { IT=-2 → BESTGF (try all 4, pick lowest residual)
+    IT=-1 → loop 1..4 and stop at first success (cosy.fox L1437-1438)
+    IT 1..4 → use that GF type directly                                    }
   IF IT = -2;
     BESTGF IE;
+  ELSEIF IT = -1;
+    VARIABLE (RE) IT_TRY;
+    LOOP IT_TRY 1 4;
+      IT := IT_TRY;
+      MGFF IE;
+      IF IE = 0;
+        BREAK;
+      ENDIF;
+    ENDLOOP;
   ELSE;
     MGFF IE;
   ENDIF;
@@ -693,6 +705,178 @@ PROCEDURE SYMP AM (DA 8) AN (DA 8) G (DA 8) H (DA 3 3) TY (RE) IE (RE);
       AN[I]  :=  GA[FF]    + 0*DD[1]; AN[FF] :=  A_VEC[FF] + 0*DD[1];
     ENDIF;
   ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- CGF: compute generating function for fixed-point symp (cosy.fox L1891-1949)
+  Used by TR's TY > 0 (fixed-point) symplectification path. Given a map
+  MAP_IN of type TY (1=φ(q,Q), 2=φ(q,P), 3=φ(p,Q), 4=φ(p,P) — Goldstein-style),
+  produces:
+    CL — the canonical-coordinate part of the GF expansion
+    F  — the scalar generating function
+    NG — its J·∇F gradient (∇F with the J symplectic-form swap applied)
+
+  Three nested helpers mirror cosy.fox's structure:
+    SETTYPE — outer shell, sets up CL/DL_LOC/AL/BL via SETS
+    SETS    — assembles the linear-correction matrix SS, then folds it
+              into SSL (symplectic-form-linearised approximation)
+    CONVS   — heart of the conversion: builds CL/DL_LOC for the chosen TY,
+              POLVAL-composes with ML/MLI, derives SS as -DER J of -SC2
+
+  Local DL_LOC is renamed from cosy.fox's `DL` to avoid shadowing libcosy's
+  drift-procedure DL. Otherwise the structure ports 1:1.                   }
+PROCEDURE CGF TY (RE) MAP_IN (DA 8) CL (DA 8) F (DA) NG (DA 8);
+  VARIABLE (DA 8) SC1;
+  VARIABLE (DA 8) SC2;
+  VARIABLE (DA 8) SC3;
+  VARIABLE (DA 8) M;
+  VARIABLE (DA 8) ML;
+  VARIABLE (DA 8) MLI;
+  VARIABLE (DA 8) AL;
+  VARIABLE (DA 8) BL;
+  VARIABLE (DA 8) DL_LOC;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) IER;
+  VARIABLE (RE) NOM;
+  VARIABLE (DA) DUM;
+  PROCEDURE SETTYPE;
+    VARIABLE (DA 8) SSL;
+    VARIABLE (DA 8) J2N;
+    PROCEDURE SETS;
+      VARIABLE (RE 8 8) SS;
+      PROCEDURE CONVS;
+        LOOP I 1 ND;
+          CL[I] := 0*DA(1);
+          DL_LOC[ND+I] := CL[I];
+        ENDLOOP;
+        IF TY = 1;
+          LOOP I 1 ND;
+            CL[ND+I] := DA(I);
+            DL_LOC[I] := DA(I);
+          ENDLOOP;
+        ELSEIF TY = 2;
+          LOOP I 1 ND;
+            CL[ND+I] := DA(ND+I);
+            DL_LOC[I] := DA(I);
+          ENDLOOP;
+        ELSEIF TY = 3;
+          LOOP I 1 ND;
+            CL[ND+I] := DA(I);
+            DL_LOC[I] := DA(ND+I);
+          ENDLOOP;
+        ELSEIF TY = 4;
+          LOOP I 1 ND;
+            CL[ND+I] := DA(ND+I);
+            DL_LOC[I] := DA(ND+I);
+          ENDLOOP;
+        ENDIF;
+        POLVAL 2 CL TWOND ML TWOND SC1 TWOND;
+        LOOP I 1 TWOND;
+          SC1[I] := SC1[I] + DL_LOC[I];
+        ENDLOOP;
+        MI SC1 SC2 TWOND IER NOC NV NM1;
+        IF IER # 0;
+          WRITE 6 ' *** ERROR in CGF, no gen. fct.';
+          QUIT 0;
+        ENDIF;
+        POLVAL 2 CL TWOND ML TWOND SC1 TWOND;
+        LOOP I 1 TWOND;
+          SC1[I] := SC1[I] - DL_LOC[I];
+        ENDLOOP;
+        POLVAL 2 SC2 TWOND SC1 TWOND SC2 TWOND;
+        POLVAL 2 J2N TWOND SC2 TWOND SC2 TWOND;
+        LOOP I 1 TWOND;
+          SC2[I] := -SC2[I];
+        ENDLOOP;
+        LOOP I 1 TWOND;
+          LOOP J 1 TWOND;
+            SS[I, J] := CONS(DER(J, SC2[I]));
+          ENDLOOP;
+        ENDLOOP;
+      ENDPROCEDURE;
+      IF TY = 0;
+        LOOP I 1 TWOND;
+          LOOP J 1 TWOND;
+            SS[I, J] := 0;
+          ENDLOOP;
+        ENDLOOP;
+      ELSEIF (TY > 0) AND (TY < 5);
+        CONVS;
+      ELSE;
+        WRITE 6 ' *** ERROR in CGF, invalid typ';
+        QUIT 0;
+      ENDIF;
+      LOOP I 1 TWOND;
+        LOOP J 1 TWOND;
+          SSL[I] := SSL[I] + DA(J)*SS[I, J];
+        ENDLOOP;
+      ENDLOOP;
+    ENDPROCEDURE;
+    LOOP I 1 ND;
+      J2N[I] := DA(ND+I);
+      J2N[ND+I] := -DA(I);
+    ENDLOOP;
+    SETS;
+    LOOP I 1 TWOND;
+      AL[I] := -J2N[I];
+      BL[I] := J2N[I];
+    ENDLOOP;
+    POLVAL 2 J2N TWOND SSL TWOND SC1 TWOND;
+    LOOP I 1 TWOND;
+      CL[I] := (DA(I) + SC1[I])/2;
+      DL_LOC[I] := (DA(I) - SC1[I])/2;
+    ENDLOOP;
+    POLVAL 2 AL TWOND MLI TWOND AL TWOND;
+    POLVAL 2 CL TWOND MLI TWOND CL TWOND;
+  ENDPROCEDURE;
+  { Main body: snapshot MAP_IN into M, transpose, invert linear part. }
+  LOOP I 1 TWOND;
+    M[I] := MAP_IN[I];
+  ENDLOOP;
+  RCT M;
+  NOM := NOC;
+  CO 1;
+  LOOP I 1 TWOND;
+    ML[I] := M[I];
+  ENDLOOP;
+  MI ML MLI TWOND IER NOC NV NM1;
+  CO NOM;
+  IF IER # 0;
+    WRITE 6 ' *** ERROR in CGF, no inverse';
+    QUIT 0;
+  ENDIF;
+  SETTYPE;
+  POLVAL 2 AL TWOND M TWOND SC1 TWOND;
+  LOOP I 1 TWOND;
+    SC1[I] := SC1[I] + BL[I];
+  ENDLOOP;
+  POLVAL 2 CL TWOND M TWOND SC2 TWOND;
+  LOOP I 1 TWOND;
+    SC2[I] := SC2[I] + DL_LOC[I];
+  ENDLOOP;
+  MI SC2 SC3 TWOND IER NOC NV NM1;
+  IF IER # 0;
+    WRITE 6 ' *** ERROR in CGF, no gen. fct.';
+    QUIT 0;
+  ENDIF;
+  POLVAL 2 SC1 TWOND SC3 TWOND SC1 TWOND;
+  NOC := NOC + 1;
+  DANOT NOC;
+  POTI SC1 TWOND F;
+  LOOP I 1 TWOND;
+    NG[I] := DER(I, F);
+  ENDLOOP;
+  RETF F;
+  NOC := NOM;
+  DANOT NOC;
+  LOOP I 1 ND;
+    DUM := NG[I];
+    NG[I] := NG[ND+I];
+    NG[ND+I] := -DUM;
+  ENDLOOP;
+  POLVAL 2 ML TWOND NG TWOND NG TWOND;
+  RET CL;
+  RET NG;
 ENDPROCEDURE;
 
 { ----- SY: symplectify a map via MGF + GFM round-trip (cosy.fox L1443-1444) -

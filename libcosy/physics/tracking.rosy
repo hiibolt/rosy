@@ -207,6 +207,31 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   VARIABLE (DA 8) AN_NEWTON;
   VARIABLE (RE) IE_NEWTON;
   VARIABLE (RE) ABS_TY;
+  { TY = -12/-13 linear-only-removal work-arrays. TYS_LOC is the
+    "shifted TY" used for Newton's symp order: TY = -12 → -2,
+    TY = -13 → -3. AL_LIN holds the linear-coefficient matrix
+    that gets re-applied after Newton symp.                            }
+  VARIABLE (RE) TYS_LOC;
+  VARIABLE (RE 8 8) AL_LIN;
+  VARIABLE (DA 8) ML_TY;
+  VARIABLE (DA 8) MLI_TY;
+  VARIABLE (DA) F_TY;
+  VARIABLE (RE) ITY_TMP;
+  VARIABLE (RE) JTY_TMP;
+  VARIABLE (RE) AL_VAL;
+  { Fixed-point symp work-arrays (TY > 0 path) }
+  VARIABLE (DA 8) CL_FP;
+  VARIABLE (DA) F_FP;
+  VARIABLE (DA 8) NG_FP;
+  VARIABLE (DA 8) ML_FP;
+  VARIABLE (DA 8) AN_FP;
+  VARIABLE (DA 8) KK_DA;
+  VARIABLE (DA 8) M2_DA;
+  VARIABLE (DA 8) M1_DA;
+  VARIABLE (DA 8) TMP_DA;
+  VARIABLE (RE) DFCT_FP;
+  VARIABLE (RE) II_FP;
+  VARIABLE (RE) DERR;
   { Spin tracking work-arrays (IID1 < 0 or IID2 < 0 path) }
   VARIABLE (RE) IS_FLAG;
   VARIABLE (DA 9) TMAP_SPIN;
@@ -217,16 +242,6 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   VARIABLE (RE) TSSC_2;
   VARIABLE (RE) TSSC_3;
   VARIABLE (RE) DUM_J;
-  IF TY > 0;
-    WRITE 6 ' *** ERROR in TR (v2 M12.4): TY > 0 (fixed-point symp) not yet ported';
-    WRITE 6 '     Reason: needs CGF (~75-line nested-helper port). Deferred to M12.5.';
-    QUIT 0;
-  ENDIF;
-  IF (TY = -12) OR (TY = -13);
-    WRITE 6 ' *** ERROR in TR (v2 M12.4): TY = -12/-13 (linear-only) not yet ported';
-    WRITE 6 '     Reason: needs the MGF/GFM/MI/AL pre-pass. Deferred to M12.5.';
-    QUIT 0;
-  ENDIF;
   IF TY = -21;
     WRITE 6 ' *** ERROR in TR (v2 M12.4): TY = -21 not yet ported';
     QUIT 0;
@@ -255,10 +270,38 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   ENC := 0;
   LWNTR := 0;
   IS_FLAG := 0;
+  TYS_LOC := TY;
   { Copy MAP into TMAP for tracking. }
   LOOP I 1 TWOND;
     TMAP[I] := MAP[I];
   ENDLOOP;
+  { TY = -12/-13 pre-pass: extract the linear part of MAP, store its
+    matrix in AL_LIN, replace TMAP with the linear-removed version
+    (MLI ∘ MAP). Subsequent Newton symp runs at order ABS(TYS_LOC) =
+    2 or 3 — much faster than the 12 or 13 from raw TY. After Newton,
+    we re-apply AL_LIN to restore the linear coefficients.            }
+  IF (TY = -12) OR (TY = -13);
+    TYS_LOC := TY + 10;
+    NOC := 1;
+    DANOT NOC;
+    ITY_TMP := -1;
+    MGF MAP F_TY ITY_TMP JTY_TMP;
+    GFM ML_TY F_TY ITY_TMP;
+    MI ML_TY MLI_TY TWOND IE_NEWTON NOC NV NM1;
+    NOC := NOM;
+    DANOT NOC;
+    IF IE_NEWTON # 0;
+      WRITE 6 ' *** ERROR in TR, no inverse';
+      QUIT 0;
+    ENDIF;
+    LOOP I 1 TWOND;
+      TMAP[I] := 0*DD[1];
+      LOOP J 1 TWOND;
+        AL_LIN[I, J] := COEF(ML_TY[I], J);
+        TMAP[I] := TMAP[I] + COEF(MLI_TY[I], J)*MAP[J];
+      ENDLOOP;
+    ENDLOOP;
+  ENDIF;
   { Spin tracking setup: when IID1 < 0 or IID2 < 0, validate spin
     state and snapshot SPI/SPNR into local TSPI_LOCAL/TMAP_SPIN. The
     TMAP_SPIN holds the 3x3 spin rotation matrix (flattened) lifted
@@ -277,12 +320,32 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
       ENDLOOP;
     ENDLOOP;
   ENDIF;
+  { Fixed-point symplectification setup (TY > 0): build CL/F/NG via
+    CGF, snapshot the linear part of TMAP into ML_FP at order 1, and
+    pre-cache POLVAL trees for flags -3 and -4 (which the in-loop
+    iteration uses).                                                     }
+  IF TY > 0;
+    DERR := 1E5;
+    CGF TY TMAP CL_FP F_FP NG_FP;
+    NOC := 1;
+    DANOT NOC;
+    LOOP I 1 TWOND;
+      ML_FP[I] := TMAP[I];
+    ENDLOOP;
+    NOC := NOM;
+    DANOT NOC;
+    LOOP I 1 TWOND;
+      AN_FP[I] := 0*DD[1];
+    ENDLOOP;
+    POLVAL 103 CL_FP TWOND AN_FP TWOND AN_FP TWOND;
+    POLVAL 104 NG_FP TWOND AN_FP TWOND AN_FP TWOND;
+  ENDIF;
   { Newton symplectification setup: compute the generating function F
     and its Hessian decomposition (G, H) once before the iteration
     starts. Per-iteration we'll call SYMP with these to refine each
     ray's coordinates. Skipped for TY = 0 (no symp).                  }
   IF TY < -1;
-    ABS_TY := ABS(TY);
+    ABS_TY := ABS(TYS_LOC);
     MGF TMAP F_GF ABS_TY IE_NEWTON;
     IF IE_NEWTON # 0;
       WRITE 6 ' *** ERROR in TR, no generating function.';
@@ -306,7 +369,7 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   { Main tracking loop: per-iteration, per-ray POLVAL push through TMAP. }
   LOOP IT 1 N;
     LTRI := LTRI + 1;
-    ABS_TY := ABS(TY);
+    ABS_TY := ABS(TYS_LOC);
     { Reset ENC at the start of each iteration — cosy.fox's
       `ENC := ABS(DUM-1)` overwrites each iteration too, so the final
       ENC reflects only the LAST iteration's spin-norm error sum.    }
@@ -358,6 +421,40 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
         VELSET PART_I_TMP J TSSC_3/DUM_J;
         TSPI_LOCAL[3] := PART_I_TMP;
       ENDIF;
+      { Fixed-point symplectification (TY > 0): iterate
+          M2 := NG ∘ (CL ∘ M2 + ARG_DA)   { ARG_DA = old PARI }
+        until convergence, then PART := M2 + KK where KK = ML(ARG_DA).
+        cosy.fox-faithful — POLVAL flags -3 and -4 use the trees cached
+        during setup (103/104). DFCT < 100*DEPS triggers LWNTR bump. }
+      IF TY > 0;
+        POLVAL 2 ML_FP TWOND ARG_DA TWOND KK_DA TWOND;
+        LOOP I 1 TWOND;
+          M2_DA[I] := RES_DA[I] - KK_DA[I];
+        ENDLOOP;
+        II_FP := 0;
+        DFCT_FP := 1;
+        WHILE (DFCT_FP > 10*DEPS) AND (DFCT_FP < DERR) AND (II_FP < 101);
+          II_FP := II_FP + 1;
+          POLVAL -3 CL_FP TWOND M2_DA TWOND TMP_DA TWOND;
+          LOOP I 1 TWOND;
+            TMP_DA[I] := TMP_DA[I] + ARG_DA[I];
+          ENDLOOP;
+          POLVAL -4 NG_FP TWOND TMP_DA TWOND M1_DA TWOND;
+          DFCT_FP := 0;
+          LOOP I 1 TWOND;
+            DFCT_FP := MAX(DFCT_FP, ABS(CONS(M1_DA[I] - M2_DA[I])));
+            M2_DA[I] := M1_DA[I];
+          ENDLOOP;
+        ENDWHILE;
+        IF DFCT_FP > 100*DEPS;
+          LWNTR := LWNTR + 1;
+        ENDIF;
+        LOOP I 1 TWOND;
+          PART_I_TMP := PART[I];
+          VELSET PART_I_TMP J CONS(M2_DA[I]) + CONS(KK_DA[I]);
+          PART[I] := PART_I_TMP;
+        ENDLOOP;
+      ENDIF;
       { Newton symplectification step (TY < -1): refines the just-
         pushed coords using the precomputed G/H Hessian decomposition.
         SYMP iterates until the implicit GF equations are satisfied to
@@ -378,6 +475,21 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
         ELSE;
           LWNTR := LWNTR + 1;
         ENDIF;
+      ENDIF;
+      { TY = -12/-13 linear-restore: re-apply AL_LIN matrix to PART
+        (overwriting the orbit). cosy.fox L2169-2173 — multiply each
+        ray's just-symp'd coords by AL to put back the linear part
+        we stripped during the pre-pass.                              }
+      IF (TY = -12) OR (TY = -13);
+        LOOP I 1 TWOND;
+          AL_VAL := 0;
+          LOOP K 1 TWOND;
+            AL_VAL := AL_VAL + AL_LIN[I, K]*PART[K][J];
+          ENDLOOP;
+          PART_I_TMP := PART[I];
+          VELSET PART_I_TMP J AL_VAL;
+          PART[I] := PART_I_TMP;
+        ENDLOOP;
       ENDIF;
     ENDLOOP;
     { Per-iteration aperture cut. LCUT can be ±1 / ±2; ABS gives the
