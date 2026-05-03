@@ -274,41 +274,106 @@ PROCEDURE UPDATEMAP MAPT (DA 8) MAPO (DA 8) MAPU (DA 8)
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- UPDATE: standard step-update for ring tracking (cosy.fox L521+) ----
+{ ----- UPDATE: standard step-update for ring tracking (cosy.fox L521-619) -
   UPDATE(IM, IR): the per-element finalizer that composes MSC into MAP
-  (when IM=1), updates ray bundles (when IR=1 and NRAY≠0), refreshes the
-  envelope ERAY (when LENV=1), and emits any active graphics.
+  (when IM≠0), pushes ray bundles through MSC (when IR≠0 and NRAY≠0),
+  refreshes the envelope ERAY (when LENV=1), and advances the local-
+  frame transform onto the global one.
 
-  libcosy v1 ports only the IM=1 path: UPDATEMAP MSC MAP MAP — applying
-  the local element map onto the running active MAP. Ray application and
-  graphics are stubbed (NRAY=0 in default libcosy v1 setup, so the ray
-  branch is a no-op anyway).                                             }
+  M16 lifts the previously-deferred IR + LENV branches:
+
+  * IR + NRAY ≠ 0 path (cosy.fox L597-598):
+    Calls POLVAL 1 MSC TWOND RAY 8 RAY TWOND. Because libcosy stores
+    RAY as `(VE 8)` (each RAY[k] is a VE of all particles' k-th
+    coordinate), POLVAL routes via `rosy_polval_ve` (polval.rs:70)
+    and batch-evaluates MSC at all particles simultaneously. This
+    is the same dispatch path TR uses for tracking; UPDATE re-uses
+    it for the ring-step ray push.
+
+    SPNVEC (cosy.fox L525-538, spin-vector update gated by LSPN=1
+    and NSPN>0) remains deferred — it needs SSCR/SPI scoping that
+    interacts with the partial-index spin path in reference_particle.
+    Diagnostic warns when triggered.
+
+  * LENV=1 path (cosy.fox L539-548):
+    Calls the inlined NEWENV — propagates the 1σ phase-space envelope
+    ERAY[I, I+1] for each canonical pair (I = 1, 3 for ND=2) through
+    the linear part of MSC, using the cosy.fox closed-form combining
+    PHSP (axis variances) and PHSR (correlation factors). Matrix
+    elements ME(I, J) are extracted via `CONS(DER(J, MSC[I]))` — the
+    ROSY-canonical pattern documented at normal_form.rosy:1564 (cosy
+    fox's ME intrinsic isn't in ROSY because ROSY's TRANSPORT id
+    encoding is left-to-right, so DER+CONS is the equivalent).
+
+  Local-frame transform & SPOS advance (cosy.fox L600-615): NOT
+  ported in M16. Existing libcosy element procedures (DL, BEND, ...)
+  already advance SPOS themselves rather than routing through UPDATE,
+  so adding it here would double-count. A future refactor (M16.5)
+  could centralize SPOS/XLOC/PLOC/LTRA/GTRA into UPDATE the cosy.fox
+  way and strip the per-element advances; left out of M16 to keep
+  the change surgical.
+
+  Skipped (graphics-only, libcosy v1 plan): LPI ≠ 0 element-box draw,
+  LSYS / LCE flags, RSC / ERSC graphics-snapshot writes.              }
 PROCEDURE UPDATE IM (RE) IR (RE);
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+
   IF IM # 0;
     UPDATEMAP MSC MAP MAP SSCR SPNR SPNR;
   ENDIF;
-  { IR≠0 + NRAY≠0 → ray application via POLVAL: deferred (NRAY-aware).
-    LENV=1 → envelope NEWENV: deferred.
-    LSYS / LCE / LPI graphics: skipped permanently per libcosy v1 plan. }
+
+  { Ray bundle push through the local element map. }
+  IF (IR # 0) AND (NRAY # 0);
+    IF (LSPN = 1) AND (NSPN > 0);
+      WRITE 6 ' --- WARNING in UPDATE, SPNVEC spin-vector update is';
+      WRITE 6 '     deferred — ray spin not refreshed this step.';
+    ENDIF;
+    POLVAL 1 MSC TWOND RAY 8 RAY TWOND;
+  ENDIF;
+
+  { Envelope update — closed-form 1σ propagation through the linear
+    part of MSC (cosy.fox L539-548).                                   }
+  IF LENV = 1;
+    LOOP I 1 MIN(TWOND, 4) 2;
+      J := (I + 1)/2;
+      ERAY[I] := SQRT(SQR(PHSP[I]*CONS(DER(I, MSC[I])))
+                     + SQR(PHSP[I+1]*CONS(DER(I+1, MSC[I])))
+                     + 2*PHSP[I]*PHSP[I+1]*PHSR[J]
+                       *CONS(DER(I, MSC[I]))*CONS(DER(I+1, MSC[I])));
+      ERAY[I+1] := SQR(PHSP[I])*CONS(DER(I, MSC[I]))*CONS(DER(I, MSC[I+1]))
+                  + SQR(PHSP[I+1])*CONS(DER(I+1, MSC[I]))*CONS(DER(I+1, MSC[I+1]));
+      ERAY[I+1] := (PHSP[I]*PHSP[I+1]*PHSR[J]
+                    *(CONS(DER(I, MSC[I]))*CONS(DER(I+1, MSC[I+1]))
+                     + CONS(DER(I+1, MSC[I]))*CONS(DER(I, MSC[I+1])))
+                   + ERAY[I+1]) / ERAY[I];
+      EMAX[J] := MAX(EMAX[J], ERAY[I]);
+    ENDLOOP;
+  ENDIF;
 ENDPROCEDURE;
 
 { ----- Apply a map to the momentary MAP (cosy.fox L651-653) --------------
-  AM(M) composes M onto the active map: MAP := M ∘ MAP. The cosy.fox AM
-  also propagates the action to ray bundles via UPDATE; without UPDATE
-  ported, the ray-tracking branch is gated behind a clear error. For the
-  common NRAY=0 case (pure map composition, no rays), AM reduces to a
-  single ANM call that's mathematically identical to cosy.fox's behavior.
+  AM(M) composes M onto the active map and propagates the action to ray
+  bundles. cosy.fox semantics:
+        MSC := M (copy)
+        LOCSET 0 0 0 0 0 0          { zero local-frame transform }
+        UPDATE 1 1                  { apply MSC to MAP and rays }
 
-  AM is the procedural equivalent of ANM with the implicit "compose into
-  the live map" convention — every element procedure (DL / MQ / MH /
-  MQK / MSK / ...) ultimately writes into MAP via this kind of in-place
-  composition during cosy.fox's standard tracking workflow.            }
+  With UPDATE-with-rays now landed (M16), AM follows cosy.fox literally —
+  no NRAY=0 fast-path needed. The only behavioral difference from a bare
+  ANM is that AM also stamps zero local-frame deltas via LOCSET, so the
+  caller's coordinate-frame state stays consistent.                       }
 PROCEDURE AM M (DA 8);
-  IF NRAY # 0;
-    WRITE 6 ' *** ERROR, AM with rays needs UPDATE+ray pipeline (deferred)';
-    QUIT 0;
-  ENDIF;
-  ANM M MAP MAP;
+  VARIABLE (RE) I;
+  LOOP I 1 TWOND;
+    MSC[I] := M[I];
+  ENDLOOP;
+  { LOCSET 0 0 0 0 0 0 inlined to dodge the forward-reference order:
+    LOCSET is defined later in this file (line 632), AM here must be
+    visible to physics callers via the include chain. }
+  XLOC := 0; ZLOC := 0; PLOC := 0;
+  SLOC := 0; VLOC := 0; TLOC := 0;
+  UPDATE 1 1;
 ENDPROCEDURE;
 
 { ----- Fixed point + map-around-fixed-point (cosy.fox L783-799) -----------
