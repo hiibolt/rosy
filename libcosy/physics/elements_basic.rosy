@@ -75,26 +75,30 @@ PROCEDURE PS D (RE);
 ENDPROCEDURE;
 
 { ----- CB: change bending direction (cosy.fox L3098-3106) -----------------
-  CB negates the x-position and x-momentum components of the active MAP.
-  Used to flip a magnet's bending direction (e.g. before a RIGHT-bend
-  vs. a LEFT-bend in a chicane). Also tracks the global LCB sign-flag.
-
-  cosy.fox additionally negates corresponding components of RAY, RSC,
-  SPNR, SPI, SSC arrays — those branches are gated by NRAY≠0 and LSPN=1
-  respectively, both zero in libcosy v1's default state. We error out
-  cleanly if either is set, since the ray / spin updates would need the
-  ray subsystem layout decision (deferred).                              }
+  CB negates the x-position and x-momentum components of the active MAP,
+  RAY (per-particle bundle), RSC (snapshot), and the spin row SPNR[1,*]
+  + SPI[1] + SSC[1]. Used to flip a magnet's bending direction (e.g.
+  before a RIGHT-bend vs. a LEFT-bend in a chicane). LCB tracks the
+  cumulative sign so subsequent UPDATE calls know which frame applies. }
 PROCEDURE CB;
+  VARIABLE (RE) I;
   IF LUM = 0;
     WRITE 6 ' *** ERROR, call UM before CB';
     QUIT 0;
   ENDIF;
-  IF (NRAY # 0) OR (LSPN = 1);
-    WRITE 6 ' *** ERROR in CB, ray / spin paths not yet ported in libcosy v1';
-    QUIT 0;
-  ENDIF;
   MAP[1] := -MAP[1];
   MAP[2] := -MAP[2];
+  RAY[1] := -RAY[1];
+  RAY[2] := -RAY[2];
+  RSC[1] := -RSC[1];
+  RSC[2] := -RSC[2];
+  IF LSPN = 1;
+    LOOP I 1 3;
+      SPNR[1, I] := -SPNR[1, I];
+    ENDLOOP;
+    SPI[1] := -SPI[1];
+    SSC[1] := -SSC[1];
+  ENDIF;
   LCB := -LCB;
 ENDPROCEDURE;
 

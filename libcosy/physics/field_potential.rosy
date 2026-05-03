@@ -1207,8 +1207,37 @@ PROCEDURE ODE X (DA 30) S (RE) XP (DA 30);
   XP[7] := 0*DD[1];
   XP[8] := 0*DD[1];
   IF LSPN = 1;
-    WRITE 6 ' *** ERROR in ODE, spin path (LSPN=1) not yet ported in libcosy v1';
-    QUIT 0;
+    { Thomas-BMT spin precession (cosy.fox L2751-2764). Computes the
+      angular-velocity vector W = (WX, WY, WZ) from the on-axis fields
+      and current state, then writes XP[21..29] as W × R for each row
+      R of the 3×3 spin matrix X[21..29]. The Berz-NIM-A298 formula
+      keeps γ-corrections explicit so the precession is symplectically
+      consistent with the orbital motion above.                          }
+    VARIABLE (DA) SCR0;
+    VARIABLE (DA) SCR1;
+    VARIABLE (DA) SCR2;
+    VARIABLE (DA) SCR3;
+    VARIABLE (DA) LAMBDA;
+    VARIABLE (DA) WX;
+    VARIABLE (DA) WY;
+    VARIABLE (DA) WZ;
+    SCR1   := -SCR*(1 + G0*(1 + ETA1))*(1 + X[8])/CONS(CHIM);
+    SCR0   := CONS(ETA)*(2 + CONS(ETA))*(1 + X[8])/EPG;
+    LAMBDA := SCR*(X[2]*BFX + X[4]*BFY + BFZ/P0PZ)/CONS(CHIM);
+    SCR2   := SCR0*G0*LAMBDA/(2 + ETA1)/EPG;
+    SCR3   := SCR0*(G0 + 1/(2 + ETA1))/(1 + CONS(ETA))/CONS(CHIE)*EPHX;
+    WX := SCR1*BFX + SCR2*X[2] + SCR3*(X[4]*P0PZ*EFZ - EFY);
+    WY := SCR1*BFY + SCR2*X[4] + SCR3*(EFX - X[2]*P0PZ*EFZ) + H;
+    WZ := SCR1*BFZ + SCR2/P0PZ + SCR3*(X[2]*EFY - X[4]*EFX)*P0PZ;
+    XP[21] := -WZ*X[24] + WY*X[27];
+    XP[22] := -WZ*X[25] + WY*X[28];
+    XP[23] := -WZ*X[26] + WY*X[29];
+    XP[24] :=  WZ*X[21] - WX*X[27];
+    XP[25] :=  WZ*X[22] - WX*X[28];
+    XP[26] :=  WZ*X[23] - WX*X[29];
+    XP[27] := -WY*X[21] + WX*X[24];
+    XP[28] := -WY*X[22] + WX*X[25];
+    XP[29] := -WY*X[23] + WX*X[26];
   ENDIF;
 ENDPROCEDURE;
 
@@ -1505,8 +1534,72 @@ PROCEDURE SIELE L (RE) D (RE);
     MSC[I] := RES_VEC[I];
   ENDLOOP;
   IF LSPN = 1;
-    WRITE 6 ' *** ERROR in SIELE, spin path (LSPN=1) not yet ported in libcosy v1';
-    QUIT 0;
+    { SPNFLO (cosy.fox L2957-2970): Picard iteration that builds the
+      element-local spin matrix SSCR from the angular-velocity
+      contribution XP[21..29] (already filled by ODE's spin block).
+
+      Algorithm (Magnus / Dyson-style series):
+        W[i,j]   := XP[3(i-1)+j+20] * L     (length-scaled rotation rate)
+        VNP      := identity (3×3)
+        SSCR     := identity (3×3)
+        Iterate n = 1, 2, ...:
+          VN[i,j] := (1/n) * (Σ_k XP[k] * ∂_k VNP[i,j]    {orbital drag}
+                            + Σ_k W[k,j] * VNP[i,k])     {Magnus term}
+          SSCR    += VN
+          VNP     := VN
+          stop when |VN| → 0   (or N > 200 → divergence error)
+
+      Each iteration adds the n-th order term in the Lie-series
+      exponentiation of the spin-velocity operator. }
+    VARIABLE (DA 3 3) VN;
+    VARIABLE (DA 3 3) VNP;
+    VARIABLE (DA 3 3) W;
+    VARIABLE (DA)     VNIJ;
+    VARIABLE (RE)     RES;
+    VARIABLE (RE)     N;
+    VARIABLE (RE)     J_;
+    VARIABLE (RE)     K_;
+    RES := 1;
+    N := 0;
+
+    { Seed W, SSCR (identity), VNP (identity). }
+    LOOP I 1 3;
+      LOOP J_ 1 3;
+        W[I, J_] := XP[3*(I - 1) + J_ + 20]*L;
+        SSCR[I, J_] := 0*DD[1];
+        VNP[I, J_] := 0*DD[1];
+      ENDLOOP;
+      VNP[I, I] := 1 + 0*DD[1];
+      SSCR[I, I] := 1 + 0*DD[1];
+    ENDLOOP;
+
+    WHILE RES # 0;
+      N := N + 1;
+      RES := 0;
+      LOOP I 1 3;
+        LOOP J_ 1 3;
+          VNIJ := 0*DD[1];
+          LOOP K_ 1 TWOND;
+            VNIJ := VNIJ + XP[K_]*DER(K_, VNP[I, J_]);
+          ENDLOOP;
+          LOOP K_ 1 3;
+            VNIJ := VNIJ + W[K_, J_]*VNP[I, K_];
+          ENDLOOP;
+          RES := RES + ABS(CONS(VNIJ));
+          VN[I, J_] := VNIJ/N;
+          SSCR[I, J_] := SSCR[I, J_] + VN[I, J_];
+        ENDLOOP;
+      ENDLOOP;
+      LOOP I 1 3;
+        LOOP J_ 1 3;
+          VNP[I, J_] := VN[I, J_];
+        ENDLOOP;
+      ENDLOOP;
+      IF N > 200;
+        WRITE 6 ' $$$ ERROR in SPNFLO, no convergence';
+        QUIT 0;
+      ENDIF;
+    ENDWHILE;
   ENDIF;
 ENDPROCEDURE;
 

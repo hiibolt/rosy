@@ -202,12 +202,14 @@ ENDFUNCTION;
    * The ND=3 branch that promotes E0 to a DA-of-DD(6) is omitted — that
      mode requires a 6D phase space and adds parameter dependence; will
      port alongside the elements that actually use it.
-   * The XX setup loop (cosy.fox L2788-2792) and the spin-matrix block
-     (XX[21..29]) are deferred — they require partial-index access on
-     DD / XX which the M4 ray_io milestone will introduce.
    * cosy.fox saves NOC, raises the order via `CO NO+1` for the
      calculation, then restores via `CO NOM`. The order shuffle is kept
-     so derivative orders propagate correctly through SQRT / CONS.    }
+     so derivative orders propagate correctly through SQRT / CONS.
+   * XX[21..29] is the 3×3 identity matrix used by UM to seed SPNR /
+     SSCR when LSPN=1. cosy.fox sets these unconditionally at L2791-2792;
+     libcosy mirrors the unconditional set so any later UM call with
+     LSPN=1 finds a clean identity in XX (the cost is 9 RE→DA writes
+     into XX even when spin tracking is off — negligible).               }
 PROCEDURE RP E (RE) M (RE) Z (RE);
   VARIABLE (RE) NOM;
   VARIABLE (RE) I;
@@ -237,8 +239,16 @@ PROCEDURE RP E (RE) M (RE) Z (RE);
   XX[6] := (E0 - CONS(E0))/CONS(E0);
   XX[7] := (M0 - CONS(M0))/CONS(M0);
   XX[8] := (Z0 - CONS(Z0))/CONS(Z0);
-  { Spin-matrix identity at XX[21..29] is deferred — needs LSPN-controlled
-    setup that pairs with the spin tracking in M5 spin_su2.            }
+  { Spin-matrix identity (cosy.fox L2791-2792). Row-major 3×3:
+        XX[21..23] = (1, 0, 0)
+        XX[24..26] = (0, 1, 0)
+        XX[27..29] = (0, 0, 1)
+    UM consumes these when LSPN=1 to seed SPNR / SSCR. RE→DA promotion
+    is automatic; the 0*DD[1] anchor on the diagonal entries keeps the
+    DA representation order-correct. }
+  XX[21] := 1 + 0*DD[1]; XX[22] := 0*DD[1]; XX[23] := 0*DD[1];
+  XX[24] := 0*DD[1]; XX[25] := 1 + 0*DD[1]; XX[26] := 0*DD[1];
+  XX[27] := 0*DD[1]; XX[28] := 0*DD[1]; XX[29] := 1 + 0*DD[1];
   ETA  := E0/M0/AMUMEV;
   V0   := CLIGHT*SQRT(ETA*(2 + ETA))/(1 + ETA);
   P0   := AMUMEV*M0*SQRT(ETA*(2 + ETA));

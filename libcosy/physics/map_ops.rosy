@@ -251,10 +251,16 @@ ENDPROCEDURE;
   Algorithm:
     1. Build MS as MAPO padded with DD basis beyond TWOND.
     2. POLVAL: MAPU = MAPT ∘ MS — pure map composition.
-    3. If spin tracking is on (LSPN=1), call SPNMUL to compose spin
-       matrices via the order-2 POLVAL trick. DEFERRED in libcosy v1
-       (errors out cleanly when LSPN=1).
-                                                                            }
+    3. If LSPN = 1, fold SPNT (the local-element spin matrix) onto SPNO
+       through SPNMUL (cosy.fox L508-515):
+         a. Flatten SPNT into a 9-vector SVO row-major.
+         b. POLVAL 2 — substitute MS into SVO so SV is the map-pulled-back
+            local spin matrix (each entry now lives in the orbital DA
+            algebra of MAPO, not MAPT).
+         c. Multiply SV (reshaped 3×3) into SM := SPNO from the left:
+              SPNU[I, J] = Σ_K SV[3(I-1)+K] · SPNO[K, J]
+         The result is the proper composition of two SO(3) rotations
+         expressed as DA-valued matrices.                                 }
 PROCEDURE UPDATEMAP MAPT (DA 8) MAPO (DA 8) MAPU (DA 8)
                     SPNT (DA 3 3) SPNO (DA 3 3) SPNU (DA 3 3);
   VARIABLE (DA 20) MS;
@@ -269,8 +275,31 @@ PROCEDURE UPDATEMAP MAPT (DA 8) MAPO (DA 8) MAPU (DA 8)
   POLVAL 1 MAPT TWOND MS NV MAPU TWOND;
 
   IF LSPN = 1;
-    WRITE 6 ' *** ERROR in UPDATEMAP, spin-update path SPNMUL is deferred';
-    QUIT 0;
+    VARIABLE (DA 9) SVO;
+    VARIABLE (DA 9) SV;
+    VARIABLE (RE)   J;
+    VARIABLE (RE)   K;
+
+    { Flatten SPNT row-major into SVO (cosy.fox uses 3*(I-1)+J indexing). }
+    LOOP I 1 3;
+      LOOP J 1 3;
+        SVO[3*(I - 1) + J] := SPNT[I, J];
+      ENDLOOP;
+    ENDLOOP;
+
+    { Pull SVO back through MS — SV[k] now lives in MAPO's DA algebra. }
+    POLVAL 2 SVO 9 MS NV SV 9;
+
+    { 3×3 matrix product SPNU = SV (reshaped) · SPNO. cosy.fox writes
+      directly to SPNU; we write 0 first since accumulation is += DA. }
+    LOOP I 1 3;
+      LOOP J 1 3;
+        SPNU[I, J] := 0*DD[1];
+        LOOP K 1 3;
+          SPNU[I, J] := SPNU[I, J] + SV[3*(I - 1) + K]*SPNO[K, J];
+        ENDLOOP;
+      ENDLOOP;
+    ENDLOOP;
   ENDIF;
 ENDPROCEDURE;
 
@@ -325,10 +354,67 @@ PROCEDURE UPDATE IM (RE) IR (RE);
 
   { Ray bundle push through the local element map. }
   IF (IR # 0) AND (NRAY # 0);
+    { SPNVEC: per-ray spin-vector rotation (cosy.fox L525-538).
+      Pulls SSCR (3×3 DA local rotation) back through RAY's particle
+      coordinates via POLVAL 2, then matrix-multiplies the result
+      into SPI[1..3] per ray, normalizing each output. }
     IF (LSPN = 1) AND (NSPN > 0);
-      WRITE 6 ' --- WARNING in UPDATE, SPNVEC spin-vector update is';
-      WRITE 6 '     deferred — ray spin not refreshed this step.';
+      VARIABLE (DA 9) SVO_UV;
+      VARIABLE (VE 9) SSCM_UV;
+      VARIABLE (VE 3) SCRV_UV;
+      VARIABLE (VE)   SCR_UV;
+      VARIABLE (RE)   IR_;
+      VARIABLE (RE)   JR_;
+
+      { Initial sanity-check: any ray with |SPI| ≈ 0 means the user
+        forgot to seed spin via SSPI. Done once when LCR=1 latches. }
+      IF LCR = 1;
+        LCR := 0;
+        SCR_UV := 0*SPI[1];
+        LOOP IR_ 1 3;
+          SCR_UV := SCR_UV + (SPI[IR_])*(SPI[IR_]);
+        ENDLOOP;
+        VELSET SCR_UV 1 1;
+        IF VMIN(SCR_UV) < 1E-3;
+          WRITE 6 ' *** ERROR in UPDATE, there is a zero spin vector';
+          QUIT 0;
+        ENDIF;
+      ENDIF;
+
+      { Flatten SSCR into a 9-poly SVO_UV (row-major 3*(I-1)+J). }
+      LOOP IR_ 1 3;
+        LOOP JR_ 1 3;
+          SVO_UV[3*(IR_ - 1) + JR_] := SSCR[IR_, JR_];
+        ENDLOOP;
+      ENDLOOP;
+
+      { Per-particle batch: substitute RAY's (VE 8) into SVO_UV.
+        SSCM_UV[k] now holds the k-th flattened-matrix entry for
+        every ray (cosy.fox uses POLVAL 2; libcosy's POLVAL routes
+        to rosy_polval_ve via the (VE 8) layout). }
+      POLVAL 2 SVO_UV 9 RAY 8 SSCM_UV 9;
+
+      { Apply 3×3 matrix to SPI per ray into SCRV_UV, build squared
+        norm in SCR_UV. The reshape SSCM_UV[3(I-1)+J] is the (I, J)
+        entry of the per-ray rotation. }
+      SCR_UV := 0*SPI[1];
+      LOOP IR_ 1 3;
+        SCRV_UV[IR_] := 0*SPI[1];
+        LOOP JR_ 1 3;
+          SCRV_UV[IR_] := SCRV_UV[IR_] + SSCM_UV[3*(IR_ - 1) + JR_]*SPI[JR_];
+        ENDLOOP;
+        SCR_UV := SCR_UV + (SCRV_UV[IR_])*(SCRV_UV[IR_]);
+      ENDLOOP;
+
+      { Normalize: SQRT element-wise, anchor index-1 to 1 (the
+        reserved slot, matches cosy.fox's VELSET trick). }
+      SCR_UV := SQRT(SCR_UV);
+      VELSET SCR_UV 1 1;
+      LOOP IR_ 1 3;
+        SPI[IR_] := SCRV_UV[IR_]/SCR_UV;
+      ENDLOOP;
     ENDIF;
+
     POLVAL 1 MSC TWOND RAY 8 RAY TWOND;
   ENDIF;
 

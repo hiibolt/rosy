@@ -89,20 +89,32 @@ PROCEDURE MQ L (RE) B (RE) D (RE);
     ENDIF;
   ENDPROCEDURE;
 
-  { MQ outer body: only the analytical fast path is kept (NOC < 3, no
-    fringe field, no spin). The fringe-field branch is deferred until
-    FFELE lands.                                                         }
+  { MQ outer body. Two paths follow cosy.fox L3151-3155:
+
+    * Fast analytical path (NOC < 3, LFR = 0, LSPN = 0): MQUAD-only
+      symplectic computation, then UPDATE 0 1 to push rays / advance
+      the local-frame transform.
+
+    * General path (NOC ≥ 3, fringe field on, or spin tracking): set up
+      a single quadrupole multipole entry in PPOL / MPOL and delegate
+      to FFELE, which now supports LFR ∈ {0, 1, -1, -2, -10}. Spin
+      tracking flows through UPDATEMAP/SPNMUL inside FFELE.            }
   IF (NOC < 3) AND (LFR = 0) AND (LSPN = 0);
     MQUAD MAP L B D;
     IF NRAY # 0;
       UMS;
       MQUAD MSC L B D;
     ENDIF;
+    LOCSET 0 L 0 L 0 0;
     DR := D;
     CE := 'MQ';
+    UPDATE 0 1;
   ELSE;
-    WRITE 6 ' *** ERROR, MQ fringe-field path not yet ported (needs FFELE)';
-    QUIT 0;
+    NPOL := 1;
+    PPOL[1] := B/D + 0*DD[1];
+    MPOL[1] := 2;
+    LOFF := 1;
+    FFELE L D 0 1 2 'MQ';
   ENDIF;
 
 ENDPROCEDURE;
@@ -150,11 +162,16 @@ PROCEDURE MH L (RE) B (RE) D (RE);
       UMS;
       MHEXA MSC L B D;
     ENDIF;
+    LOCSET 0 L 0 L 0 0;
     DR := D;
     CE := 'MH';
+    UPDATE 0 1;
   ELSE;
-    WRITE 6 ' *** ERROR, MH fringe-field path not yet ported (needs FFELE)';
-    QUIT 0;
+    NPOL := 1;
+    PPOL[1] := B/D/D + 0*DD[1];
+    MPOL[1] := 3;
+    LOFF := 1;
+    FFELE L D 0 1 2 'MH';
   ENDIF;
 
 ENDPROCEDURE;
