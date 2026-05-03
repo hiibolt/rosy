@@ -953,6 +953,31 @@ TRNC SPIN_ENC;
 WRITE 6 SPIN_ENC '   [expect 0 — identity spin rotation preserves |spin|=1]';
 LSPN := 0;       { reset for downstream tests that don't expect spin tracking }
 
+{ ----- v2 M12.2: TR with NCT > 0 (multi-AP) cuts -----
+  AP records MAP[1]/MAP[3] (x, y components) at the call site into MCT.
+  TR's NCT > 0 path then evaluates MCT at each ray's coords per
+  iteration to get the AP-frame cut coords. Multi-AP variant is the
+  native way to model accelerator beamlines with multiple physical
+  apertures along the lattice.                                          }
+WRITE 6 ' ----- v2 M12.2: TR with multi-AP cut (NCT = 1) -----';
+LCUT := 0;
+NCT := 0;
+FR 0;
+OV 2 2 0;
+RPP 100;
+UM;
+AP 0.005 0.005 1;     { 5mm × 5mm elliptic AP at lattice start }
+WRITE 6 'After AP, NCT = ' NCT '   [expect 1]';
+CR;
+SR 0.001 0 0.001 0 0 0 0 0 1;     { inside }
+SR 0.1 0 0.1 0 0 0 0 0 1;          { outside }
+TRR 1;
+TR 1 0 1 2 1 1 0 0 6;
+VARIABLE (RE) NCT_SURV;
+TRAPN NCT_SURV;
+WRITE 6 'After TR with NCT cut, TRAPN survivor count = ' NCT_SURV '   [expect 1 — far ray cut]';
+NCT := 0;             { reset for downstream tests }
+
 { ----- v2 M12.5a: TR with TY=1 fixed-point symplectification -----
   Same sextupole setup as M12.4 but TY=1 (fixed-point with type-1 GF).
   CGF computes the generating function once, then per-iteration the

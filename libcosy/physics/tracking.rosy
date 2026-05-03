@@ -47,6 +47,34 @@ PROCEDURE TRAP X (RE) Y (RE) I (RE);
   LCUT := I;
 ENDPROCEDURE;
 
+{ ----- M12.2: AP — define a particle-cutting aperture (cosy.fox L2212-2219)
+  Each AP call snapshots the current MAP[1]/MAP[3] (x and y components)
+  into MCT[2*NCT-1] / MCT[2*NCT], records the cut shape (1=elliptic,
+  2=rectangular) in LCT[NCT], stores the half-axes in XCT[1, NCT] /
+  XCT[2, NCT], and bumps NCT/NCCT counters.
+
+  TR's NCT > 0 path then uses these cumulative AP records to compute
+  cut tests at each iteration: for each ray, evaluate MCT[2*I-1..2*I]
+  at the ray coords (giving the AP-frame cut coords) and apply the
+  unit-ellipse / unit-rectangle test as in CUT_LCUT.
+
+  UM resets the AP table (NCT := 0). Modes other than 1/2 are silently
+  ignored per cosy.fox.                                                  }
+PROCEDURE AP X (RE) Y (RE) I (RE);
+  IF (I = 1) OR (I = 2);
+    NCT := NCT + 1;
+    NCCT := NCCT + I;
+    LCT[NCT] := I;
+    XCT[1, NCT] := ABS(X);
+    XCT[2, NCT] := ABS(Y);
+    MCT[2*NCT - 1] := MAP[1];
+    MCT[2*NCT] := MAP[3];
+    DR := ABS(Y);
+    LOCSET 0 0 0 0 0 0;
+    UPDATE 0 0;
+  ENDIF;
+ENDPROCEDURE;
+
 { ----- TRR: TR resume flag (cosy.fox L2266-2268) --------------------------
   TRR(L) sets the resume mode — when LTRR ≠ 0, TR will pick up where it
   left off rather than re-initialising. The LTRI := 0 reset fires when
@@ -160,6 +188,66 @@ PROCEDURE CUT_LCUT PART_INPUT (VE 8);
   REMOVE := REMOVE_VE;
 ENDPROCEDURE;
 
+{ ----- M12.2: CUT_NCT — apply NCT > 0 multi-aperture cuts (cosy.fox L2018-2034)
+  Per-ray, evaluates the cumulative AP-snapshot maps in MCT at the live
+  ray coords to get APART (the cut-test coords for each AP). Then loops
+  through NCT cuts applying the unit-ellipse / unit-rectangle test per
+  cut shape (LCT[I]).
+
+  Replaces cosy.fox's PREAP + bulk POLVAL + CUTCND-via-VEZERO machinery
+  with a per-ray loop. POLVAL flag 1 (no tree caching) evaluates MCT in
+  one call per ray, giving 2*NCT cut-frame coords. We only test until
+  the first cut hit per ray (CUT_FLAG sticky); subsequent AP loops
+  no-op for that ray.                                                    }
+PROCEDURE CUT_NCT PART_INPUT (VE 8);
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) AP_I;
+  VARIABLE (RE) CUT_FLAG;
+  VARIABLE (DA 8) ARG_DA;
+  VARIABLE (DA 20) APART_DA;
+  VARIABLE (VE) REMAIN_VE;
+  VARIABLE (VE) REMOVE_VE;
+  VARIABLE (RE) XV;
+  VARIABLE (RE) YV;
+  VARIABLE (RE) NUM_AP_COORDS;
+  REMAIN_VE := REMAIN;
+  REMOVE_VE := REMOVE;
+  NUM_AP_COORDS := 2*NCT;
+  LOOP J 2 NRAY;
+    IF REMAIN_VE[J] = 1;
+      LOOP I 1 TWOND;
+        ARG_DA[I] := PART_INPUT[I][J] + 0*DD[1];
+      ENDLOOP;
+      POLVAL 1 MCT NUM_AP_COORDS ARG_DA TWOND APART_DA NUM_AP_COORDS;
+      CUT_FLAG := 0;
+      LOOP AP_I 1 NCT;
+        IF CUT_FLAG = 0;
+          XV := CONS(APART_DA[2*AP_I - 1]);
+          YV := CONS(APART_DA[2*AP_I]);
+          IF LCT[AP_I] = 1;
+            IF SQR(XV/XCT[1, AP_I]) + SQR(YV/XCT[2, AP_I]) > 1;
+              CUT_FLAG := 1;
+            ENDIF;
+          ELSEIF LCT[AP_I] = 2;
+            IF SQR(XV/XCT[1, AP_I]) > 1;
+              CUT_FLAG := 1;
+            ELSEIF SQR(YV/XCT[2, AP_I]) > 1;
+              CUT_FLAG := 1;
+            ENDIF;
+          ENDIF;
+        ENDIF;
+      ENDLOOP;
+      IF CUT_FLAG = 1;
+        VELSET REMAIN_VE J 0;
+        VELSET REMOVE_VE J REMOVE_VE[J] + LTRI;
+      ENDIF;
+    ENDIF;
+  ENDLOOP;
+  REMAIN := REMAIN_VE;
+  REMOVE := REMOVE_VE;
+ENDPROCEDURE;
+
 { ----- v2 M12.0: TR — minimal ray tracker (cosy.fox L1993-2203)
   Pushes the active RAY pool through the active MAP for N iterations.
   The cosy.fox TR is a 210-line behemoth with 5 nested helpers; M12.0
@@ -256,11 +344,6 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
     still runs to keep TSPI consistent with the orbit). Validate that
     NSPN matches NRAY (one SSR per SR) and that NF ≠ 1 (normal-form
     spin tracking is unsupported).                                       }
-  IF NCT > 0;
-    WRITE 6 ' *** ERROR in TR (v2 M12.1): NCT (multi-AP) cuts not yet ported';
-    WRITE 6 '     NCT > 0 needs PREAP/APCOPY infrastructure deferred to M12.2';
-    QUIT 0;
-  ENDIF;
   IF NRAY < 2;
     WRITE 6 ' --- WARNING in TR, no rays to track (NRAY < 2); skipping';
   ELSE;
@@ -492,10 +575,13 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
         ENDLOOP;
       ENDIF;
     ENDLOOP;
-    { Per-iteration aperture cut. LCUT can be ±1 / ±2; ABS gives the
-      cut shape. Negative LCUT means skip-initial-particles only;
+    { Per-iteration aperture cut. NCT > 0 (multi-AP) wins over LCUT
+      (single TRAP) per cosy.fox priority — only one path runs per
+      iteration. Negative LCUT means skip-initial-particles only;
       both positive and negative do per-iteration cuts.            }
-    IF LCUT # 0;
+    IF NCT > 0;
+      CUT_NCT PART;
+    ELSEIF LCUT # 0;
       CUT_LCUT PART;
     ENDIF;
   ENDLOOP;
