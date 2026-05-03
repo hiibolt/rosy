@@ -56,7 +56,9 @@ PROCEDURE DL L (RE);
   DLACT MAP L;
   UMS;
   DLACT MSC L;
+  LOCSET 0 L 0 L 0 0;
   DR := 0;
+  UPDATE 0 1;
 ENDPROCEDURE;
 
 { ----- PS: Poincaré-section marker (cosy.fox L2907-2908) -----------------

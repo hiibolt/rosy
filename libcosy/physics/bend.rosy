@@ -326,7 +326,8 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
       LOOP I 1 TWOND;
         MAP[I] := MSC[I];
       ENDLOOP;
-      SPOS := SPOS + LGH;
+      LOCSET (COS(PHI) - 1)*R SIN(PHI)*R PHI R*PHI 0 0;
+      UPDATE 0 1;
       CE := 'BEND';
     ELSEIF (LFR = -1) OR (LFR = -2);
       { LFR=-1/-2: half-fringe via FFELE delegation (cosy.fox L3406-3411).
@@ -449,7 +450,12 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
       LOOP I 1 TWOND;
         MAP[I] := MSC[I];
       ENDLOOP;
-      SPOS := SPOS + LGH;
+      LOCSET (COS(PHI) - 1)*R SIN(PHI)*R PHI R*PHI 0 0;
+      IF (NRAY = 0) AND (LSPN = 0);
+        UPDATE 0 1;
+      ELSE;
+        UPDATE 1 1;
+      ENDIF;
       CE := 'BEND';
     ENDIF;
   ELSE;

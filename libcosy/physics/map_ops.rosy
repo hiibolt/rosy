@@ -242,6 +242,55 @@ PROCEDURE ANM N (DA 8) M (DA 8) O (DA 8);
   POLVAL 1 N TWOND MM NV O TWOND;
 ENDPROCEDURE;
 
+{ ----- Set local-Cartesian axis coordinates (cosy.fox L460-462) -----------
+  LOCSET stashes 6 angles/positions into globals XLOC/ZLOC/PLOC/SLOC/
+  VLOC/TLOC. Element procedures call this to declare the local-frame
+  delta before invoking UPDATE, which then composes the delta onto
+  the global GTRA / SPOS state.                                         }
+PROCEDURE LOCSET X (RE) Z (RE) P (RE) S (RE) V (RE) T (RE);
+  XLOC := X; ZLOC := Z; PLOC := P;
+  SLOC := S; VLOC := V; TLOC := T;
+ENDPROCEDURE;
+
+{ ----- Final-to-initial Cartesian transformation (cosy.fox L445-458) -------
+  LOCTRA(X, Y, Z, T, P, A, NAP) builds a 3-row map NAP describing the
+  position-vector transformation from the final reference frame back to
+  the initial frame, parameterized by translation (X, Y, Z) and Euler-
+  like rotation angles (T = θ, P = φ, A = α).
+
+  The math is a standard 3-2-1 Euler rotation composed with a translation:
+  CT/ST = cos/sin(θ), CP/SP = cos/sin(φ), CA/SA = cos/sin(α). The
+  IF/ELSEIF on `ABS(ST*SP)=1` handles the gimbal-lock degenerate case.
+  Final NAP[1..3] are DA polynomials in DD[1..3] (the canonical position
+  variables x, y, z).                                                    }
+PROCEDURE LOCTRA X (RE) Y (RE) Z (RE) T (RE) P (RE) A (RE) NAP;
+  VARIABLE (RE) CT; VARIABLE (RE) ST;
+  VARIABLE (RE) CP; VARIABLE (RE) SP;
+  VARIABLE (RE) CA; VARIABLE (RE) SA;
+  VARIABLE (RE) CB; VARIABLE (RE) SB;
+  VARIABLE (RE) CM; VARIABLE (RE) SM;
+  VARIABLE (RE) N;
+
+  CT := COS(T); ST := SIN(T);
+  CP := COS(P); SP := SIN(P);
+  CA := COS(A); SA := SIN(A);
+
+  IF ABS(ST*SP) = 1;
+    CB := 0; SB := 1;
+  ELSE;
+    N := SQRT(1 - SQR(ST)*SQR(SP));
+    CB := CP/N;
+    SB := CT*SP/N;
+  ENDIF;
+
+  CM := CA*CB + SA*SB;
+  SM := SA*CB - CA*SB;
+
+  NAP[1] := X + (CM*CT*CP - SM*SP)*DD[1] - (CM*SP + SM*CT*CP)*DD[2] + (ST*CP)*DD[3];
+  NAP[2] := Y + (CM*CT*SP + SM*CP)*DD[1] + (CM*CP - SM*CT*SP)*DD[2] + (ST*SP)*DD[3];
+  NAP[3] := Z - (CM*ST)*DD[1]            + (SM*ST)*DD[2]            + (CT)*DD[3];
+ENDPROCEDURE;
+
 { ----- UPDATEMAP: compose two maps + spin update (cosy.fox L504-519) -------
   UPDATEMAP(MAPT, MAPO, MAPU, SPNT, SPNO, SPNU): apply (MAPT, SPNT) onto
   the previous state (MAPO, SPNO), producing the updated state
@@ -334,13 +383,12 @@ ENDPROCEDURE;
     fox's ME intrinsic isn't in ROSY because ROSY's TRANSPORT id
     encoding is left-to-right, so DER+CONS is the equivalent).
 
-  Local-frame transform & SPOS advance (cosy.fox L600-615): NOT
-  ported in M16. Existing libcosy element procedures (DL, BEND, ...)
-  already advance SPOS themselves rather than routing through UPDATE,
-  so adding it here would double-count. A future refactor (M16.5)
-  could centralize SPOS/XLOC/PLOC/LTRA/GTRA into UPDATE the cosy.fox
-  way and strip the per-element advances; left out of M16 to keep
-  the change surgical.
+  Local-frame transform & SPOS advance (cosy.fox L600-615): centralized
+  here as of M16.5. Element procedures call LOCSET to populate the
+  local-frame deltas (XLOC, ZLOC, PLOC, SLOC, VLOC, TLOC) then route
+  through UPDATE to compose them onto the global state. SPOS
+  accumulates by SLOC each call; LTRA + GTRA propagate the running
+  reference-axis transform via LOCTRA + POLVAL composition.
 
   Skipped (graphics-only, libcosy v1 plan): LPI ≠ 0 element-box draw,
   LSYS / LCE flags, RSC / ERSC graphics-snapshot writes.              }
@@ -436,6 +484,23 @@ PROCEDURE UPDATE IM (RE) IR (RE);
       EMAX[J] := MAX(EMAX[J], ERAY[I]);
     ENDLOOP;
   ENDIF;
+
+  { Local-frame transform advance (cosy.fox L600-615). LCB is the
+    bend-direction sign flag — XLOC and PLOC double-tap by it (once
+    pre-LOCTRA, once post-) so coordinate flips through CB stay
+    consistent. GPLOC accumulates the global-azimuth angle. LTRA
+    holds the local axis offset / rotation; POLVAL composes it onto
+    the running global GTRA. SPOS finally advances by SLOC. }
+  VARIABLE (RE) NEG_PLOC_UV;
+  XLOC := XLOC*LCB;
+  PLOC := PLOC*LCB;
+  GPLOC := GPLOC + PLOC;
+  NEG_PLOC_UV := -PLOC;
+  LOCTRA XLOC 0 ZLOC NEG_PLOC_UV 0 0 LTRA;
+  POLVAL 1 GTRA 3 LTRA 3 GTRA 3;
+  SPOS := SPOS + SLOC;
+  XLOC := XLOC*LCB;
+  PLOC := PLOC*LCB;
 ENDPROCEDURE;
 
 { ----- Apply a map to the momentary MAP (cosy.fox L651-653) --------------
@@ -454,11 +519,7 @@ PROCEDURE AM M (DA 8);
   LOOP I 1 TWOND;
     MSC[I] := M[I];
   ENDLOOP;
-  { LOCSET 0 0 0 0 0 0 inlined to dodge the forward-reference order:
-    LOCSET is defined later in this file (line 632), AM here must be
-    visible to physics callers via the include chain. }
-  XLOC := 0; ZLOC := 0; PLOC := 0;
-  SLOC := 0; VLOC := 0; TLOC := 0;
+  LOCSET 0 0 0 0 0 0;
   UPDATE 1 1;
 ENDPROCEDURE;
 
@@ -713,55 +774,9 @@ PROCEDURE CATR IAP (DA 8) NAP (DA 8) LGH (RE);
   ANM DOP COP NAP;
 ENDPROCEDURE;
 
-{ ----- Set local-Cartesian axis coordinates (cosy.fox L460-462) -----------
-  LOCSET stashes 6 angles/positions into globals XLOC/ZLOC/PLOC/SLOC/
-  VLOC/TLOC. Element procedures and UPDATE consult these to know the
-  reference axis's orientation in the lab frame. Thin wrapper, but
-  required so AM (which calls LOCSET 0 0 0 0 0 0 in cosy.fox to "reset"
-  the axis state) and downstream tracking code can find the symbols. }
-PROCEDURE LOCSET X (RE) Z (RE) P (RE) S (RE) V (RE) T (RE);
-  XLOC := X; ZLOC := Z; PLOC := P;
-  SLOC := S; VLOC := V; TLOC := T;
-ENDPROCEDURE;
-
-{ ----- Final-to-initial Cartesian transformation (cosy.fox L445-458) -------
-  LOCTRA(X, Y, Z, T, P, A, NAP) builds a 3-row map NAP describing the
-  position-vector transformation from the final reference frame back to
-  the initial frame, parameterized by translation (X, Y, Z) and Euler-
-  like rotation angles (T = θ, P = φ, A = α).
-
-  The math is a standard 3-2-1 Euler rotation composed with a translation:
-  CT/ST = cos/sin(θ), CP/SP = cos/sin(φ), CA/SA = cos/sin(α). The
-  IF/ELSEIF on `ABS(ST*SP)=1` handles the gimbal-lock degenerate case.
-  Final NAP[1..3] are DA polynomials in DD[1..3] (the canonical position
-  variables x, y, z).                                                    }
-PROCEDURE LOCTRA X (RE) Y (RE) Z (RE) T (RE) P (RE) A (RE) NAP;
-  VARIABLE (RE) CT; VARIABLE (RE) ST;
-  VARIABLE (RE) CP; VARIABLE (RE) SP;
-  VARIABLE (RE) CA; VARIABLE (RE) SA;
-  VARIABLE (RE) CB; VARIABLE (RE) SB;
-  VARIABLE (RE) CM; VARIABLE (RE) SM;
-  VARIABLE (RE) N;
-
-  CT := COS(T); ST := SIN(T);
-  CP := COS(P); SP := SIN(P);
-  CA := COS(A); SA := SIN(A);
-
-  IF ABS(ST*SP) = 1;
-    CB := 0; SB := 1;
-  ELSE;
-    N := SQRT(1 - SQR(ST)*SQR(SP));
-    CB := CP/N;
-    SB := CT*SP/N;
-  ENDIF;
-
-  CM := CA*CB + SA*SB;
-  SM := SA*CB - CA*SB;
-
-  NAP[1] := X + (CM*CT*CP - SM*SP)*DD[1] - (CM*SP + SM*CT*CP)*DD[2] + (ST*CP)*DD[3];
-  NAP[2] := Y + (CM*CT*SP + SM*CP)*DD[1] + (CM*CP - SM*CT*SP)*DD[2] + (ST*SP)*DD[3];
-  NAP[3] := Z - (CM*ST)*DD[1]            + (SM*ST)*DD[2]            + (CT)*DD[3];
-ENDPROCEDURE;
+{ LOCSET / LOCTRA — moved up before UPDATEMAP / UPDATE during M16.5
+  so UPDATE's local-frame block can call LOCTRA without forward-
+  reference issues. See top of file for the original definitions. }
 
 { ----- Map of rotated element (cosy.fox L474-487) -------------------------
   MT(IAP, NAP, PHI) rotates the input map IAP by PHI degrees about the
