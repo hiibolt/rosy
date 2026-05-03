@@ -925,6 +925,31 @@ VARIABLE (RE) TR_ESC;
 TRSC TR_ESC;
 WRITE 6 TR_ESC '   [expect 0 — momentum is zero, no x-shift]';
 
+{ ----- v2 M12.4: TR with Newton symplectification (TY=-2) -----
+  Builds a sextupole map (MH 0.3 0.5 0.05) and tracks 1 ray with
+  TY=-2 (Newton order 2). The MGF + SYMP0 setup runs once before
+  iteration; per-iteration SYMP refines each ray's coords. Just
+  needs to run without crashing — the symp acts as a no-op on
+  small-amplitude rays.                                                }
+WRITE 6 ' ----- v2 M12.4: TR with Newton symp (TY=-2) -----';
+LCUT := 0;
+NCT := 0;
+FR 0;
+OV 2 2 0;
+RPP 100;
+UM;
+MH 0.3 0.5 0.05;
+CR;
+SR 0.0001 0 0.0001 0 0 0 0 0 1;
+TRR 1;
+VARIABLE (RE) NEG_TWO;
+NEG_TWO := -2;
+TR 1 0 1 2 1 1 NEG_TWO 0 6;
+WRITE 6 'After TR with Newton symp (TY=-2), TRSC ESC =';
+VARIABLE (RE) NEWTON_ESC;
+TRSC NEWTON_ESC;
+WRITE 6 NEWTON_ESC '   [expect small but non-zero — sextupole is nonlinear]';
+
 { ----- v2 M12.1: TRAP cut + TRAPN survival count -----
   Add a second ray that's WAY outside any reasonable aperture, then
   TRAP ELLIPTIC 1mm × 1mm and run TR. The far-out ray should be

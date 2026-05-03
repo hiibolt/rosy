@@ -199,9 +199,26 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   VARIABLE (DA 16) RES_DA;
   VARIABLE (VE 8) PART;
   VARIABLE (VE) PART_I_TMP;
-  IF TY # 0;
-    WRITE 6 ' *** ERROR in TR (v2 M12.0): TY # 0 not yet ported';
-    WRITE 6 '     symplectification (CGF/MGF/SYMP) deferred to M12.x';
+  { Newton symplectification work-arrays (TY < -1 path) }
+  VARIABLE (DA) F_GF;
+  VARIABLE (DA 8) G_NEWTON;
+  VARIABLE (DA 3 3) H_NEWTON;
+  VARIABLE (DA 8) AM_NEWTON;
+  VARIABLE (DA 8) AN_NEWTON;
+  VARIABLE (RE) IE_NEWTON;
+  VARIABLE (RE) ABS_TY;
+  IF TY > 0;
+    WRITE 6 ' *** ERROR in TR (v2 M12.4): TY > 0 (fixed-point symp) not yet ported';
+    WRITE 6 '     Reason: needs CGF (~75-line nested-helper port). Deferred to M12.5.';
+    QUIT 0;
+  ENDIF;
+  IF (TY = -12) OR (TY = -13);
+    WRITE 6 ' *** ERROR in TR (v2 M12.4): TY = -12/-13 (linear-only) not yet ported';
+    WRITE 6 '     Reason: needs the MGF/GFM/MI/AL pre-pass. Deferred to M12.5.';
+    QUIT 0;
+  ENDIF;
+  IF TY = -21;
+    WRITE 6 ' *** ERROR in TR (v2 M12.4): TY = -21 not yet ported';
     QUIT 0;
   ENDIF;
   IF NF # 0;
@@ -229,6 +246,19 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   LOOP I 1 TWOND;
     TMAP[I] := MAP[I];
   ENDLOOP;
+  { Newton symplectification setup: compute the generating function F
+    and its Hessian decomposition (G, H) once before the iteration
+    starts. Per-iteration we'll call SYMP with these to refine each
+    ray's coordinates. Skipped for TY = 0 (no symp).                  }
+  IF TY < -1;
+    ABS_TY := ABS(TY);
+    MGF TMAP F_GF ABS_TY IE_NEWTON;
+    IF IE_NEWTON # 0;
+      WRITE 6 ' *** ERROR in TR, no generating function.';
+      QUIT 0;
+    ENDIF;
+    SYMP0 F_GF G_NEWTON H_NEWTON;
+  ENDIF;
   { Snapshot RAY into PART. }
   LOOP I 1 8;
     PART[I] := RAY[I];
@@ -245,6 +275,7 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   { Main tracking loop: per-iteration, per-ray POLVAL push through TMAP. }
   LOOP IT 1 N;
     LTRI := LTRI + 1;
+    ABS_TY := ABS(TY);
     LOOP J 2 NRAY;
       { Build (DA TWOND) ARG_DA from ray J's coords in PART.
         Chained PART[I][J] reads the J-th element of the I-th VE — the
@@ -264,6 +295,27 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
         PART[I] := PART_I_TMP;
         ESC := ESC + ABS(CONS(RES_DA[I]) - PRE_X);
       ENDLOOP;
+      { Newton symplectification step (TY < -1): refines the just-
+        pushed coords using the precomputed G/H Hessian decomposition.
+        SYMP iterates until the implicit GF equations are satisfied to
+        the requested order. IE != 0 means non-convergence — skip the
+        write-back for that ray and bump LWNTR diagnostic.            }
+      IF TY < -1;
+        LOOP I 1 TWOND;
+          AM_NEWTON[I] := PART[I][J] + 0*DD[1];
+          AN_NEWTON[I] := AM_NEWTON[I];
+        ENDLOOP;
+        SYMP AM_NEWTON AN_NEWTON G_NEWTON H_NEWTON ABS_TY IE_NEWTON;
+        IF IE_NEWTON = 0;
+          LOOP I 1 TWOND;
+            PART_I_TMP := PART[I];
+            VELSET PART_I_TMP J CONS(AN_NEWTON[I]);
+            PART[I] := PART_I_TMP;
+          ENDLOOP;
+        ELSE;
+          LWNTR := LWNTR + 1;
+        ENDIF;
+      ENDIF;
     ENDLOOP;
     { Per-iteration aperture cut. LCUT can be ±1 / ±2; ABS gives the
       cut shape. Negative LCUT means skip-initial-particles only;
