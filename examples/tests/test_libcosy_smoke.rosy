@@ -902,17 +902,11 @@ CR;
 WRITE 6 'After CR, NRAY = ' NRAY '   [expect 0]';
 SR 0.001 0 0.002 0 0 0 0 0 1;
 WRITE 6 'After SR, NRAY = ' NRAY '   [expect 2 — cosy 0→2 boost]';
-VARIABLE (VE) RAY1_TMP;
-VARIABLE (VE) RAY3_TMP;
-VARIABLE (VE) SPI3_TMP;
-RAY1_TMP := RAY[1];
-RAY3_TMP := RAY[3];
-WRITE 6 'After SR, RAY[1][2] = ' RAY1_TMP[2] '   [expect 0.001]';
-WRITE 6 'After SR, RAY[3][2] = ' RAY3_TMP[2] '   [expect 0.002]';
+WRITE 6 'After SR, RAY[1][2] = ' RAY[1][2] '   [expect 0.001]';
+WRITE 6 'After SR, RAY[3][2] = ' RAY[3][2] '   [expect 0.002]';
 SSR 0 0 1;
 WRITE 6 'After SSR, NSPN = ' NSPN '   [expect 2]';
-SPI3_TMP := SPI[3];
-WRITE 6 'After SSR, SPI[3][2] = ' SPI3_TMP[2] '   [expect 1]';
+WRITE 6 'After SSR, SPI[3][2] = ' SPI[3][2] '   [expect 1]';
 
 { ----- v2 M12.0: minimal TR — track 1 ray through drift(0.5) -----
   TY=0 + NF=0 + no spin + no cuts: simplest-case tracking. Push the

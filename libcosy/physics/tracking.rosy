@@ -123,30 +123,21 @@ PROCEDURE CUT_LCUT PART_INPUT (VE 8);
   VARIABLE (RE) LCND;
   VARIABLE (VE) REMAIN_VE;
   VARIABLE (VE) REMOVE_VE;
-  VARIABLE (VE) PART_X;
-  VARIABLE (VE) PART_Y;
   VARIABLE (RE) XV;
   VARIABLE (RE) YV;
-  VARIABLE (RE) REMOVE_J_VAL;
   REMAIN_VE := REMAIN;
   REMOVE_VE := REMOVE;
-  PART_X := PART_INPUT[1];
-  IF TWOND > 2;
-    PART_Y := PART_INPUT[3];
-  ELSE;
-    PART_Y := VE(0);
-  ENDIF;
   LCND := ABS(LCUT);
   LOOP J 2 NRAY;
-    IF (REMAIN_VE|J) = 1;
-      XV := PART_X|J;
+    IF REMAIN_VE[J] = 1;
+      XV := PART_INPUT[1][J];
       CUT_FLAG := 0;
       IF TWOND = 2;
         IF SQR(XV/XCUT[1]) > 1;
           CUT_FLAG := 1;
         ENDIF;
       ELSE;
-        YV := PART_Y|J;
+        YV := PART_INPUT[3][J];
         IF LCND = 1;
           IF SQR(XV/XCUT[1]) + SQR(YV/XCUT[2]) > 1;
             CUT_FLAG := 1;
@@ -161,8 +152,7 @@ PROCEDURE CUT_LCUT PART_INPUT (VE 8);
       ENDIF;
       IF CUT_FLAG = 1;
         VELSET REMAIN_VE J 0;
-        REMOVE_J_VAL := REMOVE_VE|J;
-        VELSET REMOVE_VE J REMOVE_J_VAL + LTRI;
+        VELSET REMOVE_VE J REMOVE_VE[J] + LTRI;
       ENDIF;
     ENDIF;
   ENDLOOP;
@@ -257,20 +247,19 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
     LTRI := LTRI + 1;
     LOOP J 2 NRAY;
       { Build (DA TWOND) ARG_DA from ray J's coords in PART.
-        cosy.fox's `vec|J` extract returns the J-th element of a VE
-        as RE — the natural way to read a single ray's component
-        out of PART[I] (a NRAY-element VE).                          }
+        Chained PART[I][J] reads the J-th element of the I-th VE — the
+        natural way to extract a single ray's component.                }
       LOOP I 1 TWOND;
-        PART_I_TMP := PART[I];
-        ARG_DA[I] := (PART_I_TMP|J) + 0*DD[1];
+        ARG_DA[I] := PART[I][J] + 0*DD[1];
       ENDLOOP;
       { Push through the active map. POLVAL flag -5 = "tree-evaluation
         of preserved structure" mode used by cosy.fox's tracker.       }
       POLVAL -5 TMAP IMP ARG_DA TWOND RES_DA IMP;
-      { Write back into PART[I][J] and accumulate ESC diagnostic. }
+      { Write back into PART[I][J] via VELSET (writes need a bare VE
+        target, so round-trip through PART_I_TMP). Track ESC.          }
       LOOP I 1 TWOND;
         PART_I_TMP := PART[I];
-        PRE_X := PART_I_TMP|J;
+        PRE_X := PART_I_TMP[J];
         VELSET PART_I_TMP J CONS(RES_DA[I]);
         PART[I] := PART_I_TMP;
         ESC := ESC + ABS(CONS(RES_DA[I]) - PRE_X);
@@ -296,11 +285,6 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- M9.0 → v2 M12.0: TRAPN / TRAPHIST / TRAYPAC stubs unchanged
-  These three need the cut-tracking REMOVE/REMAIN bookkeeping that
-  TR's full version maintains. M12.0's minimal TR doesn't run cuts,
-  so the post-tracking accounting they expect isn't in place yet.
-  Will be unblocked alongside the LCUT≠0 / NCT>0 path in M12.1.        }
 { ----- M12.1: TRAPN — count of survived particles after TR (cosy.fox L2221-2223)
   ABS(REMAIN) sums all survival flags (each is 0=cut or 1=alive). The
   -1 excludes the placeholder reference particle slot.
@@ -384,10 +368,6 @@ PROCEDURE TRAYPAC;
   VARIABLE (VE 8) PART;
   VARIABLE (VE 3) TSPI;
   VARIABLE (VE) REMAIN0;
-  VARIABLE (VE) RAY_I_TMP;
-  VARIABLE (VE) SPI_I_TMP;
-  VARIABLE (VE) PART_I_TMP;
-  VARIABLE (VE) TSPI_I_TMP;
   VARIABLE (RE) I;
   VARIABLE (RE) J;
   VARIABLE (RE) K;
@@ -402,34 +382,29 @@ PROCEDURE TRAYPAC;
     REMAIN := VE(1);
     LOOP I 1 8;
       PART[I] := RAY[I];
-      RAY_I_TMP := PART[I];
-      RAY[I] := VE(RAY_I_TMP|1);
+      RAY[I] := VE(PART[I][1]);
     ENDLOOP;
     SPIN := 0;
-    SPI_I_TMP := SPI[1];
-    IF LENGTH(SPI_I_TMP) = L0;
+    IF LENGTH(SPI[1]) = L0;
       SPIN := 1;
     ENDIF;
     IF SPIN = 1;
       LOOP I 1 3;
         TSPI[I] := SPI[I];
-        TSPI_I_TMP := TSPI[I];
-        SPI[I] := VE(TSPI_I_TMP|1);
+        SPI[I] := VE(TSPI[I][1]);
       ENDLOOP;
     ENDIF;
     K := 1;
     LOOP J 2 L0;
-      IF (REMAIN0|J) = 1;
+      IF REMAIN0[J] = 1;
         K := K + 1;
         REMAIN := REMAIN & 1;
         LOOP I 1 8;
-          PART_I_TMP := PART[I];
-          RAY[I] := RAY[I] & (PART_I_TMP|J);
+          RAY[I] := RAY[I] & PART[I][J];
         ENDLOOP;
         IF SPIN = 1;
           LOOP I 1 3;
-            TSPI_I_TMP := TSPI[I];
-            SPI[I] := SPI[I] & (TSPI_I_TMP|J);
+            SPI[I] := SPI[I] & TSPI[I][J];
           ENDLOOP;
         ENDIF;
       ENDIF;

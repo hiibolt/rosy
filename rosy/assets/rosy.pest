@@ -452,7 +452,7 @@ gte         = { ">=" }
 and_op      = { ^"AND" ~ !(ASCII_ALPHANUMERIC | "_") }
 or_op       = { ^"OR"  ~ !(ASCII_ALPHANUMERIC | "_") }
 
-variable_identifier = { variable_name ~ paren_group* ~ bracket_index? }
+variable_identifier = { variable_name ~ paren_group* ~ bracket_index* }
 paren_group = { "(" ~ expr ~ ("," ~ expr)* ~ ")" }
 bracket_index = { "[" ~ expr ~ ("," ~ expr)* ~ "]" }
 variable_name  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }

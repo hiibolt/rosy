@@ -719,10 +719,26 @@ impl TypeResolver {
                     .get(slot)
                     .and_then(|n| n.resolved.clone())
                     .ok_or_else(|| anyhow!("Variable slot {} not resolved", slot))?;
-                Ok(RosyType::new(
-                    base.base_type,
-                    base.dimensions.saturating_sub(*num_indices),
-                ))
+                // Cascade: peel min(indices, dimensions), then if remaining
+                // index applies to a (VE) (dim=0 VE base), it extracts to RE.
+                // Mirrors VariableIdentifier::type_of's cascade exactly.
+                let mut remaining = *num_indices;
+                let dim_peel = remaining.min(base.dimensions);
+                let new_dim = base.dimensions - dim_peel;
+                remaining -= dim_peel;
+                if remaining == 1
+                    && new_dim == 0
+                    && base.base_type == crate::rosy_lib::RosyBaseType::VE
+                {
+                    return Ok(RosyType::RE());
+                }
+                if remaining > 0 {
+                    return Err(anyhow!(
+                        "IndexedVariable: too many indices ({} for {} dims)",
+                        num_indices, base.dimensions
+                    ));
+                }
+                Ok(RosyType::new(base.base_type, new_dim))
             }
             ExprRecipe::WithDimensions(inner, extra_dims) => {
                 let mut t = self.evaluate_recipe(inner)?;
