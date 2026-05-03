@@ -1117,9 +1117,34 @@ PROCEDURE GT MM (DA 8) F (DA 8) MU (DA 4) ALPHA (DA 4) BETA (DA 4) GAMMA (DA 4) 
     D  := CONS(DER(L, M[L]));
     DET := A*D - B*CC;
     IF DET > 0;
-      IF ABS((A+D)/2/SQRT(A*D - B*CC)) < 1;
-        R[J] := SQRT(A*D - B*CC) + 0*DD[1];
-        COSMU := (A+D)/2/CONS(R[J]);
+      VARIABLE (RE) ABS_COSMU;
+      COSMU := (A + D)/2/SQRT(DET);
+      ABS_COSMU := ABS(COSMU);
+      IF ABS(ABS_COSMU - 1) < DEPS;
+        { Parabolic boundary (cosy.fox L1520-1526): COSMU ≈ ±1 means
+          the map is on the stability border — typical for pure drifts
+          and straight sections with no focusing. cosy.fox accepts only
+          the b=0, c=0 case; otherwise the map can't be represented in
+          Twiss form (would need a Jordan block).                       }
+        IF (ABS(B) = 0) AND (ABS(CC) = 0);
+          R[J]     := SQRT(DET) + 0*DD[1];
+          ALPHA[J] := 0*DD[1];
+          BETA[J]  := 1 + 0*DD[1];
+          GAMMA[J] := 1 + 0*DD[1];
+          IF COSMU < 0;
+            MU[J] := 0.5 + 0*DD[1];
+          ELSE;
+            MU[J] := 0*DD[1];
+          ENDIF;
+        ELSE;
+          WRITE 6 ' *** ERROR in GT, unrepresentable parabolic map';
+          WRITE 6 '     (COSMU ≈ ±1 but B / CC nonzero — would need Jordan form)';
+          QUIT 0;
+        ENDIF;
+      ELSEIF ABS_COSMU < 1;
+        { Stable rotation (cosy.fox L1531-1533): the bread-and-butter
+          ring case. COSMU is the rotation cosine, MU is the tune. }
+        R[J] := SQRT(DET) + 0*DD[1];
         MU_J := ACOS(COSMU);
         IF B < 0;
           MU_J := 2*PI - MU_J;
@@ -1127,11 +1152,18 @@ PROCEDURE GT MM (DA 8) F (DA 8) MU (DA 4) ALPHA (DA 4) BETA (DA 4) GAMMA (DA 4) 
         SINMU := SIN(MU_J);
         DEN := CONS(R[J])*SINMU;
         MU[J]    := MU_J/(2*PI) + 0*DD[1];
-        ALPHA[J] := (A-D)/(2*DEN) + 0*DD[1];
+        ALPHA[J] := (A - D)/(2*DEN) + 0*DD[1];
         BETA[J]  := B/DEN + 0*DD[1];
         GAMMA[J] := -CC/DEN + 0*DD[1];
       ELSE;
-        WRITE 6 ' *** ERROR in GT, hyperbolic / parabolic branch not yet ported (needs CD arithmetic)';
+        { Hyperbolic (DET>0, |COSMU|>1) needs CD-typed MU output (cosy.fox
+          L1527-1530 produces MU = π·k + i·LOG(COSMU + √(COSMU² - 1))).
+          libcosy's GT signature is DA-typed throughout; the CD route
+          lives in TS / DANF. Callers wanting the unstable case should
+          go via TS (which then does TS → DAPLU strip in TP's LC=1
+          fallback at normal_form.rosy:1592).                            }
+        WRITE 6 ' *** ERROR in GT, hyperbolic branch (|COSMU|>1) needs CD-typed MU';
+        WRITE 6 '     route via TS instead — see TP for the LC=1 fallback pattern';
         QUIT 0;
       ENDIF;
     ELSEIF DET = 0;
@@ -1146,7 +1178,11 @@ PROCEDURE GT MM (DA 8) F (DA 8) MU (DA 4) ALPHA (DA 4) BETA (DA 4) GAMMA (DA 4) 
         QUIT 0;
       ENDIF;
     ELSE;
-      WRITE 6 ' *** ERROR in GT, instability branch not yet ported (needs CD arithmetic)';
+      { DET<0: imaginary R, MU=π/2 + K·i·LOG(...) (cosy.fox L1538-1542).
+        Same CD-output requirement as the hyperbolic case above —
+        callers should route through TS for full information. }
+      WRITE 6 ' *** ERROR in GT, instability branch (DET<0) needs CD-typed MU';
+      WRITE 6 '     route via TS instead — see TP for the LC=1 fallback pattern';
       QUIT 0;
     ENDIF;
   ENDLOOP;
