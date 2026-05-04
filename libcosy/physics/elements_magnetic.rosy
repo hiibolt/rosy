@@ -1,32 +1,36 @@
-{ ============================================================================
-  libcosy/physics/elements_magnetic.rosy — Magnetic-element initial port
-
-  M5 starts with the analytical-fast-path quadrupole (MQ) — no fringe
-  field, no spin, low order — which exercises the nested-procedure scope
-  semantics (MQ → MQUAD nested helper, with MAPY further nested inside
-  MQUAD reading MQUAD's locals).
-
-  Deferred:
-    * The fringe-field branch of MQ (and the entire MH / MO / MD / MZ /
-      M5 / MM / MMS family) calls FFELE, which itself chains into SIELE
-      and POTFLD — both depend on the m6 field_potential.rosy body
-      (POTFLD with its 8 nested helpers, ODE / HAMILTONIAN / RK).
-      Will land alongside that milestone.
-    * BEND (the dipole monster, 13 nested procedures) — its own focused
-      milestone in m7.
-    * MQK / MSK / MOK / MDK / MZK / MMK / MMSK (integrated-strength
-      variants) and the solenoid family — port after FFELE.
-  ============================================================================ }
+{ Magnetic elements:
+    * MQ / MH       analytical fast paths for quadrupole / sextupole
+                    (NOC < 3, LFR = 0, LSPN = 0). Other configurations
+                    fall through to FFELE.
+    * MO / MD / MZ  octupole, decapole, dodecapole — FFELE-driven.
+    * M5            combined quadrupole + sextupole + octupole +
+                    decapole + dodecapole bundle.
+    * MM / MMS      arbitrary normal / normal-plus-skew multipole list.
+    * MQK / MSK /
+      MOK / MDK /
+      MZK / MMK /
+      MMSK          integrated-strength variants of the above.
+    * MGE           general s-dependent field-driven magnet.
+    * DI / DP / DIL convenience wrappers around BEND.
+    * MC / MS / MSL /
+      MPL / MCLK    combined-function magnets with edges.
+    * MSS           split-pole solenoid.
+    * CMR / CMG /
+      CML / CMSI /
+      CMS / CMSP /
+      CMST / CMSTP  charged-mirror / Cartesian electric-magnetic combos.
+    * WI / MF / MFFLD / MFFLDIN / FGDATCHECK — wiggler / measured-field
+                    setup and validation. }
 
 BEGIN;
 
 INCLUDE '../globals.rosy';
 
-{ ----- Magnetic quadrupole (analytical fast path, cosy.fox L3126-3155) ----
+{ ----- Magnetic quadrupole (analytical fast path, ) ----
   Inline port of MQ's no-fringe-field / no-spin / low-order branch. The
-  cosy.fox structure is MQ procedure containing nested MQUAD which itself
+   structure is MQ procedure containing nested MQUAD which itself
   contains nested MAPY. All three levels are preserved here so the
-  scope-sharing matches what cosy.fox expects (MAPY reads MQUAD's locals
+  scope-sharing matches what  expects (MAPY reads MQUAD's locals
   N, FP, IAP).
 
   Parameters
@@ -89,7 +93,7 @@ PROCEDURE MQ L (RE) B (RE) D (RE);
     ENDIF;
   ENDPROCEDURE;
 
-  { MQ outer body. Two paths follow cosy.fox L3151-3155:
+  { MQ outer body. Two paths follow :
 
     * Fast analytical path (NOC < 3, LFR = 0, LSPN = 0): MQUAD-only
       symplectic computation, then UPDATE 0 1 to push rays / advance
@@ -119,7 +123,7 @@ PROCEDURE MQ L (RE) B (RE) D (RE);
 
 ENDPROCEDURE;
 
-{ ----- Magnetic sextupole (analytical fast path, cosy.fox L3157-3176) -----
+{ ----- Magnetic sextupole (analytical fast path, ) -----
   Sextupole kick computed via the second-order expansion of the cubic
   potential. Two-deep nesting (MH → MHEXA) — simpler than MQ since
   MHEXA does not need a MAPY-style helper.
@@ -176,7 +180,7 @@ PROCEDURE MH L (RE) B (RE) D (RE);
 
 ENDPROCEDURE;
 
-{ ----- Integrated-strength variants (cosy.fox L3208-3210) -----------------
+{ ----- Integrated-strength variants -----------------
   MQK and MSK delegate to MQ / MH after converting the integrated strength
   K into the equivalent pole-tip field B = K · χ_m · D^(2n) / D, where n is
   the multipole order. Useful when lattice files specify K1 / K2 directly
@@ -189,7 +193,7 @@ PROCEDURE MSK L (RE) K (RE) D (RE);
   MH L K*CONS(CHIM)*D*D D;
 ENDPROCEDURE;
 
-{ ----- M6.3: SIELE-driven multipole magnets (cosy.fox L3178-3206) -----
+{ ----- SIELE-driven multipole magnets -----
   These all set up PPOL/MPOL/NPOL with the multipole content, then call
   FFELE which dispatches on the current LFR setting (0, 1, -1, -2, -10
   per M19). LFR=0 is the SIELE-only no-fringe path; the rest add
@@ -243,7 +247,7 @@ PROCEDURE M5 L (RE) BQ (RE) BH (RE) BO (RE) BD (RE) BZ (RE) D (RE);
   FFELE L D 0 1 2 'M5';
 ENDPROCEDURE;
 
-{ MM: arbitrary normal multipole array (cosy.fox L3195-3199).
+{ MM: arbitrary normal multipole array.
   BA[I] is the I-th multipole strength (I=1 quad, I=2 sext, ...);
   NBA is the number of provided strengths.                            }
 PROCEDURE MM L (RE) BA (RE 5) NBA (RE) D (RE);
@@ -260,7 +264,7 @@ PROCEDURE MM L (RE) BA (RE 5) NBA (RE) D (RE);
   FFELE L D 0 1 2 'MM';
 ENDPROCEDURE;
 
-{ MMS: skew multipole — adds skew components on top of MM (cosy.fox L3201-3206).
+{ MMS: skew multipole — adds skew components on top of MM.
   NB is count of provided pairs; BA is normal strengths, BS is skew.   }
 PROCEDURE MMS L (RE) BA (RE 5) BS (RE 5) NB (RE) D (RE);
   VARIABLE (RE) I;
@@ -308,7 +312,7 @@ PROCEDURE MZK L (RE) K (RE) D (RE);
   FFELE L D 0 1 2 'MZK';
 ENDPROCEDURE;
 
-{ ----- M6.29: K-strength multipole array variants (cosy.fox L3221-3229) -----
+{ ----- K-strength multipole array variants -----
   MMK / MMSK are sister wrappers to MM/MMS that take integrated K
   values scaled by χ_m, mirroring the MOK/MDK/MZK relationship for
   array-of-strengths magnets.                                          }
@@ -323,10 +327,10 @@ PROCEDURE MMK L (RE) BA (RE 5) NBA (RE) D (RE);
   FFELE L D 0 1 2 'MMK';
 ENDPROCEDURE;
 
-{ MMSK: skew-K multipole. cosy.fox combines a normal-K vector KA with
+{ MMSK: skew-K multipole.  combines a normal-K vector KA with
   an angle vector TA into a single MMS call by computing the skew
   partner BS := KA[I]·sin((I+1)·TA[I]·deg→rad) and rotating KA by
-  cos. Mutates KA / TA in place — semantics match cosy.fox.           }
+  cos. Mutates KA / TA in place — semantics match .           }
 PROCEDURE MMSK L (RE) KA (RE 5) TA (RE 5) NA (RE) D (RE);
   VARIABLE (RE) I;
   VARIABLE (RE) DP;
@@ -342,7 +346,7 @@ PROCEDURE MMSK L (RE) KA (RE 5) TA (RE 5) NA (RE) D (RE);
   MMS L KA TA NA D;
 ENDPROCEDURE;
 
-{ ----- M6.29: CM* family — axial-symmetric magnetic devices (cosy.fox L3520-3601) -----
+{ ----- CM* family — axial-symmetric magnetic devices -----
   All set NPOL=1 + MPOL[1]=20 (axial-symmetric pole flag) and route
   through DSDED (default-stepping s-dependent integrator) using NSDP
   modes 3, 5, 7, 8, 10, 13, or 14 from POTFLD's POTS path.
@@ -531,7 +535,7 @@ PROCEDURE CMSTP N (RE) NI (RE 30) R1 (RE 30) R2 (RE 30) L (RE 30)
   UPDATE 1 1;
 ENDPROCEDURE;
 
-{ ----- M6.27: MGE — general magnetic multipole by Gaussians (cosy.fox L3231-3238)
+{ ----- MGE — general magnetic multipole by Gaussians
   MGE(NP, A, NS, DS, SIGMA, D): for each pole I=1..NP, copies the
   caller's coefficient column A[I, 1..NS] (after dividing by the
   aperture power D^I) into the global MFD[I, 1..NS] table, then
@@ -578,7 +582,7 @@ PROCEDURE MGE NP (RE) A (RE 30 30) NS (RE) DS (RE) SIGMA (RE) D (RE);
   UPDATE 1 1;
 ENDPROCEDURE;
 
-{ ----- M6.25: MF — magnet from measured field data (cosy.fox L3627-3640)
+{ ----- MF — magnet from measured field data
   MF(L, A, NX, NZ, DX, DZ, SIGMA, D, SX, SZ, SPHI): copies the user's
   2D field grid A into the global MFD table, sets up NSDP=-5 + LOFF=2,
   and integrates SDELE over [0, L]. Inside POTFLD → POTXZ → FIELDXZ
@@ -635,7 +639,7 @@ PROCEDURE MF L (RE) A_GRID (RE 700 30) NX (RE) NZ (RE)
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- M6.23: WI — wiggler magnet (cosy.fox L3603-3625)
+{ ----- WI — wiggler magnet
   WI(B, K, L, D, K1, IA, A): a wiggler with field profile
     BFY(z) = EDGE(z/D) · EDGE((-z+L)/D) · B · cos((2π/K + K1·z)·z)
   where the EDGE function provides soft sigmoid end-fields keyed by
@@ -664,8 +668,8 @@ ENDPROCEDURE;
     6. UPDATEMAP MSC MS MSC + DLACT for backward exit-drift.
     7. Restore axis state from snapshots, finalise UPDATE 1 1.
 
-  cosy.fox uses LPI graphics manipulation to suppress wiggler-internal
-  picture updates — libcosy v1 has no graphics, so that's skipped.    }
+   uses LPI graphics manipulation to suppress wiggler-internal
+  picture updates — libcosy has no graphics, so that's skipped.    }
 PROCEDURE WI B (RE) K (RE) L (RE) D (RE) K1 (RE) IA (RE) A_COEFF (RE 10);
   VARIABLE (RE) L1;
   VARIABLE (RE) LS;
@@ -739,7 +743,7 @@ PROCEDURE WI B (RE) K (RE) L (RE) D (RE) K1 (RE) IA (RE) A_COEFF (RE 10);
   PS D;
 ENDPROCEDURE;
 
-{ ----- M6.22: MSEM — bend magnet with E-multipoles for g-2 (cosy.fox L3826-3870)
+{ ----- MSEM — bend magnet with E-multipoles for g-2
   MSEM(R, PHI, DM, NB, DE, EV, N, CI): combined-function bending magnet
   with both magnetic multipole (NB[I] strengths up to N) and electric
   multipole (EV[I] voltages) content. Designed for g-2 storage rings
@@ -749,7 +753,7 @@ ENDPROCEDURE;
   Parameters:
     R   : magnetic bending radius [m]
     PHI : bend angle [rad]
-    DM  : magnetic aperture (declared but unused — cosy.fox quirk)
+    DM  : magnetic aperture (declared but unused —  quirk)
     NB  : RE 16 array of magnetic multipole strengths
     DE  : electric aperture / characteristic radius
     EV  : RE 16 array of electric multipole voltages [kV]
@@ -761,7 +765,7 @@ ENDPROCEDURE;
     MPOL[NPOL+1]    = NM (count of magnetic multipoles)
     MPOL[NPOL+2]    = 1 (electric fringe flag)
 
-  libcosy v1 supports LFR=0 (no fringe, SIELE-based) and LFR=3/2.5
+  libcosy supports LFR=0 (no fringe, SIELE-based) and LFR=3/2.5
   (high-precision NSDP=-21 with bend geometry). LFR=0 with electric
   multipoles falls back to SIELE — the magnetic part is faithful but
   the electric part contributes constant-field rather than true
@@ -854,12 +858,12 @@ PROCEDURE MSEM R (RE) PHI (RE) DM (RE) NB (RE 16) DE (RE) EV (RE 16) N (RE) CI (
     SLOC := R*PHI;
     UPDATE 1 1;
   ELSE;
-    WRITE 6 ' *** ERROR in MSEM, only LFR=0 / 3 / 2.5 supported in libcosy v1';
+    WRITE 6 ' *** ERROR in MSEM, only LFR=0 / 3 / 2.5 supported in libcosy';
     QUIT 0;
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- M7.2: MSS — magnetic sector with center-detail field (cosy.fox L3480-3518)
+{ ----- MSS — magnetic sector with center-detail field
   MSS(R, PHID, D, E1D, H1, E2D, H2, W): a sector dipole of bending
   radius R, deflection angle PHID (degrees), aperture D, with arbitrary
   edge angles (E1D/E2D, deg) and pole-tip curvatures (H1/H2). The W[4,4]
@@ -870,7 +874,7 @@ ENDPROCEDURE;
   restores caller's LFR via FR. Pads the SDELE integration window by
   ±10·D drift on each side so soft-edge fringe tails are captured.
 
-  cosy.fox's NT=0 hardcoding makes the multipole-presence check dead
+  NT=0 hardcoding makes the multipole-presence check dead
   code; libcosy port omits it for clarity.                                }
 PROCEDURE MSS R (RE) PHID (RE) D (RE) E1D (RE) H1 (RE)
               E2D (RE) H2 (RE) W_MAT (RE 4 4);
@@ -980,7 +984,7 @@ PROCEDURE MSS R (RE) PHID (RE) D (RE) E1D (RE) H1 (RE)
   FR LFT;
 ENDPROCEDURE;
 
-{ ----- M6.32: GE — general s-dependent element via support-point tables (cosy.fox L3108-3121)
+{ ----- GE — general s-dependent element via support-point tables
   GE(N, M, S, H, V, W): integrates a custom field model defined by N
   support points, each carrying M derivatives of curvature H, electric
   potential V, and magnetic potential W as DA polynomials.
@@ -996,7 +1000,7 @@ ENDPROCEDURE;
 
   Workflow
     1. Bump NOC by 1 so all DA arithmetic in INTERP carries one extra
-       order of precision (cosy.fox idiom for bracket-and-restore).
+       order of precision ( idiom for bracket-and-restore).
     2. INTPOL PN M generates the (2M+2)-coefficient blending polynomial
        used by INTERP's reverse-Horner step.
     3. Copy caller arrays into globals SN/HN/VN/WN.

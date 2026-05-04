@@ -1,31 +1,22 @@
-{ ============================================================================
-  libcosy/globals.rosy — Shared global state
-
-  Translated from cosy.fox (COSY INFINITY 10.2) lines 28-100.
-
-  Translation rules applied:
-   * COSY's leading "memory size" prefix on map / field arrays (4000)
-     becomes a ROSY (DA ...) type — ROSY handles per-DA storage internally.
-   * Other COSY declarations become ROSY (RE ...) with the same trailing
-     dimensions.
-   * COSY string variables (CE, RKOFNST, TFPFN, TFPRFN) become (ST).
-   * COSY's TRUE / FALSE are reserved keywords in ROSY; they are NOT declared
-     here and must be replaced by literal 1 / 0 when porting DEF and consumers.
-
-  Types may need to widen later (e.g., E0/M0 -> DA for parameter sweeps).
-  Adjust here as porting milestones expose mismatches.
-  ============================================================================ }
+{ Shared global state for libcosy. Holds the active map (MAP / MSC),
+  spin matrices (SPNR / SSCR), reference-particle scalars (E0 / M0 /
+  Z0 / V0 / P0 / ETA / CHIM / CHIE / HFAC), local-frame transform
+  state (XLOC / ZLOC / PLOC / SLOC / GPLOC / LTRA / GTRA / SPOS), the
+  fringe-field coefficient table (ENGEC), measured-field data buffer
+  (MFD), ray pool (RAY / RSC / SPI / SSC / REMAIN / REMOVE / RCOL),
+  Butcher-tableau scratch (A / B / C / D), and the long list of mode
+  flags (LFR / LSPN / LCB / LKC / LCUT / LRP / LOV / LUM / ...). }
 
 BEGIN;
 
 { Physical constants — set in DEF }
 VARIABLE (RE) AMU; VARIABLE (RE) AMUMEV; VARIABLE (RE) EZERO; VARIABLE (RE) CLIGHT;
 VARIABLE (RE) PI; VARIABLE (RE) DEGRAD;
-{ NOTE: cosy.fox also declares TRUE and FALSE here; both are reserved in ROSY,
+{ NOTE:  also declares TRUE and FALSE here; both are reserved in ROSY,
         so DEF must use literal 1 / 0 when porting. }
 
 { Reference particle — set in RP / RPR / RPM / RPP / RPE / RPPI / RPMU.
-  These are DA because cosy.fox lets the energy carry a parameter
+  These are DA because  lets the energy carry a parameter
   dependence when ND=3 (`E0 := CONS(E0)*(1+DD(6))`), and the derived
   quantities (V0, P0, ETA, CHIM, CHIE, HFAC) propagate that DA-ness
   through their arithmetic. Even when the RP body skips the ND=3
@@ -44,7 +35,7 @@ VARIABLE (RE) LSPN;
 VARIABLE (DA 20) MCT;
 
 { Rays }
-{ Ray-subsystem arrays (v2 retype): cosy.fox `RAY 10001 8` is an array
+{ Ray-subsystem arrays :  `RAY 10001 8` is an array
   of 8 vectors each up to 10001 long — i.e. one vector per phase-space
   component (x, p_x, y, p_y, t, dE, dM, ?). Concatenation operator `&`
   grows each vector at SR-call time. Same for RSC scratch + 3-component
@@ -63,18 +54,18 @@ VARIABLE (RE) ESC; VARIABLE (RE) ENC;
 VARIABLE (RE 4) ERAY; VARIABLE (RE 4) ERSC; VARIABLE (RE 2) EMAX;
 
 { Axis coordinates — AXP / AXD are graphics-only buffers (skipped in
-  libcosy v1). SPOS is the current arc-length scalar updated by every
-  element body; cosy.fox declares it `1000` (a graphics trace buffer)
-  but the cosy.fox UM body sets it scalar-wise (`SPOS := 0`).         }
+  libcosy). SPOS is the current arc-length scalar updated by every
+  element body;  declares it `1000` (a graphics trace buffer)
+  but the  UM body sets it scalar-wise (`SPOS := 0`).         }
 VARIABLE (RE 3 1000) AXP; VARIABLE (RE 6 1000) AXD; VARIABLE (RE) SPOS;
-{ Local-Cartesian axis coordinates (cosy.fox L51, declared as RE 20 there
+{ Local-Cartesian axis coordinates (, declared as RE 20 there
   for COSY's "type-flexible" storage but assigned only as scalars by
   LOCSET — RE here matches actual usage). }
 VARIABLE (RE) XLOC;    VARIABLE (RE) ZLOC;    VARIABLE (RE) PLOC;
 VARIABLE (RE) SLOC;    VARIABLE (RE) VLOC;    VARIABLE (RE) TLOC;
 VARIABLE (RE) GPLOC;
 
-{ Picture buffers — graphics is skipped in libcosy v1; arrays exist only for
+{ Picture buffers — graphics is skipped in libcosy; arrays exist only for
   procedures (e.g. UPDATE) that reference them via flag-guarded paths. }
 VARIABLE (RE 20000) SYS;
 VARIABLE (ST) CE;
@@ -84,7 +75,7 @@ VARIABLE (RE 1000) ETRA; VARIABLE (RE 200) SYS0; VARIABLE (ST) TRTST;
 
 { Picture-related sizing }
 VARIABLE (RE) LSCR; VARIABLE (RE) LSCT;
-{ Local-axis transform DA arrays: cosy.fox `LTRA 20 3` is 1-D-of-3
+{ Local-axis transform DA arrays:  `LTRA 20 3` is 1-D-of-3
   DA cells (leading 20 = per-cell DA storage hint, not a data dim).
   LOCTRA writes DA polynomials in DD[1..3] for the position-only
   rotation/translation; RA/SA/TA consume them as such.                 }
@@ -96,7 +87,7 @@ VARIABLE (DA) BFX; VARIABLE (DA) BFY; VARIABLE (DA) BFZ; VARIABLE (DA) W;
 VARIABLE (DA) H;
 VARIABLE (RE) CHIM1; VARIABLE (RE) CHIE1; VARIABLE (RE) TP1;
 
-{ Multipole fields — cosy.fox `VARIABLE PMM 20 40` declares a 40-element
+{ Multipole fields —  `VARIABLE PMM 20 40` declares a 40-element
   DA array (the leading 20 is the DA monomial-count). PMM[i] is the i-th
   off-plane symmetric magnetic-multipole completion polynomial; PEM[i] is
   the electric counterpart. PPOL holds per-element multipole strengths
@@ -108,22 +99,22 @@ VARIABLE (RE) NPOL; VARIABLE (RE) LS;
 VARIABLE (RE) NSDP; VARIABLE (RE) LCCT; VARIABLE (RE) LOFF;
 
 { Enge fringe-field coefficients — accessed as ENGEC[IMP, IEE, IEM, K]
-  cosy.fox declares `VARIABLE ENGEC 2 20 2 2 6;` (five dimensions) but
-  every access in cosy.fox uses exactly four indices, with K bounded by 6.
+   declares `VARIABLE ENGEC 2 20 2 2 6;` (five dimensions) but
+  every access in  uses exactly four indices, with K bounded by 6.
   The leading 2 is COSY's "two-reals-per-cell" reservation that is unused
-  in the cosy.fox body, so the ROSY port collapses to a 4D table.        }
+  in the  body, so the ROSY port collapses to a 4D table.        }
 VARIABLE (RE 20 2 2 6) ENGEC;
 VARIABLE (RE) LE;
 
 { Symplectic-scaling fringe-field arrays.
-  cosy.fox: GFF2 NM1 2 6 10 / LFF2 NM2 2 6 10 — NM1/NM2 are
+  : GFF2 NM1 2 6 10 / LFF2 NM2 2 6 10 — NM1/NM2 are
   DA-monomial-count placeholders. libcosy stores them as DA 3D arrays.
   DATFF2 stores reference parameters — pure RE per FC2 usage.       }
 VARIABLE (DA 2 6 10) GFF2; VARIABLE (DA 2 6 10) LFF2;
 VARIABLE (RE 2 6 10) DATFF2;
 
-{ Measured-field interpolation buffers — retyped from cosy.fox L72-73.
-  cosy.fox's `VARIABLE HN 25 100` declares a 1-D array of 100 DA cells
+{ Measured-field interpolation buffers — retyped from 
+  `VARIABLE HN 25 100` declares a 1-D array of 100 DA cells
   with up to 25 polynomial coefficients each. ROSY-strict interpretation
   is `(DA 100)` (the leading "25" is per-cell DA-storage hint, not a
   data dimension). HN/VN/WN store DA polynomials per support point so
@@ -134,7 +125,7 @@ VARIABLE (RE 100) SN;    VARIABLE (DA 100) HN;
 VARIABLE (DA 100) VN;    VARIABLE (DA 100) WN;
 VARIABLE (VE) PN;        VARIABLE (RE) NPG;
 VARIABLE (RE) DR;        VARIABLE (RE) DMAX;
-{ Measured-field data table — cosy.fox declares `MFD 6 700 30` (3D);
+{ Measured-field data table —  declares `MFD 6 700 30` (3D);
   libcosy collapses to 2D (RE 700 30) which handles the dominant
   use-case (MF with NX ≤ 700, NZ ≤ 30) and keeps MGE/NSDP=12 working
   within NS ≤ 30 s-samples. NP ≤ 700 (multipole index) is generous.  }
@@ -147,7 +138,7 @@ VARIABLE (RE 5) BXNOD;       VARIABLE (RE 5 7) BXDDT;
 VARIABLE (RE 70) BXBOXID;    VARIABLE (RE) BXIBOX;
 VARIABLE (RE 70 4) BX1BOXPN; VARIABLE (RE 70 4 2 3) BX1BOXP;
 
-{ Runge-Kutta Butcher tableau (libcosy v1 uses ROSY's DOP853 from RKCO).
+{ Runge-Kutta Butcher tableau (libcosy uses ROSY's DOP853 from RKCO).
   RK_INIT_COEFFS in field_potential.rosy populates these from the
   ROSY-side intrinsic. A=nodes, B=coupling matrix, C=8th-order weights,
   D=7th-order weights (= C - error). HSQR is the step-adjustment
@@ -158,8 +149,8 @@ VARIABLE (ST) RKOFNST;
 VARIABLE (RE) EPS; VARIABLE (RE) WAF;
 VARIABLE (ST) TFPFN; VARIABLE (ST) TFPRFN;
 
-{ Generic scratch buffers — DD and XX hold DA polynomials in cosy.fox.
-  cosy.fox declares `DD 1 20` and `XX 15 30`; the leading 1 / 15 are
+{ Generic scratch buffers — DD and XX hold DA polynomials in .
+   declares `DD 1 20` and `XX 15 30`; the leading 1 / 15 are
   COSY's "memory hint" prefix. Each cell stores a DA, accessed via a
   single index (DD(I), XX(I)). DEPS is a scalar tolerance.            }
 VARIABLE (DA 20) DD; VARIABLE (DA 20) DX;

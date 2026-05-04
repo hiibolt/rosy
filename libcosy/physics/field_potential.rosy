@@ -1,39 +1,19 @@
-{ ============================================================================
-  libcosy/physics/field_potential.rosy — Field/potential primitives (M6)
-
-  M6 keystone file. Holds the integrator stack (RK4 / ODE / HAMILTONIAN) and
-  the field-potential evaluator POTFLD with its helper geometry (LEN2,
-  NORMAL, EDGESEC, PTBOX, MCSDIST, FOURIERGAUSS).
-
-  Porting strategy:
-    M6.1 (this commit): HAMILTONIAN + LEN2 + NORMAL — independent
-                        helpers, no callers in cosy.fox proper.
-    M6.2:               RKCO (Butcher tableau) + RK (adaptive integrator)
-    M6.3:               POTFLD stub (NSDP=0 / NSDP=1/2 ENGE) — enough
-                        for simple multipole magnets via SIELE.
-    M6.4:               ODE (uses POTFLD).
-    M6.5:               SIELE → unblocks BEND multipole path + simple
-                        magnetic multipoles MO/MD/MZ/M5/MM/MMS/etc.
-    M6.6:               SDELE family + FFELE orchestration.
-    M6.7+:              Expand POTFLD with remaining NSDP modes
-                        (Wiggler, Solenoid, Three-tube, etc.).
-
-  Dependencies on existing libcosy:
-    * Globals: ETA / HFAC / E0 / M0 / Z0 / V0 / P0 / CHIM / CHIE
-               (defined by RP family in reference_particle.rosy).
-    * POLVAL — already an intrinsic.
-    * DAFLO — used by SIELE (deferred).
-    * ENGE — already in fringe_field.rosy.
-  ============================================================================ }
+{ Field / potential primitives. Holds the integrator stack (RK4 / ODE /
+  HAMILTONIAN), the field-potential evaluator POTFLD with its helper
+  geometry (LEN2, NORMAL, EDGESEC, PTBOX, MCSDIST, FOURIERGAUSS), the
+  s-dependent / s-independent element actuators (SDELE / SDELEREF /
+  SIELE / DSDED), the GE / SYSCLM / RSM finishers, and the FFELE
+  fringe-field dispatch hub. Reads reference-particle globals (ETA,
+  HFAC, E0, M0, Z0, V0, P0, CHIM, CHIE) seeded by RP. }
 
 BEGIN;
 
 INCLUDE '../globals.rosy';
 
-{ ----- LEN2: Euclidean norm of a 2-component vector (cosy.fox L2331-2337) -
-  Returns sqrt(X^2 + Y^2). cosy.fox dispatches RE vs DA via TYPE()
+{ ----- LEN2: Euclidean norm of a 2-component vector -
+  Returns sqrt(X^2 + Y^2).  dispatches RE vs DA via TYPE()
   introspection — libcosy ROSY is strict-typed, so we expose the
-  DA-input version (the more general case). cosy.fox's near-zero
+  DA-input version (the more general case). 's near-zero
   fast-path for DA (skips SQRT when constant part is < 1e-8) is
   preserved: for tiny constants, return CONS+0*DA(1) to avoid the
   square-root's near-origin gradient blowup.
@@ -53,7 +33,7 @@ FUNCTION (DA) LEN2 X (DA) Y (DA);
 ENDFUNCTION;
 
 { ----- NORMAL: distance from point to line + foot-of-perpendicular
-        (cosy.fox L2339-2345) ---
+ ---
   Computes:
     DIS = signed distance from P=(X,Z) to the line P0->P1
     (XS, ZS) = foot of perpendicular from P onto the line
@@ -61,7 +41,7 @@ ENDFUNCTION;
   to determine which side of an edge the test point lies on.
 
   All inputs/outputs are RE (the core geometry doesn't propagate DA-ness
-  in cosy.fox usage). Builds the unit-normal (-Δz, Δx) / |Δp1|, then
+  in  usage). Builds the unit-normal (-Δz, Δx) / |Δp1|, then
   projects.                                                                  }
 PROCEDURE NORMAL X (RE) Z (RE) X0 (RE) Z0 (RE) X1 (RE) Z1 (RE)
                  DIS (RE) XS (RE) ZS (RE);
@@ -78,7 +58,7 @@ PROCEDURE NORMAL X (RE) Z (RE) X0 (RE) Z0 (RE) X1 (RE) Z1 (RE)
   ZS := Z - DIS*NZ;
 ENDPROCEDURE;
 
-{ ----- NORMAL_DA: DA-aware variant of NORMAL (cosy.fox L2339-2345)
+{ ----- NORMAL_DA: DA-aware variant of NORMAL
   Same algorithm but accepts DA-typed input position (X, Z) and emits
   DA-typed outputs. The line geometry (X0..Z1) stays RE since BX1BOXP
   always stores constants. Required by EDGESEC's DA-input call path
@@ -99,7 +79,7 @@ PROCEDURE NORMAL_DA X (DA) Z (DA) X0 (RE) Z0 (RE) X1 (RE) Z1 (RE)
   ZS := Z - DIS*NZ;
 ENDPROCEDURE;
 
-{ ----- EDGESEC: edge-section closest-approach (cosy.fox L2347-2363)
+{ ----- EDGESEC: edge-section closest-approach
   For point (X, Z) and box-edge IB.IE, compute closest point (XS, ZS)
   on that edge and signed distance DIS.
 
@@ -156,7 +136,7 @@ PROCEDURE EDGESEC X (DA) Z (DA) IB (RE) IE (RE)
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- PTBOX: point-vs-box geometry (cosy.fox L2365-2378)
+{ ----- PTBOX: point-vs-box geometry
   Tests whether the *constant* part of point (X, Z) is inside box IB
   and reports per-edge {distance, side} arrays. INSIDE flag = 1 iff
   the point lies on the "inside" side of all four edges (sign vote).
@@ -193,7 +173,7 @@ PROCEDURE PTBOX X (DA) Z (DA) IB (RE)
 ENDPROCEDURE;
 
 { ----- POLB_BD: Horner evaluation of one row of a 2D RE table (BX*-style)
-  cosy.fox's MCSDIST defines POLB as a nested fn that reverses a row of
+  MCSDIST defines POLB as a nested fn that reverses a row of
   P[IB, 1..N+1] via Horner. ROSY can't nest fns inside procs cleanly, so
   POLB_BD is hoisted to a top-level FUNCTION that takes the 2D table P
   + row index IB + order N. Both BXBDT and BXDDT have shape (RE 5 7), so
@@ -206,7 +186,7 @@ FUNCTION (DA) POLB_BD X (DA) P (RE 5 7) IB (RE) N_ORDER (RE);
   ENDLOOP;
 ENDFUNCTION;
 
-{ ----- MCSDIST: superimposed combined-function-magnet field (cosy.fox L2380-2413)
+{ ----- MCSDIST: superimposed combined-function-magnet field
   Sums per-box BY contributions for all BXIBOX boxes. For each box IM:
    * If point (X, Z) is inside the box → evaluate BY = POLB_BD(R, BXBDT, ...)
      with R = |X, Z|, then attenuate by 4 ENGE soft-edge factors (one per
@@ -215,7 +195,7 @@ ENDFUNCTION;
      closest edge and evaluate at that edge's foot, attenuated by ENGE
      factors for any edge within 6·DMAX of the point.
 
-  cosy.fox's LHE=1 hard-edge branch is dead in normal operation (LHE=0
+  LHE=1 hard-edge branch is dead in normal operation (LHE=0
   hardcoded); not ported.                                                 }
 FUNCTION (DA) MCSDIST X (DA) Z (DA);
   VARIABLE (RE) IM;
@@ -284,7 +264,7 @@ FUNCTION (DA) MCSDIST X (DA) Z (DA);
 ENDFUNCTION;
 
 { ----- HAMILTONIAN: H(A, V, H) in particle-optical coordinates
-        (cosy.fox L2767-2780) ---
+ ---
   Computes the on-shell Hamiltonian
     H = A/CONS(CHIM) - (1 + curv·DD[1])·sqrt((CHIM/CONS(CHIM))^2 - DD[2]^2 - DD[4]^2)
   with relativistic kinematics restricted to the reference-particle plane
@@ -293,21 +273,21 @@ ENDFUNCTION;
 
   Inputs:
     A : (DA) vector potential component (in T·m)
-    V : (DA) scalar potential (in kV — note the cosy.fox 0.001 conversion)
+    V : (DA) scalar potential (in kV — note the  0.001 conversion)
     H : (DA) curvature [m^-1]
   Output: HAMILTONIAN (DA), the Hamiltonian as a Taylor series in DD.
 
   Notes:
-    * cosy.fox's `IF ABS(V)=0` distinction selects the fast HFAC path.
+    * 's `IF ABS(V)=0` distinction selects the fast HFAC path.
       ROSY can't introspect a DA's "is exactly zero" cheaply; we use
       the equivalent HFULL formula always (slightly slower but correct).
-    * cosy.fox HFULL refers to a bare `C` in the formula
+    *  HFULL refers to a bare `C` in the formula
       `(AMU*C/Z0/EZERO)*M0*PREL`. The global C at libcosy is the RK
       Butcher-tableau coefficient array (RE 13), not a scalar. The
-      analogous expression in RP (cosy.fox L2796) uses CLIGHT — the
-      cosy.fox `C` here was almost certainly meant to be CLIGHT, so we
+      analogous expression in RP uses CLIGHT — the
+       `C` here was almost certainly meant to be CLIGHT, so we
       port as CLIGHT (matches the physics).                              }
-{ ----- POFF: off-plane potential extension (cosy.fox L2443-2451) ---------
+{ ----- POFF: off-plane potential extension ---------
   POFF(P, H, IX, IY, IS) extends the in-plane potential P to off-plane
   values that satisfy Laplace's equation ∇²P = 0 in particle-optical
   coordinates. The curvature parameter H_PARAM (separate from the global
@@ -340,7 +320,7 @@ PROCEDURE POFF P (DA) H_PARAM (DA) IX (RE) IY (RE) IS (RE);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- PMFF: Cartesian off-plane multipole completion (cosy.fox L2452-2461)
+{ ----- PMFF: Cartesian off-plane multipole completion
   PMFF(P, L_ORDER, IX, IY, IS) extends in-plane potential P to off-plane
   using Cartesian Laplacian recursion appropriate for an L-pole field
   with the rotational symmetry of the multipole order.
@@ -403,7 +383,7 @@ FUNCTION (DA) HAMILTONIAN A_VEC (DA) V_SCAL (DA) H_CURV (DA);
   CO NOC-1;
 ENDFUNCTION;
 
-{ ----- POTI: potential to a vector field (cosy.fox L245-253) -------------
+{ ----- POTI: potential to a vector field -------------
   POTI(F, NF, P) finds a scalar potential P satisfying ∂P/∂x_i = F[i] for
   i=1..NF (a vector field is conservative if it admits such a potential).
 
@@ -446,14 +426,14 @@ PROCEDURE POTI F (DA 8) NF (RE) P (DA);
   DANOT NOC;
 ENDPROCEDURE;
 
-{ ----- POTFLD: field-potential evaluator (cosy.fox L2438-2717, partial) ----
+{ ----- POTFLD: field-potential evaluator (, partial) ----
   POTFLD(X, S) computes the electric/magnetic potentials V, W and the
   on-axis fields (EFX, EFY, EFZ, BFX, BFY, BFZ) plus curvature H at the
   current particle position, for the multipoles configured in PPOL/MPOL.
 
-  This is the M6 keystone — cosy.fox's POTFLD has 8+ nested helpers and
+  This is the M6 keystone — 's POTFLD has 8+ nested helpers and
   handles 25+ NSDP modes (constant, ENGE fringe, Gaussian, Wiggler,
-  measured-data, etc.). The libcosy v1 port handles only the simplest
+  measured-data, etc.). The libcosy port handles only the simplest
   cases needed for SIELE-driven multipole magnets:
 
     NSDP ≥ 0  → POTS path (constant + ENGE fringe + multipole profiles)
@@ -461,7 +441,7 @@ ENDPROCEDURE;
     LOFF = 1  → PMM/PEM symmetric multipole completion
     LOFF = 2  → DD[1]/DD[3] direct off-plane completion
     LCCT = 1  → FCCT concatenation post-step                          }
-{ ----- DIST: signed distance + foot-of-perpendicular (cosy.fox L2503-2516)
+{ ----- DIST: signed distance + foot-of-perpendicular
   Computes the signed distance DIS from point (X, Z) to a curve specified
   by a center point (XC, ZC) and a tangent point (XP, ZP), with curvature
   parameter H_PAR. If H_PAR != 0, the curve is a circle; if 0, it's a line.
@@ -509,7 +489,7 @@ PROCEDURE DIST X (DA) Z (DA) XP_PT (DA) ZP_PT (DA) XC_PT (DA) ZC_PT (DA)
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- CENT: bend-center detail polynomial (cosy.fox L2525-2534) -----
+{ ----- CENT: bend-center detail polynomial -----
   Returns a quartic-in-PH / cubic-in-DR fit using PPOL[21..36] as the
   16 coefficients. PH = atan2(Z, X) - PHI0/2 is the rotated angle from
   the bend center. Used by BENDIST IC=2 (NSDP=-7 detailed-center bend).
@@ -536,7 +516,7 @@ FUNCTION (DA) CENT X (DA) Z (DA) DR_PARAM (DA) PHI0 (RE);
             *(PPOL[33] + PH*(PPOL[34] + PH*(PPOL[35] + PH*PPOL[36])));
 ENDFUNCTION;
 
-{ ----- ENGESIDES: ENGE-modulated distance combo (cosy.fox L2517-2524) -----
+{ ----- ENGESIDES: ENGE-modulated distance combo -----
   Uses two DIST calls (one per bend edge) with PPOL[5..14] as the
   edge geometry, then combines via ENGE for soft-edge fringe.        }
 PROCEDURE ENGESIDES X (DA) Z (DA) D (RE) LEV_FLAG (RE) IEM (RE)
@@ -561,13 +541,13 @@ PROCEDURE ENGESIDES X (DA) Z (DA) D (RE) LEV_FLAG (RE) IEM (RE)
   ENGES := ENGE(1, 1, IEM, DIS1/D/2)*ENGE(1, 2, IEM, DIS2/D/2);
 ENDPROCEDURE;
 
-{ ----- BENDIST: field distribution of bending sectors (cosy.fox L2535-2546)
+{ ----- BENDIST: field distribution of bending sectors
   Returns a DA-valued field strength at (X, Z) for a bending sector with
   geometry encoded in PPOL[1..36]. IC selects:
     IC =  1 → standard polynomial radial profile (1 - Σ PPOL[20+i]·xr^i)
     IC = -1 → linear-in-XR0 profile (used by NSDP=-11 electric bend)
     IC =  2 → CENT-driven detailed-center profile (used by NSDP=-7;
-             cosy.fox uses CENT here — libcosy v1 errors out for IC=2)
+              uses CENT here — libcosy errors out for IC=2)
   Multiplied by PPOL[1] (field magnitude) and ENGES (soft-edge).      }
 FUNCTION (DA) BENDIST X (DA) Z (DA) IC (RE);
   VARIABLE (DA) XR0;
@@ -606,8 +586,8 @@ FUNCTION (DA) BENDIST X (DA) Z (DA) IC (RE);
 ENDFUNCTION;
 
 PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
-  { ----- FIELDXZ: Cartesian-frame field evaluator (cosy.fox L2627-2700)
-    Supports a subset of NSDP<0 modes for libcosy v1:
+  { ----- FIELDXZ: Cartesian-frame field evaluator
+    Supports a subset of NSDP<0 modes for libcosy:
       NSDP = -1 → entrance bend electric fringe
       NSDP = -2 → exit bend electric fringe
       NSDP = -3 → wiggler
@@ -617,8 +597,8 @@ PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
     -7 (BENDIST detailed-center), -8 (MCSDIST superimposed combined),
     -21 (MSEM g-2 magnet) all wired. NSDP = -6 (FOURIERGAUSS) is
     *permanently deferred* — its data source FGDATIN is itself
-    commented-out in cosy.fox 10.2 (L3664), so NSDP=-6 is unreachable
-    in cosy.fox too. Porting it would require 3D MFD with cosy's
+    commented-out in  10.2 (L3664), so NSDP=-6 is unreachable
+    in  too. Porting it would require 3D MFD with cosy's
     `|K` DA-component-extraction operator, which ROSY doesn't have
     in its grammar. No business case until COSY upstream re-enables
     FGDATIN. }
@@ -665,11 +645,11 @@ PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
     BFY := PPOL[1]*COS((PPOL[2] + PPOL[5]*Z_F)*Z_F);
     BFY := EDGE(Z_F/PPOL[3])*EDGE((-Z_F + PPOL[4])/PPOL[3])*BFY;
   ELSEIF NSDP = -4;
-    { Magnetic dipole with bend geometry (cosy.fox L2656). BENDIST IC=1
+    { Magnetic dipole with bend geometry. BENDIST IC=1
       gives the standard polynomial radial profile.                      }
     BFY := BENDIST(X_F, Z_F, 1);
   ELSEIF NSDP = -5;
-    { Measured magnetic field data (cosy.fox L2657-2659). 2D Gaussian
+    { Measured magnetic field data. 2D Gaussian
       smoother on the global MFD table, with PPOL[1..5] holding NX,
       NZ, DX, DZ, SIGMA. MFP[1] accumulates "out-of-range" warnings.  }
     VARIABLE (RE) GAUSS_ERR;
@@ -679,7 +659,7 @@ PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
                  CONS(PPOL[5]), MFD, GAUSS_ERR) + 0*DD[1];
     MFP[1] := MFP[1] + GAUSS_ERR;
   ELSEIF NSDP = -7;
-    { Magnetic dipole with detailed center (cosy.fox L2663-2667). BENDIST
+    { Magnetic dipole with detailed center. BENDIST
       IC=2 routes through CENT for refined angular-radial profile. If
       MFP[2]=1 (armed by MFFLD), first sweep the full grid and dump
       field values to unit 98 — one-shot trigger that resets MFP[2].   }
@@ -704,7 +684,7 @@ PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
     ENDIF;
     BFY := BENDIST(X_F, Z_F, 2);
   ELSEIF NSDP = -8;
-    { Superimposed combined-function magnets (cosy.fox L2668-2673).
+    { Superimposed combined-function magnets.
       MCSDIST sums per-box BY contributions over BXIBOX boxes. Same
       MFFLD-writer trigger pattern as NSDP=-7.                          }
     IF MFP[2] = 1;
@@ -728,7 +708,7 @@ PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
     ENDIF;
     BFY := MCSDIST(X_F, Z_F);
   ELSEIF NSDP = -11;
-    { Electrostatic deflector (cosy.fox L2674). BENDIST IC=-1 gives the
+    { Electrostatic deflector. BENDIST IC=-1 gives the
       linear-in-XR0 profile multiplied by Σ multipole correction.        }
     V := BENDIST(X_F, Z_F, -1);
   ELSEIF NSDP = -12;
@@ -738,7 +718,7 @@ PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
     XR0 := SQRT(SQR(X_F - PPOL[2]) + SQR(Z_F));
     V := PPOL[1]*(1 + PPOL[2]/XR0);
   ELSEIF NSDP = -21;
-    { MSEM G-2 magnet (cosy.fox L2681-2698): combined magnetic + electric
+    { MSEM G-2 magnet: combined magnetic + electric
       multipoles. Magnetic part has no s-dependent fringe; electric part
       uses ENGE-modulated soft-edge fringe via two DIST calls.
       PPOL layout (after NSDP=-21):
@@ -829,7 +809,7 @@ PROCEDURE FIELDXZ X_F (DA) Z_F (DA) CPHI (DA) SPHI (DA);
   W := BFY*DD[3];
 ENDPROCEDURE;
 
-{ ----- POTXZ: Cartesian-frame potential wrapper (cosy.fox L2625-2705) -----
+{ ----- POTXZ: Cartesian-frame potential wrapper -----
   POTXZ rotates the integration position (X[11..13]) through the
   reference-orbit angle X[13] before calling FIELDXZ in the magnet's
   Cartesian frame, then POFF V/W for off-plane completion.            }
@@ -849,14 +829,14 @@ PROCEDURE POTXZ X (DA 30);
   POFF W ZERO_DA_PX 1 3 2;
 ENDPROCEDURE;
 
-{ ----- INTERP: support-point polynomial blend (cosy.fox L2470-2485)
+{ ----- INTERP: support-point polynomial blend
   Used by NSDP=20 (general s-dependent element via GE). Walks SN[1..NN]
   to find the segment INP containing S, then blends two POLVAL'd
   polynomials evaluated at the segment basis (one per endpoint) with a
   PN-defined Horner weight P. The two endpoint contributions average
   with weights (1 - P) and (1 + P) so the blend transitions smoothly.
 
-  HN/VN/WN are now (DA 100) per cosy.fox semantics — each cell stores
+  HN/VN/WN are now (DA 100) per  semantics — each cell stores
   a polynomial in (DD[1], DD[2], DD[3]) describing the curvature /
   scalar-electric / scalar-magnetic potentials at that support point.
   POLVAL 1 AC 3 BC 3 AC 3 evaluates the AC poly-array at BC's offset.   }
@@ -963,35 +943,35 @@ PROCEDURE POTFLD X (DA 30) S (RE);
     ELSEIF NSDP = 2;
       P := PPOL[I]*ENGE(MOD(JPOL, 20), 2, JEM, (S + DD[2])/DR/2);
     ELSEIF NSDP = 3;
-      { Gaussian s-profile (cosy.fox L2556) }
+      { Gaussian s-profile }
       P := PPOL[I]*EXP(-SQR((S + DD[2])/DR));
     ELSEIF NSDP = 4;
-      { Linear s-profile (cosy.fox L2557) }
+      { Linear s-profile }
       P := PPOL[I]*(S + DD[2]);
     ELSEIF NSDP = 5;
-      { Algebraic-saturation profile (cosy.fox L2558).
+      { Algebraic-saturation profile.
           P = PPOL[I] · (s+DD[2]) / sqrt(1 + ((s+DD[2])/DR)²)
         Linear near s=0, saturates to ±PPOL[I]·DR for |s|≫DR — useful
         for short-magnet field profiles where Gaussian tails (NSDP=3)
         are too aggressive. ISRT is the native 1/√x intrinsic.        }
       P := PPOL[I]*(S + DD[2])*ISRT(1 + SQR((S + DD[2])/DR));
     ELSEIF NSDP = 6;
-      { Three-tube electric lens (cosy.fox L2559-2562) }
+      { Three-tube electric lens }
       P := LOG(COSH((S+DD[2])/DR+PPOL[2])/COSH((S+DD[2])/DR+PPOL[3]));
       P := P + LOG(COSH((S+DD[2])/DR-PPOL[2])/COSH((S+DD[2])/DR-PPOL[3]));
       P := P * PPOL[1];
     ELSEIF NSDP = 9;
-      { Three-aperture electric lens (cosy.fox L2572-2577) }
+      { Three-aperture electric lens }
       P := (S+DD[2]+PPOL[3])*ATAN((S+DD[2]+PPOL[3])/DR);
       P := P + (S+DD[2]-PPOL[3])*ATAN((S+DD[2]-PPOL[3])/DR);
       P := P - (S+DD[2]+PPOL[2])*ATAN((S+DD[2]+PPOL[2])/DR);
       P := P - (S+DD[2]-PPOL[2])*ATAN((S+DD[2]-PPOL[2])/DR);
       P := P * PPOL[1];
     ELSEIF NSDP = 7;
-      { Glaser lens profile: PPOL[1]·DR·atan(s/DR) (cosy.fox L2563) }
+      { Glaser lens profile: PPOL[1]·DR·atan(s/DR) }
       P := PPOL[1]*DR*ATAN((S + DD[2])/DR);
     ELSEIF NSDP = 8;
-      { Solenoid potential (cosy.fox L2564-2571). Three-piece logarithmic
+      { Solenoid potential. Three-piece logarithmic
         profile with discontinuity-aware branches at s=0 and s=PPOL[2]. }
       IF S < 0;
         P := LOG((1+EXP(2/DR*(S+DD[2])))/(1+EXP(2*(S+DD[2]-PPOL[2])/DR)))
@@ -1005,15 +985,15 @@ PROCEDURE POTFLD X (DA 30) S (RE);
       ENDIF;
       P := PPOL[1]*P;
     ELSEIF NSDP = 10;
-      { Ideal solenoid (cosy.fox L2578-2580). Differential of two
+      { Ideal solenoid. Differential of two
         sqrt-distance potentials gives uniform-field box.              }
       P := SQRT(SQR(S+DD[2])+SQR(DR)) - SQRT(SQR(S+DD[2]-PPOL[2])+SQR(DR));
       P := P*PPOL[1];
     ELSEIF NSDP = 11;
-      { Accelerating static homogeneous E-field: PPOL[1]·s (cosy.fox L2581-2582) }
+      { Accelerating static homogeneous E-field: PPOL[1]·s }
       P := PPOL[1]*(S + DD[2]);
     ELSEIF NSDP = 12;
-      { General multipole by Gaussians (cosy.fox L2583-2585). MFD[I, IS]
+      { General multipole by Gaussians. MFD[I, IS]
         is a measured-on-grid amplitude for pole I at grid point IS;
         GAUSS1_DA Gaussian-smooths along s with width PPOL[3].
           PPOL[1] = NS (grid count), PPOL[2] = DS (spacing), PPOL[3] = σ.
@@ -1024,7 +1004,7 @@ PROCEDURE POTFLD X (DA 30) S (RE);
                      CONS(PPOL[3]), I, MFD, IS_GAUSS);
       MFP[1] := MFP[1] + IS_GAUSS;
     ELSEIF NSDP = 13;
-      { Thick solenoid (cosy.fox L2587-2595). Two-piece sqrt-log
+      { Thick solenoid. Two-piece sqrt-log
         potential with derivatives at s=0 and s=PPOL[2].               }
       VARIABLE (DA) P1_TMP;
       P1_TMP := SQRT(SQR(S+DD[2])+SQR(PPOL[4]));
@@ -1037,7 +1017,7 @@ PROCEDURE POTFLD X (DA 30) S (RE);
       P := P + SQR(S-PPOL[2]+DD[2])*LOG(PPOL[3]+P1_TMP) + PPOL[3]*P1_TMP;
       P := P*PPOL[1];
     ELSEIF NSDP = 14;
-      { Multi-piece thick solenoid (cosy.fox L2596-2608). PPOL[1] = N
+      { Multi-piece thick solenoid. PPOL[1] = N
         (count of pieces). For each IS=1..N, MFD[IS, 1..5] holds the
         piece data: amplitude, length, inner radius, outer radius, s-
         offset. Sum the per-piece thick-solenoid potentials.            }
@@ -1125,7 +1105,7 @@ PROCEDURE POTFLD X (DA 30) S (RE);
         V := V + P;
       ENDIF;
     ELSE;
-      WRITE 6 ' *** ERROR in POTFLD, only LOFF=1 and LOFF=2 supported in libcosy v1';
+      WRITE 6 ' *** ERROR in POTFLD, only LOFF=1 and LOFF=2 supported in libcosy';
       QUIT 0;
     ENDIF;
   ENDLOOP;
@@ -1148,9 +1128,9 @@ PROCEDURE POTFLD X (DA 30) S (RE);
   CO NOC-1;
   IF LCCT = 1;
     { FCCT — concatenate field expressions with the integration state X.
-      cosy.fox L2462-2469: pack the 8 field components into ACCT, run
+      : pack the 8 field components into ACCT, run
       POLVAL with X (transverse phase-space) substituted in, unpack
-      back. cosy.fox zeros X[2] (momentum slot) before POLVAL and
+      back.  zeros X[2] (momentum slot) before POLVAL and
       restores after; libcosy uses a local copy to avoid mutation.    }
     LOOP I 1 TWOND;
       X_LOCAL[I] := X[I];
@@ -1164,7 +1144,7 @@ PROCEDURE POTFLD X (DA 30) S (RE);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- ODE: equations of motion right-hand side (cosy.fox L2719-2765) ----
+{ ----- ODE: equations of motion right-hand side ----
   ODE(X, S, XP) computes the derivatives XP[1..29] of the integrated
   quantities at position S given current state X. Used by RK as the rhs
   callback during s-stepping, and by SIELE to seed DAFLO with the local
@@ -1179,7 +1159,7 @@ ENDPROCEDURE;
   (POP0, ETA1, P0PZ scalings) account for changes in reference momentum
   along the trajectory due to RF cavities or electrostatic fields.
 
-  libcosy v1 skips the spin block (LSPN=1) — see SIELE's separate SPNFLO
+  libcosy skips the spin block (LSPN=1) — see SIELE's separate SPNFLO
   helper for the spin-flow path. Also assumes LKC ∈ {0, 1} (full or
   linearised kinematic correction).                                      }
 PROCEDURE ODE X (DA 30) S (RE) XP (DA 30);
@@ -1237,7 +1217,7 @@ PROCEDURE ODE X (DA 30) S (RE) XP (DA 30);
   XP[7] := 0*DD[1];
   XP[8] := 0*DD[1];
   IF LSPN = 1;
-    { Thomas-BMT spin precession (cosy.fox L2751-2764). Computes the
+    { Thomas-BMT spin precession. Computes the
       angular-velocity vector W = (WX, WY, WZ) from the on-axis fields
       and current state, then writes XP[21..29] as W × R for each row
       R of the 3×3 spin matrix X[21..29]. The Berz-NIM-A298 formula
@@ -1272,17 +1252,17 @@ PROCEDURE ODE X (DA 30) S (RE) XP (DA 30);
 ENDPROCEDURE;
 
 { ----- RK: classical RK4 fixed-step Runge-Kutta integrator -----
-  cosy.fox uses adaptive Verner 7(8) via RKCO; libcosy v1 uses classical
+   uses adaptive Verner 7(8) via RKCO; libcosy uses classical
   RK4 (4-stage, 4th-order) with fixed step size.
 
   Reason: ROSY's RKCO intrinsic returns DOP853 coefficients whose b-weight
   vector sums to ~0.7126 instead of 1.0, producing systematic drift errors
   of (1 - 0.7126) ≈ 28.7% per step in the integrated state. RK4 has
   sum(b_J) = 1/6 + 2/6 + 2/6 + 1/6 = 1, so it's correct by construction.
-  The accuracy hit (4th-order vs. 8th-order) is acceptable for libcosy v1
+  The accuracy hit (4th-order vs. 8th-order) is acceptable for libcosy
   use cases (fringe-field s-stepping with many small steps).
 
-  Parameters: same signature as cosy.fox RK so SDELE can call uniformly.
+  Parameters: same signature as  RK so SDELE can call uniformly.
   N      — number of ODEs
   X0, X1 — integration interval
   Y0     — initial state (DA-30)
@@ -1343,7 +1323,7 @@ PROCEDURE RK N (RE) X0 (RE) X1 (RE) Y0 (DA 30) H0 (RE) HS (RE) H1 (RE)
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- SDELE: s-dependent element actuator (cosy.fox L2910-2932) ---------
+{ ----- SDELE: s-dependent element actuator ---------
   SDELE(S1, S2, H1, H2, H3, D) integrates the equations of motion from
   s = S1 to s = S2 using the adaptive RK integrator. H1/H2/H3 are
   min/suggested/max step sizes; D is the aperture / characteristic
@@ -1365,7 +1345,7 @@ ENDPROCEDURE;
   This is the workhorse for fringe-field elements — FFELE LFR=1/2/3
   paths drive multi-step SDELE calls with NSDP=1/2 (entrance/exit
   ENGE) substituted in POTFLD. Note: NSDP=1/2 in POTFLD is not yet
-  ported in libcosy v1, so SDELE works only for NSDP=0 (constant
+  ported in libcosy, so SDELE works only for NSDP=0 (constant
   fields) — useful for thick-element drift-equivalent testing.       }
 PROCEDURE SDELE S1 (RE) S2 (RE) H1 (RE) H2 (RE) H3 (RE) D_AP (RE);
   VARIABLE (RE) ERREST_LOCAL;
@@ -1426,7 +1406,7 @@ PROCEDURE SDELE S1 (RE) S2 (RE) H1 (RE) H2 (RE) H3 (RE) D_AP (RE);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- DSDED: SDELE between negative drifts (cosy.fox L2945-2953) -----
+{ ----- DSDED: SDELE between negative drifts -----
   DSDED(LDL, L, H1, H2, H3, D_AP) wraps SDELE with a backward drift
   by LDL on either side. Used by short-element wrappers (CEG, CEL,
   CEA, DC) where the element occupies [0, L] but the integration
@@ -1470,7 +1450,7 @@ PROCEDURE DSDED LDL (RE) L (RE) H1 (RE) H2 (RE) H3 (RE) D_AP (RE);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- SDELEREF: reference-orbit-only s-dependent element (cosy.fox L2934-2943)
+{ ----- SDELEREF: reference-orbit-only s-dependent element
   SDELEREF integrates only the reference orbit (X[11..15] slots) over
   [S1, S2] without updating MSC or the spin matrix. Used for "preview"
   of the curved axis without committing the full transfer-map update.
@@ -1482,7 +1462,7 @@ ENDPROCEDURE;
     * Doesn't write MSC or SSCR after RK.
     * LOCSET uses S2 as the arc-length stamp (not S2-S1 like SDELE).
 
-  Used by BENDFF3 (cosy.fox L3284) for the high-precision bend-fringe
+  Used by BENDFF3 for the high-precision bend-fringe
   path to walk the reference axis through the dipole interior before
   the actual map integration runs.                                     }
 PROCEDURE SDELEREF S1 (RE) S2 (RE) H1 (RE) H2 (RE) H3 (RE) D_AP (RE);
@@ -1512,7 +1492,7 @@ PROCEDURE SDELEREF S1 (RE) S2 (RE) H1 (RE) H2 (RE) H3 (RE) D_AP (RE);
   LSPN := LSPNO;
 ENDPROCEDURE;
 
-{ ----- SIELE: s-independent element actuator (cosy.fox L2955-2975) -----
+{ ----- SIELE: s-independent element actuator -----
   SIELE(L, D) applies an s-independent element of length L and aperture D
   to the active map (via MSC). It works by:
 
@@ -1525,8 +1505,8 @@ ENDPROCEDURE;
     4. Calling DAFLO to compute exp(L_XP)·DD[i] for each phase-space
        coordinate, giving the new MSC.
 
-  Spin path (LSPN=1): cosy.fox uses a nested SPNFLO procedure that
-  iteratively applies the spin-flow operator. libcosy v1 errors out
+  Spin path (LSPN=1):  uses a nested SPNFLO procedure that
+  iteratively applies the spin-flow operator. libcosy errors out
   for the spin path — needs the SPNFLO sibling to land first.
 
   SIELE is the simplest element actuator: no s-dependence, no fringe
@@ -1564,7 +1544,7 @@ PROCEDURE SIELE L (RE) D (RE);
     MSC[I] := RES_VEC[I];
   ENDLOOP;
   IF LSPN = 1;
-    { SPNFLO (cosy.fox L2957-2970): Picard iteration that builds the
+    { SPNFLO: Picard iteration that builds the
       element-local spin matrix SSCR from the angular-velocity
       contribution XP[21..29] (already filled by ODE's spin block).
 
@@ -1633,10 +1613,10 @@ PROCEDURE SIELE L (RE) D (RE);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- FFELE: fringe-field element wrapper (cosy.fox L3024-3097, partial)
+{ ----- FFELE: fringe-field element wrapper (, partial)
   FFELE(L, D, H_LOCAL, LF1, LF2, CI) is the dispatch hub for
   s-dependent / s-independent elements with optional fringe fields.
-  cosy.fox supports many LFR modes (0=no FF, 1=soft edge, 2/1.9=
+   supports many LFR modes (0=no FF, 1=soft edge, 2/1.9=
   symplectic-scaling, 3/2.5=high precision, -1/-2=half fringe, -10=RK
   no FF).
 
@@ -1678,7 +1658,7 @@ PROCEDURE FFELE L (RE) D_AP (RE) H_LOCAL (RE) LF1 (RE) LF2 (RE) CI (ST);
     ENDIF;
     UPDATE 1 1;
   ELSEIF LFR = 1;
-    { LFR=1: soft-edge fringe field, two-step (cosy.fox L3043-3055).
+    { LFR=1: soft-edge fringe field, two-step.
       Entrance fringe via SDELE NSDP=LF1, body via SIELE NSDP=0,
       exit fringe via SDELE NSDP=LF2.                                 }
     { Pre-compute step parameters as RE temps to avoid ROSY's
@@ -1729,8 +1709,8 @@ PROCEDURE FFELE L (RE) D_AP (RE) H_LOCAL (RE) LF1 (RE) LF2 (RE) CI (ST);
     ENDIF;
     UPDATE 1 1;
   ELSEIF (LFR = 3) OR (LFR = 2.5);
-    { LFR=3 (and LFR=2.5 alias from cosy.fox): high-precision soft-edge
-      fringe (cosy.fox L3068-3078). Wider 8*D drift extension than
+    { LFR=3 (and LFR=2.5 alias from ): high-precision soft-edge
+      fringe. Wider 8*D drift extension than
       LFR=1's 4*D, single SDELE per side for higher RK accuracy. Step
       sizes D/200 (min) / D / 7*D give very fine adaptive control.    }
     VARIABLE (RE) NEG8D;
@@ -1780,7 +1760,7 @@ PROCEDURE FFELE L (RE) D_AP (RE) H_LOCAL (RE) LF1 (RE) LF2 (RE) CI (ST);
     UPDATE 1 1;
   ELSEIF LFR = -10;
     { LFR=-10: no fringe field, but use RK for the entire element
-      (cosy.fox L3093-3094). Gives fine-grained accuracy when the user
+. Gives fine-grained accuracy when the user
       doesn't want the fringe-field smearing — useful for measured-data
       elements where the field profile is computed externally.        }
     VARIABLE (RE) STEP_MIN_M10;
@@ -1791,7 +1771,7 @@ PROCEDURE FFELE L (RE) D_AP (RE) H_LOCAL (RE) LF1 (RE) LF2 (RE) CI (ST);
     SDELE 0 L STEP_MIN_M10 D_AP STEP_MAX_M10 D_AP;
     UPDATE 1 1;
   ELSEIF LFR = -1;
-    { LFR=-1: entrance fringe alone, high-precision (cosy.fox L3079-3085).
+    { LFR=-1: entrance fringe alone, high-precision.
       Like LFR=3 but only the entrance half — gives the user explicit
       control over fringe placement. Body integration via SIELE -6*D D
       after entrance fringe.                                           }
@@ -1818,7 +1798,7 @@ PROCEDURE FFELE L (RE) D_AP (RE) H_LOCAL (RE) LF1 (RE) LF2 (RE) CI (ST);
     LOCSET 0 0 0 0 0 0;
     UPDATE 1 1;
   ELSEIF LFR = -2;
-    { LFR=-2: exit fringe alone, high-precision (cosy.fox L3086-3092).
+    { LFR=-2: exit fringe alone, high-precision.
       Mirror of LFR=-1 — body-then-fringe instead of fringe-then-body. }
     VARIABLE (RE) NEG8D_M2;
     VARIABLE (RE) NEG6D_M2;

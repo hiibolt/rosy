@@ -1,41 +1,29 @@
-{ ============================================================================
-  libcosy/physics/elements_electric.rosy — Electric-field elements
-
-  Status (post-M6): the full electric-element family is ported.
-    * RF                                — analytical thin-lens cavity.
+{ Electric-field elements:
+    * RF                                analytical thin-lens cavity.
     * EQ / EH / EO / ED / EZ / E5 / EM /
-      EMS                               — multipoles via FFELE.
-    * EBEND / EC / ES / ECL / ESP / DC  — electrostatic deflectors and
-                                          drift-cell helpers via FFELE.
-    * CEG / CEL / CEA                   — Einzel-lens family via FFELE.
-    * WC / WF                           — Wien-filter pair.
+      EMS                               multipoles via FFELE.
+    * EBEND / EC / ES / ECL / ESP / DC  electrostatic deflectors and
+                                        drift-cell helpers via FFELE.
+    * CEG / CEL / CEA                   Einzel-lens family via FFELE.
+    * WC / WF                           Wien-filter pair.
 
-  RF Cavity (cosy.fox L3899-3916)
-  -------------------------------
-  RF(V, N, W, PHI, D) applies a thin-lens RF cavity to the active MAP
-  (and the scratch MSC if rays are enabled). Inputs:
-    * V : (RE 3 3) polynomial coefficients of the on-axis voltage
-                   profile V(x, y) = sum_{ij} V[i,j] · x^(i-1) · y^(j-1)
-    * N : (RE)     polynomial degree (N+1 terms per axis)
-    * W : (RE)     RF frequency [Hz]
-    * PHI: (RE)    RF phase at the longitudinal reference [degrees]
-    * D : (RE)     pole-tip aperture [m]
-
-  The cavity is treated as a thin lens: time-of-flight T translates to
-  a phase, the polynomial V evaluated at (x, y) gives the energy kick,
-  and the post-kick momenta are scaled by the new-to-old momentum ratio.
-  ============================================================================ }
+  RF cavity is a thin lens: time-of-flight translates to a phase, the
+  polynomial V evaluated at (x, y) gives the energy kick, and the
+  post-kick momenta are scaled by the new-to-old momentum ratio. The
+  remaining electric elements use the same FFELE / SDELE / SIELE
+  pipeline as the magnetic family with negative MPOL entries flagged
+  as electric. }
 
 BEGIN;
 
 INCLUDE '../globals.rosy';
 
-{ ----- RF: thin-lens RF cavity (cosy.fox L3899-3916) ----------------------
+{ ----- RF: thin-lens RF cavity ----------------------
   Algorithm:
     1. Save EE0 = CONS(E0), PP0 = CONS(P0) (energy/momentum BEFORE kick).
     2. Compute VV0 = POLY(0, 0, V, N) · sin(PHI·DEGRAD) · 0.001 · Z0
        (the constant-axis kick at reference; .001 factor converts kV→MeV
-       per cosy.fox's electrical convention; Z0 is the charge state).
+       per 's electrical convention; Z0 is the charge state).
     3. Update reference particle to E0+VV0 via RP — this rebuilds
        P0/V0/CHIM/CHIE for the new kinetic energy.
     4. Apply RFM to MAP and (if rays enabled) MSC.
@@ -97,7 +85,7 @@ PROCEDURE RF V (RE 3 3) N (RE) W (RE) PHI (RE) D (RE);
   UPDATE 0 1;
 ENDPROCEDURE;
 
-{ ----- M6.4: SIELE-driven electric multipoles (cosy.fox L3724-3759) -----
+{ ----- SIELE-driven electric multipoles -----
   Parallel to the magnetic multipoles but with negative MPOL (identifying
   them as electric in POTFLD's POTS path) and PPOL holding voltages
   (kV) rather than fields (T). All delegate to FFELE which dispatches
@@ -147,7 +135,7 @@ PROCEDURE EZ L (RE) VV (RE) D (RE);
   FFELE L D 0 1 2 'EZ';
 ENDPROCEDURE;
 
-{ E5: 5-pole electric bundle (cosy.fox L3739-3745). }
+{ E5: 5-pole electric bundle. }
 PROCEDURE E5 L (RE) VQ (RE) VH (RE) VO (RE) VD (RE) VZ (RE) D (RE);
   NPOL := 5;
   PPOL[1] := VQ/D/D + 0*DD[1];                MPOL[1] := -2;
@@ -159,7 +147,7 @@ PROCEDURE E5 L (RE) VQ (RE) VH (RE) VO (RE) VD (RE) VZ (RE) D (RE);
   FFELE L D 0 1 2 'E5';
 ENDPROCEDURE;
 
-{ EM: arbitrary normal electric multipole array (cosy.fox L3747-3751). }
+{ EM: arbitrary normal electric multipole array. }
 PROCEDURE EM L (RE) VA (RE 5) NVA (RE) D (RE);
   VARIABLE (RE) I;
   VARIABLE (DA) DP;
@@ -174,14 +162,14 @@ PROCEDURE EM L (RE) VA (RE 5) NVA (RE) D (RE);
   FFELE L D 0 1 2 'EM';
 ENDPROCEDURE;
 
-{ ----- M6.7: EBEND — electrostatic combined-function deflector (cosy.fox L3761-3794)
+{ ----- EBEND — electrostatic combined-function deflector
   EBEND(R, PHI, D, N, NT, CI) is the electrostatic counterpart of the
   magnetic BEND. R is the bending radius (sets the dipole electric
   field component), PHI is the bend angle (radians), D is the aperture,
   N is an array of higher-multipole strengths, NT is the count, CI is
   the element-name string.
 
-  libcosy v1 supports LFR=0 (no fringe field) only. cosy.fox's LFR=2.5/3
+  libcosy supports LFR=0 (no fringe field) only. 's LFR=2.5/3
   paths (high-precision soft-edge fringe) need NSDP=-11..-13 (electric
   bend Cartesian field modes) which are deferred.
 
@@ -220,7 +208,7 @@ PROCEDURE EBEND R (RE) PHI (RE) D (RE) N_ARR (RE 16) NT (RE) CI (ST);
     LOCSET R*(COS(PHI)-1) R*SIN(PHI) PHI R*PHI 0 0;
     UPDATE 1 1;
   ELSEIF (LFR = 3) OR (LFR = 2.5);
-    { LFR=3 / 2.5: high-precision soft-edge fringe (cosy.fox L3774-3791).
+    { LFR=3 / 2.5: high-precision soft-edge fringe.
       NSDP=-11 routes through POTXZ/FIELDXZ → BENDIST IC=-1. PPOL is
       laid out with the bend-radius geometry encoded for BENDIST.       }
     VARIABLE (RE) LDL_LOCAL;
@@ -282,12 +270,12 @@ PROCEDURE EBEND R (RE) PHI (RE) D (RE) N_ARR (RE 16) NT (RE) CI (ST);
     ZLOC := ZLOC - LDL_LOCAL*COS(PLOC);
     UPDATE 1 1;
   ELSE;
-    WRITE 6 ' *** ERROR in EBEND, only LFR=0 / 3 / 2.5 supported in libcosy v1';
+    WRITE 6 ' *** ERROR in EBEND, only LFR=0 / 3 / 2.5 supported in libcosy';
     QUIT 0;
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- EC / ES / ECL / ESP — electrostatic deflector wrappers (cosy.fox L3796-3814)
+{ ----- EC / ES / ECL / ESP — electrostatic deflector wrappers
   EC takes user-supplied N array; ES bundles 5 scalars; ECL/ESP build
   the canonical cylindrical / spherical N arrays before delegating to
   EBEND.                                                                }
@@ -337,11 +325,11 @@ PROCEDURE ESP R (RE) PHID (RE) D (RE);
 ENDPROCEDURE;
 
 { ----- M6.7+: DC + CEG — accelerator + Gaussian electric lens -----
-  DC (cosy.fox L3893-3897): static homogeneous E-field accelerator
+  DC: static homogeneous E-field accelerator
   with potential P = -V/L · s. Uses NSDP=11, MPOL=-20 (skew/no-mult
   marker), LOFF=1. SDELE drives the integration over [0, L].
 
-  CEG (cosy.fox L3872-3874): Gaussian electric lens. Uses NSDP=3
+  CEG: Gaussian electric lens. Uses NSDP=3
   (Gaussian s-profile), DSDED for the negative-drift wrap.            }
 PROCEDURE DC V_VOLT (RE) D_AP (RE) L (RE);
   NPOL := 1;
@@ -365,7 +353,7 @@ PROCEDURE CEG V_VOLT (RE) D_AP (RE);
   DSDED 5*D_AP 0 1E-4*D_AP D_AP 10*D_AP D_AP;
 ENDPROCEDURE;
 
-{ ----- CEL — three-tube electric lens (cosy.fox L3876-3884) -----
+{ ----- CEL — three-tube electric lens -----
   V/D characterise the central tube; L is the gap length, C the tube
   spacing. Uses NSDP=6 (three-tube cosh/log profile) with the
   characteristic-length scaling DR := D/O where O = 1.315 (Jiye
@@ -385,7 +373,7 @@ PROCEDURE CEL V_VOLT (RE) D_AP (RE) L_GAP (RE) C_SPACE (RE);
   DSDED 5*D_AP+C_SPACE+L_GAP/2 0 1E-4*D_AP D_AP 10*D_AP D_AP/O;
 ENDPROCEDURE;
 
-{ ----- CEA — three-aperture electric einzel lens (cosy.fox L3886-3891) -----
+{ ----- CEA — three-aperture electric einzel lens -----
   V/D/L/C parameters as for CEL. Uses NSDP=9 (atan-product profile).
   DSDED extends 15D + C + L/2 in each direction since the atan field
   decay is slower than the cosh of CEL.                                }
@@ -401,7 +389,7 @@ PROCEDURE CEA V_VOLT (RE) D_AP (RE) L_GAP (RE) C_SPACE (RE);
   DSDED 15*D_AP+C_SPACE+L_GAP/2 0 1E-4*D_AP D_AP 10*D_AP D_AP;
 ENDPROCEDURE;
 
-{ ----- WC — combined-function Wien filter (cosy.fox L3816-3822) -----
+{ ----- WC — combined-function Wien filter -----
   WC(RE_RAD, RM_RAD, L, D, NE, NM, NT) sets up a Wien filter with
   electric bend radius RE_RAD, magnetic bend radius RM_RAD, length L,
   aperture D. NE/NM are normal-multipole strength arrays for the
@@ -415,7 +403,7 @@ ENDPROCEDURE;
 
   H_LOCAL = 1/RM - 1/RE  is the net curvature for the LOCSET.
 
-  libcosy v1: only LFR=0 path works (LFR≠0 would need POTXZ NSDP=-1/-2
+  libcosy: only LFR=0 path works (LFR≠0 would need POTXZ NSDP=-1/-2
   for bend-element Cartesian fringe fields, deferred).               }
 PROCEDURE WC RE_RAD (RE) RM_RAD (RE) L (RE) D_AP (RE)
             NE_ARR (RE 16) NM_ARR (RE 16) NT (RE);
@@ -445,7 +433,7 @@ PROCEDURE WC RE_RAD (RE) RM_RAD (RE) L (RE) D_AP (RE)
   FFELE L D_AP H_LOCAL NEG1 NEG2 'WC';
 ENDPROCEDURE;
 
-{ ----- WF — homogeneous Wien filter (cosy.fox L3824) -----
+{ ----- WF — homogeneous Wien filter -----
   Convenience wrapper: WC with NT=0 (no multipoles).                   }
 PROCEDURE WF RE_RAD (RE) RM_RAD (RE) L (RE) D_AP (RE);
   VARIABLE (RE 16) NE_ZEROS;
@@ -458,7 +446,7 @@ PROCEDURE WF RE_RAD (RE) RM_RAD (RE) L (RE) D_AP (RE);
   WC RE_RAD RM_RAD L D_AP NE_ZEROS NM_ZEROS 0;
 ENDPROCEDURE;
 
-{ EMS: skew electric multipole — VA normal, VS skew (cosy.fox L3753-3759). }
+{ EMS: skew electric multipole — VA normal, VS skew. }
 PROCEDURE EMS L (RE) VA (RE 5) VS (RE 5) NV_PARAM (RE) D (RE);
   VARIABLE (RE) I;
   VARIABLE (DA) DP;

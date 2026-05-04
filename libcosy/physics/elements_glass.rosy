@@ -1,21 +1,14 @@
-{ ============================================================================
-  libcosy/physics/elements_glass.rosy — glass-optics axis manipulators
-
-  M8.1: opens the glass-elements file with the three axis-state primitives
-  SA / TA / RA (cosy.fox L4038-4069). These don't need GLASS itself, just
-  UMS / LOCSET / LOCTRA / UPDATE — all earlier-INCLUDEd. They're also useful
-  in non-glass-optical contexts (steering, rotation, alignment).
-
-  Big glass-optics body (GLASS + GLS / GL / GP / GMS / GMP / GMF / GM
-  wrappers, plus WL / EL / WA) is a separate milestone — GLASS itself
-  carries 4 nested helpers (TRANS1, TRANS2, LL, ANG) and is ~75 lines.
-  ============================================================================ }
+{ Glass-optics elements: axis-state primitives (SA, TA, RA) for
+  steering / rotation / alignment, plus the GLASS / GLS / GL / GP /
+  GMS / GMP / GMF / GM family of glass surfaces and the WL / EL / WA
+  wave-optics wrappers. SA / TA / RA are useful outside of glass
+  optics (charged-particle alignment, beamline displacement). }
 
 BEGIN;
 
 INCLUDE '../globals.rosy';
 
-{ ----- SA: shift the local axis by (DX, DY) (cosy.fox L4038-4040)
+{ ----- SA: shift the local axis by (DX, DY)
   Rebuilds MSC from scratch via UMS, then offsets MSC[1] / MSC[3] by
   the requested displacement. LOCSET 0 0 0 0 0 0 + DR := 0 marks "no
   curvature, no length" so the axis-tracker doesn't accumulate drift.
@@ -32,7 +25,7 @@ PROCEDURE SA DX_OFF (RE) DY_OFF (RE);
   UPDATE 1 1;
 ENDPROCEDURE;
 
-{ ----- TA: tilt the local axis by (AX, AY) [degrees] (cosy.fox L4042-4059)
+{ ----- TA: tilt the local axis by (AX, AY) [degrees]
   Two-step rotation: TAX rotates about the y-axis by AXR, TAY rotates
   about the x-axis by AYR. Each transform reads PF (relativistic factor
   squared = (P/CONS(P))²) and writes back into the active map.
@@ -82,7 +75,7 @@ PROCEDURE TA AX (RE) AY (RE);
   UPDATE 0 1;
 ENDPROCEDURE;
 
-{ ----- RA: rotate the local axis by PHI [degrees] (cosy.fox L4061-4069)
+{ ----- RA: rotate the local axis by PHI [degrees]
   In-place rotation of the (x, y) phase-space pair by ANG = PHI*DEGRAD.
   Mixes DD[1]/DD[3] for positions and DD[2]/DD[4] for momenta. After
   the mix, LOCTRA captures the rotation into LTRA so subsequent axis-
@@ -107,7 +100,7 @@ PROCEDURE RA PHI (RE);
   UPDATE 1 1;
 ENDPROCEDURE;
 
-{ ----- M8.2: GLASS — central glass-optics engine (cosy.fox L3921-3994)
+{ ----- GLASS — central glass-optics engine
   Refracts/reflects ray (X, A, Y, B) through one or two surfaces with
   shapes IS1 / IS2:
     IS = 0  → spherical surface, P1/P2 carry the radius at P[1,1]
@@ -119,14 +112,14 @@ ENDPROCEDURE;
               D, refraction at IS2 surface, exit). N is refractive index.
     IS0 < 0 → mirror (reflection at IS1 surface only). P2 / IS2 unused.
 
-  Four nested helpers mirror cosy.fox's structure:
+  Four nested helpers mirror 's structure:
     TRANS1 (a, b → tan-a, tan-b)        : direction-cosine → tangent
     TRANS2 (tan-a, tan-b → a, b)        : inverse
     LL    (X, TANA, Y, TANB, P, L, IS)  : drift to surface, write L
     ANG   (X, TANA, Y, TANB, N, P, L, IS, IS0) : compute refraction/
                                                  reflection of TANA, TANB
 
-  Polymorphism note: cosy.fox lets P1/P2 be either scalar or matrix.
+  Polymorphism note:  lets P1/P2 be either scalar or matrix.
   ROSY-strict requires fixed type — port uses (RE 3 3) for both, with
   scalar-radius callers (GLS, GMS) packing R into P[1,1].               }
 PROCEDURE GLASS IS0 (RE) P1 (RE 3 3) IS1 (RE) P2 (RE 3 3) IS2 (RE)
@@ -319,11 +312,11 @@ PROCEDURE GLASS IS0 (RE) P1 (RE 3 3) IS1 (RE) P2 (RE 3 3) IS2 (RE)
   CO NOM;
 ENDPROCEDURE;
 
-{ ----- M8.2 wrappers (cosy.fox L3996-4036): user-facing glass elements
+{ ----- M8.2 wrappers: user-facing glass elements
   All call GLASS with (RE 3 3) buffers; scalar-radius callers (GLS, GMS)
   pack R into P[1,1] via the helper INIT_P3_SCALAR pattern.            }
 
-{ GLS: spherical glass lens (cosy.fox L3996-3999) }
+{ GLS: spherical glass lens }
 PROCEDURE GLS R1 (RE) R2 (RE) N (RE) L (RE) D (RE);
   VARIABLE (RE 3 3) P1_BUF;
   VARIABLE (RE 3 3) P2_BUF;
@@ -481,7 +474,7 @@ PROCEDURE GM P (RE 3 3) N (RE) D (RE);
   UPDATE 0 1;
 ENDPROCEDURE;
 
-{ ----- M8.3: WL — wave-front through a refractive surface (cosy.fox L4160-4193)
+{ ----- WL — wave-front through a refractive surface
   Computes the s-coordinate map (FNL[2, 1..3]) at the entrance/exit faces
   of a refractive layer described by SS1 / SS2 polynomial coefficients.
 
@@ -501,7 +494,7 @@ ENDPROCEDURE;
   polynomial constant term defines the reference surface position);
   S2 ≠ S1.
 
-  cosy.fox declares ARG/RES sized by NV (dynamic). libcosy uses (DA 16)
+   declares ARG/RES sized by NV (dynamic). libcosy uses (DA 16)
   to handle typical NV ≤ 11 with headroom — POLVAL/MI only touch the
   first NV entries, so oversize is safe.                                 }
 PROCEDURE WL
@@ -615,7 +608,7 @@ PROCEDURE WL
   LF := SQRT(LF);
 ENDPROCEDURE;
 
-{ ----- M8.3: WA — wedge-absorber through SS1/SS2 surfaces (cosy.fox L4271-4305)
+{ ----- WA — wedge-absorber through SS1/SS2 surfaces
   Treats a wedge-shaped absorber: SS1 entrance face, SS2 exit face, with
   energy-loss integration over each half via WL + EL + COSY2TR + MI.
 
@@ -634,7 +627,7 @@ ENDPROCEDURE;
        coordinates, write into MSC.
     7. RP CONS(EF) — refresh reference particle to post-absorber energy.
 
-  cosy.fox SS0 sized 1 N+1 N+1: leading 1 = scalar DA storage, N+1 N+1
+   SS0 sized 1 N+1 N+1: leading 1 = scalar DA storage, N+1 N+1
   is the data shape. libcosy uses (RE 3 3) (matches WL's SS1/SS2 cap of
   order ≤ 2). N is bounded accordingly.                                  }
 PROCEDURE WA SS1IN (RE 3 3) SS2IN (RE 3 3) N (RE) L (RE) D (RE);
@@ -738,7 +731,7 @@ PROCEDURE WA SS1IN (RE 3 3) SS2IN (RE 3 3) N (RE) L (RE) D (RE);
   UPDATE 1 1;
 ENDPROCEDURE;
 
-{ ----- M8.4: CRSYSCA — generate SYSCA reference file (cosy.fox L4097-4122)
+{ ----- CRSYSCA — generate SYSCA reference file
   Walks a fixed sequence of magnet types (DI, MQ, MH, MO, MD, MZ) at
   both LFR=-1 and LFR=-2 fringe modes, dumping each one's symplectic
   representation to unit 99 ('SYSCA.DAT') via WSM. Output is the canonical

@@ -1,41 +1,30 @@
-{ ============================================================================
-  libcosy/physics/reference_particle.rosy — Reference particle + setup
+{ Reference-particle setup and configuration primitives:
 
-  Ports the lightweight setup primitives from cosy.fox L393-444, L2319-2329:
-
-    DEF       — physical constants (AMU, EZERO, CLIGHT, AMUMEV, PI, DEGRAD)
-    CO  NNO   — change computational order (writes NOC + DANOT)
-    KC  I     — kinematic-correction flag (LKC), warns on disable
-    WAS I     — wedge-computation flag (LWA = -I)
-    FR  I     — fringe-field mode flag (LFR), conditionally bootstraps FD2
-    SB ...    — set phase-space widths (PHSP / PHSR + LPS guard)
-    SP ...    — set parameter widths (PARS)
-    PARA(I)   — DA-coordinate helper for parameter dependence
-
-  Deferred to a later milestone (need correct DA-typed RAY / MAP / DD
-  globals plus DAINI ordering — they're a tight cluster):
-
-    OV  ORD NND NNP    — order / dimension / parameter setup, the gateway
-                          procedure every cosy.fox script calls first
-    CR                 — clear rays (touches RAY / RSC / SPI / SSC, and
-                          treats RAY(I) as a column slice of a 10001×8
-                          array — needs slice-via-partial-index semantics)
-    UM / UMS           — unity map and unity scratch map (touch MAP / MSC
-                          which must be (DA 8) and accept 0*DD(1) idioms)
-    RP / RPR / RPM /
-    RPP / RPE / RPPI /
-    RPMU / RPS         — reference-particle setup variants (depend on OV)
-
-  These will be the focus of the next milestone (M3.5 / M4) along with
-  fixes to globals.rosy for the few RE/DA mis-typings that block them.
-  ============================================================================ }
+    DEF       physical constants (AMU, EZERO, CLIGHT, AMUMEV, PI, DEGRAD).
+    OV        order / phase-space / parameter dimensions — the gateway
+              every script calls first.
+    CO        change computational order.
+    KC        kinematic-correction flag.
+    WAS       wedge-computation flag.
+    FR        fringe-field mode flag (also bootstraps the symplectic-
+              scaling tables when needed).
+    SB / SP   phase-space and parameter widths (PHSP, PHSR, PARS).
+    PARA      DA-coordinate helper for parameter dependence.
+    UM / UMS  unity map / unity scratch map.
+    RP and
+    RPR / RPM /
+    RPP / RPE /
+    RPPI / RPMU /
+    RPS       reference-particle setup variants (rigidity, momentum,
+              proton / electron / pion / muon shortcuts).
+    CR        clear rays. }
 
 BEGIN;
 
 INCLUDE '../globals.rosy';
 
-{ ----- Physical constants (cosy.fox L393-398) -----------------------------
-  cosy.fox additionally calls `LTRUE TRUE; LFALSE FALSE` to seed two of
+{ ----- Physical constants -----------------------------
+   additionally calls `LTRUE TRUE; LFALSE FALSE` to seed two of
   COSY's RE-as-bool globals; ROSY reserves TRUE / FALSE as keywords (LO
   literals) so those globals don't exist here, and the corresponding lines
   are intentionally omitted. Code that previously branched on `IF X = TRUE`
@@ -52,21 +41,21 @@ PROCEDURE DEF;
   DSET 1E-16;
 ENDPROCEDURE;
 
-{ ----- Computational-order change (cosy.fox L405) ------------------------- }
+{ ----- Computational-order change ------------------------- }
 PROCEDURE CO NNO (RE);
   NOC := NNO;
   DANOT NOC;
 ENDPROCEDURE;
 
-{ ----- Order / dimension / parameter setup (cosy.fox L406-426) ------------
-  The single most important entry point in libcosy: every cosy.fox script
+{ ----- Order / dimension / parameter setup ------------
+  The single most important entry point in libcosy: every  script
   starts with `OV order ND NP;` to set the phase-space order, dimension,
   and parameter count. Initializes the DA system (DAINI), seeds the DD
   scratch buffer with basis variables DA(1)..DA(NV), sets every flow-
   control flag to its default, and chains DEF → FD for constants and
   fringe-field defaults.
 
-  cosy.fox additionally calls CR at the bottom to clear ray buffers; CR
+   additionally calls CR at the bottom to clear ray buffers; CR
   needs partial-index slice semantics on RAY / RSC / SPI / SSC that ROSY
   doesn't yet provide, so the corresponding scalar flags (NRAY, NSPN,
   LCR, LENV) are zeroed inline here. The array-clearing CR will land
@@ -128,7 +117,7 @@ PROCEDURE OV ORD (RE) NND (RE) NNP (RE);
   FD;
 ENDPROCEDURE;
 
-{ ----- Kinematic-correction flag (cosy.fox L2324-2326) -------------------- }
+{ ----- Kinematic-correction flag -------------------- }
 PROCEDURE KC I (RE);
   LKC := I;
   IF I = 1;
@@ -136,12 +125,12 @@ PROCEDURE KC I (RE);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- Wedge-computation flag (cosy.fox L2328-2329) ----------------------- }
+{ ----- Wedge-computation flag ----------------------- }
 PROCEDURE WAS I (RE);
   LWA := -I;
 ENDPROCEDURE;
 
-{ ----- Fringe-field mode (cosy.fox L2319-2322) ----------------------------
+{ ----- Fringe-field mode ----------------------------
   The conditional FD2 bootstrap is suppressed here because FD2 lives in
   the deferred symplectic-scaling block (FC2/FD2/SYSCFL). When FD2 lands,
   the inner branch becomes `IF (I < 3) AND (I > 0) AND (LFR2 = 0); FD2;
@@ -157,7 +146,7 @@ PROCEDURE FR I (RE);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- Phase-space widths (cosy.fox L434-439) ----------------------------- }
+{ ----- Phase-space widths ----------------------------- }
 PROCEDURE SB PX (RE) PA (RE) R12 (RE) PY (RE) PB (RE) R34 (RE) PT (RE) PD (RE) R56 (RE) PG (RE) PZ (RE);
   IF LOV = 0;
     WRITE 6 ' *** ERROR, call OV before SB';
@@ -169,13 +158,13 @@ PROCEDURE SB PX (RE) PA (RE) R12 (RE) PY (RE) PB (RE) R34 (RE) PT (RE) PD (RE) R
   LPS := 1;
 ENDPROCEDURE;
 
-{ ----- Parameter widths (cosy.fox L441-443) ------------------------------- }
+{ ----- Parameter widths ------------------------------- }
 PROCEDURE SP P1 (RE) P2 (RE) P3 (RE) P4 (RE) P5 (RE) P6 (RE);
   PARS[1] := P1; PARS[2] := P2; PARS[3] := P3;
   PARS[4] := P4; PARS[5] := P5; PARS[6] := P6;
 ENDPROCEDURE;
 
-{ ----- Parameter-identifier helper (cosy.fox L428-432) -------------------- }
+{ ----- Parameter-identifier helper -------------------- }
 { Returns a DA expression `1 + DA(2*ND + I)` when the I-th parameter is in
   scope, else 1 — used by element procedures to weight parameter-dependent
   terms in their kick.                                                     }
@@ -192,21 +181,21 @@ FUNCTION (DA) PARA I (RE);
   ENDIF;
 ENDFUNCTION;
 
-{ ----- Set reference particle (cosy.fox L2782-2798) -----------------------
+{ ----- Set reference particle -----------------------
   RP(E, M, Z) seeds the global reference-particle quantities from a kinetic
   energy E [MeV], mass M [amu], and charge Z [units]. Computes the standard
   relativistic derived values (η, β, γ) and the rigidity coefficients used
   throughout the element families.
 
-  Differences from cosy.fox:
+  Differences from :
    * The ND=3 branch that promotes E0 to a DA-of-DD(6) is omitted — that
      mode requires a 6D phase space and adds parameter dependence; will
      port alongside the elements that actually use it.
-   * cosy.fox saves NOC, raises the order via `CO NO+1` for the
+   *  saves NOC, raises the order via `CO NO+1` for the
      calculation, then restores via `CO NOM`. The order shuffle is kept
      so derivative orders propagate correctly through SQRT / CONS.
    * XX[21..29] is the 3×3 identity matrix used by UM to seed SPNR /
-     SSCR when LSPN=1. cosy.fox sets these unconditionally at L2791-2792;
+     SSCR when LSPN=1.  sets these unconditionally at L2791-2792;
      libcosy mirrors the unconditional set so any later UM call with
      LSPN=1 finds a clean identity in XX (the cost is 9 RE→DA writes
      into XX even when spin tracking is off — negligible).               }
@@ -226,7 +215,7 @@ PROCEDURE RP E (RE) M (RE) Z (RE);
   M0 := M + 0*DA(1);
   Z0 := Z + 0*DA(1);
   { Seed XX[1..8] — the canonical phase-space basis used by UM / UMS to
-    initialise MAP and MSC. cosy.fox L2788-2792:
+    initialise MAP and MSC. :
        XX[I] := DD[I] when I ≤ TWOND, otherwise 0*DD[I];
        XX[6, 7, 8] hold the (E0, M0, Z0) parameter-dependence terms,
                    which are zero for ND<3 and DD[6]-bound for ND=3.    }
@@ -239,7 +228,7 @@ PROCEDURE RP E (RE) M (RE) Z (RE);
   XX[6] := (E0 - CONS(E0))/CONS(E0);
   XX[7] := (M0 - CONS(M0))/CONS(M0);
   XX[8] := (Z0 - CONS(Z0))/CONS(Z0);
-  { Spin-matrix identity (cosy.fox L2791-2792). Row-major 3×3:
+  { Spin-matrix identity. Row-major 3×3:
         XX[21..23] = (1, 0, 0)
         XX[24..26] = (0, 1, 0)
         XX[27..29] = (0, 0, 1)
@@ -259,13 +248,13 @@ PROCEDURE RP E (RE) M (RE) Z (RE);
   CO NOM;
 ENDPROCEDURE;
 
-{ ----- Unity map (cosy.fox L627-635) --------------------------------------
+{ ----- Unity map --------------------------------------
   Sets MAP and MSC to the identity transformation by copying the XX basis
   seeded by RP. Spin maps (SPNR / SSCR) become 3×3 identities when LSPN=1.
 
-  Differences from cosy.fox:
+  Differences from :
    * Axis-tracking arrays AXP / AXD / LTRA / GTRA are all touched by the
-     cosy.fox UM body for the COSY graphics display — graphics is out of
+      UM body for the COSY graphics display — graphics is out of
      scope for libcosy so the corresponding lines are intentionally
      omitted. The flow-control flag LUM and the path-length scalars
      SPOS / GPLOC / NCT / NCCT are still set so downstream guards see
@@ -293,7 +282,7 @@ PROCEDURE UM;
   LUM := 1; SPOS := 0; GPLOC := 0; NCT := 0; NCCT := 0;
 ENDPROCEDURE;
 
-{ ----- Unity scratch map (cosy.fox L621-625) ------------------------------
+{ ----- Unity scratch map ------------------------------
   Sets MSC to the identity (without touching the active MAP). Used as
   the starting point for accumulating a new map without clobbering the
   current one.                                                            }
@@ -316,9 +305,9 @@ PROCEDURE UMS;
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- Particle-specific RP shortcuts (cosy.fox L2807-2814) ---------------
+{ ----- Particle-specific RP shortcuts ---------------
   These call RP with the standard atomic-mass and charge values for each
-  particle species and stamp the spin-Lorentz factor G0. cosy.fox uses
+  particle species and stamp the spin-Lorentz factor G0.  uses
   procedure-call syntax (e.g. `RP E 1.00727646688 1`) — ports verbatim. }
 PROCEDURE RPP E (RE);     { proton  }
   RP E 1.00727646688 1;
@@ -347,9 +336,9 @@ PROCEDURE RPS LS (RE) G (RE);    { spin-flag + Lorentz-factor override }
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- Rigidity-based RP (cosy.fox L2800-2803) ----------------------------
+{ ----- Rigidity-based RP ----------------------------
   RPR(CHI, M, Z) sets the reference particle from the magnetic rigidity
-  CHI = Bρ [T·m], the mass M [amu], and the charge Z [units]. The cosy.fox
+  CHI = Bρ [T·m], the mass M [amu], and the charge Z [units]. The 
   body bootstraps with a dummy RP 1 1 1 (so ETA_local stays in scope at
   the right CHI value), computes pφ via χ_m / (M c²) form, derives the
   kinetic energy ETA_local, then re-runs RP with the correct values.   }
@@ -365,12 +354,12 @@ PROCEDURE RPR CHI (RE) M (RE) Z (RE);
   { ETA_L is DA but RP's E parameter is RE — extract the constant part.
     The DA-bound parameter dependence (when ND=3 and CHI is itself DA)
     is recovered later by the ND=3 branch of RP, which is currently
-    deferred; cosy.fox's loose typing does this transparently.       }
+    deferred; 's loose typing does this transparently.       }
   RP CONS(ETA_L)*M*AMUMEV M Z;
   CO NOM;
 ENDPROCEDURE;
 
-{ ----- Momentum-based RP (cosy.fox L2804-2805) ----------------------------
+{ ----- Momentum-based RP ----------------------------
   RPM(P_MeVc, M, Z): set the reference particle from the canonical
   momentum p [MeV/c]. Converts to magnetic rigidity and delegates to RPR. }
 PROCEDURE RPM MEVC (RE) M (RE) Z (RE);

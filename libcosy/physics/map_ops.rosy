@@ -1,23 +1,19 @@
-{ ============================================================================
-  libcosy/physics/map_ops.rosy — Map save / apply / print primitives
-
-  Initial port of the simple savers from cosy.fox L637-650. The full
-  map-ops surface (ME / MEP / MA / PB / LEXP / SM / SNM / SSM / SSNM /
-  AM / ANM / PM / PSM / WM / PNM / WNM / DMAP / DSMAP / CATR / TRCA /
-  COCR / CRCO / RM / RNM / PT / PA / FM / MR / MT / UPDATEMAP / LOCTRA /
-  LOCSET / BDEP / EDEP / MCM / ECM / BM / RCT / RET / RETF / COSY2TR /
-  POTI / RR / AR / UPDATE) ports incrementally — each procedure has its
-  own subset of dependencies (UPDATE alone runs ~100 lines with five
-  nested helpers, LOCTRA needs LINV, AM chains into UPDATE, MR needs
-  MI from linear_algebra). The simple savers below are the foundation
-  every other map operation builds on.
-  ============================================================================ }
+{ Map save / apply / compose / print primitives. Holds the savers
+  (SM / SNM / SSM / SSNM), matrix-element extractors (ME / MEP / MA),
+  Poisson bracket and Lie exponential (PB / LEXP), printers and writers
+  (PM / PSM / WM / PNM / WNM / DMAP / DSMAP), composition helpers (ANM,
+  AM, UPDATEMAP, UPDATE), TRANSPORT / canonical conversions (CATR,
+  TRCA, COCR, CRCO), the closed-orbit + map-around-closed-orbit pair
+  (FM, MR), partial / dependence-flag setters (BDEP, EDEP, MCM, ECM,
+  BM), recursive trajectory reconstruction (RR), and the local-frame
+  axis primitives (LOCSET, LOCTRA). UPDATE centralizes SPOS / LTRA /
+  GTRA advance for every element. }
 
 BEGIN;
 
 INCLUDE '../globals.rosy';
 
-{ ----- Save the momentary MAP into M (cosy.fox L637-638) ------------------
+{ ----- Save the momentary MAP into M ------------------
   Copies the active map's first TWOND DA components into M. M is an
   untyped DA-array param; ROSY's inference picks up the dimension from
   the call site (typically `(DA 8)` to match the global MAP).           }
@@ -28,7 +24,7 @@ PROCEDURE SM M (DA 8);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- Save the map N into M (cosy.fox L640-641) -------------------------- }
+{ ----- Save the map N into M -------------------------- }
 PROCEDURE SNM N (DA 8) M (DA 8);
   VARIABLE (RE) I;
   LOOP I 1 TWOND;
@@ -36,7 +32,7 @@ PROCEDURE SNM N (DA 8) M (DA 8);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- Save the momentary spin map (SPNR 3x3) into M (cosy.fox L643-645) -- }
+{ ----- Save the momentary spin map (SPNR 3x3) into M -- }
 PROCEDURE SSM M (DA 3 3);
   VARIABLE (RE) I; VARIABLE (RE) J;
   LOOP I 1 3;
@@ -46,7 +42,7 @@ PROCEDURE SSM M (DA 3 3);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- Save the spin map N into M (cosy.fox L647-649) --------------------- }
+{ ----- Save the spin map N into M --------------------- }
 PROCEDURE SSNM N (DA 3 3) M (DA 3 3);
   VARIABLE (RE) I; VARIABLE (RE) J;
   LOOP I 1 3;
@@ -56,7 +52,7 @@ PROCEDURE SSNM N (DA 3 3) M (DA 3 3);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- Matrix-element extraction (cosy.fox L216) --------------------------
+{ ----- Matrix-element extraction --------------------------
   ME(M, I) returns the I-th monomial coefficient of MAP[M]. Like COEF,
   the input is a single DA pulled from a DA-array slot; ROSY's DAPEE
   expects a `Vec<DA>` so we wrap into a one-element scratch.            }
@@ -66,7 +62,7 @@ FUNCTION (RE) ME M (RE) I (RE);
   DAPEE XS I ME;
 ENDFUNCTION;
 
-{ ----- Matrix-element with parameter (cosy.fox L217) ----------------------
+{ ----- Matrix-element with parameter ----------------------
   MEP(M, I) returns the parameter-dependent component of MAP[M] keyed by
   exponent ID I, where the first TWOND variables are dynamic and the
   rest are parameters. The result is a DA polynomial in the parameter
@@ -80,7 +76,7 @@ FUNCTION (DA) MEP M (RE) I (RE);
   MEP := RES[1];
 ENDFUNCTION;
 
-{ ----- Aberration extraction (cosy.fox L218-222) --------------------------
+{ ----- Aberration extraction --------------------------
   MA(M, II) returns the aberration coefficient of MAP[M] indexed by II
   in BCD digit-encoding: each decimal digit of II names a phase-space
   variable index (1..TWOND) or parameter index (TWOND+1..NV). The
@@ -113,7 +109,7 @@ FUNCTION (RE) MA M (RE) II (RE);
   ENDWHILE;
 ENDFUNCTION;
 
-{ ----- Print map to unit (cosy.fox L660-662) ------------------------------
+{ ----- Print map to unit ------------------------------
   Pretty-prints the first 5 DA components of MAP via DAPRV. The
   `+ 0*DD[1]` idiom forces M slots to be DA-typed even if MAP[I] is
   a constant (e.g. just-initialized identity map).                       }
@@ -126,7 +122,7 @@ PROCEDURE PM IU (RE);
   DAPRV M 5 6 TWOND IU;
 ENDPROCEDURE;
 
-{ ----- Print spin map to unit (cosy.fox L664-667) -------------------------
+{ ----- Print spin map to unit -------------------------
   Prints SPNR row by row (3 rows × 3 columns of DAs). Mirrors PM but
   iterates the outer dim and prints each row as a 3-component DA group. }
 PROCEDURE PSM IU (RE);
@@ -140,12 +136,12 @@ PROCEDURE PSM IU (RE);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- WM: write the active MAP to unit IU (cosy.fox L669-673) ------------
+{ ----- WM: write the active MAP to unit IU ------------
   WM(IU) writes the global MAP to file unit IU in the standard COSY
   transfer-map format: an "L SPOS" header (arc-length), "P (X,0,Z)"
   position, "A (PLOC,0,0)" axis, then MAP[1..8] with E24.16 precision.
 
-  cosy.fox uses a single I variable both as the format-string holder
+   uses a single I variable both as the format-string holder
   and the loop counter (loose typing). ROSY needs separate variables —
   FORM (ST) holds the format spec, I (RE) is the loop counter.        }
 PROCEDURE WM IU (RE);
@@ -160,7 +156,7 @@ PROCEDURE WM IU (RE);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- WNM: write a saved map NAP to unit IU (cosy.fox L680-684) ----------
+{ ----- WNM: write a saved map NAP to unit IU ----------
   Like WM but for an arbitrary map NAP (8 components written, no axis info).
   Always writes the full NAP[1..8] even if TWOND < 8 — RNM expects 8. }
 PROCEDURE WNM IU (RE) NAP (DA 8);
@@ -175,7 +171,7 @@ PROCEDURE WNM IU (RE) NAP (DA 8);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- Print map N to unit (cosy.fox L675-678) ----------------------------
+{ ----- Print map N to unit ----------------------------
   Same as PM but for an arbitrary parameter map N rather than the global
   active MAP. Used to inspect saved or computed maps without making them
   the active state.                                                       }
@@ -188,7 +184,7 @@ PROCEDURE PNM N (DA 8) IU (RE);
   DAPRV M 5 6 TWOND IU;
 ENDPROCEDURE;
 
-{ ----- Difference of two maps to unit (cosy.fox L686-691) -----------------
+{ ----- Difference of two maps to unit -----------------
   DMAP(M, N, IU) prints D[I] = M[I] - N[I] for I = 1..TWOND. Useful for
   validating that two maps represent the same transformation up to the
   computational order.                                                    }
@@ -201,7 +197,7 @@ PROCEDURE DMAP M (DA 8) N (DA 8) IU (RE);
   DAPRV D TWOND 6 TWOND IU;
 ENDPROCEDURE;
 
-{ ----- Difference of two spin maps to unit (cosy.fox L693-697) ----------- }
+{ ----- Difference of two spin maps to unit ----------- }
 PROCEDURE DSMAP M (DA 3 3) N (DA 3 3) IU (RE);
   VARIABLE (DA 3) D;
   VARIABLE (RE) I; VARIABLE (RE) J;
@@ -213,7 +209,7 @@ PROCEDURE DSMAP M (DA 3 3) N (DA 3 3) IU (RE);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- Apply a map to a saved map (cosy.fox L655-658) ---------------------
+{ ----- Apply a map to a saved map ---------------------
   ANM(N, M, O) computes the polynomial composition O = N ∘ M, treating M as
   the substitution argument for the canonical phase-space variables in N.
 
@@ -242,7 +238,7 @@ PROCEDURE ANM N (DA 8) M (DA 8) O (DA 8);
   POLVAL 1 N TWOND MM NV O TWOND;
 ENDPROCEDURE;
 
-{ ----- Set local-Cartesian axis coordinates (cosy.fox L460-462) -----------
+{ ----- Set local-Cartesian axis coordinates -----------
   LOCSET stashes 6 angles/positions into globals XLOC/ZLOC/PLOC/SLOC/
   VLOC/TLOC. Element procedures call this to declare the local-frame
   delta before invoking UPDATE, which then composes the delta onto
@@ -252,7 +248,7 @@ PROCEDURE LOCSET X (RE) Z (RE) P (RE) S (RE) V (RE) T (RE);
   SLOC := S; VLOC := V; TLOC := T;
 ENDPROCEDURE;
 
-{ ----- Final-to-initial Cartesian transformation (cosy.fox L445-458) -------
+{ ----- Final-to-initial Cartesian transformation -------
   LOCTRA(X, Y, Z, T, P, A, NAP) builds a 3-row map NAP describing the
   position-vector transformation from the final reference frame back to
   the initial frame, parameterized by translation (X, Y, Z) and Euler-
@@ -291,7 +287,7 @@ PROCEDURE LOCTRA X (RE) Y (RE) Z (RE) T (RE) P (RE) A (RE) NAP;
   NAP[3] := Z - (CM*ST)*DD[1]            + (SM*ST)*DD[2]            + (CT)*DD[3];
 ENDPROCEDURE;
 
-{ ----- UPDATEMAP: compose two maps + spin update (cosy.fox L504-519) -------
+{ ----- UPDATEMAP: compose two maps + spin update -------
   UPDATEMAP(MAPT, MAPO, MAPU, SPNT, SPNO, SPNU): apply (MAPT, SPNT) onto
   the previous state (MAPO, SPNO), producing the updated state
   (MAPU, SPNU). Used by UPDATE and ring-element procedures to chain
@@ -301,7 +297,7 @@ ENDPROCEDURE;
     1. Build MS as MAPO padded with DD basis beyond TWOND.
     2. POLVAL: MAPU = MAPT ∘ MS — pure map composition.
     3. If LSPN = 1, fold SPNT (the local-element spin matrix) onto SPNO
-       through SPNMUL (cosy.fox L508-515):
+       through SPNMUL:
          a. Flatten SPNT into a 9-vector SVO row-major.
          b. POLVAL 2 — substitute MS into SVO so SV is the map-pulled-back
             local spin matrix (each entry now lives in the orbital DA
@@ -329,7 +325,7 @@ PROCEDURE UPDATEMAP MAPT (DA 8) MAPO (DA 8) MAPU (DA 8)
     VARIABLE (RE)   J;
     VARIABLE (RE)   K;
 
-    { Flatten SPNT row-major into SVO (cosy.fox uses 3*(I-1)+J indexing). }
+    { Flatten SPNT row-major into SVO ( uses 3*(I-1)+J indexing). }
     LOOP I 1 3;
       LOOP J 1 3;
         SVO[3*(I - 1) + J] := SPNT[I, J];
@@ -339,7 +335,7 @@ PROCEDURE UPDATEMAP MAPT (DA 8) MAPO (DA 8) MAPU (DA 8)
     { Pull SVO back through MS — SV[k] now lives in MAPO's DA algebra. }
     POLVAL 2 SVO 9 MS NV SV 9;
 
-    { 3×3 matrix product SPNU = SV (reshaped) · SPNO. cosy.fox writes
+    { 3×3 matrix product SPNU = SV (reshaped) · SPNO.  writes
       directly to SPNU; we write 0 first since accumulation is += DA. }
     LOOP I 1 3;
       LOOP J 1 3;
@@ -352,15 +348,15 @@ PROCEDURE UPDATEMAP MAPT (DA 8) MAPO (DA 8) MAPU (DA 8)
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- UPDATE: standard step-update for ring tracking (cosy.fox L521-619) -
+{ ----- UPDATE: standard step-update for ring tracking -
   UPDATE(IM, IR): the per-element finalizer that composes MSC into MAP
   (when IM≠0), pushes ray bundles through MSC (when IR≠0 and NRAY≠0),
   refreshes the envelope ERAY (when LENV=1), and advances the local-
   frame transform onto the global one.
 
-  M16 lifts the previously-deferred IR + LENV branches:
+  deferred IR + LENV branches:
 
-  * IR + NRAY ≠ 0 path (cosy.fox L597-598):
+  * IR + NRAY ≠ 0 path:
     Calls POLVAL 1 MSC TWOND RAY 8 RAY TWOND. Because libcosy stores
     RAY as `(VE 8)` (each RAY[k] is a VE of all particles' k-th
     coordinate), POLVAL routes via `rosy_polval_ve` (polval.rs:70)
@@ -368,29 +364,29 @@ ENDPROCEDURE;
     is the same dispatch path TR uses for tracking; UPDATE re-uses
     it for the ring-step ray push.
 
-    SPNVEC (cosy.fox L525-538, spin-vector update gated by LSPN=1
+    SPNVEC (, spin-vector update gated by LSPN=1
     and NSPN>0) remains deferred — it needs SSCR/SPI scoping that
     interacts with the partial-index spin path in reference_particle.
     Diagnostic warns when triggered.
 
-  * LENV=1 path (cosy.fox L539-548):
+  * LENV=1 path:
     Calls the inlined NEWENV — propagates the 1σ phase-space envelope
     ERAY[I, I+1] for each canonical pair (I = 1, 3 for ND=2) through
-    the linear part of MSC, using the cosy.fox closed-form combining
+    the linear part of MSC, using the  closed-form combining
     PHSP (axis variances) and PHSR (correlation factors). Matrix
     elements ME(I, J) are extracted via `CONS(DER(J, MSC[I]))` — the
     ROSY-canonical pattern documented at normal_form.rosy:1564 (cosy
     fox's ME intrinsic isn't in ROSY because ROSY's TRANSPORT id
     encoding is left-to-right, so DER+CONS is the equivalent).
 
-  Local-frame transform & SPOS advance (cosy.fox L600-615): centralized
-  here as of M16.5. Element procedures call LOCSET to populate the
+  Local-frame transform & SPOS advance: centralized
+  here. Element procedures call LOCSET to populate the
   local-frame deltas (XLOC, ZLOC, PLOC, SLOC, VLOC, TLOC) then route
   through UPDATE to compose them onto the global state. SPOS
   accumulates by SLOC each call; LTRA + GTRA propagate the running
   reference-axis transform via LOCTRA + POLVAL composition.
 
-  Skipped (graphics-only, libcosy v1 plan): LPI ≠ 0 element-box draw,
+  Skipped (graphics-only, libcosy plan): LPI ≠ 0 element-box draw,
   LSYS / LCE flags, RSC / ERSC graphics-snapshot writes.              }
 PROCEDURE UPDATE IM (RE) IR (RE);
   VARIABLE (RE) I;
@@ -402,7 +398,7 @@ PROCEDURE UPDATE IM (RE) IR (RE);
 
   { Ray bundle push through the local element map. }
   IF (IR # 0) AND (NRAY # 0);
-    { SPNVEC: per-ray spin-vector rotation (cosy.fox L525-538).
+    { SPNVEC: per-ray spin-vector rotation.
       Pulls SSCR (3×3 DA local rotation) back through RAY's particle
       coordinates via POLVAL 2, then matrix-multiplies the result
       into SPI[1..3] per ray, normalizing each output. }
@@ -438,7 +434,7 @@ PROCEDURE UPDATE IM (RE) IR (RE);
 
       { Per-particle batch: substitute RAY's (VE 8) into SVO_UV.
         SSCM_UV[k] now holds the k-th flattened-matrix entry for
-        every ray (cosy.fox uses POLVAL 2; libcosy's POLVAL routes
+        every ray ( uses POLVAL 2; libcosy's POLVAL routes
         to rosy_polval_ve via the (VE 8) layout). }
       POLVAL 2 SVO_UV 9 RAY 8 SSCM_UV 9;
 
@@ -455,7 +451,7 @@ PROCEDURE UPDATE IM (RE) IR (RE);
       ENDLOOP;
 
       { Normalize: SQRT element-wise, anchor index-1 to 1 (the
-        reserved slot, matches cosy.fox's VELSET trick). }
+        reserved slot, matches 's VELSET trick). }
       SCR_UV := SQRT(SCR_UV);
       VELSET SCR_UV 1 1;
       LOOP IR_ 1 3;
@@ -467,7 +463,7 @@ PROCEDURE UPDATE IM (RE) IR (RE);
   ENDIF;
 
   { Envelope update — closed-form 1σ propagation through the linear
-    part of MSC (cosy.fox L539-548).                                   }
+    part of MSC.                                   }
   IF LENV = 1;
     LOOP I 1 MIN(TWOND, 4) 2;
       J := (I + 1)/2;
@@ -485,7 +481,7 @@ PROCEDURE UPDATE IM (RE) IR (RE);
     ENDLOOP;
   ENDIF;
 
-  { Local-frame transform advance (cosy.fox L600-615). LCB is the
+  { Local-frame transform advance. LCB is the
     bend-direction sign flag — XLOC and PLOC double-tap by it (once
     pre-LOCTRA, once post-) so coordinate flips through CB stay
     consistent. GPLOC accumulates the global-azimuth angle. LTRA
@@ -503,14 +499,14 @@ PROCEDURE UPDATE IM (RE) IR (RE);
   PLOC := PLOC*LCB;
 ENDPROCEDURE;
 
-{ ----- Apply a map to the momentary MAP (cosy.fox L651-653) --------------
+{ ----- Apply a map to the momentary MAP --------------
   AM(M) composes M onto the active map and propagates the action to ray
-  bundles. cosy.fox semantics:
+  bundles.  semantics:
         MSC := M (copy)
         LOCSET 0 0 0 0 0 0          { zero local-frame transform }
         UPDATE 1 1                  { apply MSC to MAP and rays }
 
-  With UPDATE-with-rays now landed (M16), AM follows cosy.fox literally —
+  With UPDATE-with-rays now landed (M16), AM follows  literally —
   no NRAY=0 fast-path needed. The only behavioral difference from a bare
   ANM is that AM also stamps zero local-frame deltas via LOCSET, so the
   caller's coordinate-frame state stays consistent.                       }
@@ -523,7 +519,7 @@ PROCEDURE AM M (DA 8);
   UPDATE 1 1;
 ENDPROCEDURE;
 
-{ ----- Fixed point + map-around-fixed-point (cosy.fox L783-799) -----------
+{ ----- Fixed point + map-around-fixed-point -----------
   FM(M, XF, MF, IER) finds the closed-orbit fixed point XF of map M (where
   M(XF) = XF) and the local map MF around it.
 
@@ -602,7 +598,7 @@ PROCEDURE FM M (DA 8) XF (DA 8) MF (DA 8) IER (RE);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- Map reverse — beam time-reversal (cosy.fox L464-472) ---------------
+{ ----- Map reverse — beam time-reversal ---------------
   MR(NAP, LAP) computes the time-reversed map LAP from the forward map NAP.
   Time reversal inverts the map and flips the sign of all momenta and
   (in 3D) the time variable, since classical mechanics is reversible up
@@ -650,7 +646,7 @@ PROCEDURE MR NAP (DA 8) LAP (DA 8);
   POLVAL 1 MM TWOND COD NV LAP TWOND;
 ENDPROCEDURE;
 
-{ ----- COSY → exponential-theory variable reorder (cosy.fox L1874-1878) ----
+{ ----- COSY → exponential-theory variable reorder ----
   RCT(X) reorders the array X from COSY's canonical pairing (q1 p1 q2 p2 ...)
   to exponential-theory's grouped pairing (q1 q2 ... qN p1 p2 ... pN).
   Uses a POLVAL substitution: build TMP with the reordered components,
@@ -676,7 +672,7 @@ PROCEDURE RCT X (DA 8);
   POLVAL 2 TMP TWOND RCE TWOND X TWOND;
 ENDPROCEDURE;
 
-{ ----- Exponential-theory → COSY variable reorder (cosy.fox L1880-1884) ----
+{ ----- Exponential-theory → COSY variable reorder ----
   RET(X): inverse of RCT. Reorders from grouped (q...p...) back to
   canonical (q1 p1 q2 p2 ...). The pair-then-substitute mechanic mirrors
   RCT exactly with the indices swapped.                                  }
@@ -714,7 +710,7 @@ PROCEDURE RETF F (DA);
   F := X[1];
 ENDPROCEDURE;
 
-{ ----- Canonical → TRANSPORT-standard map (cosy.fox L699-717) --------------
+{ ----- Canonical → TRANSPORT-standard map --------------
   CATR(IAP, NAP, LGH) converts the canonical map IAP into TRANSPORT's
   small-angle-approximation representation NAP, with LGH the element's
   arc length. The conversion folds in kinematic factors so positions and
@@ -729,7 +725,7 @@ ENDPROCEDURE;
   outer branch *adds* terms to COP/DOP — ND=1 only writes positions 1,2;
   ND=2 also writes 3,4; ND=3 also writes 5,6 (time-of-flight). DD is
   size-20 so out-of-range references like DD[4] at ND=1 silently read
-  zero DAs without crashing, matching cosy.fox's loose array semantics. }
+  zero DAs without crashing, matching 's loose array semantics. }
 PROCEDURE CATR IAP (DA 8) NAP (DA 8) LGH (RE);
   VARIABLE (RE) NC;
   VARIABLE (RE) PC;
@@ -774,11 +770,11 @@ PROCEDURE CATR IAP (DA 8) NAP (DA 8) LGH (RE);
   ANM DOP COP NAP;
 ENDPROCEDURE;
 
-{ LOCSET / LOCTRA — moved up before UPDATEMAP / UPDATE during M16.5
+{ LOCSET / LOCTRA — moved up before UPDATEMAP / UPDATE
   so UPDATE's local-frame block can call LOCTRA without forward-
   reference issues. See top of file for the original definitions. }
 
-{ ----- Map of rotated element (cosy.fox L474-487) -------------------------
+{ ----- Map of rotated element -------------------------
   MT(IAP, NAP, PHI) rotates the input map IAP by PHI degrees about the
   beam axis, producing NAP. Used to construct skew variants of upright
   elements (skew quad / sextupole) — the rotation acts on (x, y) and
@@ -855,7 +851,7 @@ PROCEDURE MT IAP (DA 8) NAP (DA 8) PHI (RE);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- TRANSPORT-standard → canonical map (cosy.fox L719-738) --------------
+{ ----- TRANSPORT-standard → canonical map --------------
   TRCA is the inverse of CATR: convert NAP-as-TRANSPORT into NAP-as-canonical.
   The kinematic factors GM and MG swap roles (GM now divides DOP, MG divides
   COP), and the time-of-flight LT branch reads from IAP rather than DD for
@@ -904,7 +900,7 @@ PROCEDURE TRCA IAP (DA 8) NAP (DA 8) LGH (RE);
   ANM DOP COP NAP;
 ENDPROCEDURE;
 
-{ ----- Poisson bracket (cosy.fox L223-225) --------------------------------
+{ ----- Poisson bracket --------------------------------
   PB(X, Y) = Σ_{i=1,3,5,...} ∂X/∂q_i · ∂Y/∂p_i − ∂X/∂p_i · ∂Y/∂q_i
   where (q_i, p_i) are the canonical phase-space pairs and the sum runs
   over the ND pairs (TWOND = 2*ND, step 2).
@@ -918,7 +914,7 @@ FUNCTION (DA) PB X (DA) Y (DA);
   ENDLOOP;
 ENDFUNCTION;
 
-{ ----- Print active MAP in TRANSPORT representation (cosy.fox L766-774) ---
+{ ----- Print active MAP in TRANSPORT representation ---
   PT(IU) prints the active MAP's TRANSPORT-standard form to unit IU. The
   TRANSPORT convention scales positions to cm (×100) and angles to mrad
   (×1000), making the matrix elements dimensionally interpretable for
@@ -961,7 +957,7 @@ PROCEDURE PT IU (RE);
   DAPRV MM 5 6 TWOND IU;
 ENDPROCEDURE;
 
-{ ----- COSY-to-TRANSPORT coordinate conversion (cosy.fox L4264-4269) ------
+{ ----- COSY-to-TRANSPORT coordinate conversion ------
   COSY2TR(MC) writes the active phase-space basis XX into MC, scaling the
   momenta and time-of-flight slots so that MC ends up in TRANSPORT-like
   coordinates (relative slopes for momenta, normalized time-of-flight).
@@ -986,7 +982,7 @@ PROCEDURE COSY2TR MC (DA 8);
   MC[5] := -CONS(P0)/CONS(E0)*MC[5];
 ENDPROCEDURE;
 
-{ ----- Print aberrations of the active MAP (cosy.fox L776-781) -----------
+{ ----- Print aberrations of the active MAP -----------
   PA(IU) prints aberration coefficients of the active MAP to unit IU,
   scaled by per-coordinate phase-space factors (PHSP) and parameter-
   space factors (PARS). The scaling makes higher-order coefficients
@@ -1015,7 +1011,7 @@ PROCEDURE PA IU (RE);
   DAPRV MM 5 6 TWOND IU;
 ENDPROCEDURE;
 
-{ ----- Block-diagonalize a linear map (cosy.fox L1495-1505) ---------------
+{ ----- Block-diagonalize a linear map ---------------
   BM(M, MB, A, IER) writes M as A^{-1} · MB · A where MB has decoupled
   planes (the linear part is block-diagonal). Used by DANF as the first
   step of normal-form analysis: linearize, decouple planes, then run
@@ -1040,7 +1036,7 @@ PROCEDURE BM M (DA 8) MB (DA 8) A (DA 8) IER (RE);
   VARIABLE (DA 20) SCR;
 
   { Linear matrix extraction via DER+CONS: ∂M[I]/∂x_J at origin = m_IJ.
-    cosy.fox uses `DAPEE M(I) J K` with J as the id, but ROSY's TRANSPORT
+     uses `DAPEE M(I) J K` with J as the id, but ROSY's TRANSPORT
     id is left-to-right (id=10 → x_1 not x_2), so single-digit J only
     works for J=1. The DER route is encoding-agnostic. }
   LOOP I 1 TWOND;
@@ -1070,7 +1066,7 @@ PROCEDURE BM M (DA 8) MB (DA 8) A (DA 8) IER (RE);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- Twiss / tune extraction for block-diagonal maps (cosy.fox L1507-1543)
+{ ----- Twiss / tune extraction for block-diagonal maps
   GT(MM, F, MU, ALPHA, BETA, GAMMA, R) computes the tune (MU), the three
   Twiss parameters (ALPHA, BETA, GAMMA) and the contraction factor (R) from
   a one-turn map MM. F is the fixed point (output of FM).
@@ -1095,9 +1091,9 @@ ENDPROCEDURE;
   helpers (ACOS on CD, LOG on CD) that aren't yet wired through ROSY's
   intrinsic surface — they error out with a clear message.
 
-  Variables renamed: cosy.fox's nested OUT helper closes over A/B/C/D in
+  Variables renamed: 's nested OUT helper closes over A/B/C/D in
   the enclosing scope, but inlining it sidesteps the closure entirely.
-  CC stands in for cosy.fox's C (avoiding the C / C_2 / C_3 namespace
+  CC stands in for 's C (avoiding the C / C_2 / C_3 namespace
   pollution from libcosy global declarations).                            }
 PROCEDURE GT MM (DA 8) F (DA 8) MU (DA 4) ALPHA (DA 4) BETA (DA 4) GAMMA (DA 4) R (DA 4);
   VARIABLE (RE) A;
@@ -1122,7 +1118,7 @@ PROCEDURE GT MM (DA 8) F (DA 8) MU (DA 4) ALPHA (DA 4) BETA (DA 4) GAMMA (DA 4) 
     L := K + 1;
     { Extract the 2x2 stability sub-matrix [[A, B], [CC, D]] via partial-
       derivative-then-CONS. ROSY's DAPEP uses left-to-right TRANSPORT id
-      encoding (id=10 → x_1 not x_2), so cosy.fox's `DAPEP M(K) K TWOND`
+      encoding (id=10 → x_1 not x_2), so 's `DAPEP M(K) K TWOND`
       doesn't extract the K-th-variable coefficient when K>1. The DER
       route is encoding-agnostic: ∂M[K]/∂x_K at origin = linear
       coefficient m_KK.                                                   }
@@ -1136,9 +1132,9 @@ PROCEDURE GT MM (DA 8) F (DA 8) MU (DA 4) ALPHA (DA 4) BETA (DA 4) GAMMA (DA 4) 
       COSMU := (A + D)/2/SQRT(DET);
       ABS_COSMU := ABS(COSMU);
       IF ABS(ABS_COSMU - 1) < DEPS;
-        { Parabolic boundary (cosy.fox L1520-1526): COSMU ≈ ±1 means
+        { Parabolic boundary: COSMU ≈ ±1 means
           the map is on the stability border — typical for pure drifts
-          and straight sections with no focusing. cosy.fox accepts only
+          and straight sections with no focusing.  accepts only
           the b=0, c=0 case; otherwise the map can't be represented in
           Twiss form (would need a Jordan block).                       }
         IF (ABS(B) = 0) AND (ABS(CC) = 0);
@@ -1157,7 +1153,7 @@ PROCEDURE GT MM (DA 8) F (DA 8) MU (DA 4) ALPHA (DA 4) BETA (DA 4) GAMMA (DA 4) 
           QUIT 0;
         ENDIF;
       ELSEIF ABS_COSMU < 1;
-        { Stable rotation (cosy.fox L1531-1533): the bread-and-butter
+        { Stable rotation: the bread-and-butter
           ring case. COSMU is the rotation cosine, MU is the tune. }
         R[J] := SQRT(DET) + 0*DD[1];
         MU_J := ACOS(COSMU);
@@ -1172,7 +1168,7 @@ PROCEDURE GT MM (DA 8) F (DA 8) MU (DA 4) ALPHA (DA 4) BETA (DA 4) GAMMA (DA 4) 
         GAMMA[J] := -CC/DEN + 0*DD[1];
       ELSE;
         { Hyperbolic (DET > 0, |COSMU| > 1). MU = DEN + i·LOG(COSMU+SINMU)
-          per cosy.fox; the real part is DEN ∈ {0, π} depending on sign
+          per ; the real part is DEN ∈ {0, π} depending on sign
           of COSMU. ALPHA / BETA / GAMMA are purely imaginary and so
           collapse to 0 under the DA-typed real-cast that libcosy's
           GT signature requires. Callers needing the imaginary tune
@@ -1214,7 +1210,7 @@ PROCEDURE GT MM (DA 8) F (DA 8) MU (DA 4) ALPHA (DA 4) BETA (DA 4) GAMMA (DA 4) 
       ENDIF;
     ELSE;
       { DET < 0: instability. R = i·√(-DET) is purely imag, MU = π/2
-        + K·i·LOG(SINMU+COSMU) per cosy.fox. Real-cast extracts only
+        + K·i·LOG(SINMU+COSMU) per . Real-cast extracts only
         the π/2 tune component; the K·LOG growth-rate residue is
         reported as a diagnostic. ALPHA / BETA / GAMMA collapse to 0
         for the same reason as hyperbolic. }
@@ -1244,7 +1240,7 @@ PROCEDURE GT MM (DA 8) F (DA 8) MU (DA 4) ALPHA (DA 4) BETA (DA 4) GAMMA (DA 4) 
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- Momentum compaction dL(dP)/L (cosy.fox L1483-1487) -----------------
+{ ----- Momentum compaction dL(dP)/L -----------------
   MCM(IAP, LGH, ALPHA) computes the momentum-compaction factor αp from a
   ring map IAP. αp = dL/L per dP — fractional path-length change per
   fractional momentum offset, the foundational figure of merit for
@@ -1269,7 +1265,7 @@ PROCEDURE MCM IAP (DA 8) LGH (RE) ALPHA (DA);
   ALPHA := (XF[5] - DD[5])/LGH;
 ENDPROCEDURE;
 
-{ ----- Energy compaction dT(dE) (cosy.fox L1489-1493) ---------------------
+{ ----- Energy compaction dT(dE) ---------------------
   ECM(IAP, LGH, ALPHA): the relativistic-energy analogue of MCM. Returns
   the time-of-flight derivative with respect to energy offset.           }
 PROCEDURE ECM IAP (DA 8) LGH (RE) ALPHA (DA);
@@ -1287,7 +1283,7 @@ PROCEDURE ECM IAP (DA 8) LGH (RE) ALPHA (DA);
 ENDPROCEDURE;
 
 { ----- DANF (full normal-form analysis) — DEFERRED ------------------------
-  cosy.fox's DANF is a 60-line procedure that block-diagonalizes a one-turn
+  DANF is a 60-line procedure that block-diagonalizes a one-turn
   map, computes resonant terms, and extracts the symplectic normal form
   via Cj operator iteration. It heavily mixes DA and CD arithmetic
   (variables typed differently mid-procedure depending on which step is
@@ -1307,10 +1303,10 @@ ENDPROCEDURE;
     - Just the fixed point: use FM directly.
     - Just the block-diagonal form: use BM directly.
     - Just the tunes / Twiss: use GT directly (no DANF needed).
-  These three cover the typical "ring analysis" workflow in libcosy v1
+  These three cover the typical "ring analysis" workflow in libcosy
   even without DANF.                                                        }
 
-{ ----- RM: read transfer map from unit IU (cosy.fox L839-847) -------------
+{ ----- RM: read transfer map from unit IU -------------
   Inverse of WM. Two file formats are supported:
 
     1. Modern (WM-format): first line begins with " L ". Header parses
@@ -1361,7 +1357,7 @@ PROCEDURE RM IU (RE);
   UPDATE 1 1;
 ENDPROCEDURE;
 
-{ ----- RNM: read NAP from unit IU (cosy.fox L849-854) ---------------------
+{ ----- RNM: read NAP from unit IU ---------------------
   Inverse of WNM. Same dual-format scheme as RM but writes into the
   caller's NAP[8] argument instead of MSC. Skips the LOCSET / UPDATE
   side effects since NAP is a local variable to the caller, not the
@@ -1395,7 +1391,7 @@ PROCEDURE RNM IU (RE) NAP (DA 8);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- COCR: COSY → circular representation (cosy.fox L740-749) ----------
+{ ----- COCR: COSY → circular representation ----------
   Builds the circular-coordinate substitution
         z₊ = x + i·a,   z₋ = x - i·a   (for each (x,a) plane)
   and applies it to the input map IAP via CPOLVAL.
@@ -1404,7 +1400,7 @@ ENDPROCEDURE;
   representation diagonalizes the linear rotation: a stable plane with
   tune μ becomes a phase-multiply z₊ ↦ e^(iμ)z₊, z₋ ↦ e^(-iμ)z₋.
 
-  In cosy.fox the local `I` is reused first as IMUNIT then as a loop
+  In  the local `I` is reused first as IMUNIT then as a loop
   counter — ROSY strict typing splits these into `IM` (CM) and `I` (RE).
   All DA-valued globals (DD) lift to CD via `+ 0*IM` since LAP/COD live
   in CD-arithmetic for the CPOLVAL substitution.                          }
@@ -1436,16 +1432,16 @@ PROCEDURE COCR IAP (CD 8) NAP (CD 8);
   CPOLVAL 1 LAP TWOND COD NV NAP TWOND;
 ENDPROCEDURE;
 
-{ ----- CRCO: circular representation → COSY (cosy.fox L751-764) ----------
+{ ----- CRCO: circular representation → COSY ----------
   Inverse of COCR. Builds
         x = (z₊ + z₋)/2,   a = (z₊ - z₋)/(2i)
   and applies via CPOLVAL. The result should be purely real (zero imag
   part) up to numerical noise — we strip the imag part in-place and warn
-  if the residual exceeds 1e-12 (matches cosy.fox's diagnostic).
+  if the residual exceeds 1e-12 (matches 's diagnostic).
 
   Note the in-place `NAP[I] := REAL(NAP[I])` keeps NAP CD-typed (REAL of
   a CM gives RE which auto-lifts back to CD with zero imag) — same effect
-  as cosy.fox's loose-typed write-back, just written explicitly.          }
+  as 's loose-typed write-back, just written explicitly.          }
 PROCEDURE CRCO IAP (CD 8) NAP (CD 8);
   VARIABLE (CD 8)  LAP;
   VARIABLE (CD 20) COD;

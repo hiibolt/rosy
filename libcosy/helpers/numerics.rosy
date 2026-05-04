@@ -1,20 +1,16 @@
-{ ============================================================================
-  libcosy/helpers/numerics.rosy — Numerical primitives
-
-  Ported from cosy.fox L4195-4262. The Bethe-Bloch / EODE / RK4 / EL chain
-  enables material-traversal energy-loss calculations (the workhorse for
-  spectrometer / detector / beam-stop physics).
-  ============================================================================ }
+{ Numerical primitives for material-traversal energy loss: Bethe-Bloch
+  stopping power, the kinetic-energy / time-of-flight ODE, and a fixed-
+  step RK4 integrator that drives them. }
 
 BEGIN;
 
-{ ----- Bethe-Bloch coefficient setter (cosy.fox L4195-4203) -------------- }
+{ ----- Bethe-Bloch coefficient setter -------------- }
 PROCEDURE BBC Z A RHO I DELTA C;
   BETHEBLOCHC(1) := Z; BETHEBLOCHC(2) := A;     BETHEBLOCHC(3) := RHO;
   BETHEBLOCHC(4) := I; BETHEBLOCHC(5) := DELTA; BETHEBLOCHC(6) := C;
 ENDPROCEDURE;
 
-{ ----- Velocity from kinetic energy (cosy.fox L4260-4262) ----------------
+{ ----- Velocity from kinetic energy ----------------
   v/c = sqrt( eta * (2 + eta) ) / (1 + eta), where eta = KE / (M0 * AMUMEV)
   Reads globals M0 and AMUMEV. Caller must run on the top level (or from a
   procedure) — calling VELC from inside a FUNCTION currently fails because
@@ -29,13 +25,13 @@ FUNCTION (RE) VELC KE (RE);
   VELC := SQRT(ETA0*(2 + ETA0))/(1 + ETA0);
 ENDFUNCTION;
 
-{ ----- BETHEBLOCH: stopping-power dE/dx (cosy.fox L4205-4215) ---------------
+{ ----- BETHEBLOCH: stopping-power dE/dx ---------------
   Returns the Bethe-Bloch stopping power (energy loss per unit path) for
   a particle of charge Z0 and rest-mass M0 traversing material set up by
   BBC (BETHEBLOCHC[1..6] = Z, A, ρ, I, δ, C). Result has units of
   MeV·cm²/g · MeV/cm.
 
-  cosy.fox treats GAMMA / BETA / MEM0 etc. as DA scalars, propagating
+   treats GAMMA / BETA / MEM0 etc. as DA scalars, propagating
   the energy ETOT's DA dependence through to the stopping-power output —
   which lets users compute dE/dx with parameter sensitivity for free.   }
 FUNCTION (DA) BETHEBLOCH ETOT (DA);
@@ -62,7 +58,7 @@ FUNCTION (DA) BETHEBLOCH ETOT (DA);
                             - 2*BETHEBLOCHC[6]/BETHEBLOCHC[1]);
 ENDFUNCTION;
 
-{ ----- EODE: 2-component energy-loss ODE (cosy.fox L4217-4219) -------------
+{ ----- EODE: 2-component energy-loss ODE -------------
   Right-hand side for the energy-loss-in-material ODE:
     dY[1]/ds = BETHEBLOCH(Y[1])         (stopping power)
     dY[2]/ds = sqrt(1 - (M0·c²/Y[1])²)  (relativistic v/c factor)
@@ -72,14 +68,14 @@ PROCEDURE EODE Y (DA 8) S (RE) YP (DA 8);
   YP[2] := ISRT(1 - SQR(M0*AMUMEV/Y[1]));
 ENDPROCEDURE;
 
-{ ----- RK4: fixed-step 4th-order Runge-Kutta (cosy.fox L4221-4241) ---------
+{ ----- RK4: fixed-step 4th-order Runge-Kutta ---------
   Integrates a system of N ODEs (with right-hand side EODE) from X0 to X1
   in NS uniform steps. Z is a scratch (8x4) workspace; output Y1 holds
   the final values.
 
-  Hardcoded for N up to 8 and EODE as the RHS — the cosy.fox version
+  Hardcoded for N up to 8 and EODE as the RHS — the  version
   parameterizes RHS via the global EODE name; libcosy keeps the same
-  structure since EODE is the only RHS consumer in libcosy v1.            }
+  structure since EODE is the only RHS consumer in libcosy.            }
 PROCEDURE RK4 N (RE) X0 (RE) X1 (RE) Y0 (DA 8) NS (RE) Z (DA 8 4) Y1 (DA 8);
   VARIABLE (RE) H;
   VARIABLE (RE 4) HH;
@@ -124,7 +120,7 @@ PROCEDURE RK4 N (RE) X0 (RE) X1 (RE) Y0 (DA 8) NS (RE) Z (DA 8 4) Y1 (DA 8);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- EL: energy-loss integration in material (cosy.fox L4243-4258) -------
+{ ----- EL: energy-loss integration in material -------
   EL(EI, TI, L, EF, TF) integrates the kinetic energy and time-of-flight
   through a material slab of thickness L, given initial conditions EI
   (kinetic energy) and TI (time-of-flight × c). Output: EF, TF.

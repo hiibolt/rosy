@@ -1,43 +1,27 @@
-{ ============================================================================
-  libcosy/physics/spin_su2.rosy — Spin normal forms in SU(2) representation
+{ Spin normal-form analysis in the SU(2) (complex 2-component)
+  representation. SU(2) multiplication encodes SO(3) composition via
+  the Pauli-matrix isomorphism, with half-angle parameters that avoid
+  the trig singularities of Euler angles.
 
-  cosy.fox L1761-1900-ish. The spin-tracking pipeline uses SU(2) (complex
-  2-component) instead of SO(3) (3×3 real) representation for cleaner
-  composition: SU(2) multiplication encodes SO(3) composition via the
-  Pauli-matrix isomorphism, with half-angle parameters that avoid the
-  trig-singularities of Euler angles.
+  Procedures:
+    * SO3_IN_SU2 — SO(3) rotation → SU(2).
+    * IDENSU2 / MULASU2 / INVRSU2 / CORRSU2 / MEXPSU2 / EHOMSU2 —
+      SU(2) group / algebra primitives.
+    * MAPINVR / ANALMAP / SOLVSU2 — DA → CD analytic map and
+      Newton-style SU(2) normal-form solver.
+    * NORMSU2 — full spin normal-form pipeline.
+    * TSS / TSP / PARASU2 — spin-tune extraction and parameter
+      dependence.
 
-  Procedures landed in this file (M5 + M11 + M17):
-    * SO3_IN_SU2(A, B, KEY) — SO(3) rotation → SU(2) (cosy.fox L1761-1787).
-    * IDENSU2 / MULASU2 / INVRSU2 / CORRSU2 / MEXPSU2 / EHOMSU2 — SU(2)
-      group/algebra primitives (cosy.fox L1789-1856).
-    * MAPINVR / ANALMAP / SOLVSU2 — DA→CD analytic-map and Newton-style
-      solver for SU(2) normal forms (cosy.fox L1857-1909).
-    * NORMSU2(UI, UO, CU, NBAR, STUNE, MN, MA, EPS) — full spin
-      normal-form pipeline (cosy.fox L1643). Three-deep nested helpers
-      land via the CD-scratch + REAL-cast pattern documented in
-      normal_form.rosy.
-    * TSS / TSP / PARASU2 — spin-tune extraction and parameter-dependence
-      utilities (cosy.fox L1911-1979).
-
-  All CD-typed scratch arrays follow the DANF convention: DA → CD lift
-  via `+ 0*IM`, CD → DA via REAL(...), with imaginary residue tracked
-  for diagnostics where physical interpretation requires it.
-
-  End-to-end status: the spin *analysis* surface (NORMSU2 / TSS / TSP /
-  ANALMAP / SOLVSU2 / ...) compiles and is callable from user code,
-  but you cannot yet build a non-trivial SPNR from libcosy lattice
-  elements. Most magnetic / electric element wrappers (MQ / MH / DI /
-  BEND / EQ / ...) gate on `LSPN = 0` because the SPNVEC and
-  UPDATEMAP-with-spin paths are deferred. Users testing the analyzers
-  today must construct SPNR manually (e.g. SO3_IN_SU2 directly).
-  ============================================================================ }
+  CD-typed scratch arrays follow the convention: DA → CD via `+ 0*IM`,
+  CD → DA via `REAL(...)`, with imaginary residue tracked for the
+  diagnostic warnings where physical interpretation requires it. }
 
 BEGIN;
 
 INCLUDE '../globals.rosy';
 
-{ ----- SO3_IN_SU2: SO(3) rotation → SU(2) (cosy.fox L1761-1787) -----------
+{ ----- SO3_IN_SU2: SO(3) rotation → SU(2) -----------
   SO3_IN_SU2(A, B, KEY) maps a 3×3 SO(3) rotation matrix A to its SU(2)
   representation B (2-component CD). KEY=0 selects the principal branch;
   KEY≠0 selects the antipodal branch (since SU(2) double-covers SO(3)).
@@ -107,7 +91,7 @@ PROCEDURE SO3_IN_SU2 A (DA 3 3) B (CD 2) KEY (RE);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- SU(2) arithmetic primitives (cosy.fox L1651-1674) -------------------
+{ ----- SU(2) arithmetic primitives -------------------
   These are the building blocks of NORMSU2's spin normal-form algorithm,
   exposed here as standalone procedures so users can build custom spin
   tracking pipelines without reimplementing the basic SU(2) algebra.    }
@@ -148,7 +132,7 @@ ENDPROCEDURE;
 
 { MEXPSU2(A, B): SU(2) exponential A := exp(:B:) via truncated power
   series. Requires B to be at-origin (constant terms zero); errors
-  out otherwise. cosy.fox uses NOC iterations for the truncation. }
+  out otherwise.  uses NOC iterations for the truncation. }
 PROCEDURE MEXPSU2 A (CD 2) B (CD 2);
   VARIABLE (CD 2) C1;
   VARIABLE (CD 2) C2;
@@ -173,7 +157,7 @@ PROCEDURE MEXPSU2 A (CD 2) B (CD 2);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- EHOMSU2: extract J-th-order homogeneous part of an SU(2) (cosy.fox L1668)
+{ ----- EHOMSU2: extract J-th-order homogeneous part of an SU(2)
   EHOMSU2(A, B, J) computes A := B|_{order=J} - B|_{order=J-1}, isolating
   the J-th order homogeneous slice of B. Uses CO truncation walks to
   extract each order without disturbing NOC.                              }
@@ -190,7 +174,7 @@ PROCEDURE EHOMSU2 A (CD 2) B (CD 2) J (RE);
   A[2] := A[2] - C[2];
 ENDPROCEDURE;
 
-{ ----- MAPINVR: error-checked DA-map inverse (cosy.fox L1704-1707) ---------
+{ ----- MAPINVR: error-checked DA-map inverse ---------
   Thin MI wrapper that errors out cleanly if the inverse fails. }
 PROCEDURE MAPINVR M1 (DA 8) M2 (DA 8);
   VARIABLE (RE) IER;
@@ -202,7 +186,7 @@ PROCEDURE MAPINVR M1 (DA 8) M2 (DA 8);
 ENDPROCEDURE;
 
 { ----- ANALMAP: extract Twiss / linear-tune basis from a CD map ------------
-  cosy.fox L1681-1703. Diagonalizes the linear part of MN per phase-space
+   Diagonalizes the linear part of MN per phase-space
   pair into PHI (tune) + R (radius) plus the M1, M2 substitution
   polynomials needed to map between Floquet and canonical coords.
 
@@ -259,7 +243,7 @@ PROCEDURE ANALMAP MN (CD 8) PHI (RE 8) R (RE 8) M1 (CD 20) M2 (CD 20);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- SOLVSU2: per-order Cj-operator solver (cosy.fox L1675-1680) --------
+{ ----- SOLVSU2: per-order Cj-operator solver --------
   Applies CDNFDS to extract the j-th order resonance correction in
   Floquet variables, then maps back to canonical coords. Used inside
   the NORMSU2 main iteration loop.                                       }
@@ -302,14 +286,14 @@ PROCEDURE SOLVSU2 U1 (CD 2) U2 (CD 2) D (CD) PHI (RE 8) R (RE 8)
   U1[2] := U2[2];
 ENDPROCEDURE;
 
-{ ----- NORMSU2: spin normal form via SU(2) iteration (cosy.fox L1643-1759)
+{ ----- NORMSU2: spin normal form via SU(2) iteration
   NORMSU2(UI, UO, CU, NBAR, STUNE, MN, MA, EPS) extracts the spin
   normal-form quantities — closed orbit UO, change-of-basis CU, the
   rotation axis NBAR, and the spin tune STUNE — from an input SU(2)
   spin map UI given orbital normal-form data MN, MA.
 
   Algorithm: repeatedly conjugate-and-correct UI using EHOMSU2/SOLVSU2/
-  MEXPSU2/MULASU2 helpers (see cosy.fox source). Inputs MN, MA must be
+  MEXPSU2/MULASU2 helpers (see  source). Inputs MN, MA must be
   CD-typed (caller lifts DANF's DA outputs via `+ 0*IM` if needed).
 
   Type juggling pattern (similar to DANF):
@@ -459,7 +443,7 @@ PROCEDURE NORMSU2 UI (CD 2) UO (RE 4) CU (RE 4) NBAR (DA 3) STUNE (DA)
   UO[4] := CONS(IMAG(UOO[2]));
 ENDPROCEDURE;
 
-{ ----- TSS: spin tune + ñ vector on parameters AND orbit (cosy.fox L1789-1816)
+{ ----- TSS: spin tune + ñ vector on parameters AND orbit
   TSS(ST, NBAR, KEY) computes the spin tune ST and the rotation-axis
   NBAR of the active MAP via the full DANF + NORMSU2 chain.
 
@@ -532,12 +516,12 @@ PROCEDURE TSS ST (DA) NBAR (DA 3) KEY (RE);
   ST := ST/PI/2;
 ENDPROCEDURE;
 
-{ ----- PARASU2: extract parameter-only part of a DA scalar (cosy.fox L1831)
+{ ----- PARASU2: extract parameter-only part of a DA scalar
   PARASU2(B) plugs 0 for variables 1..TWOND (the phase-space) into B,
   leaving only the parameter-space residue. This isolates the
   parameter dependence of B for the TSP "tune-on-parameters" view.
 
-  cosy.fox uses the DAPLU sweep — wrap into 1-element buffers since
+   uses the DAPLU sweep — wrap into 1-element buffers since
   ROSY's DAPLU expects Vec<DA>.                                          }
 FUNCTION (DA) PARASU2 B (DA);
   VARIABLE (DA 1) D_BUF;
@@ -551,7 +535,7 @@ FUNCTION (DA) PARASU2 B (DA);
   PARASU2 := D_BUF[1];
 ENDFUNCTION;
 
-{ ----- TSP: spin tune + ñ vector on parameters ONLY (cosy.fox L1818-1872)
+{ ----- TSP: spin tune + ñ vector on parameters ONLY
   TSP(ST, NBAR, KEY) computes the parameter-dependence-only part of the
   spin tune ST and rotation-axis NBAR. Unlike TSS (which gives both
   amplitude AND parameter dependence), TSP strips the phase-space

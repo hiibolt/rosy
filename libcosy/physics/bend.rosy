@@ -1,59 +1,42 @@
-{ ============================================================================
-  libcosy/physics/bend.rosy — BEND (general dipole magnet)
+{ BEND — general dipole magnet with curved edges, edge angles, optional
+  fringe-field path, and optional inhomogeneous (multipole) content.
 
-  cosy.fox L3240-3399. The dipole monster — fully general magnet with
-  curved edges, edge angles, optional fringe-field path, and optional
-  inhomogeneous (multipole) content.
-
-  Port scope (libcosy v2):
-    * BENDFF0 path (LFR=0, NT=0): simple sector dipole — works for most
-      teaching examples and basic ring lattices.
-    * BENDFF3 path (LFR=3 / LFR=2.5): high-precision soft-edge fringe
-      via NSDP=-4 + BENDIST. Landed M6.18-M6.22.
-    * Multipole content (NT > 0): DIPOLEY entrance + SIELE body +
-      DIPOLEY exit (cosy.fox L3382-3388). Landed M6.x.
-    * LFR=-1 / LFR=-2 half-fringe paths: delegate to FFELE
-      (field_potential.rosy:1665+). Landed M6.20.
-    * Spin tracking (LSPN=1): DEFERRED — needs SPNVEC + LSPN-driven
-      UPDATEMAP spin pipeline. M16 lands SPNVEC scaffolding (warns
-      and skips ray spin push); full integration is M19+.
+  Supported LFR modes:
+    * 0       no fringe field (simple sector dipole; NT > 0 also goes
+              through here as DIPOLEY + SIELE + DIPOLEY multipole body).
+    * 3 / 2.5 high-precision soft-edge fringe (NSDP=-4 + BENDIST).
+    * -1 / -2 half-fringe paths via FFELE delegation.
 
   Convenience wrappers:
     DI   = curved-edge dipole (BEND with E1/E2/H1/H2 in degrees)
     DP   = parallel-faced dipole
     DIL  = DI with L instead of R (computes R = L/PHI)
 
-  cosy.fox structure (4-deep nesting):
+  Internal structure (4-deep nesting):
     BEND
       ├─ FK / SNS / KICK / POL / KICKSXYN — multipole helpers
       ├─ BENDFF3 (procedure)              — fringe-field path
       └─ BENDFF0 (procedure)              — no-fringe path
-            ├─ DIPOLE (procedure)
+            ├─ DIPOLE
             │     ├─ RADI / CAPO / EQ2 / LINLIN / LINCIR / CIRCIR
-            └─ DIPOLEY (procedure)        — y-plane KICK + DIPOLE + KICK
-
-  ROSY's strict typing means inner procedures need explicit array sizes
-  and scalar-vs-vector decisions made up front. The DA arithmetic is the
-  canonical phase-space variables, plus reference-particle factors P0,
-  CHIM, ETA, V0 — all already in libcosy/globals.rosy.
-  ============================================================================ }
+            └─ DIPOLEY                    — y-plane KICK + DIPOLE + KICK }
 
 BEGIN;
 
 INCLUDE '../globals.rosy';
 
-{ ----- BEND: full general magnet (cosy.fox L3240-3399) --------------------- }
+{ ----- BEND: full general magnet --------------------- }
 PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
               N (RE 5) S1 (RE 5) S2 (RE 5) NT (RE);
 
   { Working scalars / arrays declared at BEND scope so nested helpers can
-    capture them. cosy.fox uses NMP (number of monomials per parameter)
+    capture them.  uses NMP (number of monomials per parameter)
     sizes — translates to (DA) for DA-typed scalars, (DA 8) for DA arrays.}
   VARIABLE (RE) I;
   VARIABLE (RE) NTS;
   VARIABLE (RE) LGH;
 
-  { ----- FK: circle FK(X) (cosy.fox L3246-3248) -----------------------------
+  { ----- FK: circle FK(X) -----------------------------
     Used to compute the entry/exit edge effects. For zero curvature XI,
     FK reduces to TAN(E)*X (linear edge angle); otherwise it's the more
     general circular-edge formula.                                          }
@@ -65,7 +48,7 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
     ENDIF;
   ENDFUNCTION;
 
-  { ----- KICK: apply transverse kick to a ray array (cosy.fox L3257-3262)
+  { ----- KICK: apply transverse kick to a ray array
     Builds a single-DA kick polynomial A from the input field F, then
     POLVAL-applies it at the canonical basis to extract the kick value
     that goes into IAP[2*K] (the conjugate momentum slot for axis K).      }
@@ -91,10 +74,10 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
     IAP[2*K] := IAP[2*K] + A[1];
   ENDPROCEDURE;
 
-  { ----- DIPOLE: sector-bend geometric solution (cosy.fox L3294-3373) ------
+  { ----- DIPOLE: sector-bend geometric solution ------
     The keystone routine — solves the "where does the ray exit the dipole"
     geometry analytically in DA. Given an entry ray IN, computes the exit
-    ray OUT and the path length LGH. cosy.fox writes this as a sequence of
+    ray OUT and the path length LGH.  writes this as a sequence of
     geometric problems (line/line, line/circle, circle/circle intersections,
     angle captures) — implemented here with the same 6 nested helpers.    }
   PROCEDURE DIPOLE R0 (RE) PHIA (RE) E1A (RE) XI1 (RE) E2A (RE) XI2 (RE)
@@ -119,12 +102,12 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
     VARIABLE (DA) DA_PLUS_ONE;
     VARIABLE (DA) DA_ZERO;
 
-    { ----- RADI: 2D radius (cosy.fox L3303) ------------------------------- }
+    { ----- RADI: 2D radius ------------------------------- }
     FUNCTION (RE) RADI XX (RE) YY (RE);
       RADI := SQRT(SQR(XX) + SQR(YY));
     ENDFUNCTION;
 
-    { ----- CAPO: atan2-style angle capture (cosy.fox L3304-3310) ---------- }
+    { ----- CAPO: atan2-style angle capture ---------- }
     PROCEDURE CAPO XC (DA) YC (DA) PHIO (DA) IERO (RE);
       VARIABLE (RE) XCC; VARIABLE (RE) YCC; VARIABLE (RE) TINY;
       TINY := 1E-16;
@@ -145,7 +128,7 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
       ENDIF;
     ENDPROCEDURE;
 
-    { ----- EQ2: solve A·X² - 2B·X - C = 0 (cosy.fox L3311-3314) ----------- }
+    { ----- EQ2: solve A·X² - 2B·X - C = 0 ----------- }
     PROCEDURE EQ2 A (DA) B (DA) C_EQ (DA) Z1O (DA) Z2O (DA);
       IF (CONS(A) = 0) OR (SQR(CONS(B)) + CONS(C_EQ)*CONS(A) < 0);
         WRITE 6 ' *** ERROR in DIPOLE EQ2, no solution';
@@ -155,7 +138,7 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
       Z2O := SQRT(SQR(Z1O) + C_EQ/A);
     ENDPROCEDURE;
 
-    { ----- LINLIN: A1X+B1Y+C1=0 ∩ A2X+B2Y+C2=0 (cosy.fox L3315-3319) ----- }
+    { ----- LINLIN: A1X+B1Y+C1=0 ∩ A2X+B2Y+C2=0 ----- }
     PROCEDURE LINLIN A1 (DA) B1 (DA) C1 (DA) A2 (DA) B2 (DA) C2 (DA)
                      XO (DA) YO (DA);
       VARIABLE (DA) D_LIN;
@@ -170,7 +153,7 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
       YO := (A2*C1 - A1*C2)/D_LIN;
     ENDPROCEDURE;
 
-    { ----- LINCIR: line ∩ circle (cosy.fox L3320-3329) ------------------- }
+    { ----- LINCIR: line ∩ circle ------------------- }
     PROCEDURE LINCIR A (DA) B (DA) C_LC (DA) XR_LC (DA) YR_LC (DA) RA (DA)
                      X1O (DA) Y1O (DA) X2O (DA) Y2O (DA);
       VARIABLE (DA) A1; VARIABLE (DA) C1; VARIABLE (DA) ZA1; VARIABLE (DA) ZB1;
@@ -187,7 +170,7 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
       ENDIF;
     ENDPROCEDURE;
 
-    { ----- CIRCIR: circle ∩ circle (cosy.fox L3330-3335) ----------------- }
+    { ----- CIRCIR: circle ∩ circle ----------------- }
     PROCEDURE CIRCIR XR1 (DA) YR1 (DA) R1 (DA) XR2 (DA) YR2 (DA) R2 (DA)
                      X1O (DA) Y1O (DA) X2O (DA) Y2O (DA);
       VARIABLE (DA) C_CC;
@@ -287,7 +270,7 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
     ENDIF;
   ENDPROCEDURE;
 
-  { ----- DIPOLEY: y-plane KICK + DIPOLE + KICK (cosy.fox L3374-3377) ------ }
+  { ----- DIPOLEY: y-plane KICK + DIPOLE + KICK ------ }
   PROCEDURE DIPOLEY R0 (RE) PHIA (RE) E1A (RE) XI1 (RE) E2A (RE) XI2 (RE)
                     IND (DA 8) OUTD (DA 8) LGHD (RE);
     KICK 2 FK(DD[1], E1A, XI1)/R0 IND;
@@ -317,8 +300,8 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
 
   IF (LFR = 0) OR (LFR = 3) OR (LFR = 2.5) OR (LFR = -1) OR (LFR = -2);
     IF (LFR = 0) AND (NT = 0) AND (LSPN = 0);
-      { Pure dipole, no fringe, no spin (cosy.fox L3380): DIPOLEY
-        entrance + body + exit edge. cosy.fox gates this fast path
+      { Pure dipole, no fringe, no spin: DIPOLEY
+        entrance + body + exit edge.  gates this fast path
         on LSPN=0 since the analytical DIPOLEY doesn't propagate the
         spin matrix; LSPN=1 falls through to the SIELE multipole
         path below which runs SPNFLO. }
@@ -330,7 +313,7 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
       UPDATE 0 1;
       CE := 'BEND';
     ELSEIF (LFR = -1) OR (LFR = -2);
-      { LFR=-1/-2: half-fringe via FFELE delegation (cosy.fox L3406-3411).
+      { LFR=-1/-2: half-fringe via FFELE delegation.
         Set up dipole + multipoles in PPOL/MPOL, then call FFELE with
         L=R·PHI, H_LOCAL=1/R, LF1=-1, LF2=-2. FFELE's LFR=-1/-2 path
         runs SDELE with NSDP=-1 or -2 (POTXZ NSDP=-1/-2 bend fringe).  }
@@ -351,7 +334,7 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
       LOFF := 2;
       FFELE R*PHI D 1/R NEG1_HF NEG2_HF '  ';
     ELSEIF (LFR = 3) OR (LFR = 2.5);
-      { BENDFF3 path (cosy.fox L3268-3290): magnetic dipole + multipoles
+      { BENDFF3 path: magnetic dipole + multipoles
         with high-precision soft-edge fringe via NSDP=-4 + BENDIST.   }
       VARIABLE (RE) LDL_BFF;
       VARIABLE (RE) NEG_LDL_BFF;
@@ -419,7 +402,7 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
       ENDLOOP;
       CE := 'BEND';
     ELSE;
-      { NT>0: multipole-extension dipole (cosy.fox L3382-3388).
+      { NT>0: multipole-extension dipole.
         Set up PPOL/MPOL with dipole + N multipoles, then:
           1. DIPOLEY entrance edge (no body bend) → ISC
           2. Copy ISC[TWOND+1..NV] into MSC (preserve param slots)
@@ -464,7 +447,7 @@ PROCEDURE BEND R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE)
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- DI: curved-edge dipole convenience wrapper (cosy.fox L3433-3435) --- }
+{ ----- DI: curved-edge dipole convenience wrapper --- }
 PROCEDURE DI R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE);
   VARIABLE (RE 5) S1Z;
   VARIABLE (RE 5) S2Z;
@@ -477,7 +460,7 @@ PROCEDURE DI R (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE);
   BEND R PHI*DEGRAD D E1*DEGRAD H1 E2*DEGRAD H2 NZ S1Z S2Z 0;
 ENDPROCEDURE;
 
-{ ----- DIL: length-form dipole (cosy.fox L3468-3469) ----------------------
+{ ----- DIL: length-form dipole ----------------------
   DIL(L, PHI, D, E1, H1, E2, H2) is DI parameterized by arc length L
   instead of bending radius R. Falls back to a pure drift DL(L) when
   PHI = 0. The R = L/(PHI·DEGRAD) substitution gives the same magnet
@@ -490,7 +473,7 @@ PROCEDURE DIL L (RE) PHI (RE) D (RE) E1 (RE) H1 (RE) E2 (RE) H2 (RE);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- DP: parallel-faced dipole convenience wrapper (cosy.fox L3437-3439) }
+{ ----- DP: parallel-faced dipole convenience wrapper }
 PROCEDURE DP R (RE) PHI (RE) D (RE);
   VARIABLE (RE) PH;
   VARIABLE (RE 5) S1Z;
@@ -506,7 +489,7 @@ PROCEDURE DP R (RE) PHI (RE) D (RE);
 ENDPROCEDURE;
 
 { ----- MC: combined-function magnet with caller-provided N/S1/S2 arrays
-        (cosy.fox L3441-3443) -----
+ -----
   MC(R, PHI, D, N, S1, S2, NT) is a combined-function magnet wrapper
   that delegates straight to BEND with all four edge angles fixed at
   zero (sharp-cut entrance/exit, no S-shape inhomogeneity at the
@@ -519,7 +502,7 @@ PROCEDURE MC R (RE) PHI (RE) D (RE) N (RE 5) S1 (RE 5) S2 (RE 5) NT (RE);
 ENDPROCEDURE;
 
 { ----- MS: combined-function magnet with five scalar multipole strengths
-        (cosy.fox L3445-3449) -----
+ -----
   MS(R, PHI, D, N1..N5) packages the five normal multipole strengths
   N1..N5 (quadrupole through dodecapole) into the N[5] array BEND
   expects, with zero S1/S2 inhomogeneity. Convenient for users who
@@ -540,7 +523,7 @@ PROCEDURE MS R (RE) PHI (RE) D (RE)
   BEND R PHI*DEGRAD D 0 0 0 0 N S1 S2 5;
 ENDPROCEDURE;
 
-{ ----- MSL: length-form combined-function magnet (cosy.fox L3451-3457) ----
+{ ----- MSL: length-form combined-function magnet ----
   MSL is MS but parameterized by physical length L instead of bending
   radius R, with the R = L/(PHI·DEGRAD) substitution. PHI=0 short-
   circuits to a pure drift DL(L), avoiding division-by-zero — handy
@@ -564,7 +547,7 @@ PROCEDURE MSL L (RE) PHI (RE) D (RE)
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- MPL: parallel-faced combined-function magnet (cosy.fox L3459-3466)
+{ ----- MPL: parallel-faced combined-function magnet
   MPL is MSL with parallel pole-face entry/exit edges: the wedges at
   the magnet's ends are tangent-half-PHI instead of zero, so the
   reference orbit enters and exits parallel to the magnet's straight
@@ -596,7 +579,7 @@ PROCEDURE MPL L (RE) PHI (RE) D (RE)
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- M7.1: MCLK — combined-function magnet K-variant (cosy.fox L3471-3478)
+{ ----- MCLK — combined-function magnet K-variant
   Sister to MC but takes integrated K-strengths instead of physical
   fields. For non-zero PHI, scales K[I] by R^(I+1) (powers of bend
   radius) before delegating to MC. For PHI≈0 (straight magnet),

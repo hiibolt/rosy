@@ -1,42 +1,34 @@
-{ ============================================================================
-  libcosy/physics/tracking.rosy — Particle tracking auxiliaries
+{ Particle tracking. TR is the main per-element tracker — pushes the
+  ray pool through MAP for N iterations, applying aperture cuts (LCUT
+  via TRAP, multi-aperture via AP), symplectification (TY > 0 fixed
+  point or TY < -1 Newton, with TY = -12 / -13 linear-only and TY =
+  -21 raw push specializations), and per-iteration spin propagation
+  when IID1 < 0 or IID2 < 0. NF = 1 routes the initial conditions
+  through DANF's normal-form coordinate transform first.
 
-  This file ports the small TR-family state setters and result getters that
-  control the (forthcoming) main TR tracking procedure. The TR procedure
-  itself (cosy.fox L1993-2204) is a multi-hundred-line workhorse that
-  depends on the full element-action / ray-subsystem stack — it lands in a
-  later milestone. The auxiliaries here are pure flag/state mutators and
-  accessor-style read-outs, all under 10 lines each.
-
-  Ported procedures (cosy.fox L2205-2283):
-    * TRT(LIN)       — set TR title string (LTR / TRTST globals)
-    * TRAP(X, Y, I)  — TR aperture-cut parameters (XCUT / LCUT)
-    * TRR(L)         — TR resume flag (LTRR, LTRI)
-    * TRPRAY(IU)     — TR print-ray flag and unit (LTRPRAY / LTRPRAYU)
-    * TRPSPI(IU)     — TR print-spin flag and unit (LTRPSPI / LTRPSPIU)
-    * TRSC(E)        — read last symplectic error (ESC -> E)
-    * TRNC(E)        — read last spin-normalization error (ENC -> E)
-
-  Deferred to the M7+ milestone with the main TR:
-    * TR (the tracker itself), TRAYPAC, TRAPHIST, TRAPN, AP, CR
-  ============================================================================ }
+  Other procedures here are flag setters and result getters: TRT
+  (title), TRAP (aperture-cut parameters), AP (multi-aperture),
+  TRR (resume flag), TRPRAY / TRPSPI (per-step file dump flags), and
+  TRSC / TRNC (read symplectic / spin-normalization error scalars
+  produced by the last TR run). CUT_LCUT / CUT_NCT are the per-ray
+  cut helpers driving aperture rejection. }
 
 BEGIN;
 
 INCLUDE '../globals.rosy';
 
-{ ----- TRT: set TR title (cosy.fox L2205) ---------------------------------
+{ ----- TRT: set TR title ---------------------------------
   TRT(LIN) flags that a title string is set (LTR := 1) and stores the
-  string in TRTST. Used by the (deferred) graphics output path of TR.   }
+  string in TRTST. Used by the graphics output path of TR.   }
 PROCEDURE TRT LIN (ST);
   LTR := 1;
   TRTST := LIN;
 ENDPROCEDURE;
 
-{ ----- TRAP: TR aperture-cut parameters (cosy.fox L2207-2210) -------------
+{ ----- TRAP: TR aperture-cut parameters -------------
   TRAP(X, Y, I) sets the TR-internal aperture cut box:
     XCUT[1] := |X|, XCUT[2] := |Y|, LCUT := I.
-  Mode I encoding (cosy.fox commentary):
+  Mode I encoding ( commentary):
     0  → no cut
     1  → elliptic cut (transverse phase-space ellipse rejection)
     2  → rectangular cut
@@ -47,7 +39,7 @@ PROCEDURE TRAP X (RE) Y (RE) I (RE);
   LCUT := I;
 ENDPROCEDURE;
 
-{ ----- M12.2: AP — define a particle-cutting aperture (cosy.fox L2212-2219)
+{ ----- AP — define a particle-cutting aperture
   Each AP call snapshots the current MAP[1]/MAP[3] (x and y components)
   into MCT[2*NCT-1] / MCT[2*NCT], records the cut shape (1=elliptic,
   2=rectangular) in LCT[NCT], stores the half-axes in XCT[1, NCT] /
@@ -59,7 +51,7 @@ ENDPROCEDURE;
   unit-ellipse / unit-rectangle test as in CUT_LCUT.
 
   UM resets the AP table (NCT := 0). Modes other than 1/2 are silently
-  ignored per cosy.fox.                                                  }
+  ignored per .                                                  }
 PROCEDURE AP X (RE) Y (RE) I (RE);
   IF (I = 1) OR (I = 2);
     NCT := NCT + 1;
@@ -75,7 +67,7 @@ PROCEDURE AP X (RE) Y (RE) I (RE);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- TRR: TR resume flag (cosy.fox L2266-2268) --------------------------
+{ ----- TRR: TR resume flag --------------------------
   TRR(L) sets the resume mode — when LTRR ≠ 0, TR will pick up where it
   left off rather than re-initialising. The LTRI := 0 reset fires when
   the previous LTRR was 0 (transitioning into resume mode for the first
@@ -91,7 +83,7 @@ PROCEDURE TRR L (RE);
   LTRR := L;
 ENDPROCEDURE;
 
-{ ----- TRPRAY: TR ray-print output flag (cosy.fox L2270-2274) -------------
+{ ----- TRPRAY: TR ray-print output flag -------------
   Enables the per-step ray dump during TR. IU is the file unit. Errors
   if TRPSPI is also enabled to the same unit (would interleave output). }
 PROCEDURE TRPRAY IU (RE);
@@ -105,7 +97,7 @@ PROCEDURE TRPRAY IU (RE);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- TRPSPI: TR spin-print output flag (cosy.fox L2276-2280) ------------
+{ ----- TRPSPI: TR spin-print output flag ------------
   Enables per-step spin-vector dump during TR. Same unit-clash check
   as TRPRAY but vs. LTRPRAY.                                              }
 PROCEDURE TRPSPI IU (RE);
@@ -119,10 +111,10 @@ PROCEDURE TRPSPI IU (RE);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- TRSC / TRNC: read tracking error scalars (cosy.fox L2282-2283) -----
+{ ----- TRSC / TRNC: read tracking error scalars -----
   TRSC reads ESC (the last symplectification error) into the caller's
   out-argument. TRNC similarly returns ENC (last spin-normalization
-  error). Both are populated by the (deferred) TR procedure during
+  error). Both are populated by the TR procedure during
   symplectic / spin sub-stepping; reading them before any TR call
   returns the post-OV initial value (zero or whatever DEF set them to). }
 PROCEDURE TRSC E (RE);
@@ -133,8 +125,8 @@ PROCEDURE TRNC E (RE);
   E := ENC;
 ENDPROCEDURE;
 
-{ ----- M12.1: CUT_LCUT — apply TRAP-style aperture cut to a ray pool
-  Per-ray equivalent of cosy.fox's nested CUT helper for the LCUT≠0,
+{ ----- CUT_LCUT — apply TRAP-style aperture cut to a ray pool
+  Per-ray equivalent of 's nested CUT helper for the LCUT≠0,
   NCT=0 path. For each surviving ray J (REMAIN|J = 1), tests:
     LCND=1 (elliptic):     (X/XCUT[1])² + (Y/XCUT[2])² > 1
     LCND=2 (rectangular):  (X/XCUT[1])² > 1 OR (Y/XCUT[2])² > 1
@@ -143,7 +135,7 @@ ENDPROCEDURE;
   to REMOVE[J] (storing the cut step for TRAPHIST consumption).
 
   Because libcosy's per-ray loop computes the cut metric directly (no
-  cosy.fox VEZERO/CLIM/CADD machinery), the threshold is just 1, the
+   VEZERO/CLIM/CADD machinery), the threshold is just 1, the
   unit-ellipse/box test. CLIM0 is unused.                              }
 PROCEDURE CUT_LCUT PART_INPUT (VE 8);
   VARIABLE (RE) J;
@@ -188,13 +180,13 @@ PROCEDURE CUT_LCUT PART_INPUT (VE 8);
   REMOVE := REMOVE_VE;
 ENDPROCEDURE;
 
-{ ----- M12.2: CUT_NCT — apply NCT > 0 multi-aperture cuts (cosy.fox L2018-2034)
+{ ----- CUT_NCT — apply NCT > 0 multi-aperture cuts
   Per-ray, evaluates the cumulative AP-snapshot maps in MCT at the live
   ray coords to get APART (the cut-test coords for each AP). Then loops
   through NCT cuts applying the unit-ellipse / unit-rectangle test per
   cut shape (LCT[I]).
 
-  Replaces cosy.fox's PREAP + bulk POLVAL + CUTCND-via-VEZERO machinery
+  Replaces 's PREAP + bulk POLVAL + CUTCND-via-VEZERO machinery
   with a per-ray loop. POLVAL flag 1 (no tree caching) evaluates MCT in
   one call per ray, giving 2*NCT cut-frame coords. We only test until
   the first cut hit per ray (CUT_FLAG sticky); subsequent AP loops
@@ -248,9 +240,9 @@ PROCEDURE CUT_NCT PART_INPUT (VE 8);
   REMOVE := REMOVE_VE;
 ENDPROCEDURE;
 
-{ ----- v2 M12.0: TR — minimal ray tracker (cosy.fox L1993-2203)
+{ ----- v2 M12.0: TR — minimal ray tracker
   Pushes the active RAY pool through the active MAP for N iterations.
-  The cosy.fox TR is a 210-line behemoth with 5 nested helpers; M12.0
+  The  TR is a 210-line behemoth with 5 nested helpers; M12.0
   ports the *minimal* path: TY=0 (no symplectification correction),
   NF=0 (no normal-form transform), no spin tracking (IID1/IID2 ≥ 0),
   no aperture cuts (LCUT=0, NCT=0), no graphics output.
@@ -266,7 +258,7 @@ ENDPROCEDURE;
        Track ESC = Σ |Δcomponent| for diagnostics.
     3. If LTRR > 0, write PART back to RAY (bake the tracking).
 
-  Per-ray POLVAL replaces cosy.fox's "all-rays-as-DA-coefficients"
+  Per-ray POLVAL replaces 's "all-rays-as-DA-coefficients"
   trick which conflates VE-of-NRAY with DA-storage. ROSY's strict
   typing makes the per-ray loop natural at the cost of speed.
 
@@ -340,7 +332,7 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
     QUIT 0;
   ENDIF;
   { Spin tracking is enabled when IID1 or IID2 < 0 (the negative index
-    selects a spin component for plotting; libcosy v1 dropped graphics
+    selects a spin component for plotting; libcosy dropped graphics
     so the plot-axis selection is moot, but the spin tracking itself
     still runs to keep TSPI consistent with the orbit). Validate that
     NSPN matches NRAY (one SSR per SR) and that NF ≠ 1 (normal-form
@@ -469,7 +461,7 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   LOOP IT 1 N;
     LTRI := LTRI + 1;
     ABS_TY := ABS(TYS_LOC);
-    { Reset ENC at the start of each iteration — cosy.fox's
+    { Reset ENC at the start of each iteration — 's
       `ENC := ABS(DUM-1)` overwrites each iteration too, so the final
       ENC reflects only the LAST iteration's spin-norm error sum.    }
     IF IS_FLAG = 1;
@@ -483,7 +475,7 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
         ARG_DA[I] := PART[I][J] + 0*DD[1];
       ENDLOOP;
       { Push through the active map. POLVAL flag -5 = "tree-evaluation
-        of preserved structure" mode used by cosy.fox's tracker.       }
+        of preserved structure" mode used by 's tracker.       }
       POLVAL -5 TMAP IMP ARG_DA TWOND RES_DA IMP;
       { Write back into PART[I][J] via VELSET (writes need a bare VE
         target, so round-trip through PART_I_TMP). Track ESC.          }
@@ -523,7 +515,7 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
       { Fixed-point symplectification (TY > 0): iterate
           M2 := NG ∘ (CL ∘ M2 + ARG_DA)   { ARG_DA = old PARI }
         until convergence, then PART := M2 + KK where KK = ML(ARG_DA).
-        cosy.fox-faithful — POLVAL flags -3 and -4 use the trees cached
+        -faithful — POLVAL flags -3 and -4 use the trees cached
         during setup (103/104). DFCT < 100*DEPS triggers LWNTR bump. }
       IF TY > 0;
         POLVAL 2 ML_FP TWOND ARG_DA TWOND KK_DA TWOND;
@@ -578,7 +570,7 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
         ENDIF;
       ENDIF;
       { TY = -12/-13 linear-restore: re-apply AL_LIN matrix to PART
-        (overwriting the orbit). cosy.fox L2169-2173 — multiply each
+        (overwriting the orbit).  — multiply each
         ray's just-symp'd coords by AL to put back the linear part
         we stripped during the pre-pass.                              }
       IF (TY = -12) OR (TY = -13);
@@ -594,7 +586,7 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
       ENDIF;
     ENDLOOP;
     { Per-iteration aperture cut. NCT > 0 (multi-AP) wins over LCUT
-      (single TRAP) per cosy.fox priority — only one path runs per
+      (single TRAP) per  priority — only one path runs per
       iteration. Negative LCUT means skip-initial-particles only;
       both positive and negative do per-iteration cuts.            }
     IF NCT > 0;
@@ -622,7 +614,7 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- M12.1: TRAPN — count of survived particles after TR (cosy.fox L2221-2223)
+{ ----- TRAPN — count of survived particles after TR
   ABS(REMAIN) sums all survival flags (each is 0=cut or 1=alive). The
   -1 excludes the placeholder reference particle slot.
   Unblocked once TR's LCUT cut path lands (this milestone) so REMAIN
@@ -631,7 +623,7 @@ PROCEDURE TRAPN N (RE);
   N := ABS(REMAIN) - 1;
 ENDPROCEDURE;
 
-{ ----- M12.1: TRAPHIST — output particle survival history (cosy.fox L2225-2242)
+{ ----- TRAPHIST — output particle survival history
   HIST = REMAIN - REMOVE encodes each ray's removal step (0 if alive,
   -k if cut at step k). The histogram counts how many rays were cut at
   each step; the running total of survivors is written one line per
@@ -641,7 +633,7 @@ ENDPROCEDURE;
   larger (typically LTRI = the last TR call's iteration count), an
   extra line is appended to bracket the survival count up to LT.
 
-  cosy.fox uses `VARIABLE DATA 1 L+2` (runtime size). libcosy uses a
+   uses `VARIABLE DATA 1 L+2` (runtime size). libcosy uses a
   bounded (RE 10000) buffer — covers any realistic TR.N up to 10k
   iterations with no extra alloc cost.                                  }
 PROCEDURE TRAPHIST FN (ST) LT (RE);
@@ -686,7 +678,7 @@ PROCEDURE TRAPHIST FN (ST) LT (RE);
   CLOSEF 77;
 ENDPROCEDURE;
 
-{ ----- M12.1: TRAYPAC — pack RAY/SPI to keep only survived particles (cosy.fox L2244-2264)
+{ ----- TRAYPAC — pack RAY/SPI to keep only survived particles
   After TR with cuts, REMAIN holds 1 for survivors and 0 for cut
   particles. TRAYPAC compacts RAY[1..8] / SPI[1..3] / REMAIN to drop
   the cut entries — useful before re-tracking with a smaller pool.

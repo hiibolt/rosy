@@ -1,14 +1,10 @@
-{ ============================================================================
-  libcosy/helpers/linear_algebra.rosy — Linear-algebra helpers
-
-  Ported from cosy.fox L129, L176-194.
-  ============================================================================ }
+{ Linear-algebra helpers: order-weighted DA norm and DA-map inversion. }
 
 BEGIN;
 
 INCLUDE '../globals.rosy';
 
-{ ----- Order-weighted DA norm (cosy.fox L129) -----------------------------
+{ ----- Order-weighted DA norm -----------------------------
   WABS(X, W) returns the COSY order-weighted norm of the DA X using
   monomial weights from the W vector. The `+ 0*DD(1)` idiom forces the
   argument to be a DA-typed expression even when X is constant — DANOW
@@ -17,7 +13,7 @@ FUNCTION (RE) WABS X (DA) W (RE);
   DANOW X + 0*DD[1] W WABS;
 ENDFUNCTION;
 
-{ ----- DA map inversion (cosy.fox L176-194) -------------------------------
+{ ----- DA map inversion -------------------------------
   MI(M, N, L, IER, NO, NV, NM1) inverts a DA map M of dimension L into N,
   iteratively refining the inverse order-by-order up to NO. The COSY
   algorithm is:
@@ -34,7 +30,7 @@ ENDFUNCTION;
     5. Final substitution to absorb the constant part: shift the basis
        by DDA - C and POLVAL N at that shifted basis.
 
-  NO/NV/NM1 are passed in (cosy.fox convention) — they shadow the
+  NO/NV/NM1 are passed in ( convention) — they shadow the
   homonymous globals locally. ROSY's procedure-arg shadowing (added in
   v0.36.x) supports this.
 

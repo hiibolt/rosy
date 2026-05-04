@@ -1,14 +1,10 @@
-{ ============================================================================
-  libcosy/helpers/io.rosy — File I/O utilities
-
-  Ported from cosy.fox L4636-4641 (COPYF), L3656-3662 (MFFLDIN), and
-  L3642-3654 (MFFLD), plus L4558-4574 (FILE2VE) and L4576-4592 (RFILT).
-  ============================================================================ }
+{ File I/O utilities: text-file copying, measured-field-data
+  read/write, and column-wise data extraction with row filtering. }
 
 BEGIN;
 
-{ ----- Copy a text file FN1 -> FN2 (cosy.fox L4636-4641) ------------------
-  Conversion: cosy.fox uses `ELSEIF LO(1) ;` as an always-true tail clause;
+{ ----- Copy a text file FN1 -> FN2 ------------------
+  Conversion:  uses `ELSEIF LO(1) ;` as an always-true tail clause;
   becomes `ELSE` in ROSY. No global captures, fully self-contained.        }
 PROCEDURE COPYF FN1 (ST) FN2 (ST);
   VARIABLE (ST) LIN;
@@ -29,7 +25,7 @@ PROCEDURE COPYF FN1 (ST) FN2 (ST);
   CLOSEF 78;
 ENDPROCEDURE;
 
-{ ----- MFFLDIN: read measured-field data from MFFLD.DAT (cosy.fox L3656-3662)
+{ ----- MFFLDIN: read measured-field data from MFFLD.DAT
   Inverse of MFFLD's "create field data" output. Reads the standard
   4-line header (XMIN/ZMIN, XMAX/ZMAX, DX/DZ, NX/NZ) plus the body of
   NX × NZ RE values into the user-provided A array.
@@ -37,7 +33,7 @@ ENDPROCEDURE;
   Output A is fixed-shape (RE 700 30) — generous enough for typical
   measured-field grids. NX ≤ 700, NZ ≤ 30.
 
-  Header format (cosy.fox L3649-3652):
+  Header format:
     line 1: ' MIN (X,Z) = (... , ...)'   skipped
     line 2: ' MAX (X,Z) = (... , ...)'   skipped
     line 3: ' DX = ' + 16-wide G + ',  DZ = ' + 16-wide G
@@ -45,7 +41,7 @@ ENDPROCEDURE;
     line 4: ' NX = ' + 6-wide I + ',  NZ = ' + 6-wide I
             → NX from chars 7..12, NZ from chars 21..26
     body:   NX*NZ lines, one RE each via READ                          }
-{ ----- M6.31: MFFLD — measured-field-data writer (cosy.fox L3642-3654)
+{ ----- MFFLD — measured-field-data writer
   Companion to MFFLDIN. Writes a header with grid extents to MFFLD.DAT
   on unit 98 and arms MFP[2]=1 so the next POTFLD/POTXZ field-eval call
   (NSDP=-7 BENDIST or NSDP=-8 MCSDIST) sweeps the full grid and dumps
@@ -82,14 +78,14 @@ PROCEDURE MFFLD XMIN (RE) ZMIN (RE) XMAX (RE) ZMAX (RE)
   MFP[8] := DZ_GRID;
 ENDPROCEDURE;
 
-{ ----- FILE2VE: extract numeric columns from a text file (cosy.fox L4558-4574)
+{ ----- FILE2VE: extract numeric columns from a text file
   Reads FN line-by-line, skipping `#`-comment and blank lines. For each
   data line, calls WORDS to tokenize on whitespace, then pulls the
   RE values at the column positions listed in COLS into the output
   vectors VEC[1..NC].
 
-  Renames vs cosy.fox:
-   * Parameter `C` → `COLS` (cosy.fox `C` collides with libcosy's
+  Renames vs :
+   * Parameter `C` → `COLS` ( `C` collides with libcosy's
      Butcher-tableau global C declared in globals.rosy:155).
 
   Output shape: VEC is (VE 64) — outer 64-cap row of inner VEs, one
@@ -132,13 +128,13 @@ PROCEDURE FILE2VE FN (ST) NC (RE) COLS (RE 64) VEC (VE 64);
 ENDPROCEDURE;
 
 { ----- RFILT: copy file FN → FNF keeping only rows inside r ≤ RMAX
-  (cosy.fox L4576-4592). Columns 1 and 2 are taken as x and y; rows
+. Columns 1 and 2 are taken as x and y; rows
   with √(x² + y²) ≤ RMAX are emitted. Comment lines (`#`) are passed
   through verbatim; blank lines and out-of-bounds rows are dropped.
 
   The √-comparison uses RMAX² with a 1e-8 widening so values exactly
   on the boundary aren't rejected by floating-point round-off — same
-  trick as cosy.fox.                                                       }
+  trick as .                                                       }
 PROCEDURE RFILT RMAX (RE) FN (ST) FNF (ST);
   VARIABLE (ST) LIN;
   VARIABLE (VE 64) WORD;

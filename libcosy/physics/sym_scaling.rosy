@@ -1,33 +1,22 @@
-{ ============================================================================
-  libcosy/physics/sym_scaling.rosy — Symplectically-scaled fringe-field map
-
-  M6.26: Ports SYSCLM (cosy.fox L2977-3017) and RSM (L3019-3022). These
-  are the consumers of the SYSCFL/FC2/FD2 file readers — together they
-  enable users to read pre-computed symplectic-scaling representations
-  of fringe fields and apply them as transfer maps.
-
-  Lives in a separate file (INCLUDEd after normal_form.rosy) so it can
-  call LFM_SCALAR / GFM / LEXP / DLACT / CATR / TRCA / BDEP / RP / MT,
-  all of which are defined earlier in the include chain.
-
-  Note: the corresponding FFELE LFR=1.9/2 dispatch path (which uses
-  the nested SYSCFF helper that calls SYSCLM) is NOT ported here —
-  FFELE lives in field_potential.rosy which is INCLUDEd before
-  normal_form.rosy, so it can't see SYSCLM's definition. Users who
-  want symplectic-scaling fringe fields call SYSCLM / RSM directly.
-  ============================================================================ }
+{ Symplectically-scaled fringe-field maps. SYSCLM and RSM are the
+  consumers of the SYSCFL / FC2 / FD2 file readers — they read
+  pre-computed symplectic-scaling representations of fringe fields and
+  apply them as transfer maps. Users wanting symplectic-scaling fringe
+  fields call SYSCLM / RSM directly (the FFELE LFR = 1.9 / 2 dispatch
+  hooks aren't wired since FFELE is loaded before SYSCLM in the include
+  chain). }
 
 BEGIN;
 
 INCLUDE '../globals.rosy';
 
-{ ----- SYSCLM: compute symplectically-scaled map (cosy.fox L2977-3017)
+{ ----- SYSCLM: compute symplectically-scaled map
   Given reference parameters AA[1..10] and the GF-expansion FF[1..NOR+1] /
   Lie-generator-expansion LL[1..NOR+1] from a SYSCFL-parsed file, computes
   the transfer map IAP for a magnet of effective length L0, field B0,
   aperture D0.
 
-  AA layout (per cosy.fox L2296):
+  AA layout (per ):
     AA[1] = L (reference length)        AA[2] = B (reference field)
     AA[3] = D (reference aperture)      AA[4] = E (reference energy)
     AA[5] = M (reference mass)          AA[6] = Z (reference charge)
@@ -46,7 +35,7 @@ INCLUDE '../globals.rosy';
     7. LFM_SCALAR IAP C IAP P -1 — apply Lie operator P to map.
     8. CATR / scale by MAG / restore ref particle / TRCA back.
 
-  Type juggling: cosy.fox treats BT as RE in the LIN branch and DA in
+  Type juggling:  treats BT as RE in the LIN branch and DA in
   the !LIN branch. libcosy declares BT as DA throughout — RE multiplies
   promote naturally.                                                    }
 PROCEDURE SYSCLM IAP (DA 8) L0 (RE) B0 (DA) D0 (DA)
@@ -158,7 +147,7 @@ PROCEDURE SYSCLM IAP (DA 8) L0 (RE) B0 (DA) D0 (DA)
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- RSM: read symplectically-scaled map (cosy.fox L3019-3022)
+{ ----- RSM: read symplectically-scaled map
   Convenience wrapper: open file IU, parse via SYSCFL, run SYSCLM into
   MSC, set up axis, finalize via UPDATE.                              }
 PROCEDURE RSM IU (RE) L0 (RE) B0 (DA) D0 (DA);
@@ -173,7 +162,7 @@ PROCEDURE RSM IU (RE) L0 (RE) B0 (DA) D0 (DA);
   UPDATE 1 1;
 ENDPROCEDURE;
 
-{ ----- M8.4: WSM — write symplectic-representation map (cosy.fox L4071-4095)
+{ ----- WSM — write symplectic-representation map
   Companion writer to RSM/SYSCFL. Dumps the active MAP plus a header
   block (OV/RP/UM/FR/ESET/WSET/CE) and a generating-function +
   Lie-exponent expansion to the given file unit, in the SYSCA file

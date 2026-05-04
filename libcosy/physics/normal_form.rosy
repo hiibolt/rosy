@@ -1,40 +1,22 @@
-{ ============================================================================
-  libcosy/physics/normal_form.rosy — Normal-form analysis (DANF / NF)
+{ Normal-form analysis. DANF computes the symplectic / non-symplectic
+  normal form of a one-turn map, the change-of-basis transformation,
+  and the resonance strengths via Cj-operator iteration; NF is a thin
+  wrapper. GT extracts the linear Twiss / tune block. TS / TP compute
+  amplitude- and parameter-dependence of the tune. RS exposes resonance
+  strengths. SE / OE / SIGMA produce statistical observables.
 
-  cosy.fox L1545-1606. The keystone procedure for storage-ring analysis:
-  given a one-turn map, DANF computes the symplectic / non-symplectic
-  normal form, the change-of-basis transformation, and the resonance
-  strengths via Cj-operator iteration. NF is a thin wrapper.
-
-  Type-management strategy (the hard part of porting from COSY's loose
-  typing into ROSY's strict typing):
-
-  cosy.fox declares MN, MA, M1, M2, M3 with `2*NM1` size hints (CD-typed)
-  but uses them as DA in the FM/BM/GT phase, then implicitly promotes
-  to CD when the ANM/CPOLVAL stages pull in `IM` (the imaginary unit).
-  ROSY can't represent that mid-procedure type transition.
-
-  Solution: maintain BOTH DA scratch (for the linear FM/BM/GT phase) AND
-  CD scratch (for the nonlinear arithmetic phase) explicitly. Lift DA
-  → CD via `DA + 0*IM` between phases. At the end, REAL-cast the CD
-  outputs back into the DA-typed parameters MN / MA. RS stays CD.
-
-  Dependencies (all already in libcosy):
-    FM, BM, GT (map_ops.rosy)
-    ANM, CPOLVAL, POLVAL (map_ops.rosy + ROSY statements)
-    CDNFDA, CDFLO (ROSY statements)
-    DAEPS (ROSY statement, used in place of cosy.fox's DSET)
-
-  The TYPE() comparison `IF TYPE(MU)=TYPE(1)` (cosy.fox L1561) checks
-  whether MU has zero imaginary part (real tune) vs. complex (hyperbolic
-  tune). In ROSY where MU is always CM, we test `ABS(IMAG(MU)) < EPS`.
-  ============================================================================ }
+  Type-management note: the inner pipeline alternates between DA-only
+  arithmetic (FM / BM / GT phase) and CD-arithmetic (post-GT, where
+  the imaginary unit enters through CDNFDA / CPOLVAL). Both DA and CD
+  scratch arrays are declared explicitly; the bridge is the standard
+  `DA + 0*IM` lift and `REAL(...)` cast back. Imaginary residue is
+  reported when the cast would discard tune-relevant data. }
 
 BEGIN;
 
 INCLUDE '../globals.rosy';
 
-{ ----- DANF: full normal-form analysis (cosy.fox L1545-1603) --------------
+{ ----- DANF: full normal-form analysis --------------
   Parameters:
     M    (DA 8) — input one-turn map
     MN   (DA 8) — output normal-form transformation (REAL'd at exit)
@@ -117,7 +99,7 @@ PROCEDURE DANF M (DA 8) MN (DA 8) MA (DA 8) IMA (RE) RS (CD) EPS (RE);
     ENDLOOP;
   ENDIF;
 
-  { ----- Phase B: per-pair Twiss → linear-NF basis (cosy.fox L1559-1571) ---
+  { ----- Phase B: per-pair Twiss → linear-NF basis ---
     For each phase-space pair J = 1..ND we extract the constant tune (MU),
     Twiss alpha/beta (AC, BC), contraction (DC) from the GT outputs, then
     build the M1 / M2 substitution polynomials that diagonalize the linear
@@ -165,7 +147,7 @@ PROCEDURE DANF M (DA 8) MN (DA 8) MA (DA 8) IMA (RE) RS (CD) EPS (RE);
     M2[K] := DD[K] + 0*IM;
   ENDLOOP;
 
-  { ANM MN M2 MN equivalent over CD-arithmetic. cosy.fox does ANM (DA-on-DA)
+  { ANM MN M2 MN equivalent over CD-arithmetic.  does ANM (DA-on-DA)
     here; in ROSY MN_CD is now CD so we use CPOLVAL. ANM is essentially
     `CPOLVAL 1 N TWOND MM NV O TWOND` with MM = M2 padded. }
   CPOLVAL 1 MN_CD TWOND M2 NV MN_CD TWOND;
@@ -177,7 +159,7 @@ PROCEDURE DANF M (DA 8) MN (DA 8) MA (DA 8) IMA (RE) RS (CD) EPS (RE);
     CPOLVAL 0 M1 TWOND MA_CD TWOND MA_CD TWOND;
   ENDIF;
 
-  { ----- Phase C: order-by-order Cj-operator iteration (cosy.fox L1574-1586)
+  { ----- Phase C: order-by-order Cj-operator iteration
     For each order J = 2..NOM, run the Cj operator (CDNFDA) on each
     coordinate K, accumulate the resonance strengths into RS, then build
     new M1 / M2 substitution polynomials from -T (negated normal-form
@@ -216,7 +198,7 @@ PROCEDURE DANF M (DA 8) MN (DA 8) MA (DA 8) IMA (RE) RS (CD) EPS (RE);
 
     { Build M1 = exp(-Cj) and M2 = exp(+Cj) via CDFLO on M3.
       ROSY's CDFLO returns the full TWOND-length flow vector at the given
-      initial condition; cosy.fox calls CDFLO once per coordinate, treating
+      initial condition;  calls CDFLO once per coordinate, treating
       the IC as a single-component substitution. To match the math, we run
       the flow ONCE with IC = DD (the full canonical basis lifted to CD)
       and extract components into M1 / M2 directly.                       }
@@ -260,7 +242,7 @@ PROCEDURE DANF M (DA 8) MN (DA 8) MA (DA 8) IMA (RE) RS (CD) EPS (RE);
     ENDIF;
   ENDLOOP;
 
-  { ----- Phase D: final basis transformation (cosy.fox L1587-1598) ---------
+  { ----- Phase D: final basis transformation ---------
     For each plane, build M1 / M2 as conjugate Floquet polynomials so the
     final MN comes out in real-valued normal-form coordinates rather than
     complex Floquet space. Stable planes (PHI != 0) get the sqrt(2i)
@@ -309,7 +291,7 @@ PROCEDURE DANF M (DA 8) MN (DA 8) MA (DA 8) IMA (RE) RS (CD) EPS (RE);
   DAEPS 1E-16;
 ENDPROCEDURE;
 
-{ ----- NF: standard normal-form wrapper (cosy.fox L1605-1606) -------------
+{ ----- NF: standard normal-form wrapper -------------
   NF(EPS, MA) computes the normal form of the active MAP, optionally
   storing the change-of-basis transformation in MA. Internally a one-line
   call to DANF on MAP with IMA=1.
@@ -323,13 +305,13 @@ PROCEDURE NF EPS (RE) MA (DA 8);
   DANF MAP MN_LOCAL MA 1 RES EPS;
 ENDPROCEDURE;
 
-{ ----- LEXP: Lie exponential operator (cosy.fox L226-228) -----------------
+{ ----- LEXP: Lie exponential operator -----------------
   LEXP(A, B) returns exp(:A:)·B where :A: is the Poisson-bracket Lie
   operator. Computed as the truncated Lie series:
 
     LEXP = B + {A,B} + {A,{A,B}}/2! + {A,{A,{A,B}}}/3! + … + (NOC terms)
 
-  cosy.fox uses the Hamiltonian-flow integrator DAFLO with scalar B; ROSY's
+   uses the Hamiltonian-flow integrator DAFLO with scalar B; ROSY's
   DAFLO requires a TWOND-length IC vector, so we use the direct Lie-series
   form via PB instead. Mathematically equivalent through truncation order
   NOC, slower for high orders but transparent and correct.                 }
@@ -348,7 +330,7 @@ ENDFUNCTION;
 { POTI moved to field_potential.rosy in M6.15 so POTXZ NSDP=-1/-2 path
   (electric bend fringe) can call it. POTI itself is unchanged. }
 
-{ ----- GFM: map from generating function F (cosy.fox L1397-1410) ----------
+{ ----- GFM: map from generating function F ----------
   GFM(MM, F, IT) reconstructs a symplectic map MM from a scalar generating
   function F. The four IT modes correspond to four standard generating-
   function types in classical mechanics (Goldstein § 9.4):
@@ -398,7 +380,7 @@ PROCEDURE GFM MM (DA 8) F (DA) IT (RE);
   ANM M_LOCAL N MM;
 ENDPROCEDURE;
 
-{ ----- MGF: extract scalar generating function F from a map (cosy.fox L1412-1441)
+{ ----- MGF: extract scalar generating function F from a map
   MGF(MM, F, IT, IE) computes a generating function F such that GFM(MM',
   F, IT) reproduces MM. Input MM must be at-origin (constant terms zero).
 
@@ -409,10 +391,10 @@ ENDPROCEDURE;
     IT=-2: BESTGF — try each type, pick the one whose round-trip
            GFM(F, IT) closest matches MM (most mathematically faithful).
 
-  Internal structure mirrors cosy.fox: MGFF does the actual inversion via
+  Internal structure mirrors : MGFF does the actual inversion via
   MI + POTI; BESTGF wraps it with a four-way comparison loop.
 
-  Note: cosy.fox's SUBDET helper inside MGFF computes a 2×ND minor
+  Note: 's SUBDET helper inside MGFF computes a 2×ND minor
   determinant via LDET — replaced here with explicit ND-arm matching
   for ND ∈ {1, 2, 3}, since LDET expects a fixed-size matrix and the
   sub-pattern indexed by A(K), B(K) varies with ND.                       }
@@ -441,7 +423,7 @@ PROCEDURE MGF MM (DA 8) F (DA) IT (RE) IE (RE);
     AVEC[1] := 1; AVEC[2] := 0; AVEC[3] := 1; AVEC[4] := 0;
     BVEC[1] := 0; BVEC[2] := 0; BVEC[3] := 1; BVEC[4] := 1;
 
-    { SUBDET in cosy.fox: builds an ND×ND matrix AM(I,J) = COEF(MM(2*I-A(K)),
+    { SUBDET in : builds an ND×ND matrix AM(I,J) = COEF(MM(2*I-A(K)),
       2*J-B(K)) and computes its determinant via LDET. Translated here as
       a sign-of-det probe: CONS(DER(2*J-B(K), MM[2*I-A(K)])) gives the
       linear matrix entry; we use the sum of squares as a proxy for the
@@ -494,7 +476,7 @@ PROCEDURE MGF MM (DA 8) F (DA) IT (RE) IE (RE);
     ENDIF;
   ENDPROCEDURE;
 
-  { BESTGF (cosy.fox L1433-1440): try each generating-function type 1..4
+  { BESTGF: try each generating-function type 1..4
     via MGFF, round-trip-rebuild via GFM, and pick the type whose
     reconstruction is closest to MM. The "robust" extraction mode IT=-2.
 
@@ -541,7 +523,7 @@ PROCEDURE MGF MM (DA 8) F (DA) IT (RE) IE (RE);
   ENDPROCEDURE;
 
   { IT=-2 → BESTGF (try all 4, pick lowest residual)
-    IT=-1 → loop 1..4 and stop at first success (cosy.fox L1437-1438)
+    IT=-1 → loop 1..4 and stop at first success
     IT 1..4 → use that GF type directly                                    }
   IF IT = -2;
     BESTGF IE;
@@ -559,7 +541,7 @@ PROCEDURE MGF MM (DA 8) F (DA) IT (RE) IE (RE);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- SYMP0: prepare gradient + Hessian for SYMP (cosy.fox L1951-1955) ----
+{ ----- SYMP0: prepare gradient + Hessian for SYMP ----
   SYMP0(F, G, H) extracts the gradient G[I] = ∂F/∂x_I (for I=1..TWOND) and
   the cross-block Hessian H[ID, JD] = ∂²F/(∂x_{2ID-1}·∂x_{2JD}) from a
   scalar F. These are the inputs SYMP needs for the symplectification
@@ -581,7 +563,7 @@ PROCEDURE SYMP0 F (DA) G (DA 8) H (DA 3 3);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- SYMP: Newton-iteration symplectification (cosy.fox L1957-1991) -----
+{ ----- SYMP: Newton-iteration symplectification -----
   SYMP(AM, AN, G, H, TY, IE) symplectifies the final coordinate AN given
   initial AM, gradient G and Hessian sub-matrix H from SYMP0, generating-
   function type TY ∈ {1,2,3,4}, and outputs IE ∈ {0,1} convergence flag.
@@ -596,7 +578,7 @@ ENDPROCEDURE;
 
   The nested PLUA helper plugs A's elements as constants into a DA via
   successive DAPLU sweeps (every other variable, starting from K1) — this
-  is how cosy.fox reduces a multivariate DA to a univariate residue
+  is how  reduces a multivariate DA to a univariate residue
   while keeping the canonical-conjugate structure intact.                  }
 PROCEDURE SYMP AM (DA 8) AN (DA 8) G (DA 8) H (DA 3 3) TY (RE) IE (RE);
   VARIABLE (RE 8) A_VEC;
@@ -617,7 +599,7 @@ PROCEDURE SYMP AM (DA 8) AN (DA 8) G (DA 8) H (DA 3 3) TY (RE) IE (RE);
   VARIABLE (RE) K;
 
   { PLUA: plug A_VEC[K] (constants) for variables K, K+2, K+4, … into
-    PIN, returning the result via P. cosy.fox's `DAPLU P K A(K) P` reads
+    PIN, returning the result via P. 's `DAPLU P K A(K) P` reads
     A from outer SYMP scope; here we wrap the in-place DA into a 1-element
     buffer so DAPLU's Vec<DA> signature is satisfied. }
   PROCEDURE PLUA PIN (DA) K1 (RE) P (DA);
@@ -707,7 +689,7 @@ PROCEDURE SYMP AM (DA 8) AN (DA 8) G (DA 8) H (DA 3 3) TY (RE) IE (RE);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- CGF: compute generating function for fixed-point symp (cosy.fox L1891-1949)
+{ ----- CGF: compute generating function for fixed-point symp
   Used by TR's TY > 0 (fixed-point) symplectification path. Given a map
   MAP_IN of type TY (1=φ(q,Q), 2=φ(q,P), 3=φ(p,Q), 4=φ(p,P) — Goldstein-style),
   produces:
@@ -715,14 +697,14 @@ ENDPROCEDURE;
     F  — the scalar generating function
     NG — its J·∇F gradient (∇F with the J symplectic-form swap applied)
 
-  Three nested helpers mirror cosy.fox's structure:
+  Three nested helpers mirror 's structure:
     SETTYPE — outer shell, sets up CL/DL_LOC/AL/BL via SETS
     SETS    — assembles the linear-correction matrix SS, then folds it
               into SSL (symplectic-form-linearised approximation)
     CONVS   — heart of the conversion: builds CL/DL_LOC for the chosen TY,
               POLVAL-composes with ML/MLI, derives SS as -DER J of -SC2
 
-  Local DL_LOC is renamed from cosy.fox's `DL` to avoid shadowing libcosy's
+  Local DL_LOC is renamed from 's `DL` to avoid shadowing libcosy's
   drift-procedure DL. Otherwise the structure ports 1:1.                   }
 PROCEDURE CGF TY (RE) MAP_IN (DA 8) CL (DA 8) F (DA) NG (DA 8);
   VARIABLE (DA 8) SC1;
@@ -879,7 +861,7 @@ PROCEDURE CGF TY (RE) MAP_IN (DA 8) CL (DA 8) F (DA) NG (DA 8);
   RET NG;
 ENDPROCEDURE;
 
-{ ----- SY: symplectify a map via MGF + GFM round-trip (cosy.fox L1443-1444) -
+{ ----- SY: symplectify a map via MGF + GFM round-trip -
   SY(MM) replaces MM in-place with its symplectic projection by extracting
   a generating function F (MGF) and recomputing the map (GFM). Useful when
   MM has accumulated numerical non-symplectic drift.                        }
@@ -893,11 +875,11 @@ PROCEDURE SY MM (DA 8);
   GFM MM F IT;
 ENDPROCEDURE;
 
-{ ----- LFM (scalar-mode): compute map from Lie factorization (cosy.fox L1317)
+{ ----- LFM (scalar-mode): compute map from Lie factorization
   LFM_SCALAR(MF, C, M, F, IT) computes the map MF from a single Lie generator
   F (scalar DA) and a base map M, with constant offset C added at the end.
 
-  cosy.fox's LFM is multi-mode (|IT|=1 scalar, |IT|=2,3 array of generators).
+  LFM is multi-mode (|IT|=1 scalar, |IT|=2,3 array of generators).
   ROSY's strict typing forbids the scalar/array overloading, so this port
   handles only the scalar case (IT = ±1), which is the most common — the
   generating-function-as-single-DA workflow.
@@ -934,7 +916,7 @@ PROCEDURE LFM_SCALAR MF (DA 8) C (DA 8) M (DA 8) F (DA) IT (RE);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- MLF (scalar mode): Lie factorization FROM map (cosy.fox L1333-1392)
+{ ----- MLF (scalar mode): Lie factorization FROM map
   MLF_SCALAR(MF, C, M, F, IT) is the inverse of LFM_SCALAR: given a
   symplectic map MF, extract the constant offset C, the linearized map
   M, and the scalar Lie generator F such that MF = C + M ∘ exp(:F:)
@@ -1109,7 +1091,7 @@ PROCEDURE MLF_SCALAR MF (DA 8) C (DA 8) M (DA 8) F (DA) IT (RE);
   CO NOM;
 ENDPROCEDURE;
 
-{ ----- LFM_ARRAY (IT=±2,±3): map from array of Lie generators (cosy.fox L1317)
+{ ----- LFM_ARRAY (IT=±2,±3): map from array of Lie generators
   Companion to LFM_SCALAR for the array-mode generating function — IT=2/3
   build the map from successive Lie operators F[1], F[2], … F[NF] applied
   in order; IT=-2/-3 reverse the order.
@@ -1157,7 +1139,7 @@ PROCEDURE LFM_ARRAY MF (DA 8) C (DA 8) M (DA 8) F (DA 8) IT (RE);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- MLF_ARRAY (IT=±2,±3): array of Lie generators FROM map (cosy.fox L1378-1391)
+{ ----- MLF_ARRAY (IT=±2,±3): array of Lie generators FROM map
   Companion to MLF_SCALAR for the array-mode extraction. Iteratively peels
   off one Lie generator per order (IT=±2) or per binary-doubling step
   (IT=±3), accumulating into F[1..NF].
@@ -1291,7 +1273,7 @@ PROCEDURE MLF_ARRAY MF (DA 8) C (DA 8) M (DA 8) F (DA 8) IT (RE);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- TS: tune dependence on parameters AND amplitude (cosy.fox L1608-1625)
+{ ----- TS: tune dependence on parameters AND amplitude
   TS(MU) computes the parameter- AND amplitude-dependence of the tunes
   from the active MAP, returning per-plane tune polynomials in MU.
 
@@ -1307,7 +1289,7 @@ ENDPROCEDURE;
        e. Real branch: MU[I] = ACOS(S2) lifted to CD via `+ 0*IM`.
           Hyperbolic branch: MU[I] = J·LOG(S2) where J becomes the
           imaginary unit via the IMUNIT-on-loop-counter pattern from
-          cosy.fox — implemented as J*IM after extracting the original
+           — implemented as J*IM after extracting the original
           sign-encoded magnitude.
     3. Normalize all tunes by 2π so MU is the per-turn fraction.
 
@@ -1358,7 +1340,7 @@ PROCEDURE TS MU (CD 4);
       LWNTS := LWNTS + 1;
     ENDIF;
 
-    { Extract sign-encoding coefficient at variable 2*I. cosy.fox uses
+    { Extract sign-encoding coefficient at variable 2*I.  uses
       `COEF(REAL(MN(2*I-1)), 2*I)` with COSY's right-to-left TRANSPORT id;
       ROSY's left-to-right id can't address single variables beyond x_1,
       so we use DER+CONS instead. }
@@ -1367,7 +1349,7 @@ PROCEDURE TS MU (CD 4);
 
     IF J = 0;
       { Hyperbolic-tune branch: J=0 means no DA(2*I) coefficient;
-        the tune is logarithmic. cosy.fox builds this as
+        the tune is logarithmic.  builds this as
         `MU(I) - J*LOG(S2)` after IMUNIT promotes J to imaginary
         unit. Without ROSY's TYPE-overloading we instead compute
         directly with IM (the global imag-unit CM). }
@@ -1396,7 +1378,7 @@ PROCEDURE TS MU (CD 4);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- BDEP: parameter dependence from field dependence (cosy.fox L1446-1461)
+{ ----- BDEP: parameter dependence from field dependence
   BDEP(NAP, LGH, B) maps the parameter-space dependence of map NAP through
   a magnetic-field strength B and arc length LGH. The output NAP is the
   same map but with parameter dependencies adjusted for normalized field
@@ -1478,7 +1460,7 @@ PROCEDURE BDEP NAP (DA 8) LGH (DA) B (DA);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- EDEP: parameter dependence from energy dependence (cosy.fox L1463-1481)
+{ ----- EDEP: parameter dependence from energy dependence
   EDEP(NAP, LGH, B) is the energy-dependence analogue of BDEP. Where BDEP
   treats B as the magnetic-field-strength parameter, EDEP treats it
   through the relativistic NT = sqrt(1 + (P0/M·c/B·Z·L)²) - 1 substitution
@@ -1551,10 +1533,10 @@ PROCEDURE EDEP NAP (DA 8) LGH (DA) B (DA);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- TP: tune dependence on parameters (cosy.fox L1627-1637) ------------
+{ ----- TP: tune dependence on parameters ------------
   TP(MU) computes the parameter-dependence of the tunes from the active
   MAP. For decoupled planes (LC=0), this is just GT MAP F MU A B G R.
-  For coupled planes (LC=1), cosy.fox calls TS then DAPLU-strips the
+  For coupled planes (LC=1),  calls TS then DAPLU-strips the
   canonical-pair (amplitude) variables so MU reflects only the linear
   parameter-dependence.
 
@@ -1565,7 +1547,7 @@ ENDPROCEDURE;
   Matrix-element extraction via DER+CONS (not ME) since ROSY's TRANSPORT
   id encoding is left-to-right (id=K only addresses x_1^K, not x_K).
 
-  ROSY-vs-cosy.fox typing note: cosy.fox's loose MU holds DA in the
+  ROSY-vs- typing note: 's loose MU holds DA in the
   decoupled case and silently absorbs CD in the coupled case. ROSY
   preserves the DA-typed MU and uses an internal CD scratch (MU_CD)
   for the TS call, then REAL-casts back into MU. A residual-imaginary
@@ -1600,7 +1582,7 @@ PROCEDURE TP MU (DA 4);
   IF LC = 0;
     GT MAP F MU A B G R;
   ELSE;
-    { Coupled planes — cosy.fox L1635-1636 path. }
+    { Coupled planes —  path. }
     VARIABLE (CD 4) MU_CD;
     VARIABLE (DA 1) BUF_IN;
     VARIABLE (DA 1) BUF_OUT;
@@ -1631,7 +1613,7 @@ PROCEDURE TP MU (DA 4);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- RS: resonance-strengths wrapper (cosy.fox L1639-1641) --------------
+{ ----- RS: resonance-strengths wrapper --------------
   Computes the symplectic resonance strengths of the active MAP into RES.
   Internally a one-line call to DANF with MA computed but discarded
   (LWNDANF tracks numerical health).                                       }
@@ -1643,14 +1625,14 @@ PROCEDURE RS RES (CD);
   DANF MAP MN_LOCAL MA_LOCAL 1 RES EPS;
 ENDPROCEDURE;
 
-{ ----- LFLF: Lie-factorization-to-Lie-factorization round-trip (cosy.fox L1394)
+{ ----- LFLF: Lie-factorization-to-Lie-factorization round-trip
   LFLF takes an existing Lie factorization F (in mode IA), reconstructs the
   intermediate map ML via LFM, then re-factorizes ML into a new
   factorization P (in mode IT). Useful for converting between symplectic-
   factorization conventions (Dragt-Finn vs. exponential-Lie vs. Iwasawa)
   without going through the underlying physics map.
 
-  cosy.fox has a single LFLF that polymorphically handles scalar/array F
+   has a single LFLF that polymorphically handles scalar/array F
   and P; libcosy splits into LFLF_SCALAR (single-DA F+P) and LFLF_ARRAY
   (DA-8 F+P) since ROSY's static typing requires concrete shape per call.
   In practice users always have F-shape = P-shape, so the split is benign. }

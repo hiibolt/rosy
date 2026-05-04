@@ -1,41 +1,29 @@
-{ ============================================================================
-  libcosy/helpers/strings.rosy — String utilities
-
-  Ported from cosy.fox L120-127, L136-174.
-
-  Conversions applied:
-   * Boolean conjunction by multiplication ((P)*(Q) for AND) becomes
-     `(P) AND (Q)`. ROSY's `*` requires same-type operands; LO×LO is not
-     valid, so the explicit AND is required.
-   * `ELSEIF LO(1)` (always-true tail clause) becomes `ELSE`.
-   * Some parameter names rename to avoid colliding with globals declared
-     in libcosy/globals.rosy. Conflicts: A (Butcher tableau), C (Butcher
-     tableau), all use underscore suffix.
-  ============================================================================ }
+{ String utilities: substring extraction, real / integer ↔ string
+  conversion, case folding, and whitespace / separator tokenization. }
 
 BEGIN;
 
-{ ----- Substring (cosy.fox L120) ------------------------------------------ }
+{ ----- Substring ------------------------------------------ }
 FUNCTION (ST) SS A (ST) I1 (RE) I2 (RE);
   SS := A|(I1&I2);
 ENDFUNCTION;
 
-{ ----- String -> Real (cosy.fox L121) ------------------------------------- }
+{ ----- String -> Real ------------------------------------- }
 FUNCTION (RE) R S (ST) I1 (RE) I2 (RE);
   STCRE (S|(I1&I2)) R;
 ENDFUNCTION;
 
-{ ----- Real -> String, default G23.16 format (cosy.fox L122) -------------- }
+{ ----- Real -> String, default G23.16 format -------------- }
 FUNCTION (ST) S R (RE);
   RECST R '(G23.16)' S;
 ENDFUNCTION;
 
-{ ----- Real -> String, custom Fortran format (cosy.fox L123) -------------- }
+{ ----- Real -> String, custom Fortran format -------------- }
 FUNCTION (ST) SF R (RE) FORM (ST);
   RECST R FORM SF;
 ENDFUNCTION;
 
-{ ----- Integer -> String (cosy.fox L124-127) ------------------------------ }
+{ ----- Integer -> String ------------------------------ }
 FUNCTION (ST) SI I (RE);
   VARIABLE (RE) J; VARIABLE (RE) K;
   K := ABS(I);
@@ -49,7 +37,7 @@ FUNCTION (ST) SI I (RE);
   ENDIF;
 ENDFUNCTION;
 
-{ ----- Last non-blank position (cosy.fox L136-139) ------------------------ }
+{ ----- Last non-blank position ------------------------ }
 FUNCTION (RE) ILAST A (ST) IA1 (RE) IA2 (RE);
   VARIABLE (RE) I; VARIABLE (ST) CH;
   CH := ' ';
@@ -61,7 +49,7 @@ FUNCTION (RE) ILAST A (ST) IA1 (RE) IA2 (RE);
   ILAST := I;
 ENDFUNCTION;
 
-{ ----- First position of character (cosy.fox L140-143) -------------------- }
+{ ----- First position of character -------------------- }
 FUNCTION (RE) IPOS C (ST) A (ST);
   VARIABLE (RE) LEN; VARIABLE (RE) I;
   LEN := LENGTH(A);
@@ -76,7 +64,7 @@ FUNCTION (RE) IPOS C (ST) A (ST);
   ENDWHILE;
 ENDFUNCTION;
 
-{ ----- Lower -> Upper case (cosy.fox L144-156) --------------------------- }
+{ ----- Lower -> Upper case --------------------------- }
 PROCEDURE TRCAP A (ST);
   VARIABLE (ST) AC; VARIABLE (ST) AS;
   VARIABLE (RE) LSL; VARIABLE (RE) IA; VARIABLE (RE) I;
@@ -108,9 +96,9 @@ PROCEDURE TRCAP A (ST);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- Tokenize string by separator (cosy.fox L157-165) -------------------
+{ ----- Tokenize string by separator -------------------
   WORDS scans A and writes (start, end) character-position pairs of each
-  non-empty token into the output table WORD. cosy.fox stores each pair
+  non-empty token into the output table WORD.  stores each pair
   as a 2-element VE inside a vec-of-vecs `WORD 2 N`; the ROSY port lifts
   that into `(VE N)` so callers can do `A | WORD[K]` directly via the
   ST × VE → ST extract rule (rosy_lib/operators/extract.rs:36).
@@ -148,24 +136,24 @@ PROCEDURE WORDS A (ST) N (RE) WORD (VE 64) SEP (ST);
   WORD[N] := WORD[N] & I;
 ENDPROCEDURE;
 
-{ ----- Field tokenize by separator (cosy.fox L166-174) --------------------
+{ ----- Field tokenize by separator --------------------
   Same shape as WORDS but emits *every* field — including empty ones
   between adjacent separators — using `0&0` as the empty-field sentinel
   (start=0, end=0). Useful for CSV-like comma-delimited files where
   trailing commas should produce empty trailing fields.
 
-  Edge cases preserved from cosy.fox:
+  Edge cases preserved from :
    * Run starts with J=1 (not 0 like WORDS) so the first character can
      immediately close an empty leading field.
    * Tail handling: if I > J at end-of-string, last region is non-empty
      [J, I]; else emit [0, 0] as the trailing empty field.
 
-  Faithful-port quirk: cosy.fox's tail uses strict `I > J` rather than
+  Faithful-port quirk: 's tail uses strict `I > J` rather than
   `I >= J`, so a trailing *single* character after a separator (e.g.
   'a,b,c' final 'c') is reported as the empty sentinel [0, 0] instead
   of [6, 6]. Any single-character no-separator input (e.g. 'a') hits
   the same path. We replicate this behavior because FGDATIN — the
-  primary FIELDS caller in cosy.fox L3664 — assumes it. Flag for
+  primary FIELDS caller in  — assumes it. Flag for
   callers: pad inputs with a trailing separator to guarantee proper
   boundary handling.                                                       }
 PROCEDURE FIELDS A (ST) N (RE) FIELD (VE 64) SEP (ST);

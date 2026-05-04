@@ -1,30 +1,21 @@
-{ ============================================================================
-  libcosy/physics/fringe_field.rosy — Enge fringe-field machinery
-
-  Ported from cosy.fox L303-391. The Enge function is the standard COSY
-  model for the longitudinal profile of a magnet's or electrostatic
-  element's fringe field:
+{ Enge fringe-field machinery. The Enge function is the standard model
+  for the longitudinal profile of a magnet's or electrostatic element's
+  fringe field:
 
       F(s) = 1 / (1 + exp(c_1 + c_2 s + c_3 s^2 + ... + c_6 s^5))
 
-  where {c_1..c_6} are the Enge coefficients stored in the global
-  ENGEC table, indexed by multipole order, entry/exit, and magnetic /
-  electric kind. F transitions from ~1 (deep inside the magnet) to ~0
-  (deep outside) over a normalized arclength s ∈ [-3, 5].
-
-  Status (post-M6.18-M6.22):
-    * ENGE / FC / FD landed in M3 (analytical Enge function + coefficient
-      seeders).
-    * FC2 / FD2 / SYSCFL — symplectic-scaling fringe-field mode setup
-      via file I/O — landed M6.19 / M6.21.
-    * FP (graphics) is permanently out of scope per the libcosy v2 plan.
-  ============================================================================ }
+  The coefficients {c_1..c_6} live in the global ENGEC table, indexed by
+  multipole order, entry/exit, and magnetic / electric kind. F transitions
+  from ~1 (deep inside the magnet) to ~0 (deep outside) over a normalized
+  arclength s ∈ [-3, 5]. EDGE / ENGEP are derivative variants used by the
+  bend / wiggler off-plane field models. FC / FD / FC2 / FD2 / SYSCFL
+  populate ENGEC and the symplectic-scaling reference tables. }
 
 BEGIN;
 
 INCLUDE '../globals.rosy';
 
-{ ----- Enge function (cosy.fox L303-313) ----------------------------------
+{ ----- Enge function ----------------------------------
   Returns DA in the production case where S is a Taylor series in the
   path coordinate. The CONS(S) guards short-circuit when the constant
   part is well outside the transition window — a constant DA result is
@@ -52,8 +43,8 @@ FUNCTION (DA) ENGE IMP (RE) IEE (RE) IEM (RE) S (DA);
   ENDIF;
 ENDFUNCTION;
 
-{ ----- Set the six Enge coefficients (cosy.fox L315-331) ------------------
-  cosy.fox additionally validates that the resulting Enge profile is
+{ ----- Set the six Enge coefficients ------------------
+   additionally validates that the resulting Enge profile is
   monotonic and asymptotes to {0, 1}. The validation loop calls ENGE
   with RE arguments (LOOP S 4 -3 -1; F := ENGE(...,S)), which would
   require an RE↔DA bridge that's out of scope here. The setter portion
@@ -68,7 +59,7 @@ PROCEDURE FC IMP (RE) IEE (RE) IEM (RE) C1 (RE) C2 (RE) C3 (RE) C4 (RE) C5 (RE) 
   ENGEC[IMP, IEE, IEM, 6] := C6;
 ENDPROCEDURE;
 
-{ ----- Default Enge coefficients (cosy.fox L383-391) ----------------------
+{ ----- Default Enge coefficients ----------------------
   Measured at SLAC PEP, fitted to dipole / quadrupole / hexapole / higher
   multipoles up to 30-pole. Reference: K.L. Brown and J.E. Spencer,
   IEEE Trans. Nucl. Sci. NS-28 No. 3, June 1981.                          }
@@ -76,7 +67,7 @@ PROCEDURE FD;
   { Negative coefficients are wrapped in parens because ROSY's procedure-
     call argument parser would otherwise consume `<prev> -<next>` as the
     binary subtraction `<prev> - <next>` (collapsing two args into one).
-    cosy.fox's whitespace-only separation works in COSY but not in ROSY. }
+  whitespace-only separation works in COSY but not in ROSY. }
   VARIABLE (RE) I; VARIABLE (RE) J; VARIABLE (RE) K;
   LOOP J 1 2;
     LOOP K 1 2;
@@ -90,7 +81,7 @@ PROCEDURE FD;
   LE := 1;
 ENDPROCEDURE;
 
-{ ----- EDGE: wiggler edge function (cosy.fox L2498-2502) ------------------
+{ ----- EDGE: wiggler edge function ------------------
   Sigmoid F = 1/(1 + exp(p)) where p is a 9-degree polynomial in -X
   with coefficients PPOL[7..16]. Used by POTXZ NSDP=-3 (wiggler) for
   the longitudinal end-field profile. Same shape as ENGE but with
@@ -111,7 +102,7 @@ FUNCTION (DA) EDGE X (DA);
   EDGE := 1/(1 + EXP(EDGE));
 ENDFUNCTION;
 
-{ ----- ENGEP: derivative of the Enge function (cosy.fox L2486-2497) -------
+{ ----- ENGEP: derivative of the Enge function -------
   Returns the derivative of ENGE wrt its s argument. Used by POTXZ
   NSDP=-1/-2 (bend-element fringe fields) for computing E_z component
   from the curl-free constraint on the electric potential.
@@ -119,7 +110,7 @@ ENDFUNCTION;
   ENGEPP is the derivative of the Enge polynomial; the actual
   derivative of F = 1/(1+exp(p)) is -dp/ds · exp(p) / (1+exp(p))²
   = -ENGEPP · exp(ENGE_poly) / (1+exp)² , which simplifies to
-  -ENGEPP/(2 + exp(p) + 1/exp(p)) — what cosy.fox computes.
+  -ENGEPP/(2 + exp(p) + 1/exp(p)) — what  computes.
 
   Clamps |ENGEP polynomial| ≤ 30 to prevent EXP overflow.               }
 FUNCTION (DA) ENGEP IMP (RE) IEE (RE) IEM (RE) S (DA);
@@ -144,7 +135,7 @@ FUNCTION (DA) ENGEP IMP (RE) IEE (RE) IEM (RE) S (DA);
   ENDIF;
 ENDFUNCTION;
 
-{ ----- SYSCFL: read symplectic-scaling representation (cosy.fox L2285-2301)
+{ ----- SYSCFL: read symplectic-scaling representation
   Parses a SYSCA-format data file into:
     AA(10) — 10 reference parameters: 1=L, 2=B, 3=D, 4=E, 5=M, 6=Z,
              7=type-of-GF, 8=order, 9/10=padding.
@@ -152,7 +143,7 @@ ENDFUNCTION;
     LL(10) — Lie generators (one per order)
     INOR   — caller's order request (negative = "use file's order")
 
-  File format (cosy.fox L2287-2299):
+  File format:
     line 1: header containing order at chars 8..10
     line 2: AA[4..6] (E, M, Z) at chars 8..30, 31..53, 54..76
     line 3: header with GF-type sign at chars 13..15
@@ -219,7 +210,7 @@ PROCEDURE SYSCFL IU (RE) AA (RE 10) FF (DA 10) LL (DA 10) INOR (RE);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- FC2: per-element symplectic-scaling reader (cosy.fox L2303-2308) -----
+{ ----- FC2: per-element symplectic-scaling reader -----
   FC2(POL, IEE, FILENAME) reads a SYSCA-format file and copies into
   GFF2[IEE, POL, J] / LFF2[IEE, POL, J] / DATFF2[IEE, POL, J] for J=1..10.
   POL = multipole order (1..6 typically), IEE = entrance/exit (1/2),
@@ -245,7 +236,7 @@ PROCEDURE FC2 POL (RE) IEE (RE) FILENAME (ST);
   DANOT NOC;
 ENDPROCEDURE;
 
-{ ----- FD2: load default symplectic-scaling arrays (cosy.fox L2310-2317) ----
+{ ----- FD2: load default symplectic-scaling arrays ----
   Reads SYSCA.DAT — a 12-block file containing the default symplectic-
   scaling fringe-field representations for 6 multipole orders × 2
   edges. Each block follows the SYSCFL format. Result goes into

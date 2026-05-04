@@ -1,21 +1,15 @@
-{ ============================================================================
-  libcosy/physics/elements_basic.rosy — Basic / drift-class elements
-
-  Initial port of cosy.fox L2890-2932. Starts with the drift element DL,
-  built on DLACT (the underlying field-free advance of a DA-array map).
-
-  Status (post-M6 + M16):
-    * DLACT / DL / PS / CB land here. SDELE / SDELEREF / DSDED / SIELE /
-      FFELE / GE / SYSCLM / RSM are now in field_potential.rosy after M6.
-    * DL does not yet route through UPDATE (so SPOS / LTRA / GTRA don't
-      advance through DL the cosy.fox way). M16.5 candidate refactor.
-  ============================================================================ }
+{ Basic / drift-class elements: DLACT (the underlying field-free
+  advance of a DA-array map), DL (drift wrapper that routes through
+  UPDATE), PS (Poincaré-section marker), and CB (change bending
+  direction with full ray + spin support). The s-dependent and
+  s-independent element actuators (SDELE, SIELE, FFELE, GE, SYSCLM,
+  RSM) live in field_potential.rosy. }
 
 BEGIN;
 
 INCLUDE '../globals.rosy';
 
-{ ----- Drift action on a DA-array map (cosy.fox L2892-2900) ---------------
+{ ----- Drift action on a DA-array map ---------------
   DLACT advances the DA-array ARR by a drift of length L. ARR is
   modified in place: position components ARR[1, 3, 5] pick up
   L · momentum / γ-corrected step, where γ comes from the canonical
@@ -44,9 +38,9 @@ PROCEDURE DLACT ARR L (RE);
   ENDIF;
 ENDPROCEDURE;
 
-{ ----- Field-free drift (cosy.fox L2902-2905) -----------------------------
+{ ----- Field-free drift -----------------------------
   Propagates the active MAP and the scratch MSC through a drift of length
-  L. cosy.fox additionally calls LOCSET (axis-display offset) and UPDATE
+  L.  additionally calls LOCSET (axis-display offset) and UPDATE
   (graphics + ray flow); both are graphics-only and skipped.             }
 PROCEDURE DL L (RE);
   IF LUM # 1;
@@ -61,13 +55,13 @@ PROCEDURE DL L (RE);
   UPDATE 0 1;
 ENDPROCEDURE;
 
-{ ----- PS: Poincaré-section marker (cosy.fox L2907-2908) -----------------
+{ ----- PS: Poincaré-section marker -----------------
   PS(D) marks a Poincaré-section boundary in the beamline. It sets the
   global drift-radius scalar DR := D, zeros the local Cartesian axis
   state via LOCSET, and calls UPDATE 0 0 to refresh derived state.
 
-  In cosy.fox this also triggers a graphics display of the section
-  contents. libcosy v1 has no graphics, so PS is purely a state
+  In  this also triggers a graphics display of the section
+  contents. libcosy has no graphics, so PS is purely a state
   marker — useful for users who want to break a long element chain
   into "stations" without actually advancing the map.                    }
 PROCEDURE PS D (RE);
@@ -76,7 +70,7 @@ PROCEDURE PS D (RE);
   UPDATE 0 0;
 ENDPROCEDURE;
 
-{ ----- CB: change bending direction (cosy.fox L3098-3106) -----------------
+{ ----- CB: change bending direction -----------------
   CB negates the x-position and x-momentum components of the active MAP,
   RAY (per-particle bundle), RSC (snapshot), and the spin row SPNR[1,*]
   + SPI[1] + SSC[1]. Used to flip a magnet's bending direction (e.g.

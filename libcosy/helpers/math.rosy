@@ -1,17 +1,10 @@
-{ ============================================================================
-  libcosy/helpers/math.rosy — Math utilities
-
-  Ported from cosy.fox L105-118, L255-259, L196-211, L292-294, L133-134.
-
-  Explicit return types are required because ROSY type inference cannot
-  resolve a function's return type unless the function is called somewhere
-  in scope (FEEDBACK.md Issue 4). cosy.fox omits these because COSY's loose
-  mode tolerates it.
-  ============================================================================ }
+{ Math utilities: scalar arithmetic, ATAN2 (scalar + vectorized),
+  factorial / monomial count, 1D Fourier transform, and global tolerance
+  setters (WSET / ESET / DSET). }
 
 BEGIN;
 
-{ ----- Basic arithmetic primitives (cosy.fox L105-110) -------------------- }
+{ ----- Basic arithmetic primitives -------------------- }
 
 FUNCTION (RE) MAX I (RE) J (RE);
   MAX := VMAX(I&J);
@@ -32,13 +25,13 @@ FUNCTION (RE) SIG I (RE);
   ENDIF;
 ENDFUNCTION;
 
-{ ----- Imaginary multiply (cosy.fox L110) --------------------------------- }
+{ ----- Imaginary multiply --------------------------------- }
 
 FUNCTION (CM) IM X (CM);
   IM := CM(0&1)*X;
 ENDFUNCTION;
 
-{ ----- ATAN2 in [-pi, pi] (cosy.fox L111-116) ------------------------------
+{ ----- ATAN2 in [-pi, pi] ------------------------------
   Uses RE-as-bool multiplication where COSY does. AND is used here because
   ROSY's compound boolean expressions need explicit logical operators when
   the operands are LO. }
@@ -66,7 +59,7 @@ FUNCTION (RE) ATAN2 Y (RE) X (RE);
   ENDIF;
 ENDFUNCTION;
 
-{ ----- Vectorized ATAN2 (cosy.fox L117-118) ------------------------------- }
+{ ----- Vectorized ATAN2 ------------------------------- }
 
 FUNCTION (VE) VATAN2 Y (VE) X (VE);
   VARIABLE (RE) I;
@@ -76,7 +69,7 @@ FUNCTION (VE) VATAN2 Y (VE) X (VE);
   ENDLOOP;
 ENDFUNCTION;
 
-{ ----- Factorial / monomial count (cosy.fox L255-259) --------------------- }
+{ ----- Factorial / monomial count --------------------- }
 
 FUNCTION (RE) FACT N (RE);
   VARIABLE (RE) I;
@@ -94,13 +87,13 @@ FUNCTION (RE) NMON NO_ (RE) NV_ (RE);
   ENDLOOP;
 ENDFUNCTION;
 
-{ ----- 1D Fourier transform (cosy.fox L196-211) ---------------------------
+{ ----- 1D Fourier transform ---------------------------
   Discrete Fourier transform of L evenly-spaced samples on [0, 2π) given
   in D, returning FTO+1 (amplitude, phase) pairs in FTA / FTP. Each
   Fourier order k recovers the original signal as
         D(j) ≈ Σ_k FTA(k) * sin((k-1)*φ_j + FTP(k)).
 
-  cosy.fox's loose declaration `VARIABLE RS LENGTH(D(1))` was intended
+  loose declaration `VARIABLE RS LENGTH(D(1))` was intended
   to make RS / RC polymorphic over D's element type (RE for raw data,
   DA for symbolic-energy fits). ROSY requires per-call concrete typing,
   so this port pins to RE — the dominant use case (raw oscilloscope
@@ -136,7 +129,7 @@ PROCEDURE FOURIERTRANS D (RE 4096) L (RE) FTO (RE) FTA (RE 4096) FTP (RE 4096);
   ENDLOOP;
 ENDPROCEDURE;
 
-{ ----- Constant setters (cosy.fox L292-294) ------------------------------- }
+{ ----- Constant setters ------------------------------- }
 
 PROCEDURE WSET W;
   WAF := W;
@@ -151,10 +144,10 @@ PROCEDURE DSET E;
   DEPS := E;
 ENDPROCEDURE;
 
-{ ----- Misc helpers (cosy.fox L133-134) ----------------------------------- }
+{ ----- Misc helpers ----------------------------------- }
 
 PROCEDURE CONTINUE;
-  PI := PI;        { documented no-op in cosy.fox }
+  PI := PI;        { documented no-op in  }
 ENDPROCEDURE;
 
 PROCEDURE SVSCR;

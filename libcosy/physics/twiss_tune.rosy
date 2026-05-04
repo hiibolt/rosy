@@ -1,15 +1,12 @@
-{ ============================================================================
-  libcosy/physics/twiss_tune.rosy — Twiss / sigma-matrix / tune helpers
-
-  cosy.fox L489-502 onwards. Beam-envelope and sigma-matrix utilities
-  layered on top of the GT / DANF / NF stack.
-  ============================================================================ }
+{ Twiss / sigma-matrix / tune helpers layered on top of the GT / DANF
+  / NF stack. SIGMA exposes individual sigma-matrix elements; SBE and
+  MAKEINV are envelope helpers used by GLASS / RA. }
 
 BEGIN;
 
 INCLUDE '../globals.rosy';
 
-{ ----- SIGMA: beam sigma-matrix element (cosy.fox L489-502) ---------------
+{ ----- SIGMA: beam sigma-matrix element ---------------
   SIGMA(I, J) returns the (I, J) element of the beam sigma matrix from
   the active MAP. Handles three cases:
     * I = J, I odd  → position-position variance (q_i^2 term)
@@ -22,7 +19,7 @@ INCLUDE '../globals.rosy';
   PHSP[i] are the per-coordinate phase-space scaling factors and PHSR[k]
   are the correlation coefficients between the k-th conjugate pair —
   both declared in globals.rosy and seeded by user code (typically zero
-  initially in libcosy v1).                                               }
+  initially in libcosy).                                               }
 FUNCTION (RE) SIGMA I (RE) J (RE);
   VARIABLE (RE) K;
   IF (I = J) AND (INT(I/2) # I/2);
@@ -44,7 +41,7 @@ FUNCTION (RE) SIGMA I (RE) J (RE);
   ENDIF;
 ENDFUNCTION;
 
-{ ----- STW: set MAP from Twiss parameters (cosy.fox L1283-1288) -----------
+{ ----- STW: set MAP from Twiss parameters -----------
   STW(I, MU, ALPHA, BETA, GAMMA) builds a single-plane Courant-Snyder map
   in the I-th phase-space pair (I=1, 2, or 3) of the active MAP, from the
   given tune (MU in radians) and Twiss alpha/beta/gamma. Useful for
@@ -62,7 +59,7 @@ PROCEDURE STW I (RE) MU (RE) ALPHA (RE) BETA (RE) GAMMA (RE);
   MAP[I2] := (COSMU - ALPHA*SINMU)*DD[I2] - GAMMA*SINMU*DD[I1];
 ENDPROCEDURE;
 
-{ ----- SE: symplectic-error norm of a map (cosy.fox L1290-1301) -----------
+{ ----- SE: symplectic-error norm of a map -----------
   SE(M) returns ‖J(M)^T · JJ · J(M) - JJ‖, the deviation of the linear part
   J(M) of map M from being symplectic. JJ is the canonical 2N×2N symplectic
   form. SE = 0 means M is exactly symplectic; small SE indicates numerical
@@ -96,7 +93,7 @@ FUNCTION (RE) SE M (DA 8);
   SE := SE/TWOND/TWOND;
 ENDFUNCTION;
 
-{ ----- OE: spin-map orthogonality error (cosy.fox L1303-1315) -------------
+{ ----- OE: spin-map orthogonality error -------------
   OE(A) = ‖A · A^T - I‖ + |det A - 1| for a 3×3 spin map A. Validates
   that A is a proper rotation: orthogonal AND determinant +1.            }
 FUNCTION (RE) OE A (DA 3 3);
@@ -125,7 +122,7 @@ FUNCTION (RE) OE A (DA 3 3);
   OE := OE/9 + WABS(X - 1, WAF);
 ENDFUNCTION;
 
-{ ----- SBE: set beam ellipsoid from emittances (cosy.fox L866-875) ----------
+{ ----- SBE: set beam ellipsoid from emittances ----------
   SBE(EX, EY, ET) configures the beam phase-space ellipsoid (via SB) from
   three emittances — horizontal (EX), vertical (EY), and longitudinal (ET).
   For each plane, the ellipsoid axes (X, A) and correlation R are derived
@@ -170,7 +167,7 @@ PROCEDURE SBE EX (RE) EY (RE) ET (RE);
      X_VEC[3] A_VEC[3] R_VEC[3] 0 0;
 ENDPROCEDURE;
 
-{ ----- MAKEINV: normal-form invariant from emittances (cosy.fox L4155-4158)
+{ ----- MAKEINV: normal-form invariant from emittances
   MAKEINV(A, E, INV) computes a normal-form invariant
     INV = ∑_{i=1..ND} ( A(2i-1)² + A(2i)² ) / E(i)
   given a change-of-basis A (typically the output of NF / DANF) and
