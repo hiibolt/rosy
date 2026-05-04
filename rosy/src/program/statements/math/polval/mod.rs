@@ -183,32 +183,45 @@ impl Transpile for PolvalStatement {
         // already starts with `&`. Replace the leading `&` with `&mut `.
         let r_mut = r_out.as_ref().replacen('&', "&mut ", 1);
 
-        // Dispatch based on whether A is a scalar VE or a batch (VE ND) array
+        // Dispatch based on A's element type:
+        //   DA-array  → DA→DA polynomial composition (map-composition path)
+        //   VE-array  → batch evaluation across many particles
+        //   otherwise → plain RE evaluation
         let a_type = self
             .a_expr
             .type_of(context)
             .map_err(|e| vec![e.context("...while determining type of A in POLVAL")])?;
 
-        let polval_fn = if a_type.base_type == RosyBaseType::VE && a_type.dimensions > 0 {
+        let polval_fn = if a_type.base_type == RosyBaseType::DA && a_type.dimensions > 0 {
+            "rosy_polval_da"
+        } else if a_type.base_type == RosyBaseType::VE && a_type.dimensions > 0 {
             "rosy_polval_ve"
         } else {
             "rosy_polval_re"
         };
 
-        // If A and R alias the same variable, clone A to avoid borrow conflict.
-        // This matches COSY's in-place POLVAL behavior.
+        // COSY's in-place POLVAL allows P, A, and R to alias each other. Rust's
+        // borrow checker rejects two `&mut` to the same memory or a `&` + `&mut`
+        // overlap, so we clone any input arg whose underlying name matches R's.
         let a_ref = a_out.as_ref();
-        let a_arg = if a_ref.trim_start_matches('&') == r_mut.trim_start_matches("&mut ") {
+        let p_ref = p_out.as_ref();
+        let r_strip = r_mut.trim_start_matches("&mut ");
+        let a_arg = if a_ref.trim_start_matches('&') == r_strip {
             format!("&{}.clone()", a_ref.trim_start_matches('&'))
         } else {
             a_ref
+        };
+        let p_arg = if p_ref.trim_start_matches('&') == r_strip {
+            format!("&{}.clone()", p_ref.trim_start_matches('&'))
+        } else {
+            p_ref
         };
 
         let serialization = format!(
             "rosy_lib::core::polval::{}({}, {}, {} as usize, {}, {} as usize, {}, {} as usize)?;",
             polval_fn,
             l_out.as_value(),
-            p_out.as_ref(),
+            p_arg,
             np_out.as_value(),
             a_arg,
             na_out.as_value(),

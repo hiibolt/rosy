@@ -1,0 +1,265 @@
+{ Symplectically-scaled fringe-field maps. SYSCLM and RSM are the
+  consumers of the SYSCFL / FC2 / FD2 file readers — they read
+  pre-computed symplectic-scaling representations of fringe fields and
+  apply them as transfer maps. Users wanting symplectic-scaling fringe
+  fields call SYSCLM / RSM directly (the FFELE LFR = 1.9 / 2 dispatch
+  hooks aren't wired since FFELE is loaded before SYSCLM in the include
+  chain). }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- SYSCLM: compute symplectically-scaled map
+  Given reference parameters AA[1..10] and the GF-expansion FF[1..NOR+1] /
+  Lie-generator-expansion LL[1..NOR+1] from a SYSCFL-parsed file, computes
+  the transfer map IAP for a magnet of effective length L0, field B0,
+  aperture D0.
+
+  AA layout (per ):
+    AA[1] = L (reference length)        AA[2] = B (reference field)
+    AA[3] = D (reference aperture)      AA[4] = E (reference energy)
+    AA[5] = M (reference mass)          AA[6] = Z (reference charge)
+    AA[7] = TYPE OF GF (Goldstein-style 1..4)
+    AA[8] = ORDER (highest scaling-expansion order)
+
+  Algorithm:
+    1. Edge cases: B0=0 or Z0=0 → no scaling, just DLACT drift over L0.
+    2. Compatibility check: P0/B/Z/D ratio vs reference's PE(E,M)/B/Z/D
+       must agree to within 100× (else warn).
+    3. Compute scaling parameters: MAG (length ratio), BT (field-momentum
+       product ratio).
+    4. Build FAC[1..AA[8]] = (BT/B - 1)^k powers for the expansion.
+    5. Sum LL · FAC into P (Lie generator), FF · FAC into F (GF).
+    6. GFM IAP F AA[7] — convert GF F to map IAP.
+    7. LFM_SCALAR IAP C IAP P -1 — apply Lie operator P to map.
+    8. CATR / scale by MAG / restore ref particle / TRCA back.
+
+  Type juggling:  treats BT as RE in the LIN branch and DA in
+  the !LIN branch. libcosy declares BT as DA throughout — RE multiplies
+  promote naturally.                                                    }
+PROCEDURE SYSCLM IAP (DA 8) L0 (RE) B0 (DA) D0 (DA)
+                 AA (RE 10) FF (DA 10) LL (DA 10);
+  VARIABLE (DA 21) FAC;
+  VARIABLE (DA) MAG;
+  VARIABLE (RE) I;
+  VARIABLE (DA 8) C_IC;
+  VARIABLE (RE) LIN_FLAG;
+  VARIABLE (DA) P_LIE;
+  VARIABLE (RE) PR;
+  VARIABLE (DA 20) COP;
+  VARIABLE (DA) BT;
+  VARIABLE (DA) EP;
+  VARIABLE (DA) MP;
+  VARIABLE (DA) ZP;
+  VARIABLE (DA) F_GF;
+  VARIABLE (RE) RATIO_I;
+  VARIABLE (RE) RATIO_J;
+  VARIABLE (RE) NORD;
+  VARIABLE (RE) NEG_ONE_LFM;
+  NEG_ONE_LFM := -1;
+  IF (CONS(B0) = 0) OR (CONS(Z0) = 0);
+    LOOP I 1 NV;
+      IAP[I] := XX[I];
+    ENDLOOP;
+    DLACT IAP L0;
+  ELSE;
+    EP := E0;
+    MP := M0;
+    ZP := Z0;
+    RATIO_I := CONS(P0)/CONS(B0)/CONS(Z0)/CONS(D0);
+    PR := SQRT(AA[4]*(AA[4] + 2*AMUMEV*AA[5]));
+    RATIO_J := PR/AA[2]/AA[6]/AA[3];
+    IF ABS(RATIO_I) > 100*ABS(RATIO_J);
+      LOOP I 1 NV;
+        IAP[I] := XX[I];
+      ENDLOOP;
+      DLACT IAP L0;
+    ELSE;
+      IF ABS(RATIO_I)*100 < ABS(RATIO_J);
+        WRITE 6 ' --- WARNING in SYSCLM, large deviation from scaling map: ' ABS((RATIO_I-RATIO_J)/(RATIO_I+RATIO_J));
+      ENDIF;
+      MAG := D0/AA[3];
+      BT := PR/SQRT(CONS(E0)*(CONS(E0) + 2*AMUMEV*CONS(M0))) + 0*DD[1];
+      LIN_FLAG := 0;
+      IF (ND < 3) AND (NV # TWOND);
+        LIN_FLAG := 1;
+      ENDIF;
+      IF LIN_FLAG = 1;
+        BT := BT*CONS(Z0)/AA[6]*CONS(MAG)*CONS(B0)*PARA(1);
+      ELSE;
+        BT := BT*Z0/AA[6]*MAG*B0;
+      ENDIF;
+      FAC[1] := BT/AA[2] - 1;
+      NORD := AA[8];
+      LOOP I 2 NORD;
+        FAC[I] := FAC[I-1]*FAC[1];
+      ENDLOOP;
+      NOC := NOC + 1;
+      DANOT NOC;
+      F_GF := FF[1];
+      P_LIE := LL[1];
+      LOOP I 1 NORD;
+        F_GF := F_GF + FF[I+1]*FAC[I];
+        P_LIE := P_LIE + LL[I+1]*FAC[I];
+      ENDLOOP;
+      NOC := NOC - 1;
+      DANOT NOC;
+      GFM IAP F_GF AA[7];
+      LOOP I 1 TWOND;
+        C_IC[I] := 0*DD[1];
+      ENDLOOP;
+      IF LFR = 1.9;
+        LOOP I 1 TWOND;
+          IAP[I] := DD[I];
+        ENDLOOP;
+      ENDIF;
+      LFM_SCALAR IAP C_IC IAP P_LIE NEG_ONE_LFM;
+      { Scale map: rebuild ref particle at AA's reference, CATR,
+        scale phase-space by MAG, restore ref particle, TRCA back. }
+      RP AA[4] AA[5] AA[6];
+      CATR IAP IAP AA[1];
+      LOOP I 1 NV;
+        COP[I] := DD[I];
+      ENDLOOP;
+      LOOP I 1 TWOND 2;
+        COP[I] := DD[I]/MAG;
+      ENDLOOP;
+      POLVAL 1 IAP TWOND COP NV IAP TWOND;
+      LOOP I 1 TWOND 2;
+        IAP[I] := MAG*IAP[I];
+      ENDLOOP;
+      IF LIN_FLAG = 1;
+        RP CONS(EP) CONS(MP) CONS(ZP);
+      ELSE;
+        RP CONS(EP) CONS(MP) CONS(ZP);
+      ENDIF;
+      IF LFR < 0;
+        TRCA IAP IAP 0;
+      ELSE;
+        TRCA IAP IAP L0;
+      ENDIF;
+      IF LIN_FLAG = 1;
+        RP CONS(EP) CONS(MP) CONS(ZP);
+        BDEP IAP L0+0*DD[1] 1+0*DD[1];
+      ENDIF;
+    ENDIF;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- RSM: read symplectically-scaled map
+  Convenience wrapper: open file IU, parse via SYSCFL, run SYSCLM into
+  MSC, set up axis, finalize via UPDATE.                              }
+PROCEDURE RSM IU (RE) L0 (RE) B0 (DA) D0 (DA);
+  VARIABLE (DA 10) FF;
+  VARIABLE (DA 10) LL;
+  VARIABLE (RE 10) AA;
+  VARIABLE (RE) NEG_ONE_RSM;
+  NEG_ONE_RSM := -1;
+  SYSCFL IU AA FF LL NEG_ONE_RSM;
+  SYSCLM MSC L0 B0 D0 AA FF LL;
+  LOCSET 0 L0 0 L0 0 0;
+  UPDATE 1 1;
+ENDPROCEDURE;
+
+{ ----- WSM — write symplectic-representation map
+  Companion writer to RSM/SYSCFL. Dumps the active MAP plus a header
+  block (OV/RP/UM/FR/ESET/WSET/CE) and a generating-function +
+  Lie-exponent expansion to the given file unit, in the SYSCA file
+  format that RSM understands.
+
+  Header lines describe the (NOC, ND, NP) basis, (E0, M0, Z0) reference
+  particle, (LFR, EPS, WAF) flags, and the (L, B, A) reference geometry
+  identifying this map.
+
+  Map decomposition:
+    MLF_SCALAR NAP C ML P -1   → Lie generator P (single DA)
+    MGF        ML F MGF_TY J   → generating function F (single DA),
+                                  type MGF_TY (varies by ND)
+  DAPEW writes F[var=J, order=I] and P[var=J, order=I] coefficients
+  for I=0..NOC.
+
+  ND=3 case uses J=TWOND+1 (the e/dE slot); ND<3 uses J=TWOND+2
+  (parameter slot). The (ND<3, NP<2) and (ND>2, NP<1) configurations
+  are rejected — too few DA variables for the symplectic decomposition. }
+PROCEDURE WSM IU (RE) L (RE) B (RE) A (RE);
+  VARIABLE (ST) LIN;
+  VARIABLE (DA 8) NAP;
+  VARIABLE (DA 8) C;
+  VARIABLE (DA 8) ML;
+  VARIABLE (DA) P;
+  VARIABLE (DA) F;
+  VARIABLE (DA 1) NAP_BUF;
+  VARIABLE (DA 1) F_BUF;
+  VARIABLE (DA 1) F_VEC;
+  VARIABLE (DA 1) P_VEC;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) MGF_TY;
+  VARIABLE (RE) NEG_ONE_WSM;
+  VARIABLE (ST) FMT_E;
+  IF (ND > 2) AND (NP < 1);
+    WRITE 6 ' *** ERROR in WSM, too few parameters';
+    QUIT 0;
+  ELSEIF (ND < 3) AND (NP < 2);
+    WRITE 6 ' *** ERROR in WSM, too few parameters';
+    QUIT 0;
+  ENDIF;
+  LOOP I 1 NV;
+    NAP[I] := MAP[I];
+  ENDLOOP;
+  VARIABLE (DA) L_DA;
+  L_DA := L + 0*DD[1];
+  IF ND > 2;
+    EDEP NAP L_DA PARA(1);
+  ELSEIF ND < 3;
+    EDEP NAP L_DA PARA(2);
+    LOOP I 1 TWOND;
+      NAP_BUF[1] := NAP[I];
+      DAPLU NAP_BUF TWOND+1 0 F_BUF;
+      NAP[I] := F_BUF[1];
+    ENDLOOP;
+  ENDIF;
+  FMT_E := '(E23.16)';
+  LIN := '     OV' & SF(NOC, '(I3)') & SF(ND, '(I3)') & SF(NP, '(I3)') & ' ;';
+  WRITE IU LIN;
+  LIN := '     RP' & SF(CONS(E0), FMT_E) & SF(CONS(M0), FMT_E)
+         & SF(CONS(Z0), FMT_E) & ' ;';
+  WRITE IU LIN;
+  LIN := '     UM ; FR' & SF(LFR, '(I3)') & ' ; ESET' & SF(EPS, FMT_E)
+         & ' ; WSET' & SF(WAF, FMT_E) & ' ;';
+  WRITE IU LIN;
+  LIN := '     CE' & SF(L, FMT_E) & SF(B, FMT_E) & SF(A, FMT_E) & ' ;';
+  WRITE IU LIN;
+  WRITE IU '  ';
+  NEG_ONE_WSM := -1;
+  MLF_SCALAR NAP C ML P NEG_ONE_WSM;
+  MGF_TY := -1;
+  MGF ML F MGF_TY J;
+  IF J # 0;
+    WRITE 6 ' *** ERROR in WSM, no gen. f.';
+    QUIT 0;
+  ENDIF;
+  LIN := '     GENERATING FUNCTION OF TYPE  ' & SF(MGF_TY, '(I2)');
+  WRITE IU LIN;
+  LIN := '     LIE EXPONENT        OF TYPE  ' & SF(NEG_ONE_WSM, '(I2)');
+  WRITE IU LIN;
+  WRITE IU '  ';
+  NOC := NOC + 1;
+  DANOT NOC;
+  IF ND = 3;
+    J := TWOND + 1;
+  ELSE;
+    J := TWOND + 2;
+  ENDIF;
+  F_VEC[1] := F;
+  P_VEC[1] := P;
+  LOOP I 0 NOC-1;
+    DAPEW IU F_VEC J I;
+    DAPEW IU P_VEC J I;
+  ENDLOOP;
+  NOC := NOC - 1;
+  DANOT NOC;
+ENDPROCEDURE;
+
+END;

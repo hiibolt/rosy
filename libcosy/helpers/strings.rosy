@@ -1,0 +1,187 @@
+{ String utilities: substring extraction, real / integer ↔ string
+  conversion, case folding, and whitespace / separator tokenization. }
+
+BEGIN;
+
+{ ----- Substring ------------------------------------------ }
+FUNCTION (ST) SS A (ST) I1 (RE) I2 (RE);
+  SS := A|(I1&I2);
+ENDFUNCTION;
+
+{ ----- String -> Real ------------------------------------- }
+FUNCTION (RE) R S (ST) I1 (RE) I2 (RE);
+  STCRE (S|(I1&I2)) R;
+ENDFUNCTION;
+
+{ ----- Real -> String, default G23.16 format -------------- }
+FUNCTION (ST) S R (RE);
+  RECST R '(G23.16)' S;
+ENDFUNCTION;
+
+{ ----- Real -> String, custom Fortran format -------------- }
+FUNCTION (ST) SF R (RE) FORM (ST);
+  RECST R FORM SF;
+ENDFUNCTION;
+
+{ ----- Integer -> String ------------------------------ }
+FUNCTION (ST) SI I (RE);
+  VARIABLE (RE) J; VARIABLE (RE) K;
+  K := ABS(I);
+  SI := SF(K - 10*INT(K/10), '(I1)');
+  LOOP J 1 LOG(K + 0.1)/LOG(10);
+    K := INT(K/10);
+    SI := SF(K - 10*INT(K/10), '(I1)') & SI;
+  ENDLOOP;
+  IF I < 0;
+    SI := '-' & SI;
+  ENDIF;
+ENDFUNCTION;
+
+{ ----- Last non-blank position ------------------------ }
+FUNCTION (RE) ILAST A (ST) IA1 (RE) IA2 (RE);
+  VARIABLE (RE) I; VARIABLE (ST) CH;
+  CH := ' ';
+  I := IA2 + 1;
+  WHILE (CH = ' ') AND (I > IA1);
+    I := I - 1;
+    CH := SS(A, I, I);            { I appears twice — handled by call-site dup detection }
+  ENDWHILE;
+  ILAST := I;
+ENDFUNCTION;
+
+{ ----- First position of character -------------------- }
+FUNCTION (RE) IPOS C (ST) A (ST);
+  VARIABLE (RE) LEN; VARIABLE (RE) I;
+  LEN := LENGTH(A);
+  IPOS := 0;
+  I := 0;
+  WHILE I < LEN;
+    I := I + 1;
+    IF C = (A|I);
+      IPOS := I;
+      I := LEN;     { early-out: pin to the upper bound }
+    ENDIF;
+  ENDWHILE;
+ENDFUNCTION;
+
+{ ----- Lower -> Upper case --------------------------- }
+PROCEDURE TRCAP A (ST);
+  VARIABLE (ST) AC; VARIABLE (ST) AS;
+  VARIABLE (RE) LSL; VARIABLE (RE) IA; VARIABLE (RE) I;
+  AC := 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  AS := 'abcdefghijklmnopqrstuvwxyz';
+  LSL := ILAST(A, 1, LENGTH(A));
+  IF LSL > 1;
+    LOOP I 2 LSL - 1;
+      IA := IPOS((A|I), AS);
+      IF IA > 0;
+        A := (A|(1 & (I-1))) & (AC|IA) & (A|((I+1) & LSL));
+      ENDIF;
+    ENDLOOP;
+    I := 1;
+    IA := IPOS((A|I), AS);
+    IF IA > 0;
+      A := (AC|IA) & (A|((I+1) & LSL));
+    ENDIF;
+    I := LSL;
+    IA := IPOS((A|I), AS);
+    IF IA > 0;
+      A := (A|(1 & (I-1))) & (AC|IA);
+    ENDIF;
+  ELSEIF LSL = 1;
+    IA := IPOS((A|1), AS);
+    IF IA > 0;
+      A := (AC|IA);
+    ENDIF;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- Tokenize string by separator -------------------
+  WORDS scans A and writes (start, end) character-position pairs of each
+  non-empty token into the output table WORD.  stores each pair
+  as a 2-element VE inside a vec-of-vecs `WORD 2 N`; the ROSY port lifts
+  that into `(VE N)` so callers can do `A | WORD[K]` directly via the
+  ST × VE → ST extract rule (rosy_lib/operators/extract.rs:36).
+
+  Construction pattern:
+   * On token start (J=0 → 1), write WORD[N] := VE(I) — single-element
+     VE holding the start index.
+   * On separator after token (J=1 → 0), append the prior char's index
+     as the end: WORD[N] := WORD[N] & (I-1).
+   * Tail clause at line 164 closes the last token if string ended
+     mid-word (no trailing separator).                                    }
+PROCEDURE WORDS A (ST) N (RE) WORD (VE 64) SEP (ST);
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) L;
+  L := ILAST(A, 1, LENGTH(A));
+  N := 0;
+  J := 0;
+  I := 0;
+  WHILE I < L;
+    I := I + 1;
+    IF (J = 0) AND ((A|I) # SEP);
+      J := 1;
+      N := N + 1;
+      WORD[N] := VE(I);
+    ELSEIF (J = 1) AND ((A|I) = SEP);
+      J := 0;
+      WORD[N] := WORD[N] & (I - 1);
+    ENDIF;
+  ENDWHILE;
+  IF J = 0;
+    N := N + 1;
+    WORD[N] := VE(I);
+  ENDIF;
+  WORD[N] := WORD[N] & I;
+ENDPROCEDURE;
+
+{ ----- Field tokenize by separator --------------------
+  Same shape as WORDS but emits *every* field — including empty ones
+  between adjacent separators — using `0&0` as the empty-field sentinel
+  (start=0, end=0). Useful for CSV-like comma-delimited files where
+  trailing commas should produce empty trailing fields.
+
+  Edge cases preserved from :
+   * Run starts with J=1 (not 0 like WORDS) so the first character can
+     immediately close an empty leading field.
+   * Tail handling: if I > J at end-of-string, last region is non-empty
+     [J, I]; else emit [0, 0] as the trailing empty field.
+
+  Faithful-port quirk: 's tail uses strict `I > J` rather than
+  `I >= J`, so a trailing *single* character after a separator (e.g.
+  'a,b,c' final 'c') is reported as the empty sentinel [0, 0] instead
+  of [6, 6]. Any single-character no-separator input (e.g. 'a') hits
+  the same path. We replicate this behavior because FGDATIN — the
+  primary FIELDS caller in  — assumes it. Flag for
+  callers: pad inputs with a trailing separator to guarantee proper
+  boundary handling.                                                       }
+PROCEDURE FIELDS A (ST) N (RE) FIELD (VE 64) SEP (ST);
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) L;
+  L := LENGTH(A);
+  N := 0;
+  J := 1;
+  I := 0;
+  WHILE I < L;
+    I := I + 1;
+    IF (A|I) = SEP;
+      N := N + 1;
+      IF I > J;
+        FIELD[N] := J & (I - 1);
+      ELSE;
+        FIELD[N] := 0 & 0;
+      ENDIF;
+      J := I + 1;
+    ENDIF;
+  ENDWHILE;
+  N := N + 1;
+  IF I > J;
+    FIELD[N] := J & I;
+  ELSE;
+    FIELD[N] := 0 & 0;
+  ENDIF;
+ENDPROCEDURE;
+
+END;

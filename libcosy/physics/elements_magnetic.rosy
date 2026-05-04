@@ -1,0 +1,1051 @@
+{ Magnetic elements:
+    * MQ / MH       analytical fast paths for quadrupole / sextupole
+                    (NOC < 3, LFR = 0, LSPN = 0). Other configurations
+                    fall through to FFELE.
+    * MO / MD / MZ  octupole, decapole, dodecapole — FFELE-driven.
+    * M5            combined quadrupole + sextupole + octupole +
+                    decapole + dodecapole bundle.
+    * MM / MMS      arbitrary normal / normal-plus-skew multipole list.
+    * MQK / MSK /
+      MOK / MDK /
+      MZK / MMK /
+      MMSK          integrated-strength variants of the above.
+    * MGE           general s-dependent field-driven magnet.
+    * DI / DP / DIL convenience wrappers around BEND.
+    * MC / MS / MSL /
+      MPL / MCLK    combined-function magnets with edges.
+    * MSS           split-pole solenoid.
+    * CMR / CMG /
+      CML / CMSI /
+      CMS / CMSP /
+      CMST / CMSTP  charged-mirror / Cartesian electric-magnetic combos.
+    * WI / MF / MFFLD / MFFLDIN / FGDATCHECK — wiggler / measured-field
+                    setup and validation. }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- Magnetic quadrupole (analytical fast path, ) ----
+  Inline port of MQ's no-fringe-field / no-spin / low-order branch. The
+   structure is MQ procedure containing nested MQUAD which itself
+  contains nested MAPY. All three levels are preserved here so the
+  scope-sharing matches what  expects (MAPY reads MQUAD's locals
+  N, FP, IAP).
+
+  Parameters
+    L (RE)  — physical length [m]
+    B (RE)  — pole-tip magnetic field [T]
+    D (RE)  — pole-tip aperture [m]                                       }
+PROCEDURE MQ L (RE) B (RE) D (RE);
+
+  PROCEDURE MQUAD IAP L (RE) F (RE) AP (RE);
+    VARIABLE (RE) C; VARIABLE (DA) OM1; VARIABLE (DA) OM2;
+    VARIABLE (DA) FI; VARIABLE (DA) FP; VARIABLE (DA) N; VARIABLE (DA) OM;
+
+    { MAPY: a 2x2 rotation-style update on (IAP[c], IAP[c+1]) using cosines
+      / sines (or hyperbolic counterparts for c = 3, the y plane). }
+    PROCEDURE MAPY C (RE) X (DA) Y (DA);
+      N := IAP[C];
+      IAP[C] := IAP[C]*X + IAP[C + 1]/FP*Y;
+      IF C = 1;
+        IAP[C + 1] := -FP*N*Y + IAP[C + 1]*X;
+      ELSEIF C = 3;
+        IAP[C + 1] :=  FP*N*Y + IAP[C + 1]*X;
+      ENDIF;
+    ENDPROCEDURE;
+
+    IF LUM # 1;
+      WRITE 6 ' *** ERROR, call UM before MQ';
+      QUIT 0;
+    ENDIF;
+    IF ABS(CONS(F)) < 1E-15;
+      DLACT IAP L;            { zero strength → drift }
+    ELSE;
+      FI := F + 0*DA(1);
+      IF CONS(F*Z0) < 0;
+        FI := -F + 0*DA(1);
+        N := IAP[1]; IAP[1] := IAP[3]; IAP[3] := N;
+        N := IAP[2]; IAP[2] := IAP[4]; IAP[4] := N;
+      ENDIF;
+      C := CONS(ETA);
+      OM := SQRT(FI/(AP*CHIM));
+      OM1 := CONS(OM) + 0*DA(1);
+      OM2 := 2*OM1*L;
+      FP := SQRT((1 + IAP[6])*((1 + IAP[6])*C + 2*(1 + IAP[7]))/(C + 2))*OM;
+      IF ND > 2;
+        N := IAP[3]*IAP[4]*(COSH(OM2) - 1) + IAP[1]*IAP[2]*(COS(OM2) - 1);
+        N := N
+            + SQR(IAP[2])*(L + 0.5/OM1*SIN(OM2))
+            + SQR(IAP[4])*(L + 0.5/OM1*SINH(OM2));
+        N := N + (SQR(IAP[1])*(L - SIN(OM2)*0.5/OM1)
+                + SQR(IAP[3])*(-L + SINH(OM2)*0.5/OM1))*SQR(OM1);
+        IAP[5] := IAP[5]
+              + ((1 + C)*(1 - 0.25*N/L) - ((1 + IAP[7]) + (1 + IAP[6])*C)*OM/FP)/(2 + C)*L;
+      ENDIF;
+      OM := OM*L;
+      MAPY 1 COS(OM)  SIN(OM);
+      MAPY 3 COSH(OM) SINH(OM);
+      IF CONS(F*Z0) < 0;
+        N := IAP[1]; IAP[1] := IAP[3]; IAP[3] := N;
+        N := IAP[2]; IAP[2] := IAP[4]; IAP[4] := N;
+      ENDIF;
+    ENDIF;
+  ENDPROCEDURE;
+
+  { MQ outer body. Two paths follow :
+
+    * Fast analytical path (NOC < 3, LFR = 0, LSPN = 0): MQUAD-only
+      symplectic computation, then UPDATE 0 1 to push rays / advance
+      the local-frame transform.
+
+    * General path (NOC ≥ 3, fringe field on, or spin tracking): set up
+      a single quadrupole multipole entry in PPOL / MPOL and delegate
+      to FFELE, which now supports LFR ∈ {0, 1, -1, -2, -10}. Spin
+      tracking flows through UPDATEMAP/SPNMUL inside FFELE.            }
+  IF (NOC < 3) AND (LFR = 0) AND (LSPN = 0);
+    MQUAD MAP L B D;
+    IF NRAY # 0;
+      UMS;
+      MQUAD MSC L B D;
+    ENDIF;
+    LOCSET 0 L 0 L 0 0;
+    DR := D;
+    CE := 'MQ';
+    UPDATE 0 1;
+  ELSE;
+    NPOL := 1;
+    PPOL[1] := B/D + 0*DD[1];
+    MPOL[1] := 2;
+    LOFF := 1;
+    FFELE L D 0 1 2 'MQ';
+  ENDIF;
+
+ENDPROCEDURE;
+
+{ ----- Magnetic sextupole (analytical fast path, ) -----
+  Sextupole kick computed via the second-order expansion of the cubic
+  potential. Two-deep nesting (MH → MHEXA) — simpler than MQ since
+  MHEXA does not need a MAPY-style helper.
+
+  Parameters
+    L (RE) — physical length [m]
+    B (RE) — pole-tip magnetic field [T]
+    D (RE) — pole-tip aperture [m]                                       }
+PROCEDURE MH L (RE) B (RE) D (RE);
+
+  PROCEDURE MHEXA IAP L (RE) F (RE) AP (RE);
+    VARIABLE (RE) C;
+    VARIABLE (DA) X; VARIABLE (DA) XZ; VARIABLE (DA) Y;
+    VARIABLE (DA) FP; VARIABLE (DA) FI;
+    C := CONS(ETA);
+    IF LUM # 1;
+      WRITE 6 ' *** ERROR, call UM before MH';
+      QUIT 0;
+    ENDIF;
+    FP := SQRT((1 + IAP[6])*((1 + IAP[6])*C + 2*(1 + IAP[7]))/(C + 2));
+    X  := IAP[1];
+    XZ := IAP[2];
+    Y  := IAP[3];
+    DLACT IAP L;
+    IF NO > 1;
+      FI := F/(3*SQR(AP)) + 0*DA(1);
+      C := CONS(CHIM);
+      IAP[1] := IAP[1] - FI/C*1.5*SQR(L)*(SQR(X) - SQR(Y)
+              + (2.0/3.0)*L*(X*XZ - Y*IAP[4] + 0.25*L*(SQR(XZ) - SQR(IAP[4]))));
+      IAP[2] := IAP[2] - FI/C*L*3*(SQR(X) - SQR(Y)
+              + L*(X*XZ - Y*IAP[4] + (1.0/3.0)*L*(SQR(XZ) - SQR(IAP[4]))));
+      IAP[3] := IAP[3] + FI/C*SQR(L)*(3*X*Y + L*(Y*XZ + X*IAP[4] + 0.5*L*XZ*IAP[4]));
+      IAP[4] := IAP[4] + FI/C*L*(6*X*Y + L*(3*(Y*XZ + X*IAP[4]) + 2*L*XZ*IAP[4]));
+    ENDIF;
+  ENDPROCEDURE;
+
+  IF (NOC < 3) AND (LFR = 0) AND (LSPN = 0);
+    MHEXA MAP L B D;
+    IF NRAY # 0;
+      UMS;
+      MHEXA MSC L B D;
+    ENDIF;
+    LOCSET 0 L 0 L 0 0;
+    DR := D;
+    CE := 'MH';
+    UPDATE 0 1;
+  ELSE;
+    NPOL := 1;
+    PPOL[1] := B/D/D + 0*DD[1];
+    MPOL[1] := 3;
+    LOFF := 1;
+    FFELE L D 0 1 2 'MH';
+  ENDIF;
+
+ENDPROCEDURE;
+
+{ ----- Integrated-strength variants -----------------
+  MQK and MSK delegate to MQ / MH after converting the integrated strength
+  K into the equivalent pole-tip field B = K · χ_m · D^(2n) / D, where n is
+  the multipole order. Useful when lattice files specify K1 / K2 directly
+  rather than B.                                                          }
+PROCEDURE MQK L (RE) K (RE) D (RE);
+  MQ L K*CONS(CHIM)*D D;
+ENDPROCEDURE;
+
+PROCEDURE MSK L (RE) K (RE) D (RE);
+  MH L K*CONS(CHIM)*D*D D;
+ENDPROCEDURE;
+
+{ ----- SIELE-driven multipole magnets -----
+  These all set up PPOL/MPOL/NPOL with the multipole content, then call
+  FFELE which dispatches on the current LFR setting (0, 1, -1, -2, -10
+  per M19). LFR=0 is the SIELE-only no-fringe path; the rest add
+  fringe-field handling via SDELE.
+
+  MO = octupole (4-pole), MD = decapole (5-pole), MZ = dodecapole (6-pole),
+  M5 = combined quad+sext+oct+dec+dodec, MM = arbitrary normal multipole
+  list, MMS = MM + skew components.
+
+  These elements pass LFR=0 (no fringe field) by default; users wanting
+  fringe behavior call MQK / MSK / MOK / etc. variants, which forward
+  the LFR setting through to FFELE. As of M6, FFELE supports LFR ∈
+  {0, 1, -1, -2, -10} via field_potential.rosy:1541+. For high-order
+  magnets (e.g. octupole MO with NOC<3), the lazy init of PMM/PEM
+  in POTFLD won't have populated the needed entries — user must call
+  OV with NO ≥ multipole order.                                       }
+PROCEDURE MO L (RE) B (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := B/D/D/D + 0*DD[1];
+  MPOL[1] := 4;
+  LOFF := 1;
+  FFELE L D 0 1 2 'MO';
+ENDPROCEDURE;
+
+PROCEDURE MD L (RE) B (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := B/D/D/D/D + 0*DD[1];
+  MPOL[1] := 5;
+  LOFF := 1;
+  FFELE L D 0 1 2 'MD';
+ENDPROCEDURE;
+
+PROCEDURE MZ L (RE) B (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := B/D/D/D/D/D + 0*DD[1];
+  MPOL[1] := 6;
+  LOFF := 1;
+  FFELE L D 0 1 2 'MZ';
+ENDPROCEDURE;
+
+{ M5: 5-pole bundle. Sets quadrupole through dodecapole strengths in
+  one call. Cosy.fox L3187-3193.                                       }
+PROCEDURE M5 L (RE) BQ (RE) BH (RE) BO (RE) BD (RE) BZ (RE) D (RE);
+  PPOL[1] := BQ/D + 0*DD[1];                MPOL[1] := 2;
+  PPOL[2] := BH/D/D + 0*DD[1];              MPOL[2] := 3;
+  PPOL[3] := BO/D/D/D + 0*DD[1];            MPOL[3] := 4;
+  PPOL[4] := BD/D/D/D/D + 0*DD[1];          MPOL[4] := 5;
+  PPOL[5] := BZ/D/D/D/D/D + 0*DD[1];        MPOL[5] := 6;
+  LOFF := 1;
+  NPOL := 5;
+  FFELE L D 0 1 2 'M5';
+ENDPROCEDURE;
+
+{ MM: arbitrary normal multipole array.
+  BA[I] is the I-th multipole strength (I=1 quad, I=2 sext, ...);
+  NBA is the number of provided strengths.                            }
+PROCEDURE MM L (RE) BA (RE 5) NBA (RE) D (RE);
+  VARIABLE (RE) I;
+  VARIABLE (DA) DP;
+  DP := 1 + 0*DD[1];
+  LOOP I 1 NBA;
+    DP := DP/D;
+    PPOL[I] := BA[I]*DP;
+    MPOL[I] := I+1;
+  ENDLOOP;
+  LOFF := 1;
+  NPOL := NBA;
+  FFELE L D 0 1 2 'MM';
+ENDPROCEDURE;
+
+{ MMS: skew multipole — adds skew components on top of MM.
+  NB is count of provided pairs; BA is normal strengths, BS is skew.   }
+PROCEDURE MMS L (RE) BA (RE 5) BS (RE 5) NB (RE) D (RE);
+  VARIABLE (RE) I;
+  VARIABLE (DA) DP;
+  DP := 1 + 0*DD[1];
+  LOOP I 1 NB;
+    DP := DP/D;
+    PPOL[I] := BA[I]*DP;
+    MPOL[I] := I+1;
+  ENDLOOP;
+  DP := 1 + 0*DD[1];
+  LOOP I 1 NB;
+    DP := DP/D;
+    PPOL[I+NB] := BS[I]*DP/(I+1);
+    MPOL[I+NB] := I+1+20;
+  ENDLOOP;
+  LOFF := 1;
+  NPOL := 2*NB;
+  FFELE L D 0 1 2 'MMS';
+ENDPROCEDURE;
+
+{ K-variants: replace the explicit field strengths with integrated K
+  values, scaled by χ_m ≈ 1/(B·ρ) for magnetic rigidity normalisation. }
+PROCEDURE MOK L (RE) K (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := K*CONS(CHIM) + 0*DD[1];
+  MPOL[1] := 4;
+  LOFF := 1;
+  FFELE L D 0 1 2 'MOK';
+ENDPROCEDURE;
+
+PROCEDURE MDK L (RE) K (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := K*CONS(CHIM) + 0*DD[1];
+  MPOL[1] := 5;
+  LOFF := 1;
+  FFELE L D 0 1 2 'MDK';
+ENDPROCEDURE;
+
+PROCEDURE MZK L (RE) K (RE) D (RE);
+  NPOL := 1;
+  PPOL[1] := K*CONS(CHIM) + 0*DD[1];
+  MPOL[1] := 6;
+  LOFF := 1;
+  FFELE L D 0 1 2 'MZK';
+ENDPROCEDURE;
+
+{ ----- K-strength multipole array variants -----
+  MMK / MMSK are sister wrappers to MM/MMS that take integrated K
+  values scaled by χ_m, mirroring the MOK/MDK/MZK relationship for
+  array-of-strengths magnets.                                          }
+PROCEDURE MMK L (RE) BA (RE 5) NBA (RE) D (RE);
+  VARIABLE (RE) I;
+  LOOP I 1 NBA;
+    PPOL[I] := BA[I]*CONS(CHIM) + 0*DD[1];
+    MPOL[I] := I + 1;
+  ENDLOOP;
+  LOFF := 1;
+  NPOL := NBA;
+  FFELE L D 0 1 2 'MMK';
+ENDPROCEDURE;
+
+{ MMSK: skew-K multipole.  combines a normal-K vector KA with
+  an angle vector TA into a single MMS call by computing the skew
+  partner BS := KA[I]·sin((I+1)·TA[I]·deg→rad) and rotating KA by
+  cos. Mutates KA / TA in place — semantics match .           }
+PROCEDURE MMSK L (RE) KA (RE 5) TA (RE 5) NA (RE) D (RE);
+  VARIABLE (RE) I;
+  VARIABLE (RE) DP;
+  VARIABLE (RE) BS;
+  DP := 1;
+  LOOP I 1 NA;
+    DP := DP*D;
+    KA[I] := KA[I]*CONS(CHIM)*DP;
+    BS := KA[I]*SIN((I+1)*TA[I]*DEGRAD);
+    KA[I] := KA[I]*COS((I+1)*TA[I]*DEGRAD);
+    TA[I] := BS;
+  ENDLOOP;
+  MMS L KA TA NA D;
+ENDPROCEDURE;
+
+{ ----- CM* family — axial-symmetric magnetic devices -----
+  All set NPOL=1 + MPOL[1]=20 (axial-symmetric pole flag) and route
+  through DSDED (default-stepping s-dependent integrator) using NSDP
+  modes 3, 5, 7, 8, 10, 13, or 14 from POTFLD's POTS path.
+
+  μ ≈ 1.2566×10⁻⁶ is COSY's vacuum-permeability convention (μ₀/π in
+  amp-meter units), used by CMR/CMSI/CMST/CMSTP for current-driven
+  field strengths.                                                       }
+
+PROCEDURE CMR I (RE) D (RE);
+  VARIABLE (RE) MU;
+  VARIABLE (RE) D_AP;
+  D_AP := D;
+  MU := 1.2566E-6;
+  CE := 'CMR';
+  NPOL := 1;
+  PPOL[1] := MU*I/(2*D_AP) + 0*DD[1];
+  MPOL[1] := 20;
+  NSDP := 5;
+  LOFF := 1;
+  DSDED 5E4*D_AP 0 1E-4*D_AP 1E4*D_AP 1E4*D_AP D_AP;
+ENDPROCEDURE;
+
+PROCEDURE CMG B (RE) D (RE);
+  VARIABLE (RE) D_AP;
+  D_AP := D;
+  NPOL := 1;
+  PPOL[1] := B + 0*DD[1];
+  MPOL[1] := 20;
+  NSDP := 3;
+  CE := 'CMG';
+  LOFF := 1;
+  DSDED 5*D_AP 0 D_AP/40 D_AP 10*D_AP D_AP;
+ENDPROCEDURE;
+
+PROCEDURE CML B (RE) D (RE);
+  VARIABLE (RE) D_AP;
+  D_AP := D;
+  NPOL := 1;
+  PPOL[1] := B + 0*DD[1];
+  MPOL[1] := 20;
+  NSDP := 7;
+  CE := 'CML';
+  LOFF := 1;
+  DSDED 5E4*D_AP 0 1E-4*D_AP 1E4*D_AP 1E4*D_AP D_AP;
+ENDPROCEDURE;
+
+PROCEDURE CMSI I (RE) N (RE) D (RE) L (RE);
+  VARIABLE (RE) MU;
+  VARIABLE (RE) D_AP;
+  D_AP := D;
+  MU := 1.2566E-6;
+  CE := 'CMSI';
+  NPOL := 1;
+  PPOL[1] := MU*I*N/2 + 0*DD[1];
+  PPOL[2] := L + 0*DD[1];
+  MPOL[1] := 20;
+  NSDP := 10;
+  LOFF := 1;
+  DSDED 200*D_AP L 1E-4*D_AP D_AP 3*D_AP D_AP;
+ENDPROCEDURE;
+
+PROCEDURE CMS B (RE) D (RE) L (RE);
+  VARIABLE (RE) D_AP;
+  D_AP := D;
+  NPOL := 1;
+  PPOL[1] := B*D_AP/2/TANH(L/2/D_AP) + 0*DD[1];
+  PPOL[2] := L + 0*DD[1];
+  MPOL[1] := 20;
+  NSDP := 8;
+  LOFF := 1;
+  CE := 'CMS';
+  DSDED 25*D_AP L 1E-4*D_AP D_AP 3*D_AP D_AP;
+ENDPROCEDURE;
+
+{ CMSP: a slice [S1, S2] of an otherwise-full magnetic solenoid of
+  length L. Uses the SNM / DLACT / LOCSET / SDELE / UPDATEMAP dance
+  so fringe-field effects of the *full* solenoid carry into the slice.
+  Pads the SDELE integration with 20·D backward/forward drifts when
+  S1≈0 or S2≈L (entrance/exit slices) so the entry/exit fringe is
+  fully captured.                                                         }
+PROCEDURE CMSP B (RE) D (RE) L (RE) S1 (RE) S2 (RE);
+  VARIABLE (RE) D_AP;
+  VARIABLE (RE) DS1;
+  VARIABLE (RE) DS2;
+  VARIABLE (RE) BACKDRIFT;
+  VARIABLE (RE) H2_STEP;
+  VARIABLE (DA 8) MS_BUF;
+  VARIABLE (DA 3 3) SM_BUF;
+  D_AP := D;
+  NPOL := 1;
+  PPOL[1] := B*D_AP/2/TANH(L/2/D_AP) + 0*DD[1];
+  PPOL[2] := L + 0*DD[1];
+  MPOL[1] := 20;
+  NSDP := 8;
+  LOFF := 1;
+  CE := 'CMSP';
+  UMS;
+  SNM MSC MS_BUF;
+  SSNM SSCR SM_BUF;
+  DS1 := 0;
+  IF ABS(S1) < 1E-5;
+    DS1 := L/2 - 20*D_AP;
+  ENDIF;
+  IF ABS(S1) < 1E-5;
+    DLACT MS_BUF DS1;
+  ELSE;
+    DS1 := S1;
+  ENDIF;
+  IF ABS(S2 - L) < 1E-5;
+    DS2 := 20*D_AP + L/2;
+  ELSE;
+    DS2 := S2;
+  ENDIF;
+  LOCSET 0 DS1 0 DS1 0 0;
+  H2_STEP := (20*D_AP - L/2)/100;
+  SDELE DS1 DS2 1E-4*D_AP H2_STEP 3*D_AP D_AP;
+  UPDATEMAP MSC MS_BUF MSC SSCR SM_BUF SSCR;
+  IF ABS(S2 - L) < 1E-5;
+    BACKDRIFT := L/2 - 20*D_AP;
+    DLACT MSC BACKDRIFT;
+    ZLOC := ZLOC - BACKDRIFT;
+  ENDIF;
+  SLOC := S2 - S1;
+  UPDATE 1 1;
+ENDPROCEDURE;
+
+PROCEDURE CMST NI (RE) R1 (RE) R2 (RE) L (RE);
+  VARIABLE (RE) MU;
+  MU := 1.2566E-6;
+  IF (R1 < 0) OR (R1 = 0);
+    WRITE 6 ' *** ERROR in CMST, R1 < 0 or R1 = 0';
+    QUIT 0;
+  ELSEIF (R2 < R1) OR (R2 = R1);
+    WRITE 6 ' *** ERROR in CMST, R2 < R1 or R2 = R1';
+    QUIT 0;
+  ENDIF;
+  CE := 'CMST';
+  NPOL := 1;
+  PPOL[1] := MU*NI/4/(R2 - R1) + 0*DD[1];
+  PPOL[2] := L + 0*DD[1];
+  PPOL[3] := R1 + 0*DD[1];
+  PPOL[4] := R2 + 0*DD[1];
+  MPOL[1] := 20;
+  NSDP := 13;
+  LOFF := 1;
+  DSDED 200*R2 L 1E-4*R1 R1 3*R1 R1;
+ENDPROCEDURE;
+
+{ CMSTP: superposition of N thick magnetic solenoids. Each piece IS
+  contributes (NI[IS], L[IS], R1[IS], R2[IS]) starting at X[IS]; the
+  piece data lands in MFD[IS, 1..5] for NSDP=14 to consume. The S1/S2
+  slice arguments cap the integration window, mirroring CMSP.         }
+PROCEDURE CMSTP N (RE) NI (RE 30) R1 (RE 30) R2 (RE 30) L (RE 30)
+                X (RE 30) S1 (RE) S2 (RE);
+  VARIABLE (RE) MU;
+  VARIABLE (RE) DMIN;
+  VARIABLE (RE) IS_GRID;
+  CE := 'CMSTP';
+  MU := 1.2566E-6;
+  DMIN := 1E8;
+  PPOL[1] := N + 0*DD[1];
+  LOOP IS_GRID 1 N;
+    DMIN := MIN(DMIN, R1[IS_GRID]);
+    IF (R2[IS_GRID] < R1[IS_GRID]) OR (R2[IS_GRID] = R1[IS_GRID]) OR (L[IS_GRID] < 0);
+      PPOL[1] := -1 + 0*DD[1];
+    ENDIF;
+    MFD[IS_GRID, 1] := MU*NI[IS_GRID]/4/(R2[IS_GRID] - R1[IS_GRID]);
+    MFD[IS_GRID, 2] := L[IS_GRID];
+    MFD[IS_GRID, 3] := R1[IS_GRID];
+    MFD[IS_GRID, 4] := R2[IS_GRID];
+    MFD[IS_GRID, 5] := X[IS_GRID];
+  ENDLOOP;
+  IF (DMIN < 0) OR (DMIN = 0) OR (DMIN = 1E8);
+    WRITE 6 ' *** ERROR in CMSTP, R1<0 or R1=0 or R1 too large';
+    QUIT 0;
+  ELSEIF CONS(PPOL[1]) = -1;
+    WRITE 6 ' *** ERROR in CMSTP, R2<R1 or R2=R1 or L<0';
+    QUIT 0;
+  ENDIF;
+  NPOL := 1;
+  MPOL[1] := 20;
+  NSDP := 14;
+  LOFF := 1;
+  LOCSET 0 S1 0 S1 0 0;
+  SDELE S1 S2 1E-4*DMIN DMIN 3*DMIN DMIN;
+  UPDATE 1 1;
+ENDPROCEDURE;
+
+{ ----- MGE — general magnetic multipole by Gaussians
+  MGE(NP, A, NS, DS, SIGMA, D): for each pole I=1..NP, copies the
+  caller's coefficient column A[I, 1..NS] (after dividing by the
+  aperture power D^I) into the global MFD[I, 1..NS] table, then
+  integrates SDELE over [0, (NS-1)*DS] with NSDP=12. Inside POTFLD →
+  POTS path NSDP=12, GAUSS1_DA Gaussian-smooths each pole's measured
+  s-axis amplitudes with kernel width SIGMA.
+
+  Parameters:
+    NP    : number of multipole orders (≤ 30 — bounded by MFD's dim 1)
+    A     : (RE 30 30) coefficient table — A[I, IS] = pole-I amplitude
+            at grid point IS, prior to D^I normalisation
+    NS    : number of s-grid samples (≤ 30 — bounded by MFD's dim 2)
+    DS    : s-grid spacing [m]
+    SIGMA : Gaussian-kernel width in grid units (analogue of MF's SIGMA)
+    D     : aperture / characteristic length [m]                       }
+PROCEDURE MGE NP (RE) A (RE 30 30) NS (RE) DS (RE) SIGMA (RE) D (RE);
+  VARIABLE (RE) I;
+  VARIABLE (RE) IS_GRID;
+  VARIABLE (RE) S2;
+  VARIABLE (RE) D_AP;
+  VARIABLE (RE) DPOW;
+  D_AP := D;
+  LOOP I 1 NP;
+    MPOL[I] := I + 1;
+    DPOW := 1;
+    LOOP IS_GRID 1 I;
+      DPOW := DPOW*D_AP;
+    ENDLOOP;
+    LOOP IS_GRID 1 NS;
+      MFD[I, IS_GRID] := A[I, IS_GRID]/DPOW;
+    ENDLOOP;
+  ENDLOOP;
+  PPOL[1] := NS + 0*DD[1];
+  PPOL[2] := DS + 0*DD[1];
+  PPOL[3] := SIGMA + 0*DD[1];
+  NSDP := 12;
+  LOFF := 1;
+  NPOL := NP;
+  S2 := (NS - 1)*DS;
+  LOCSET 0 0 0 0 0 0;
+  CE := 'MGE';
+  DR := D_AP;
+  SDELE 0 S2 D_AP/200 D_AP 7*D_AP D_AP;
+  UPDATE 1 1;
+ENDPROCEDURE;
+
+{ ----- MF — magnet from measured field data
+  MF(L, A, NX, NZ, DX, DZ, SIGMA, D, SX, SZ, SPHI): copies the user's
+  2D field grid A into the global MFD table, sets up NSDP=-5 + LOFF=2,
+  and integrates SDELE over [0, L]. Inside POTFLD → POTXZ → FIELDXZ
+  NSDP=-5, GAUSS evaluates BFY at (X, Z) using a 2D Gaussian kernel of
+  width SIGMA over the MFD grid.
+
+  Parameters:
+    L     : magnet length [m]
+    A     : (RE 700 30) field grid (caller-allocated, NX × NZ)
+    NX/NZ : grid counts
+    DX/DZ : grid spacing [m]
+    SIGMA : Gaussian-kernel width in grid units (0.5 ≤ SIGMA ≤ 5.0)
+    D     : aperture / characteristic length [m]
+    SX/SZ : axis offsets (LOCSET first/second args)
+    SPHI  : axis angle [deg] — passed to LOCSET as -SPHI*DEGRAD
+
+  Pre-condition: SIGMA in [0.5, 5.0], DX > 0, DZ > 0.                    }
+PROCEDURE MF L (RE) A_GRID (RE 700 30) NX (RE) NZ (RE)
+            DX_GRID (RE) DZ_GRID (RE) SIGMA (RE) D_AP (RE)
+            SX (RE) SZ (RE) SPHI (RE);
+  VARIABLE (RE) DS1;
+  VARIABLE (RE) IX;
+  VARIABLE (RE) IZ;
+  VARIABLE (RE) NEG_SPHI_RAD;
+  IF (SIGMA < 0.5) OR (SIGMA > 5.0);
+    WRITE 6 ' *** ERROR in MF, SIGMA outside [0.5, 5.0]';
+    QUIT 0;
+  ENDIF;
+  IF (DX_GRID <= 0) OR (DZ_GRID <= 0);
+    WRITE 6 ' *** ERROR in MF, DX <= 0 or DZ <= 0';
+    QUIT 0;
+  ENDIF;
+  MFP[1] := 0;
+  LOOP IX 1 NX;
+    LOOP IZ 1 NZ;
+      MFD[IX, IZ] := A_GRID[IX, IZ];
+    ENDLOOP;
+  ENDLOOP;
+  PPOL[1] := NX + 0*DD[1];
+  PPOL[2] := NZ + 0*DD[1];
+  PPOL[3] := DX_GRID + 0*DD[1];
+  PPOL[4] := DZ_GRID + 0*DD[1];
+  PPOL[5] := SIGMA + 0*DD[1];
+  NSDP := -5;
+  LOFF := 2;
+  DS1 := MIN(DX_GRID, DZ_GRID);
+  NEG_SPHI_RAD := -SPHI*DEGRAD;
+  LOCSET SX SZ NEG_SPHI_RAD 0 0 0;
+  CE := 'MF';
+  SDELE 0 L DS1/100 SQRT(DS1*L/5) L/5 D_AP;
+  UPDATE 1 1;
+  IF MFP[1] > 0;
+    WRITE 6 ' --- WARNING in MF, out of range of data at ' MFP[1] ' points';
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- WI — wiggler magnet
+  WI(B, K, L, D, K1, IA, A): a wiggler with field profile
+    BFY(z) = EDGE(z/D) · EDGE((-z+L)/D) · B · cos((2π/K + K1·z)·z)
+  where the EDGE function provides soft sigmoid end-fields keyed by
+  PPOL[7..16] coefficients.
+
+  Parameters:
+    B  : peak magnetic field [T]
+    K  : wiggler period [m]
+    L  : total length [m]
+    D  : characteristic radius / aperture [m]
+    K1 : period chirp coefficient
+    IA : 0 = use default edge profile (PPOL[8] := 8 sentinel)
+         1 = use user-supplied A[1..10] edge coefficients
+    A  : RE 10 array — user edge coefficients (only when IA=1)
+
+  Algorithm:
+    1. Set up PPOL[1..16] with field magnitude, period, geometry, and
+       edge polynomial coefficients. NSDP=-3 + LOFF=2 routes through
+       POTXZ → FIELDXZ NSDP=-3 → EDGE.
+    2. Build entrance LS = L+4·L1 backward-drift extension.
+    3. FIT X to find the s-parameter X such that ZLOC = L (the
+       reference axis hits the exit boundary). Uses SDELEREF for the
+       reference-orbit-only walk through the wiggler interior.
+    4. Save locked LOCSET globals into XLOC0..SLOC0 snapshots.
+    5. SDELE 0 LS — full integration over [0, L+4·L1].
+    6. UPDATEMAP MSC MS MSC + DLACT for backward exit-drift.
+    7. Restore axis state from snapshots, finalise UPDATE 1 1.
+
+   uses LPI graphics manipulation to suppress wiggler-internal
+  picture updates — libcosy has no graphics, so that's skipped.    }
+PROCEDURE WI B (RE) K (RE) L (RE) D (RE) K1 (RE) IA (RE) A_COEFF (RE 10);
+  VARIABLE (RE) L1;
+  VARIABLE (RE) LS;
+  VARIABLE (RE) I;
+  VARIABLE (RE) X_FIT;
+  VARIABLE (RE) XLOC0;
+  VARIABLE (RE) ZLOC0;
+  VARIABLE (RE) PLOC0;
+  VARIABLE (RE) SLOC0;
+  VARIABLE (DA 8) MS_WI;
+  VARIABLE (DA 3 3) SM_WI;
+  VARIABLE (RE) SCE;
+  VARIABLE (RE) NEG_L1;
+  VARIABLE (RE) NEG_ZLOC_L;
+  VARIABLE (RE) WI_FOM;
+  SCE := 2E-5;
+  PPOL[1] := B + 0*DD[1];
+  PPOL[2] := 2*PI/K + 0*DD[1];
+  PPOL[3] := D + 0*DD[1];
+  PPOL[4] := L + 0*DD[1];
+  PPOL[5] := K1 + 0*DD[1];
+  PPOL[6] := IA + 0*DD[1];
+  NSDP := -3;
+  LOFF := 2;
+  CE := 'WI';
+  IF IA = 0;
+    LOOP I 1 10;
+      PPOL[I+6] := 0*DD[1];
+    ENDLOOP;
+    PPOL[8] := 8 + 0*DD[1];
+    L1 := 5*D;
+  ELSEIF IA = 1;
+    LOOP I 1 10;
+      PPOL[I+6] := A_COEFF[I] + 0*DD[1];
+    ENDLOOP;
+    L1 := 10*D;
+  ELSE;
+    WRITE 6 ' *** ERROR in WI, IA must be 0 or 1';
+    QUIT 0;
+  ENDIF;
+  DR := D;
+  LOCSET 0 0 0 SCE 0 0;
+  UPDATE 0 0;
+  SPOS := SPOS - SCE;
+  LS := L + 4*L1;
+  NEG_L1 := -L1;
+  UMS;
+  DLACT MSC NEG_L1;
+  SNM MSC MS_WI;
+  SSNM SSCR SM_WI;
+  X_FIT := L;
+  { FIT to find X such that |ZLOC - L| is minimised: walks the
+    reference orbit through the wiggler interior. ZLOC is updated by
+    SDELEREF's LOCSET call inside the body. }
+  FIT X_FIT;
+    LOCSET 0 NEG_L1 0 0 0 0;
+    SDELEREF NEG_L1 X_FIT K/500 K/10 K D;
+    WI_FOM := ABS(ZLOC - L);
+  ENDFIT L*1E-5 100 1 WI_FOM;
+  XLOC0 := XLOC;
+  ZLOC0 := ZLOC;
+  PLOC0 := PLOC;
+  SLOC0 := SLOC;
+  LOCSET 0 NEG_L1 0 0 0 0;
+  SDELE 0 LS K/500 K/10 K D;
+  UPDATEMAP MSC MS_WI MSC SSCR SM_WI SSCR;
+  NEG_ZLOC_L := -(ZLOC - L);
+  DLACT MSC NEG_ZLOC_L;
+  LOCSET XLOC0 ZLOC0 PLOC0 SLOC0 0 0;
+  UPDATE 1 1;
+  PS D;
+ENDPROCEDURE;
+
+{ ----- MSEM — bend magnet with E-multipoles for g-2
+  MSEM(R, PHI, DM, NB, DE, EV, N, CI): combined-function bending magnet
+  with both magnetic multipole (NB[I] strengths up to N) and electric
+  multipole (EV[I] voltages) content. Designed for g-2 storage rings
+  where the electric quadrupole focuses while the magnetic bend
+  steers.
+
+  Parameters:
+    R   : magnetic bending radius [m]
+    PHI : bend angle [rad]
+    DM  : magnetic aperture (declared but unused —  quirk)
+    NB  : RE 16 array of magnetic multipole strengths
+    DE  : electric aperture / characteristic radius
+    EV  : RE 16 array of electric multipole voltages [kV]
+    N   : count of multipoles to use from NB / EV
+    CI  : element name string
+
+  PPOL/MPOL layout: builds standard multipole stack, then sets up
+    PPOL[NPOL+1..5] = R + electric-edge geometry for NSDP=-21
+    MPOL[NPOL+1]    = NM (count of magnetic multipoles)
+    MPOL[NPOL+2]    = 1 (electric fringe flag)
+
+  Supported LFR modes:
+    * 0       SIELE-based, no fringe (electric multipoles contribute
+              constant-field rather than fringe-modulated).
+    * 3 / 2.5 high-precision NSDP=-21 with bend geometry.
+    * 1, -1, -2, -10  delegate to FFELE for SDELE-driven fringe paths. }
+PROCEDURE MSEM R (RE) PHI (RE) DM (RE) NB (RE 16) DE (RE) EV (RE 16) N (RE) CI (ST);
+  VARIABLE (RE) I;
+  VARIABLE (RE) NM_LOCAL;
+  VARIABLE (RE) F_LOCAL;
+  VARIABLE (RE) LDL_MS;
+  VARIABLE (RE) NEG_LDL_MS;
+  VARIABLE (RE) ARC_TOTAL_MS;
+  VARIABLE (RE) STEP_MIN_MS;
+  VARIABLE (RE) STEP_MID_MS;
+  VARIABLE (RE) STEP_MAX_MS;
+  VARIABLE (DA 8) MS_MSEM;
+  VARIABLE (DA 3 3) SM_MSEM;
+  CE := CI;
+  DR := DE;
+  LOFF := 2;
+  IF LUM # 1;
+    WRITE 6 ' *** ERROR, call UM before MSEM';
+    QUIT 0;
+  ENDIF;
+  IF R < 0;
+    WRITE 6 ' *** ERROR in MSEM, negative radius';
+    QUIT 0;
+  ELSEIF PHI < 0;
+    WRITE 6 ' *** ERROR in MSEM, negative angle';
+    QUIT 0;
+  ENDIF;
+  { Magnetic multipoles }
+  NPOL := 1;
+  PPOL[1] := CONS(CHIM)/R + 0*DD[1];
+  MPOL[1] := 1;
+  F_LOCAL := 1;
+  LOOP I 1 N;
+    F_LOCAL := F_LOCAL/R;
+    IF ABS(NB[I]) # 0;
+      NPOL := NPOL + 1;
+      MPOL[NPOL] := I+1;
+      PPOL[NPOL] := -CONS(CHIM)/R*NB[I]*F_LOCAL + 0*DD[1];
+    ENDIF;
+  ENDLOOP;
+  NM_LOCAL := NPOL;
+  { Electric multipoles }
+  F_LOCAL := 1/DE;
+  LOOP I 1 N;
+    F_LOCAL := F_LOCAL/DE;
+    IF ABS(EV[I]) # 0;
+      NPOL := NPOL + 1;
+      MPOL[NPOL] := -(I+1);
+      PPOL[NPOL] := EV[I]*F_LOCAL + 0*DD[1];
+    ENDIF;
+  ENDLOOP;
+  { Edge geometry storage at PPOL[NPOL+1..5] for NSDP=-21 }
+  MPOL[NPOL+1] := NM_LOCAL;
+  PPOL[NPOL+1] := R + 0*DD[1];
+  PPOL[NPOL+2] := R*(COS(PHI)-1) + 0*DD[1];
+  PPOL[NPOL+4] := CONS(PPOL[NPOL+2]) + SIN(PHI) + 0*DD[1];
+  PPOL[NPOL+3] := R*SIN(PHI) + 0*DD[1];
+  PPOL[NPOL+5] := CONS(PPOL[NPOL+3]) - COS(PHI) + 0*DD[1];
+  MPOL[NPOL+2] := 1;
+  IF (LFR = 0) OR (NPOL = NM_LOCAL);
+    SIELE R*PHI DE;
+    LOCSET R*(COS(PHI)-1) R*SIN(PHI) PHI R*PHI 0 0;
+    UPDATE 1 1;
+  ELSEIF (LFR = 3) OR (LFR = 2.5);
+    NSDP := -21;
+    LDL_MS := 10*DE;
+    NEG_LDL_MS := -LDL_MS;
+    ARC_TOTAL_MS := R*PHI + 2*LDL_MS;
+    STEP_MIN_MS := MIN(R/10000, DE/200);
+    STEP_MID_MS := MIN(R/20, DE);
+    STEP_MAX_MS := MIN(R, 7*DE);
+    LOCSET 0 0 0 0 0 0;
+    IF LFR = 3;
+      LOCSET R*(COS(0.5*PHI)-1) R*SIN(0.5*PHI) 0.5*PHI 0.5*R*PHI 0 0;
+      SDELEREF 0.5*R*PHI 0 DE/200 DE 7*DE DE;
+    ENDIF;
+    MPOL[NPOL+2] := 0;
+    SDELE 0 NEG_LDL_MS STEP_MIN_MS STEP_MID_MS STEP_MAX_MS DE;
+    SNM MSC MS_MSEM;
+    SSNM SSCR SM_MSEM;
+    MPOL[NPOL+2] := 1;
+    SDELE 0 ARC_TOTAL_MS STEP_MIN_MS STEP_MID_MS STEP_MAX_MS DE;
+    UPDATEMAP MSC MS_MSEM MS_MSEM SSCR SM_MSEM SM_MSEM;
+    MPOL[NPOL+2] := 0;
+    SDELE 0 NEG_LDL_MS STEP_MIN_MS STEP_MID_MS STEP_MAX_MS DE;
+    UPDATEMAP MSC MS_MSEM MSC SSCR SM_MSEM SSCR;
+    SLOC := R*PHI;
+    UPDATE 1 1;
+  ELSE;
+    { Other LFR modes (1, -1, -2, -10) delegate to FFELE — the
+      magnetic / electric multipole stack stays in PPOL/MPOL above
+      and FFELE picks up the SDELE-driven fringe-field path. }
+    VARIABLE (RE) NEG1_MS;
+    VARIABLE (RE) NEG2_MS;
+    NEG1_MS := -1;
+    NEG2_MS := -2;
+    LOFF := 2;
+    FFELE R*PHI DE 1/R NEG1_MS NEG2_MS CI;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- MSS — magnetic sector with center-detail field
+  MSS(R, PHID, D, E1D, H1, E2D, H2, W): a sector dipole of bending
+  radius R, deflection angle PHID (degrees), aperture D, with arbitrary
+  edge angles (E1D/E2D, deg) and pole-tip curvatures (H1/H2). The W[4,4]
+  matrix carries center-detail multipole correction coefficients passed
+  through to PPOL[21..36] for CENT to consume during NSDP=-7 BENDIST.
+
+  Forces LFR=3 internally (high-precision soft-edge fringe), saves and
+  restores caller's LFR via FR. Pads the SDELE integration window by
+  ±10·D drift on each side so soft-edge fringe tails are captured.
+
+  NT=0 hardcoding makes the multipole-presence check dead
+  code; libcosy port omits it for clarity.                                }
+PROCEDURE MSS R (RE) PHID (RE) D (RE) E1D (RE) H1 (RE)
+              E2D (RE) H2 (RE) W_MAT (RE 4 4);
+  VARIABLE (RE) E1N;
+  VARIABLE (RE) E2N;
+  VARIABLE (RE) H1N;
+  VARIABLE (RE) H2N;
+  VARIABLE (RE) NTS;
+  VARIABLE (RE) LDL;
+  VARIABLE (RE) PHI;
+  VARIABLE (RE) E1;
+  VARIABLE (RE) E2;
+  VARIABLE (DA 8) MS_BUF;
+  VARIABLE (DA 3 3) SM_BUF;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) LFT;
+  VARIABLE (RE) NEG_LDL;
+  VARIABLE (RE) ARC_TOTAL;
+  VARIABLE (RE) STEP_MIN;
+  VARIABLE (RE) STEP_MID;
+  VARIABLE (RE) STEP_MAX;
+  LFT := LFR;
+  LFR := 3;
+  CE := 'MSS';
+  PHI := PHID*DEGRAD;
+  E1 := E1D*DEGRAD;
+  E2 := E2D*DEGRAD;
+  IF R < 0;
+    WRITE 6 ' *** ERROR in MSS, negative radius';
+    QUIT 0;
+  ELSEIF PHID < 0;
+    WRITE 6 ' *** ERROR in MSS, negative angle';
+    QUIT 0;
+  ELSEIF PHID > 360;
+    WRITE 6 ' *** ERROR in MSS, too big angle > 360';
+    QUIT 0;
+  ENDIF;
+  NSDP := -7;
+  LOFF := 2;
+  DR := D;
+  LOOP I 1 8;
+    MSC[I] := DD[I];
+  ENDLOOP;
+  IF (NRAY = 0) AND (LSPN = 0);
+    LOOP I 1 TWOND;
+      MSC[I] := MAP[I];
+    ENDLOOP;
+  ENDIF;
+  NTS := NOC;
+  E1N := E1;
+  H1N := H1;
+  E2N := E2;
+  H2N := H2;
+  PPOL[1] := CONS(CHIM)/R + 0*DD[1];
+  PPOL[2] := -R + 0*DD[1];
+  PPOL[3] := 0 + 0*DD[1];
+  PPOL[4] := D + 0*DD[1];
+  PPOL[5] := 0 + 0*DD[1];
+  PPOL[6] := 0 + 0*DD[1];
+  PPOL[7] := SIN(-E1N) + 0*DD[1];
+  PPOL[8] := COS(-E1N) + 0*DD[1];
+  IF H1N # 0;
+    PPOL[7] := SIN(-E1N)/H1N + 0*DD[1];
+    PPOL[8] := COS(-E1N)/H1N + 0*DD[1];
+  ENDIF;
+  PPOL[9] := R*(COS(PHI) - 1) + 0*DD[1];
+  PPOL[10] := R*SIN(PHI) + 0*DD[1];
+  PPOL[11] := SIN(PHI - E2N) + 0*DD[1];
+  PPOL[12] := -COS(E2N - PHI) + 0*DD[1];
+  IF H2N # 0;
+    PPOL[11] := SIN(PHI - E2N)/H2N + 0*DD[1];
+    PPOL[12] := -COS(E2N - PHI)/H2N + 0*DD[1];
+  ENDIF;
+  PPOL[11] := CONS(PPOL[11]) + CONS(PPOL[9]) + 0*DD[1];
+  PPOL[12] := CONS(PPOL[12]) + CONS(PPOL[10]) + 0*DD[1];
+  PPOL[13] := H1N + 0*DD[1];
+  PPOL[14] := H2N + 0*DD[1];
+  PPOL[20] := PHI + 0*DD[1];
+  LOOP I 1 4;
+    LOOP J 1 4;
+      PPOL[20 + 4*(I-1) + J] := W_MAT[I, J] + 0*DD[1];
+    ENDLOOP;
+  ENDLOOP;
+  LDL := 10*D;
+  NEG_LDL := -LDL;
+  LOCSET 0 NEG_LDL 0 0 0 0;
+  IF LFT = 3;
+    LOCSET R*(COS(0.5*PHI)-1) R*SIN(0.5*PHI) 0.5*PHI 0.5*R*PHI 0 0;
+    SDELEREF 0.5*R*PHI NEG_LDL D/200 D 7*D D;
+  ENDIF;
+  UMS;
+  DLACT MSC NEG_LDL;
+  SNM MSC MS_BUF;
+  SSNM SSCR SM_BUF;
+  ARC_TOTAL := R*PHI + 2*LDL;
+  STEP_MIN := MIN(R/10000, D/200);
+  STEP_MID := MIN(R/20, D);
+  STEP_MAX := MIN(R, 7*D);
+  SDELE 0 ARC_TOTAL STEP_MIN STEP_MID STEP_MAX D;
+  UPDATEMAP MSC MS_BUF MSC SSCR SM_BUF SSCR;
+  DLACT MSC NEG_LDL;
+  SLOC := R*PHI;
+  XLOC := XLOC + LDL*SIN(PLOC);
+  ZLOC := ZLOC - LDL*COS(PLOC);
+  UPDATE 1 1;
+  FR LFT;
+ENDPROCEDURE;
+
+{ ----- GE — general s-dependent element via support-point tables
+  GE(N, M, S, H, V, W): integrates a custom field model defined by N
+  support points, each carrying M derivatives of curvature H, electric
+  potential V, and magnetic potential W as DA polynomials.
+
+  Args
+    N : number of support points (≤ 100, bounded by HN/VN/WN dim)
+    M : number of derivatives stored per support point (used to size
+        the PN blending polynomial via INTPOL)
+    S : (RE 100) — array of N s-positions
+    H : (DA 100) — curvature DA polynomials at each support point
+    V : (DA 100) — scalar electric potential DA polynomials
+    W : (DA 100) — scalar magnetic potential DA polynomials
+
+  Workflow
+    1. Bump NOC by 1 so all DA arithmetic in INTERP carries one extra
+       order of precision ( idiom for bracket-and-restore).
+    2. INTPOL PN M generates the (2M+2)-coefficient blending polynomial
+       used by INTERP's reverse-Horner step.
+    3. Copy caller arrays into globals SN/HN/VN/WN.
+    4. Set NSDP=20, NPOL=0 (no multipoles), LOFF=2 (POTXZ-style routing).
+    5. SDELE over [S[1], S[N]] integrates the field via POTFLD's POTS
+       branch which now dispatches NSDP=20 → INTERP.                       }
+PROCEDURE GE N (RE) M (RE) S (RE 100) H_TBL (DA 100) V_TBL (DA 100) W_TBL (DA 100);
+  VARIABLE (RE) I;
+  VARIABLE (RE) S1;
+  VARIABLE (RE) S2;
+  VARIABLE (RE) DELS;
+  NOC := NOC + 1;
+  DANOT NOC;
+  NSDP := 20;
+  IF M < NOC;
+    WRITE 6 ' --- WARNING in GE, M < calculation order';
+  ENDIF;
+  INTPOL PN M;
+  LOOP I 1 N;
+    SN[I] := S[I];
+    HN[I] := H_TBL[I];
+    VN[I] := V_TBL[I];
+    WN[I] := W_TBL[I];
+  ENDLOOP;
+  INP := 1;
+  NN := N;
+  NPOL := 0;
+  NPG := M;
+  S1 := CONS(S[1]);
+  S2 := CONS(S[N]);
+  LOCSET 0 0 0 0 0 0;
+  CE := 'GE';
+  LOFF := 2;
+  DELS := S2 - S1;
+  SDELE S1 S2 DELS/100 DELS/10 DELS 0.1;
+  UPDATE 1 1;
+  NOC := NOC - 1;
+  DANOT NOC;
+ENDPROCEDURE;
+
+END;

@@ -1,0 +1,55 @@
+{ ============================================================================
+  Regression test: transitive global capture across nested function calls.
+
+  When function A reads a global G, the transpiler lifts G into A's
+  parameter list. Previously, when function B called A, B's signature was
+  NOT augmented to receive G — the generated `__fn_A(G, ...)` then failed
+  with rustc's E0434 ("can't capture dynamic environment in a fn item").
+
+  Fix: at every function/procedure call site, propagate the callee's
+  `requested_variables` into the caller's transpilation output, so the
+  enclosing function's signature ends up including G as well. Captures
+  flow along the call graph by simple union at each link.
+  ============================================================================ }
+
+BEGIN;
+
+VARIABLE (RE) GLOBAL_K;     { the captured global }
+
+{ Leaf reads the global. }
+FUNCTION (RE) LEAF X (RE);
+  LEAF := X * GLOBAL_K;
+ENDFUNCTION;
+
+{ Mid-level calls leaf — must receive GLOBAL_K transitively. }
+FUNCTION (RE) MID X (RE);
+  MID := LEAF(X) + 1;
+ENDFUNCTION;
+
+{ Top calls mid — must also receive GLOBAL_K. }
+FUNCTION (RE) TOP X (RE);
+  TOP := MID(X) * 2;
+ENDFUNCTION;
+
+{ Procedure variant — capture must flow through procedure calls too. }
+PROCEDURE PROC_LEAF X (RE) OUT (RE);
+  OUT := X + GLOBAL_K;
+ENDPROCEDURE;
+
+PROCEDURE PROC_MID X (RE) OUT (RE);
+  PROC_LEAF X OUT;
+ENDPROCEDURE;
+
+VARIABLE (RE) RESULT;
+
+GLOBAL_K := 10;
+
+{ Three-deep function chain. }
+RESULT := TOP(5);
+WRITE 6 'TOP(5) with K=10 = ' RESULT '   [expect ((5*10)+1)*2 = 102]';
+
+{ Procedure chain. }
+PROC_MID 7 RESULT;
+WRITE 6 'PROC_MID 7 with K=10 → RESULT = ' RESULT '   [expect 7+10 = 17]';
+
+END;

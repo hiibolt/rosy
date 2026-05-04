@@ -1,0 +1,158 @@
+{ Math utilities: scalar arithmetic, ATAN2 (scalar + vectorized),
+  factorial / monomial count, 1D Fourier transform, and global tolerance
+  setters (WSET / ESET / DSET). }
+
+BEGIN;
+
+{ ----- Basic arithmetic primitives -------------------- }
+
+FUNCTION (RE) MAX I (RE) J (RE);
+  MAX := VMAX(I&J);
+ENDFUNCTION;
+
+FUNCTION (RE) MIN I (RE) J (RE);
+  MIN := VMIN(I&J);
+ENDFUNCTION;
+
+FUNCTION (RE) MOD I1 (RE) I2 (RE);
+  MOD := I1 - INT(I1/I2)*I2;
+ENDFUNCTION;
+
+FUNCTION (RE) SIG I (RE);
+  SIG := 1;
+  IF I # 0;
+    SIG := I/ABS(CONS(I));
+  ENDIF;
+ENDFUNCTION;
+
+{ ----- Imaginary multiply --------------------------------- }
+
+FUNCTION (CM) IM X (CM);
+  IM := CM(0&1)*X;
+ENDFUNCTION;
+
+{ ----- ATAN2 in [-pi, pi] ------------------------------
+  Uses RE-as-bool multiplication where COSY does. AND is used here because
+  ROSY's compound boolean expressions need explicit logical operators when
+  the operands are LO. }
+FUNCTION (RE) ATAN2 Y (RE) X (RE);
+  VARIABLE (RE) XC; VARIABLE (RE) YC;
+  XC := CONS(X); YC := CONS(Y);
+  IF (XC=0) AND (YC=0);
+    ATAN2 := 0;
+  ELSEIF ABS(YC) > ABS(XC);
+    ATAN2 := ATAN(X/Y);
+    IF YC > 0;
+      ATAN2 := PI*0.5 - ATAN2;
+    ELSE;
+      ATAN2 := -PI*0.5 - ATAN2;
+    ENDIF;
+  ELSE;
+    ATAN2 := ATAN(Y/X);
+    IF XC < 0;
+      IF YC < 0;
+        ATAN2 := -PI + ATAN2;
+      ELSE;
+        ATAN2 := PI + ATAN2;
+      ENDIF;
+    ENDIF;
+  ENDIF;
+ENDFUNCTION;
+
+{ ----- Vectorized ATAN2 ------------------------------- }
+
+FUNCTION (VE) VATAN2 Y (VE) X (VE);
+  VARIABLE (RE) I;
+  VATAN2 := Y;
+  LOOP I 1 LENGTH(Y);
+    VELSET VATAN2 I ATAN2(Y|I, X|I);
+  ENDLOOP;
+ENDFUNCTION;
+
+{ ----- Factorial / monomial count --------------------- }
+
+FUNCTION (RE) FACT N (RE);
+  VARIABLE (RE) I;
+  FACT := 1;
+  LOOP I 1 N;
+    FACT := FACT*I;
+  ENDLOOP;
+ENDFUNCTION;
+
+FUNCTION (RE) NMON NO_ (RE) NV_ (RE);
+  VARIABLE (RE) I;
+  NMON := 1;
+  LOOP I 1 NO_;
+    NMON := NMON*(NV_+I)/I;
+  ENDLOOP;
+ENDFUNCTION;
+
+{ ----- 1D Fourier transform ---------------------------
+  Discrete Fourier transform of L evenly-spaced samples on [0, 2π) given
+  in D, returning FTO+1 (amplitude, phase) pairs in FTA / FTP. Each
+  Fourier order k recovers the original signal as
+        D(j) ≈ Σ_k FTA(k) * sin((k-1)*φ_j + FTP(k)).
+
+  loose declaration `VARIABLE RS LENGTH(D(1))` was intended
+  to make RS / RC polymorphic over D's element type (RE for raw data,
+  DA for symbolic-energy fits). ROSY requires per-call concrete typing,
+  so this port pins to RE — the dominant use case (raw oscilloscope
+  / detector data). A DA variant can land later as FOURIERTRANS_DA
+  when a caller needs symbolic propagation.
+
+  Sizing: D / FTA / FTP capped at 4096 entries. The RE-1D shape gives
+  efficient indexed writes via the post-Issue-6 WithDimensions wrap.    }
+PROCEDURE FOURIERTRANS D (RE 4096) L (RE) FTO (RE) FTA (RE 4096) FTP (RE 4096);
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) DEL;
+  VARIABLE (RE) RS;
+  VARIABLE (RE) RC;
+  RS := 0;
+  LOOP J 1 L;
+    RS := RS + D[J];
+  ENDLOOP;
+  FTA[1] := RS/L;
+  FTP[1] := 0*RS + PI/2;
+  LOOP I 1 FTO;
+    DEL := I*2*PI/L;
+    RS := (D[1] - D[L])*COS(-0.5*DEL);
+    RC := (D[L] - D[1])*SIN(-0.5*DEL);
+    LOOP J 1 L-1;
+      RS := RS + (D[J+1] - D[J])*COS((J - 0.5)*DEL);
+      RC := RC + (D[J] - D[J+1])*SIN((J - 0.5)*DEL);
+    ENDLOOP;
+    RS := RS/(PI*I);
+    RC := RC/(PI*I);
+    FTA[I+1] := SQRT(SQR(RS) + SQR(RC));
+    FTP[I+1] := ATAN2(RC, RS);
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- Constant setters ------------------------------- }
+
+PROCEDURE WSET W;
+  WAF := W;
+ENDPROCEDURE;
+
+PROCEDURE ESET E;
+  EPS := E;
+ENDPROCEDURE;
+
+PROCEDURE DSET E;
+  DAEPS E;
+  DEPS := E;
+ENDPROCEDURE;
+
+{ ----- Misc helpers ----------------------------------- }
+
+PROCEDURE CONTINUE;
+  PI := PI;        { documented no-op in  }
+ENDPROCEDURE;
+
+PROCEDURE SVSCR;
+  LSCR := -1;
+  SCRLEN LSCR;     { stores the screen line length into LSCR }
+ENDPROCEDURE;
+
+END;

@@ -1,0 +1,19 @@
+{ Reproducer for FEEDBACK Issue 6: incremental DA-array assignment.
+  Should compile cleanly if the assign-conflict check accounts for LHS
+  WithDimensions on the second assignment. }
+
+BEGIN;
+
+VARIABLE (RE) P0;
+
+PROCEDURE RUN;
+  VARIABLE MAP1;
+  P0 := 1.5;
+  MAP1(1) := DA(1);
+  MAP1(2) := DA(2)/P0;
+  WRITE 6 MAP1(1);
+  WRITE 6 MAP1(2);
+ENDPROCEDURE;
+
+RUN;
+END;

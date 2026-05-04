@@ -80,6 +80,7 @@ statement   = _{
   | velset
   | velget
   | polval
+  | cpolval
   | vedot
   | veunit
   | vezero
@@ -137,7 +138,7 @@ memory_size = { expr }
 
 /// Keywords - define all reserved words (must be followed by a non-identifier character)
 keyword = @{ keyword_raw ~ !(ASCII_ALPHANUMERIC | "_") }
-keyword_raw = { ^"ENDPROCEDURE" | ^"ENDFUNCTION" | ^"ENDWHILE" | ^"ENDLOOP" | ^"ENDPLOOP" | ^"ENDFIT" | ^"ENDIF" | ^"ELSEIF" | ^"ELSE" | ^"BEGIN" | ^"END" | ^"WRITEB" | ^"WRITE" | ^"READS" | ^"READB" | ^"READ" | ^"VARIABLE" | ^"PROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"WHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"DANOTW" | ^"DANOT" | ^"DAEPSM" | ^"DAEPS" | ^"DATRN" | ^"DASCL" | ^"DASGN" | ^"DADER" | ^"DAINT" | ^"DANORO" | ^"DANORS" | ^"DAREA" | ^"DAPEW" | ^"DAPEE" | ^"DAPEA" | ^"DAPEP" | ^"DAEST" | ^"DAPLU" | ^"DADIU" | ^"DADMU" | ^"DACLIW" | ^"DACQLC" | ^"EPSMIN" | ^"DAFSET" | ^"DAFILT" | ^"DAFLO" | ^"CDFLO" | ^"DAGMD" | ^"DANOW" | ^"CDF2" | ^"CDNFDS" | ^"CDNFDA" | ^"CDNF" | ^"DARAN" | ^"DACODE" | ^"LENGTH" | ^"SINH" | ^"SIN" | ^"COSH" | ^"COS" | ^"ASIN" | ^"ACOS" | ^"ATAN" | ^"TANH" | ^"SQRT" | ^"SQR" | ^"VMAX" | ^"VMIN" | ^"ABS" | ^"NORM" | ^"CONS" | ^"INTPOL" | ^"INT" | ^"NINT" | ^"TYPE" | ^"REAL" | ^"IMAG" | ^"TRIM" | ^"LTRIM" | ^"ISRT3" | ^"ISRT" | ^"CMPLX" | ^"CONJ" | ^"LST" | ^"LCM" | ^"LCD" | ^"LRE" | ^"LLO" | ^"LVE" | ^"LDA" | ^"LOG" | ^"BREAK" | ^"QUIT" | ^"SCRLEN" | ^"CPUSEC" | ^"OS" | ^"LINV" | ^"LDET" | ^"SUBSTR" | ^"VELSET" | ^"VELGET" | ^"INTPOL" | ^"POLVAL" | ^"VEDOT" | ^"VEUNIT" | ^"VEZERO" | ^"STCRE" | ^"RECST" | ^"RERAN" | ^"PWTIME" | ^"PNPRO" | ^"IMUNIT" | ^"LEV" | ^"MBLOCK" | ^"MTREE" | ^"LSLINE" | ^"RKCO" | ^"WRITEM" | ^"READM" | ^"ERF" | ^"WERF" | ^"FIT" | ^"OPENFB" | ^"OPENF" | ^"CLOSEF" | ^"REWF" | ^"BACKF" | ^"FUNCTION" | ^"LOOP" | ^"PLOOP" | ^"VARMEM" | ^"VARPOI" | ^"SLEEPM" | ^"ARGGET" | ^"MEMDPV" | ^"MEMFRE" | ^"MEMALL" | ^"MEMWRT" | ^"LTRUE" | ^"LFALSE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" | ^"AND" | ^"OR" | ^"POSITION" | ^"INCLUDE" | ^"SAVE" }
+keyword_raw = { ^"ENDPROCEDURE" | ^"ENDFUNCTION" | ^"ENDWHILE" | ^"ENDLOOP" | ^"ENDPLOOP" | ^"ENDFIT" | ^"ENDIF" | ^"ELSEIF" | ^"ELSE" | ^"BEGIN" | ^"END" | ^"WRITEB" | ^"WRITE" | ^"READS" | ^"READB" | ^"READ" | ^"VARIABLE" | ^"PROCEDURE" | ^"EXP" | ^"TAN" | ^"IF" | ^"WHILE" | ^"TRUE" | ^"FALSE" | ^"DAINI" | ^"DAPRV" | ^"DAREV" | ^"DANOTW" | ^"DANOT" | ^"DAEPSM" | ^"DAEPS" | ^"DATRN" | ^"DASCL" | ^"DASGN" | ^"DADER" | ^"DAINT" | ^"DANORO" | ^"DANORS" | ^"DAREA" | ^"DAPEW" | ^"DAPEE" | ^"DAPEA" | ^"DAPEP" | ^"DAEST" | ^"DAPLU" | ^"DADIU" | ^"DADMU" | ^"DACLIW" | ^"DACQLC" | ^"EPSMIN" | ^"DAFSET" | ^"DAFILT" | ^"DAFLO" | ^"CDFLO" | ^"DAGMD" | ^"DANOW" | ^"CDF2" | ^"CDNFDS" | ^"CDNFDA" | ^"CDNF" | ^"DARAN" | ^"DACODE" | ^"LENGTH" | ^"SINH" | ^"SIN" | ^"COSH" | ^"COS" | ^"ASIN" | ^"ACOS" | ^"ATAN" | ^"TANH" | ^"SQRT" | ^"SQR" | ^"VMAX" | ^"VMIN" | ^"ABS" | ^"NORM" | ^"CONS" | ^"INTPOL" | ^"INT" | ^"NINT" | ^"TYPE" | ^"REAL" | ^"IMAG" | ^"TRIM" | ^"LTRIM" | ^"ISRT3" | ^"ISRT" | ^"CMPLX" | ^"CONJ" | ^"LST" | ^"LCM" | ^"LCD" | ^"LRE" | ^"LLO" | ^"LVE" | ^"LDA" | ^"LOG" | ^"BREAK" | ^"QUIT" | ^"SCRLEN" | ^"CPUSEC" | ^"OS" | ^"LINV" | ^"LDET" | ^"SUBSTR" | ^"VELSET" | ^"VELGET" | ^"INTPOL" | ^"CPOLVAL" | ^"POLVAL" | ^"VEDOT" | ^"VEUNIT" | ^"VEZERO" | ^"STCRE" | ^"RECST" | ^"RERAN" | ^"PWTIME" | ^"PNPRO" | ^"IMUNIT" | ^"LEV" | ^"MBLOCK" | ^"MTREE" | ^"LSLINE" | ^"RKCO" | ^"WRITEM" | ^"READM" | ^"ERF" | ^"WERF" | ^"FIT" | ^"OPENFB" | ^"OPENF" | ^"CLOSEF" | ^"REWF" | ^"BACKF" | ^"FUNCTION" | ^"LOOP" | ^"PLOOP" | ^"VARMEM" | ^"VARPOI" | ^"SLEEPM" | ^"ARGGET" | ^"MEMDPV" | ^"MEMFRE" | ^"MEMALL" | ^"MEMWRT" | ^"LTRUE" | ^"LFALSE" | "rosy_universe" | "rosy_world" | "rosy_size" | "rosy_rank" | ^"AND" | ^"OR" | ^"POSITION" | ^"INCLUDE" | ^"SAVE" }
 
 /// [ IF / ELSEIF / ELSE / ENDIF ]
 if_statement = { if_clause ~ elseif_clause* ~ else_clause? ~ endif }
@@ -365,6 +366,7 @@ endif = { ^"ENDIF" ~ semicolon }
   ldet = { ^"LDET" ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   intpol = { ^"INTPOL" ~ variable_identifier ~ expr ~ semicolon }
   polval = { ^"POLVAL" ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
+  cpolval = { ^"CPOLVAL" ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   /// [ LINEAR ALGEBRA ]
   lev = { ^"LEV" ~ expr ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
   mblock = { ^"MBLOCK" ~ expr ~ expr ~ expr ~ expr ~ expr ~ semicolon }
@@ -414,8 +416,13 @@ term = _{
     variable_identifier |
     "(" ~ expr ~ ")" }
 
-// Unary negation (prefix minus)
-neg_expr = { "-" ~ expr }
+// Unary negation (prefix minus). Binds to a single term so that `-A*B + C`
+// parses as `(-A)*B + C`, matching standard math precedence and COSY
+// semantics. Expr::from_rule transparently handles both `expr` pairs
+// (with into_inner-yielded primaries+infixes) and bare primary pairs
+// (neg_expr's operand) by routing both through a single PRATT_PARSER call
+// — see expressions/mod.rs.
+neg_expr = { "-" ~ term }
 
 // Boolean literals
 boolean = { ^"TRUE" | ^"FALSE" }
@@ -442,14 +449,18 @@ lt          = { "<" }
 gt          = { ">" }
 lte         = { "<=" }
 gte         = { ">=" }
-and_op      = { ^"AND" }
-or_op       = { ^"OR" }
+and_op      = { ^"AND" ~ !(ASCII_ALPHANUMERIC | "_") }
+or_op       = { ^"OR"  ~ !(ASCII_ALPHANUMERIC | "_") }
 
-variable_identifier = { variable_name ~ paren_group* ~ bracket_index? }
+variable_identifier = { variable_name ~ paren_group* ~ bracket_index* }
 paren_group = { "(" ~ expr ~ ("," ~ expr)* ~ ")" }
 bracket_index = { "[" ~ expr ~ ("," ~ expr)* ~ "]" }
 variable_name  = @{ !keyword ~ (ASCII_ALPHANUMERIC | "_")+ }
-number      = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+/// Numeric literal — integer, fractional, and optional decimal exponent.
+/// Both `e/E` (modern) and `d/D` (Fortran double-precision, used by
+/// cosy.fox) are accepted as the exponent marker.
+/// Examples: 42  -7  3.14  1.23E-4  1e5  -2.5e+10  1.66053873D-27
+number      = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ (("e" | "E" | "d" | "D") ~ ("+" | "-")? ~ ASCII_DIGIT+)? }
 unit        = @{ ASCII_DIGIT+ }
 constant    = @{ ASCII_DIGIT+ }
 string      = { new_string | old_string }

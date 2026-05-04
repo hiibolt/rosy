@@ -1,0 +1,629 @@
+{ Spin normal-form analysis in the SU(2) (complex 2-component)
+  representation. SU(2) multiplication encodes SO(3) composition via
+  the Pauli-matrix isomorphism, with half-angle parameters that avoid
+  the trig singularities of Euler angles.
+
+  Procedures:
+    * SO3_IN_SU2 — SO(3) rotation → SU(2).
+    * IDENSU2 / MULASU2 / INVRSU2 / CORRSU2 / MEXPSU2 / EHOMSU2 —
+      SU(2) group / algebra primitives.
+    * MAPINVR / ANALMAP / SOLVSU2 — DA → CD analytic map and
+      Newton-style SU(2) normal-form solver.
+    * NORMSU2 — full spin normal-form pipeline.
+    * TSS / TSP / PARASU2 — spin-tune extraction and parameter
+      dependence.
+
+  CD-typed scratch arrays follow the convention: DA → CD via `+ 0*IM`,
+  CD → DA via `REAL(...)`, with imaginary residue tracked for the
+  diagnostic warnings where physical interpretation requires it. }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- SO3_IN_SU2: SO(3) rotation → SU(2) -----------
+  SO3_IN_SU2(A, B, KEY) maps a 3×3 SO(3) rotation matrix A to its SU(2)
+  representation B (2-component CD). KEY=0 selects the principal branch;
+  KEY≠0 selects the antipodal branch (since SU(2) double-covers SO(3)).
+
+  Algorithm:
+    1. Compute auxiliary X, Y from upper-left A entries:
+         X = 0.5·(A11 + A22 + i·(A21 - A12))
+         Y = 0.5·(A22 - A11 - i·(A21 + A12))
+       |X|² and |Y|² classify which "quadrant" the SU(2) lift comes from.
+    2. Take the larger of |X|², |Y|² to avoid divide-by-zero.
+    3. Use COMSQRT (complex square root) to recover B[1] or B[2], then
+       fill in the other component from the third column of A.
+
+  Nested COMSQRT helper (3-deep nesting): handles complex sqrt via the
+  half-angle ACOS/ASIN trick, picking ASIN-form when |Re(X)| > |Im(X)|
+  and ACOS-form otherwise to maximize numerical conditioning.            }
+PROCEDURE SO3_IN_SU2 A (DA 3 3) B (CD 2) KEY (RE);
+  VARIABLE (CD) X;
+  VARIABLE (CD) Y;
+  VARIABLE (RE) C;
+  VARIABLE (RE) D_VAL;
+  VARIABLE (CM) IM_UNIT;
+  VARIABLE (RE) F;
+
+  { COMSQRT: complex square root with branch-choice for numerical stability.
+    Captures parent's IM_UNIT (3-deep nesting test). }
+  FUNCTION (CD) COMSQRT XIN (CD);
+    VARIABLE (DA) AA;
+    VARIABLE (DA) BB;
+    AA := SQRT(SQR(REAL(XIN)) + SQR(IMAG(XIN)));
+    IF ABS(CONS(REAL(XIN))) < ABS(CONS(IMAG(XIN)));
+      BB := 0.5*ACOS(REAL(XIN)/AA);
+      IF CONS(IMAG(XIN)) < 0;
+        BB := -BB;
+      ENDIF;
+    ELSE;
+      BB := 0.5*ASIN(IMAG(XIN)/AA);
+      IF CONS(REAL(XIN)) < 0;
+        BB := 0.5*PI - BB;
+      ENDIF;
+    ENDIF;
+    COMSQRT := SQRT(AA)*(COS(BB) + IM_UNIT*SIN(BB));
+  ENDFUNCTION;
+
+  IMUNIT IM_UNIT;
+
+  X := 0.5*(A[1, 1] + A[2, 2] + IM_UNIT*(A[2, 1] - A[1, 2]));
+  Y := 0.5*(A[2, 2] - A[1, 1] - IM_UNIT*(A[2, 1] + A[1, 2]));
+  C := SQR(CONS(REAL(X))) + SQR(CONS(IMAG(X)));
+  D_VAL := SQR(CONS(REAL(Y))) + SQR(CONS(IMAG(Y)));
+
+  IF KEY = 0;
+    F := 1;
+  ELSE;
+    F := -1;
+  ENDIF;
+
+  IF 1 + C*C + D_VAL*D_VAL = 1;
+    WRITE 6 ' *** ERROR in SO3_IN_SU2';
+    QUIT 0;
+  ELSEIF C > D_VAL;
+    B[1] := F*COMSQRT(X);
+    B[2] := -0.5*(A[1, 3] + IM_UNIT*A[2, 3])/B[1];
+  ELSE;
+    B[2] := F*COMSQRT(Y);
+    B[1] := -0.5*(A[1, 3] + IM_UNIT*A[2, 3])/B[2];
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- SU(2) arithmetic primitives -------------------
+  These are the building blocks of NORMSU2's spin normal-form algorithm,
+  exposed here as standalone procedures so users can build custom spin
+  tracking pipelines without reimplementing the basic SU(2) algebra.    }
+
+{ IDENSU2(A): set A to the SU(2) identity (1, 0). }
+PROCEDURE IDENSU2 A (CD 2);
+  VARIABLE (CM) IM;
+  IMUNIT IM;
+  A[1] := 1 + IM*0 + 0*DD[1];
+  A[2] := 0 + IM*0 + 0*DD[1];
+ENDPROCEDURE;
+
+{ MULASU2(A, B, C): SU(2) multiplication A := B * C using the canonical
+  SU(2) matrix-product formula (B(1)*C(1) - B(2)*conj(C(2)), …). }
+PROCEDURE MULASU2 A (CD 2) B (CD 2) C (CD 2);
+  A[1] := B[1]*C[1] - B[2]*CONJ(C[2]);
+  A[2] := B[1]*C[2] + B[2]*CONJ(C[1]);
+ENDPROCEDURE;
+
+{ INVRSU2(A, B): SU(2) inverse A := B^{-1} = (conj(B(1)), -B(2)). Valid
+  because |B(1)|² + |B(2)|² = 1 for unit SU(2). }
+PROCEDURE INVRSU2 A (CD 2) B (CD 2);
+  A[1] := CONJ(B[1]);
+  A[2] := -B[2];
+ENDPROCEDURE;
+
+{ CORRSU2(A): normalize A to a unit SU(2) by dividing through by
+  the magnitude. Useful after numerical operations that may have
+  drifted off the unit sphere.                                       }
+PROCEDURE CORRSU2 A (CD 2);
+  VARIABLE (DA) D_VAL;
+  D_VAL := SQR(REAL(A[1])) + SQR(REAL(A[2]))
+         + SQR(IMAG(A[1])) + SQR(IMAG(A[2]));
+  D_VAL := ISRT(D_VAL);
+  A[1] := D_VAL*A[1];
+  A[2] := D_VAL*A[2];
+ENDPROCEDURE;
+
+{ MEXPSU2(A, B): SU(2) exponential A := exp(:B:) via truncated power
+  series. Requires B to be at-origin (constant terms zero); errors
+  out otherwise.  uses NOC iterations for the truncation. }
+PROCEDURE MEXPSU2 A (CD 2) B (CD 2);
+  VARIABLE (CD 2) C1;
+  VARIABLE (CD 2) C2;
+  VARIABLE (RE) I;
+  VARIABLE (RE) RES;
+
+  RES := ABS(CONS(REAL(B[1]))) + ABS(CONS(REAL(B[2])))
+       + ABS(CONS(IMAG(B[1]))) + ABS(CONS(IMAG(B[2])));
+  IF RES # 0;
+    WRITE 6 ' *** ERROR in MEXPSU2 — B not at origin';
+    QUIT 0;
+  ENDIF;
+
+  IDENSU2 A;
+  IDENSU2 C1;
+  LOOP I 1 NOC;
+    MULASU2 C2 C1 B;
+    C1[1] := (1/I)*C2[1];
+    C1[2] := (1/I)*C2[2];
+    A[1] := A[1] + C1[1];
+    A[2] := A[2] + C1[2];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- EHOMSU2: extract J-th-order homogeneous part of an SU(2)
+  EHOMSU2(A, B, J) computes A := B|_{order=J} - B|_{order=J-1}, isolating
+  the J-th order homogeneous slice of B. Uses CO truncation walks to
+  extract each order without disturbing NOC.                              }
+PROCEDURE EHOMSU2 A (CD 2) B (CD 2) J (RE);
+  VARIABLE (CD 2) C;
+  VARIABLE (RE) K;
+  K := NOC;
+  CO J;
+  A[1] := B[1]; A[2] := B[2];
+  CO J - 1;
+  C[1] := B[1]; C[2] := B[2];
+  CO K;
+  A[1] := A[1] - C[1];
+  A[2] := A[2] - C[2];
+ENDPROCEDURE;
+
+{ ----- MAPINVR: error-checked DA-map inverse ---------
+  Thin MI wrapper that errors out cleanly if the inverse fails. }
+PROCEDURE MAPINVR M1 (DA 8) M2 (DA 8);
+  VARIABLE (RE) IER;
+  MI M1 M2 NV IER NOC NV NM1;
+  IF IER # 0;
+    WRITE 6 ' *** ERROR in MAPINVR';
+    QUIT 0;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- ANALMAP: extract Twiss / linear-tune basis from a CD map ------------
+   Diagonalizes the linear part of MN per phase-space
+  pair into PHI (tune) + R (radius) plus the M1, M2 substitution
+  polynomials needed to map between Floquet and canonical coords.
+
+  All locals are RE-typed scalars extracted via COEF (matrix elements at
+  specific TRANSPORT id's). Note: COEF id encoding works correctly here
+  since the K, L indices are single digits (≤ 6); for higher-index access
+  we'd need DER+CONS like in GT/BM.                                       }
+PROCEDURE ANALMAP MN (CD 8) PHI (RE 8) R (RE 8) M1 (CD 20) M2 (CD 20);
+  VARIABLE (RE) J;
+  VARIABLE (RE) K;
+  VARIABLE (RE) L;
+  VARIABLE (RE) AC;
+  VARIABLE (RE) BC;
+  VARIABLE (RE) CC_;
+  VARIABLE (RE) D_VAL;
+  VARIABLE (CM) IU;
+
+  IMUNIT IU;
+
+  LOOP J 1 ND;
+    K := 2*J - 1;
+    L := K + 1;
+    { COEF takes DA, MN is CD — REAL-cast inside before COEF. }
+    AC  := COEF(REAL(MN[K]), K);
+    BC  := COEF(REAL(MN[K]), L);
+    CC_ := COEF(REAL(MN[L]), K);
+    D_VAL := COEF(REAL(MN[L]), L);
+    IF 1 + BC*BC + CC_*CC_ # 1;
+      R[K] := SQRT(AC*AC + BC*BC);
+      R[L] := R[K];
+      PHI[K] := ACOS(AC/R[K])*(BC/ABS(BC));
+      PHI[L] := -PHI[K];
+    ELSE;
+      PHI[K] := 0;
+      PHI[L] := 0;
+      R[K] := AC;
+      R[L] := D_VAL;
+    ENDIF;
+    IF PHI[K] # 0;
+      M1[K] := DD[K] - IU*DD[L];
+      M1[L] := DD[K] + IU*DD[L];
+      M2[K] := (DD[K] + DD[L])/2 + 0*IU;
+      M2[L] := (IU*DD[K] - IU*DD[L])/2;
+    ELSE;
+      M1[K] := DD[K] + 0*IU;
+      M1[L] := DD[L] + 0*IU;
+      M2[K] := DD[K] + 0*IU;
+      M2[L] := DD[L] + 0*IU;
+    ENDIF;
+  ENDLOOP;
+  LOOP J TWOND+1 NV;
+    M1[J] := DD[J] + 0*IU;
+    M2[J] := DD[J] + 0*IU;
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- SOLVSU2: per-order Cj-operator solver --------
+  Applies CDNFDS to extract the j-th order resonance correction in
+  Floquet variables, then maps back to canonical coords. Used inside
+  the NORMSU2 main iteration loop.                                       }
+PROCEDURE SOLVSU2 U1 (CD 2) U2 (CD 2) D (CD) PHI (RE 8) R (RE 8)
+                  M1 (CD 20) M2 (CD 20) EPS (RE);
+  VARIABLE (CD 1) U1_BUF;
+  VARIABLE (CD 1) YY;
+  VARIABLE (VE) PHI_VE;
+  VARIABLE (VE) R_VE;
+
+  { Materialize VE views of PHI/R for CDNFDS. Branched by TWOND. }
+  IF TWOND = 2;
+    PHI_VE := PHI[1] & PHI[2];
+    R_VE := R[1] & R[2];
+  ELSEIF TWOND = 4;
+    PHI_VE := PHI[1] & PHI[2] & PHI[3] & PHI[4];
+    R_VE := R[1] & R[2] & R[3] & R[4];
+  ELSEIF TWOND = 6;
+    PHI_VE := PHI[1] & PHI[2] & PHI[3] & PHI[4] & PHI[5] & PHI[6];
+    R_VE := R[1] & R[2] & R[3] & R[4] & R[5] & R[6];
+  ELSE;
+    WRITE 6 ' *** ERROR in SOLVSU2, unsupported TWOND';
+    QUIT 0;
+  ENDIF;
+
+  CPOLVAL 1 U2 2 M2 NV U1 2;
+
+  U1_BUF[1] := U1[1];
+  CDNFDS U1_BUF R_VE PHI_VE 0 2*ND EPS YY;
+  U1[1] := YY[1];
+
+  U1_BUF[1] := U1[2];
+  VARIABLE (RE) NEG_D_RE;
+  NEG_D_RE := -CONS(REAL(D));
+  CDNFDS U1_BUF R_VE PHI_VE NEG_D_RE 2*ND EPS YY;
+  U1[2] := YY[1];
+
+  CPOLVAL 1 U1 2 M1 NV U2 2;
+  U1[1] := U2[1];
+  U1[2] := U2[2];
+ENDPROCEDURE;
+
+{ ----- NORMSU2: spin normal form via SU(2) iteration
+  NORMSU2(UI, UO, CU, NBAR, STUNE, MN, MA, EPS) extracts the spin
+  normal-form quantities — closed orbit UO, change-of-basis CU, the
+  rotation axis NBAR, and the spin tune STUNE — from an input SU(2)
+  spin map UI given orbital normal-form data MN, MA.
+
+  Algorithm: repeatedly conjugate-and-correct UI using EHOMSU2/SOLVSU2/
+  MEXPSU2/MULASU2 helpers (see  source). Inputs MN, MA must be
+  CD-typed (caller lifts DANF's DA outputs via `+ 0*IM` if needed).
+
+  Type juggling pattern (similar to DANF):
+    * MN, MA: CD-typed parameters. MNN, MAA local CD scratch.
+    * MAPINVR works on DA only — REAL-cast MAA to MAA_DA, invert into
+      MAI_DA, lift back to CD MAI.
+    * U0, K, L: CM scalars. D: RE scalar.
+    * NBN, XX, YY: DA scratch for the final POLVAL extractions.            }
+PROCEDURE NORMSU2 UI (CD 2) UO (RE 4) CU (RE 4) NBAR (DA 3) STUNE (DA)
+                  MN (CD 8) MA (CD 8) EPS (RE);
+  VARIABLE (CD 2) U1;
+  VARIABLE (CD 2) U2;
+  VARIABLE (CD 2) UOO;
+  VARIABLE (CD 2) CUU;
+  VARIABLE (DA 1) XX;
+  VARIABLE (DA 1) YY;
+  VARIABLE (DA 3) NBN;
+  VARIABLE (CD 20) MAI;
+  VARIABLE (CD 20) MNN;
+  VARIABLE (CD 20) MAA;
+  VARIABLE (CD 20) M1;
+  VARIABLE (CD 20) M2;
+  VARIABLE (DA 20) MAA_DA;
+  VARIABLE (DA 20) MAI_DA;
+  VARIABLE (RE 8) PHI;
+  VARIABLE (RE 8) R;
+  VARIABLE (CM 2) U0;
+  VARIABLE (CM) IU;
+  VARIABLE (CM) K;
+  VARIABLE (RE) D;
+  VARIABLE (CM) L;
+  VARIABLE (CD) D_CD;
+  VARIABLE (RE) I;
+
+  IMUNIT IU;
+  ANALMAP MN PHI R M1 M2;
+
+  LOOP I 1 TWOND;
+    MNN[I] := MN[I];
+    MAA[I] := MA[I];
+  ENDLOOP;
+  LOOP I TWOND+1 NV;
+    MNN[I] := DD[I] + 0*IU;
+    MAA[I] := DD[I] + 0*IU;
+  ENDLOOP;
+
+  { MAPINVR expects DA — REAL-cast MAA, invert, lift back to CD MAI. }
+  LOOP I 1 NV;
+    MAA_DA[I] := REAL(MAA[I]);
+  ENDLOOP;
+  MAPINVR MAA_DA MAI_DA;
+  LOOP I 1 NV;
+    MAI[I] := MAI_DA[I] + 0*IU;
+  ENDLOOP;
+
+  U1[1] := UI[1];
+  U1[2] := UI[2];
+  CPOLVAL 1 U1 2 MAI NV UOO 2;
+  CORRSU2 UOO;
+
+  U0[1] := CONS(UOO[1]);
+  U0[2] := CONS(UOO[2]);
+  D := SQR(REAL(U0[2])) + SQR(IMAG(U0[2]));
+  IF D > 0;
+    D := SQRT(D);
+  ENDIF;
+
+  IF 1 + ABS(D) = 1;
+    L := U0[1];
+    IDENSU2 CUU;
+  ELSE;
+    D := REAL(U0[1]);
+    L := D + IU*SQRT(1 - SQR(D));
+    K := U0[2]/(U0[1] - L);
+    D := ISRT(1 + SQR(REAL(K)) + SQR(IMAG(K)));
+    CUU[1] := K*D + 0*DD[1];
+    CUU[2] := D + 0*IU + 0*DD[1];
+  ENDIF;
+  D := ISRT(SQR(REAL(L)) + SQR(IMAG(L)));
+  L := D*L;
+  MULASU2 U1 UOO CUU;
+  INVRSU2 U2 CUU;
+  MULASU2 UOO U2 U1;
+  UOO[1] := UOO[1] - CONS(UOO[1]) + L + 0*DD[1];
+  UOO[2] := UOO[2] - CONS(UOO[2]);
+  D := ACOS(REAL(L));
+  IF IMAG(L) < 0;
+    D := -D;
+  ENDIF;
+  K := -COS(D) + IU*SIN(D);
+  D := 2*D;
+  IF D < 0;
+    D := D + 2*PI;
+  ENDIF;
+
+  D_CD := D + 0*IU + 0*DD[1];
+
+  LOOP I 1 NOC;
+    EHOMSU2 U1 UOO I;
+    U2[1] := K*U1[1] + 0*DD[1];
+    U2[2] := K*U1[2] + 0*DD[1];
+    SOLVSU2 U1 U2 D_CD PHI R M1 M2 EPS;
+    MEXPSU2 U2 U1;
+    MULASU2 U1 CUU U2;
+    CUU[1] := U1[1];
+    CUU[2] := U1[2];
+    MULASU2 U1 UOO U2;
+    INVRSU2 UOO U2;
+    CPOLVAL 1 UOO 2 MNN NV U2 2;
+    MULASU2 UOO U2 U1;
+  ENDLOOP;
+
+  D := SQR(ABS(REAL(UOO[2])) + ABS(IMAG(UOO[2])));
+  IF 1 + D = 1;
+    STUNE := 2*ACOS(REAL(UOO[1]));
+    NBN[1] := -2*(REAL(CUU[1])*REAL(CUU[2]) - IMAG(CUU[1])*IMAG(CUU[2]));
+    NBN[2] := -2*(REAL(CUU[1])*IMAG(CUU[2]) + REAL(CUU[2])*IMAG(CUU[1]));
+    NBN[3] := SQR(REAL(CUU[1])) + SQR(IMAG(CUU[1]))
+            - SQR(REAL(CUU[2])) - SQR(IMAG(CUU[2]));
+    { NBN is DA, MAA is CD — use REAL-cast MAA for the POLVAL_DA route. }
+    POLVAL 1 NBN 3 MAA_DA NV NBAR 3;
+    IF CONS(IMAG(UOO[1])) < 0;
+      NBN[1] := -NBN[1];
+      NBN[2] := -NBN[2];
+      NBN[3] := -NBN[3];
+    ENDIF;
+    XX[1] := STUNE;
+    POLVAL 1 XX 1 MAA_DA NV YY 1;
+    STUNE := YY[1];
+  ELSE;
+    WRITE 6 ' --- WARNING in NORMSU2, spin-orbit resonance';
+    NBAR[1] := 0*DD[1];
+    NBAR[2] := 0*DD[1];
+    NBAR[3] := 0*DD[1];
+    STUNE := 0*DD[1];
+  ENDIF;
+
+  INVRSU2 U1 CUU;
+  CPOLVAL 1 U1 2 MAA NV CUU 2;
+  CU[1] := CONS(REAL(CUU[1]));
+  CU[2] := CONS(IMAG(CUU[1]));
+  CU[3] := CONS(REAL(CUU[2]));
+  CU[4] := CONS(IMAG(CUU[2]));
+  UO[1] := CONS(REAL(UOO[1]));
+  UO[2] := CONS(IMAG(UOO[1]));
+  UO[3] := CONS(REAL(UOO[2]));
+  UO[4] := CONS(IMAG(UOO[2]));
+ENDPROCEDURE;
+
+{ ----- TSS: spin tune + ñ vector on parameters AND orbit
+  TSS(ST, NBAR, KEY) computes the spin tune ST and the rotation-axis
+  NBAR of the active MAP via the full DANF + NORMSU2 chain.
+
+  KEY=0 returns the spin quantities expressed in the original orbital
+  variables; KEY≠0 transforms them to the parameter-dependent fixed-point
+  variables (using FM to find the fixed point and POLVAL to relabel).
+
+  Pre-condition: caller has built a stable orbital map in MAP and seeded
+  SPNR (the global spin matrix). Without spin tracking enabled (LSPN=0),
+  SPNR defaults to the identity → the SU(2) input is identity, so spin
+  outputs are trivial. For a real spin study, the caller must explicitly
+  populate SPNR via element-by-element spin propagation.
+
+  Type juggling: DANF outputs (DA 8) MN, MA → lift to (CD 8) for NORMSU2.
+  POLVAL on (DA 4) since the relabeling-via-XF step is purely DA.       }
+PROCEDURE TSS ST (DA) NBAR (DA 3) KEY (RE);
+  VARIABLE (DA 8) MN_DA;
+  VARIABLE (DA 8) MA_DA;
+  VARIABLE (CD 8) MN_CD;
+  VARIABLE (CD 8) MA_CD;
+  VARIABLE (CD)   S1_RS;
+  VARIABLE (RE 4) UO_NORMSU2;
+  VARIABLE (RE 4) CU_NORMSU2;
+  VARIABLE (DA 4) CU_POLVAL;
+  VARIABLE (DA 4) UO_POLVAL;
+  VARIABLE (CD 2) US;
+  VARIABLE (DA 8) XF;
+  VARIABLE (DA 8) MF;
+  VARIABLE (RE) I;
+  VARIABLE (RE) EPS_VAL;
+  VARIABLE (CM) IM;
+
+  IMUNIT IM;
+  EPS_VAL := 1E-7;
+  DANF MAP MN_DA MA_DA 1 S1_RS EPS_VAL;
+
+  { Lift DA → CD for NORMSU2 ingestion. }
+  LOOP I 1 NV;
+    MN_CD[I] := MN_DA[I] + 0*IM;
+    MA_CD[I] := MA_DA[I] + 0*IM;
+  ENDLOOP;
+
+  SO3_IN_SU2 SPNR US 0;
+  NORMSU2 US UO_NORMSU2 CU_NORMSU2 NBAR ST MN_CD MA_CD EPS_VAL;
+
+  IF KEY # 0;
+    FM MAP XF MF I;
+    IF I # 0;
+      WRITE 6 ' *** ERROR in TSS, orbital map has no fixed point';
+      QUIT 0;
+    ENDIF;
+    LOOP I 1 TWOND;
+      XF[I] := DD[I] + XF[I];
+    ENDLOOP;
+    LOOP I TWOND+1 NV;
+      XF[I] := DD[I];
+    ENDLOOP;
+    { Pack ST and NBAR into a (DA 4) bundle, POLVAL-relabel via XF, unpack. }
+    CU_POLVAL[1] := ST;
+    CU_POLVAL[2] := NBAR[1];
+    CU_POLVAL[3] := NBAR[2];
+    CU_POLVAL[4] := NBAR[3];
+    POLVAL 1 CU_POLVAL 4 XF NV UO_POLVAL 4;
+    ST      := UO_POLVAL[1];
+    NBAR[1] := UO_POLVAL[2];
+    NBAR[2] := UO_POLVAL[3];
+    NBAR[3] := UO_POLVAL[4];
+  ENDIF;
+
+  ST := ST/PI/2;
+ENDPROCEDURE;
+
+{ ----- PARASU2: extract parameter-only part of a DA scalar
+  PARASU2(B) plugs 0 for variables 1..TWOND (the phase-space) into B,
+  leaving only the parameter-space residue. This isolates the
+  parameter dependence of B for the TSP "tune-on-parameters" view.
+
+   uses the DAPLU sweep — wrap into 1-element buffers since
+  ROSY's DAPLU expects Vec<DA>.                                          }
+FUNCTION (DA) PARASU2 B (DA);
+  VARIABLE (DA 1) D_BUF;
+  VARIABLE (DA 1) C_BUF;
+  VARIABLE (RE) I;
+  D_BUF[1] := B;
+  LOOP I 1 TWOND;
+    DAPLU D_BUF I 0 C_BUF;
+    D_BUF[1] := C_BUF[1];
+  ENDLOOP;
+  PARASU2 := D_BUF[1];
+ENDFUNCTION;
+
+{ ----- TSP: spin tune + ñ vector on parameters ONLY
+  TSP(ST, NBAR, KEY) computes the parameter-dependence-only part of the
+  spin tune ST and rotation-axis NBAR. Unlike TSS (which gives both
+  amplitude AND parameter dependence), TSP strips the phase-space
+  dependence via PARASU2's DAPLU sweep, leaving only how spin observables
+  vary with PARAMETERS (energy, mass, charge offsets).
+
+  KEY=0: derive from TSS output, then PARASU2-strip phase-space deps.
+  KEY≠0: directly extract spin tune via SO3_IN_SU2 → CPOLVAL at fixed
+         point → SU(2) eigenvalue analysis. More robust for
+         strongly-coupled lattices.                                       }
+PROCEDURE TSP ST (DA) NBAR (DA 3) KEY (RE);
+  VARIABLE (CD 2) B;
+  VARIABLE (CD 2) BF;
+  VARIABLE (CM) IU;
+  VARIABLE (CD 2) U1;
+  VARIABLE (CD 2) CU;
+  VARIABLE (CM) K;
+  VARIABLE (CM) L;
+  VARIABLE (DA) D_VAL;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (DA 8) XF;
+  VARIABLE (DA 8) MF;
+  VARIABLE (DA 3) N1;
+  VARIABLE (DA) T1;
+
+  IF KEY = 0;
+    TSS T1 N1 0;
+    ST := PARASU2(T1);
+    NBAR[1] := PARASU2(N1[1]);
+    NBAR[2] := PARASU2(N1[2]);
+    NBAR[3] := PARASU2(N1[3]);
+  ELSE;
+    FM MAP XF MF J;
+    IF J # 0;
+      WRITE 6 ' *** ERROR in TSP, orbital map has no fixed point';
+      QUIT 0;
+    ENDIF;
+    LOOP I 1 TWOND;
+      XF[I] := DD[I] + XF[I];
+    ENDLOOP;
+    LOOP I TWOND+1 NV;
+      XF[I] := DD[I];
+    ENDLOOP;
+    SO3_IN_SU2 SPNR BF 0;
+    { Lift XF (DA) to CD for CPOLVAL ingestion. }
+    VARIABLE (CD 20) XF_CD;
+    IMUNIT IU;
+    LOOP I 1 NV;
+      XF_CD[I] := XF[I] + 0*IU;
+    ENDLOOP;
+    CPOLVAL 1 BF 2 XF_CD NV B 2;
+    IMUNIT IU;
+    U1[1] := PARASU2(REAL(B[1])) + IU*PARASU2(IMAG(B[1]));
+    U1[2] := PARASU2(REAL(B[2])) + IU*PARASU2(IMAG(B[2]));
+    CORRSU2 U1;
+    D_VAL := SQR(REAL(U1[2])) + SQR(IMAG(U1[2]));
+    IF CONS(D_VAL) > 0;
+      D_VAL := SQRT(D_VAL);
+    ENDIF;
+    IF 1 + ABS(CONS(D_VAL)) = 1;
+      L := CONS(REAL(U1[1])) + IU*CONS(IMAG(U1[1]));
+      CU[1] := 1 + IU*0 + 0*DD[1];
+      CU[2] := 0 + IU*0 + 0*DD[1];
+    ELSEIF 1 + ABS(ABS(CONS(REAL(U1[1]))) - 1) = 1;
+      WRITE 6 ' *** ERROR in TSP, multiple eigenvalues. Try TSS instead';
+      QUIT 0;
+    ELSE;
+      D_VAL := REAL(U1[1]);
+      L := CONS(D_VAL) + IU*SQRT(1 - SQR(CONS(D_VAL)));
+      K := CONS(U1[2])/(CONS(U1[1]) - L);
+      CU[1] := K + 0*DD[1];
+      CU[2] := 1 + IU*0 + 0*DD[1];
+      CORRSU2 CU;
+    ENDIF;
+    L := L/SQRT(SQR(REAL(L)) + SQR(IMAG(L)));
+    ST := 2*ACOS(REAL(L)) + 0*DD[1];
+    NBAR[1] := -2*(REAL(CU[1])*REAL(CU[2]) - IMAG(CU[1])*IMAG(CU[2]));
+    NBAR[2] := -2*(REAL(CU[1])*IMAG(CU[2]) + REAL(CU[2])*IMAG(CU[1]));
+    NBAR[3] := SQR(REAL(CU[1])) + SQR(IMAG(CU[1]))
+             - SQR(REAL(CU[2])) - SQR(IMAG(CU[2]));
+    IF CONS(IMAG(L)) < 0;
+      NBAR[1] := -NBAR[1];
+      NBAR[2] := -NBAR[2];
+      NBAR[3] := -NBAR[3];
+    ENDIF;
+    ST := ST/PI/2;
+  ENDIF;
+ENDPROCEDURE;
+
+END;

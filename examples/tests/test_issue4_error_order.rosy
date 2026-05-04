@@ -1,0 +1,17 @@
+{ Issue 4 — type-resolution errors should surface in source order.
+  Two cycle slots (A ↔ B on lines 9 and 12). Without the sort fix
+  cycle errors come out in graph-traversal order; with the fix they
+  come out in source order 9 → 12. }
+
+BEGIN;
+
+VARIABLE A;
+A := B + 1;
+
+VARIABLE B;
+B := A * 2;
+
+WRITE 6 A;
+WRITE 6 B;
+
+END;

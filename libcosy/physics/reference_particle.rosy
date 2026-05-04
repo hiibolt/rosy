@@ -1,0 +1,370 @@
+{ Reference-particle setup and configuration primitives:
+
+    DEF       physical constants (AMU, EZERO, CLIGHT, AMUMEV, PI, DEGRAD).
+    OV        order / phase-space / parameter dimensions — the gateway
+              every script calls first.
+    CO        change computational order.
+    KC        kinematic-correction flag.
+    WAS       wedge-computation flag.
+    FR        fringe-field mode flag (also bootstraps the symplectic-
+              scaling tables when needed).
+    SB / SP   phase-space and parameter widths (PHSP, PHSR, PARS).
+    PARA      DA-coordinate helper for parameter dependence.
+    UM / UMS  unity map / unity scratch map.
+    RP and
+    RPR / RPM /
+    RPP / RPE /
+    RPPI / RPMU /
+    RPS       reference-particle setup variants (rigidity, momentum,
+              proton / electron / pion / muon shortcuts).
+    CR        clear rays. }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- Physical constants -----------------------------
+   additionally calls `LTRUE TRUE; LFALSE FALSE` to seed two of
+  COSY's RE-as-bool globals; ROSY reserves TRUE / FALSE as keywords (LO
+  literals) so those globals don't exist here, and the corresponding lines
+  are intentionally omitted. Code that previously branched on `IF X = TRUE`
+  is ported as `IF X = 1` (or stays as `IF X` when TRUE was a bare guard). }
+PROCEDURE DEF;
+  AMU    := 1.66053873D-27;
+  EZERO  := 1.602176462D-19;
+  CLIGHT := 2.99792458D8;
+  AMUMEV := AMU * SQR(CLIGHT) / EZERO * 1D-6;
+  PI     := 3.1415926535897932384626433832795028842;
+  DEGRAD := PI / 180;
+  ESET 1E-10;
+  WSET 0.1;
+  DSET 1E-16;
+ENDPROCEDURE;
+
+{ ----- Computational-order change ------------------------- }
+PROCEDURE CO NNO (RE);
+  NOC := NNO;
+  DANOT NOC;
+ENDPROCEDURE;
+
+{ ----- Order / dimension / parameter setup ------------
+  The single most important entry point in libcosy: every  script
+  starts with `OV order ND NP;` to set the phase-space order, dimension,
+  and parameter count. Initializes the DA system (DAINI), seeds the DD
+  scratch buffer with basis variables DA(1)..DA(NV), sets every flow-
+  control flag to its default, and chains DEF → FD for constants and
+  fringe-field defaults.
+
+   additionally calls CR at the bottom to clear ray buffers; CR
+  needs partial-index slice semantics on RAY / RSC / SPI / SSC that ROSY
+  doesn't yet provide, so the corresponding scalar flags (NRAY, NSPN,
+  LCR, LENV) are zeroed inline here. The array-clearing CR will land
+  alongside ray_io.rosy in M4.                                             }
+PROCEDURE OV ORD (RE) NND (RE) NNP (RE);
+  VARIABLE (RE) I;
+  IF NND > 3;     WRITE 6 ' *** ERROR in OV, ND > 3 '; QUIT 0;
+  ELSEIF NND < 0; WRITE 6 ' *** ERROR in OV, ND < 0 '; QUIT 0;
+  ELSEIF NNP < 0; WRITE 6 ' *** ERROR in OV, NP < 0 '; QUIT 0;
+  ENDIF;
+  NO := ORD; ND := NND; TWOND := 2*ND; NP := NNP; NV := TWOND + NP;
+  IF LWA < 0; LWA := -LWA; NV := NV + 1; ENDIF;
+  IF NV > 40;
+    IF LWA = 0;
+      WRITE 6 '*** ERROR in OV, 2*ND+NP > 40 ';
+    ELSEIF LWA # 0;
+      WRITE 6 '*** ERROR in OV, 2*ND+NP > 39 ';
+    ENDIF;
+    QUIT 0;
+  ENDIF;
+  DEF;
+  IF ND = 0;
+    DAINI NO NV 0 NM1;
+  ELSE;
+    DAINI NO+1 MAX(NV, 3) 0 NM1;
+  ENDIF;
+  NM2 := NMON(NO, TWOND + NP);
+  NM3 := NMON(NO + 1, 3);
+  NMP := NMON(NO, NP);
+  { Clear the DD slots above NV. Bare RE 0 would mismatch the DA-typed
+    DD; use `0*DA(1)` so the assignment is in DA-space. }
+  LOOP I NV+1 20;
+    DD[I] := 0*DA(1);
+  ENDLOOP;
+  SVSCR;
+  LSCR := MAX(50000, LSCR);
+  LSCR := MAX(LSCR, 2*NM1);
+  SCRLEN LSCR;
+  LSCT := 50000;
+  { Seed DD with the basis DA variables DA(1)..DA(MAX(NV, 3)). }
+  LOOP I 1 MAX(NV, 3);
+    DD[I] := DA(I);
+  ENDLOOP;
+  DSET 1E-16;
+  CO NO;
+  { Default flow-control state — every flag off / unset, with LSYS / LCE /
+    LAX / LCB pre-armed to enable the picture / energy-grid / axis update
+    paths once their state machines start firing. }
+  LOV := 1;     LRP := 0;     LUM := 0;     LPI := 0;
+  LCB := 1;     LPG := 0;     LPS := 0;     LM  := 0;
+  LFR := 0;     LFR2 := 0;
+  LENV := 0;    LSYS := 1;    LCE := 1;     LAX := 1;
+  LTRR := 0;    LTRI := 0;
+  LTRPRAY := 0; LTRPSPI := 0;
+  { CR-equivalent scalar resets (the array clears defer to M4 ray_io). }
+  NRAY := 0; NSPN := 0; LCR := 0;
+  NRAYTRA0 := 251;
+  NRAYTRA := NRAY;
+  FD;
+ENDPROCEDURE;
+
+{ ----- Kinematic-correction flag -------------------- }
+PROCEDURE KC I (RE);
+  LKC := I;
+  IF I = 1;
+    WRITE 6 ' --- WARNING in KC, effects only in ODE and DLACT';
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- Wedge-computation flag ----------------------- }
+PROCEDURE WAS I (RE);
+  LWA := -I;
+ENDPROCEDURE;
+
+{ ----- Fringe-field mode ----------------------------
+  Sets the global fringe-field flag LFR. The LFR2 sentinel is set
+  for modes 1 / 2 so callers can detect that they should provide
+  symplectic-scaling reference tables (via an explicit FD2 call
+  reading SYSCA.DAT) before any element actually fires. LFR2
+  starts at 0 and latches on first FR call. }
+PROCEDURE FR I (RE);
+  IF LOV = 0;
+    WRITE 6 ' *** ERROR, call OV before FR';
+    QUIT 0;
+  ENDIF;
+  LFR := I;
+  IF (I < 3) AND (I > 0) AND (LFR2 = 0);
+    LFR2 := 1;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- Phase-space widths ----------------------------- }
+PROCEDURE SB PX (RE) PA (RE) R12 (RE) PY (RE) PB (RE) R34 (RE) PT (RE) PD (RE) R56 (RE) PG (RE) PZ (RE);
+  IF LOV = 0;
+    WRITE 6 ' *** ERROR, call OV before SB';
+    QUIT 0;
+  ENDIF;
+  PHSP[1] := PX; PHSP[2] := PA; PHSP[3] := PY; PHSP[4] := PB;
+  PHSP[5] := PT; PHSP[6] := PD; PHSP[7] := PG; PHSP[8] := PZ;
+  PHSR[1] := R12; PHSR[2] := R34; PHSR[3] := R56;
+  LPS := 1;
+ENDPROCEDURE;
+
+{ ----- Parameter widths ------------------------------- }
+PROCEDURE SP P1 (RE) P2 (RE) P3 (RE) P4 (RE) P5 (RE) P6 (RE);
+  PARS[1] := P1; PARS[2] := P2; PARS[3] := P3;
+  PARS[4] := P4; PARS[5] := P5; PARS[6] := P6;
+ENDPROCEDURE;
+
+{ ----- Parameter-identifier helper -------------------- }
+{ Returns a DA expression `1 + DA(2*ND + I)` when the I-th parameter is in
+  scope, else 1 — used by element procedures to weight parameter-dependent
+  terms in their kick.                                                     }
+FUNCTION (DA) PARA I (RE);
+  PARA := 1 + 0*DA(1);
+  IF LWA = 1;
+    IF TWOND + I < NV;
+      PARA := 1 + DA(TWOND + I);
+    ENDIF;
+  ELSEIF LWA # 1;
+    IF TWOND + I < NV + 1;
+      PARA := 1 + DA(TWOND + I);
+    ENDIF;
+  ENDIF;
+ENDFUNCTION;
+
+{ ----- Set reference particle -----------------------
+  RP(E, M, Z) seeds the global reference-particle quantities from a kinetic
+  energy E [MeV], mass M [amu], and charge Z [units]. Computes the standard
+  relativistic derived values (η, β, γ) and the rigidity coefficients used
+  throughout the element families.
+
+  Differences from :
+   * The ND=3 branch that promotes E0 to a DA-of-DD(6) is omitted — that
+     mode requires a 6D phase space and adds parameter dependence; will
+     port alongside the elements that actually use it.
+   *  saves NOC, raises the order via `CO NO+1` for the
+     calculation, then restores via `CO NOM`. The order shuffle is kept
+     so derivative orders propagate correctly through SQRT / CONS.
+   * XX[21..29] is the 3×3 identity matrix used by UM to seed SPNR /
+     SSCR when LSPN=1.  sets these unconditionally at L2791-2792;
+     libcosy mirrors the unconditional set so any later UM call with
+     LSPN=1 finds a clean identity in XX (the cost is 9 RE→DA writes
+     into XX even when spin tracking is off — negligible).               }
+PROCEDURE RP E (RE) M (RE) Z (RE);
+  VARIABLE (RE) NOM;
+  VARIABLE (RE) I;
+  IF LOV # 1;
+    WRITE 6 ' *** ERROR, call OV before RP ';
+    QUIT 0;
+  ENDIF;
+  LRP := 1;
+  NOM := NOC;
+  CO NO+1;
+  { Lift the RE parameters into DA-space — the slots are DA-typed so that
+    later procedures can mix them freely with DD-bound expressions. }
+  E0 := E + 0*DA(1);
+  M0 := M + 0*DA(1);
+  Z0 := Z + 0*DA(1);
+  { Seed XX[1..8] — the canonical phase-space basis used by UM / UMS to
+    initialise MAP and MSC. :
+       XX[I] := DD[I] when I ≤ TWOND, otherwise 0*DD[I];
+       XX[6, 7, 8] hold the (E0, M0, Z0) parameter-dependence terms,
+                   which are zero for ND<3 and DD[6]-bound for ND=3.    }
+  LOOP I 1 8;
+    XX[I] := DD[I];
+    IF I > TWOND;
+      XX[I] := 0*DD[I];
+    ENDIF;
+  ENDLOOP;
+  XX[6] := (E0 - CONS(E0))/CONS(E0);
+  XX[7] := (M0 - CONS(M0))/CONS(M0);
+  XX[8] := (Z0 - CONS(Z0))/CONS(Z0);
+  { Spin-matrix identity. Row-major 3×3:
+        XX[21..23] = (1, 0, 0)
+        XX[24..26] = (0, 1, 0)
+        XX[27..29] = (0, 0, 1)
+    UM consumes these when LSPN=1 to seed SPNR / SSCR. RE→DA promotion
+    is automatic; the 0*DD[1] anchor on the diagonal entries keeps the
+    DA representation order-correct. }
+  XX[21] := 1 + 0*DD[1]; XX[22] := 0*DD[1]; XX[23] := 0*DD[1];
+  XX[24] := 0*DD[1]; XX[25] := 1 + 0*DD[1]; XX[26] := 0*DD[1];
+  XX[27] := 0*DD[1]; XX[28] := 0*DD[1]; XX[29] := 1 + 0*DD[1];
+  ETA  := E0/M0/AMUMEV;
+  V0   := CLIGHT*SQRT(ETA*(2 + ETA))/(1 + ETA);
+  P0   := AMUMEV*M0*SQRT(ETA*(2 + ETA));
+  TFAC := ((1 + CONS(ETA))/(2 + CONS(ETA)))*CONS(V0);
+  CHIM := (AMU*CLIGHT/EZERO)*M0/Z0*SQRT(ETA*(2 + ETA));
+  CHIE := CHIM*V0;
+  HFAC := SQRT(SQR(CHIM/CONS(CHIM)) - DD[2]*DD[2] - DD[4]*DD[4]);
+  CO NOM;
+ENDPROCEDURE;
+
+{ ----- Unity map --------------------------------------
+  Sets MAP and MSC to the identity transformation by copying the XX basis
+  seeded by RP. Spin maps (SPNR / SSCR) become 3×3 identities when LSPN=1.
+
+  Differences from :
+   * Axis-tracking arrays AXP / AXD / LTRA / GTRA are all touched by the
+      UM body for the COSY graphics display — graphics is out of
+     scope for libcosy so the corresponding lines are intentionally
+     omitted. The flow-control flag LUM and the path-length scalars
+     SPOS / GPLOC / NCT / NCCT are still set so downstream guards see
+     `UM-was-called`.                                                    }
+PROCEDURE UM;
+  VARIABLE (RE) I; VARIABLE (RE) J;
+  IF LRP = 0;
+    WRITE 6 ' *** ERROR, call RP before UM ';
+    QUIT 0;
+  ENDIF;
+  LOOP I 1 8;
+    MAP[I] := XX[I];
+    MSC[I] := MAP[I];
+  ENDLOOP;
+  IF LSPN = 1;
+    LOOP I 1 3;
+      LOOP J 1 3;
+        SPNR[I, J] := 0*DA(1);
+        SSCR[I, J] := 0*DA(1);
+      ENDLOOP;
+      SPNR[I, I] := 1 + 0*DA(1);
+      SSCR[I, I] := 1 + 0*DA(1);
+    ENDLOOP;
+  ENDIF;
+  LUM := 1; SPOS := 0; GPLOC := 0; NCT := 0; NCCT := 0;
+ENDPROCEDURE;
+
+{ ----- Unity scratch map ------------------------------
+  Sets MSC to the identity (without touching the active MAP). Used as
+  the starting point for accumulating a new map without clobbering the
+  current one.                                                            }
+PROCEDURE UMS;
+  VARIABLE (RE) I; VARIABLE (RE) J;
+  IF LRP = 0;
+    WRITE 6 ' *** ERROR, call RP before UMS ';
+    QUIT 0;
+  ENDIF;
+  LOOP I 1 8;
+    MSC[I] := XX[I];
+  ENDLOOP;
+  IF LSPN = 1;
+    LOOP I 1 3;
+      LOOP J 1 3;
+        SSCR[I, J] := 0*DA(1);
+      ENDLOOP;
+      SSCR[I, I] := 1 + 0*DA(1);
+    ENDLOOP;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- Particle-specific RP shortcuts ---------------
+  These call RP with the standard atomic-mass and charge values for each
+  particle species and stamp the spin-Lorentz factor G0.  uses
+  procedure-call syntax (e.g. `RP E 1.00727646688 1`) — ports verbatim. }
+PROCEDURE RPP E (RE);     { proton  }
+  RP E 1.00727646688 1;
+  G0 := 1.792847337;
+ENDPROCEDURE;
+
+PROCEDURE RPE E (RE);     { electron }
+  RP E 5.485799110D-4 (-1);
+  G0 := 0.001159652187;
+ENDPROCEDURE;
+
+PROCEDURE RPPI E (RE) Z (RE);   { pion (charge configurable) }
+  RP E 0.149834758 Z;
+  G0 := 0;
+ENDPROCEDURE;
+
+PROCEDURE RPMU E (RE);    { muon }
+  RP E 0.1134289168 (-1);
+  G0 := 0.0011659160;
+ENDPROCEDURE;
+
+PROCEDURE RPS LS (RE) G (RE);    { spin-flag + Lorentz-factor override }
+  LSPN := LS;
+  IF G # 0;
+    G0 := G;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- Rigidity-based RP ----------------------------
+  RPR(CHI, M, Z) sets the reference particle from the magnetic rigidity
+  CHI = Bρ [T·m], the mass M [amu], and the charge Z [units]. The 
+  body bootstraps with a dummy RP 1 1 1 (so ETA_local stays in scope at
+  the right CHI value), computes pφ via χ_m / (M c²) form, derives the
+  kinetic energy ETA_local, then re-runs RP with the correct values.   }
+PROCEDURE RPR CHI (RE) M (RE) Z (RE);
+  VARIABLE (DA) PHI_L;
+  VARIABLE (DA) ETA_L;
+  VARIABLE (RE) NOM;
+  NOM := NOC;
+  RP 1 1 1;
+  CO NO+1;
+  PHI_L := CHI/(AMU*CLIGHT/EZERO)/M*Z + 0*DA(1);
+  ETA_L := SQRT(1 + PHI_L*PHI_L) - 1;
+  { ETA_L is DA but RP's E parameter is RE — extract the constant
+    part. Any DA-bound parameter dependence is preserved by RP's
+    own DA promotion of E0. }
+  RP CONS(ETA_L)*M*AMUMEV M Z;
+  CO NOM;
+ENDPROCEDURE;
+
+{ ----- Momentum-based RP ----------------------------
+  RPM(P_MeVc, M, Z): set the reference particle from the canonical
+  momentum p [MeV/c]. Converts to magnetic rigidity and delegates to RPR. }
+PROCEDURE RPM MEVC (RE) M (RE) Z (RE);
+  RP 1 1 1;
+  RPR MEVC*(1E6/CLIGHT)/Z M Z;
+ENDPROCEDURE;
+
+END;

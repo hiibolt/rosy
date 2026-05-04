@@ -436,7 +436,10 @@ impl TypeResolver {
                 };
 
                 if is_unused {
-                    // Default unresolved variables and arguments to RE (standard COSY behavior)
+                    // Default unresolved variables and arguments to RE (standard COSY behavior).
+                    // Fall through to the dependents-decrement block below so any node
+                    // depending on this slot (e.g. a function body that references an
+                    // uncalled function's argument) still progresses through the queue.
                     let node = self.nodes.get_mut(&slot).unwrap();
                     let default_type = RosyType::RE();
                     node.resolved = Some(default_type.clone());
@@ -445,11 +448,9 @@ impl TypeResolver {
                         reason: "untyped variables default to RE".to_string(),
                     };
                     warned_slots.insert(slot.clone());
-                    resolved_count += 1;
-                    continue;
+                } else {
+                    self.resolve_node(&slot)?;
                 }
-
-                self.resolve_node(&slot)?;
             }
             resolved_count += 1;
 
@@ -489,7 +490,7 @@ impl TypeResolver {
     /// Build a detailed error message for unresolved type slots.
     fn build_resolution_error(&self, unresolved: &[&GraphNode]) -> Result<Vec<RosyError>> {
         // Partition into cycle nodes (have unresolved deps) vs no-info nodes
-        let cycle_slots: Vec<&TypeSlot> = unresolved
+        let mut cycle_slots: Vec<&TypeSlot> = unresolved
             .iter()
             .filter(|n| {
                 n.depends_on
@@ -508,17 +509,23 @@ impl TypeResolver {
             })
             .map(|n| &n.slot)
             .collect();
-        // Sort by source location so errors appear in source order
-        no_info_slots.sort_by(|a, b| {
-            let loc_a = self.nodes.get(a).and_then(|n| n.declared_at.as_ref());
-            let loc_b = self.nodes.get(b).and_then(|n| n.declared_at.as_ref());
-            match (loc_a, loc_b) {
-                (Some(a), Some(b)) => a.line.cmp(&b.line).then(a.col.cmp(&b.col)),
-                (Some(_), None) => std::cmp::Ordering::Less,
-                (None, Some(_)) => std::cmp::Ordering::Greater,
-                (None, None) => std::cmp::Ordering::Equal,
-            }
-        });
+
+        // Source-order sorter: prefer `declared_at`, fall back to `assigned_at`
+        // (variables introduced by `:=` only carry `assigned_at`). Slots with no
+        // location go last, in slot-name order so output stays deterministic.
+        let order_key = |slot: &&TypeSlot| -> Option<(usize, usize)> {
+            let node = self.nodes.get(*slot)?;
+            let loc = node.declared_at.as_ref().or(node.assigned_at.as_ref())?;
+            Some((loc.line, loc.col))
+        };
+        let by_source = |a: &&TypeSlot, b: &&TypeSlot| match (order_key(a), order_key(b)) {
+            (Some(a), Some(b)) => a.cmp(&b),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => format!("{}", a).cmp(&format!("{}", b)),
+        };
+        cycle_slots.sort_by(by_source);
+        no_info_slots.sort_by(by_source);
 
         let total = unresolved.len();
         let mut msg = format!(
@@ -719,10 +726,26 @@ impl TypeResolver {
                     .get(slot)
                     .and_then(|n| n.resolved.clone())
                     .ok_or_else(|| anyhow!("Variable slot {} not resolved", slot))?;
-                Ok(RosyType::new(
-                    base.base_type,
-                    base.dimensions.saturating_sub(*num_indices),
-                ))
+                // Cascade: peel min(indices, dimensions), then if remaining
+                // index applies to a (VE) (dim=0 VE base), it extracts to RE.
+                // Mirrors VariableIdentifier::type_of's cascade exactly.
+                let mut remaining = *num_indices;
+                let dim_peel = remaining.min(base.dimensions);
+                let new_dim = base.dimensions - dim_peel;
+                remaining -= dim_peel;
+                if remaining == 1
+                    && new_dim == 0
+                    && base.base_type == crate::rosy_lib::RosyBaseType::VE
+                {
+                    return Ok(RosyType::RE());
+                }
+                if remaining > 0 {
+                    return Err(anyhow!(
+                        "IndexedVariable: too many indices ({} for {} dims)",
+                        num_indices, base.dimensions
+                    ));
+                }
+                Ok(RosyType::new(base.base_type, new_dim))
             }
             ExprRecipe::WithDimensions(inner, extra_dims) => {
                 let mut t = self.evaluate_recipe(inner)?;

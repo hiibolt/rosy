@@ -1,0 +1,166 @@
+{ Polynomial / interpolation helpers: 2D polynomial evaluation
+  (RE and DA variants) and 1D / 2D Gaussian-kernel interpolation. }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- 2D polynomial evaluation -----------------------
+  Evaluates  Σ_{i,j ≤ IS_} P[i+1, j+1] * X^i * Y^j  by nested loops with
+  X1 and Y1 carrying the running powers. The coefficient table P is a 2D
+  RE array; bracket-indexed because ROSY reserves `name(args)` for fn
+  calls (would otherwise be misparsed as a call to a function named P). }
+FUNCTION (RE) POLY X (RE) Y (RE) P (RE 3 3) IS_ (RE);
+  VARIABLE (RE) I; VARIABLE (RE) J;
+  VARIABLE (RE) X1; VARIABLE (RE) Y1;
+  POLY := 0;
+  X1 := 1;
+  LOOP I 1 IS_+1;
+    Y1 := 1;
+    LOOP J 1 IS_+1;
+      POLY := POLY + P[I, J]*X1*Y1;
+      Y1 := Y*Y1;
+    ENDLOOP;
+    X1 := X*X1;
+  ENDLOOP;
+ENDFUNCTION;
+
+{ ----- POLY_DA: 2D polynomial evaluation with DA inputs
+  Same math as POLY but accepts and returns DA. Required by RF (and a
+  forthcoming WL port) where the polynomial is evaluated symbolically
+  on DA components of the active MAP — POLY's RE-only signature won't
+  accept those inputs.
+
+  X1, Y1 are lifted into DA via `+ 0*DD[1]` so the running-power loop
+  multiplies cleanly with the DA argument. The coefficient table P
+  stays RE ( usage is always real-valued tables).               }
+FUNCTION (DA) POLY_DA X (DA) Y (DA) P (RE 3 3) IS_ (RE);
+  VARIABLE (RE) I; VARIABLE (RE) J;
+  VARIABLE (DA) X1; VARIABLE (DA) Y1;
+  POLY_DA := 0*DD[1];
+  X1 := 1 + 0*DD[1];
+  LOOP I 1 IS_+1;
+    Y1 := 1 + 0*DD[1];
+    LOOP J 1 IS_+1;
+      POLY_DA := POLY_DA + P[I, J]*X1*Y1;
+      Y1 := Y*Y1;
+    ENDLOOP;
+    X1 := X*X1;
+  ENDLOOP;
+ENDFUNCTION;
+
+{ ----- 1D Gaussian interpolation ----------------------
+  Smooths a measured-field column at fractional index X using a Gaussian
+  kernel of width SIGMA. Boundary clamping fires when the kernel window
+  touches either end (ERR=1 in that case). MFD_ is the field array;
+  untyped so the call site's MFD shape (typically 2D 25×100 or similar)
+  drives inference.                                                       }
+FUNCTION (RE) GAUSS1 X (RE) NX (RE) DX (RE) SIGMA (RE) IP (RE) MFD_ (RE 700 30) ERR (RE);
+  VARIABLE (RE) NG;
+  VARIABLE (RE) IXN;
+  VARIABLE (RE) IX;
+  VARIABLE (RE) IXM;
+  NG := NINT(8*SIGMA);
+  GAUSS1 := 0;
+  IXN := NINT(1 + CONS(X)/DX);
+  IF (IXN-NG < 1) OR (IXN+NG > NX);
+    ERR := 1;
+    LOOP IX IXN-NG IXN+NG;
+      IXM := IX;
+      IF IX < 1; IXM := 1;
+      ELSEIF IX > NX; IXM := NX;
+      ENDIF;
+      GAUSS1 := GAUSS1 + MFD_[IP, IXM]*EXP(-SQR((IX-1-X/DX)/SIGMA));
+    ENDLOOP;
+  ELSE;
+    ERR := 0;
+    LOOP IX IXN-NG IXN+NG;
+      GAUSS1 := GAUSS1 + MFD_[IP, IX]*EXP(-SQR((IX-1-X/DX)/SIGMA));
+    ENDLOOP;
+  ENDIF;
+  GAUSS1 := GAUSS1/(SQRT(PI)*SIGMA);
+ENDFUNCTION;
+
+{ ----- GAUSS1_DA: DA-propagating 1D Gaussian interpolation
+  Same kernel as GAUSS1 but X is DA-typed and the result is DA — proper
+  DA propagation through the Gaussian smoother is needed for NSDP=12
+  (MGE general multipole-by-Gaussians) where s = S+DD[2] is symbolic.
+  IP and IX still use CONS for grid indexing (must be RE), but the
+  EXP(-SQR((IX-1-X/DX)/SIGMA)) term carries DA-X through naturally.    }
+FUNCTION (DA) GAUSS1_DA X (DA) NX (RE) DX (RE) SIGMA (RE) IP (RE) MFD_ (RE 700 30) ERR (RE);
+  VARIABLE (RE) NG;
+  VARIABLE (RE) IXN;
+  VARIABLE (RE) IX;
+  VARIABLE (RE) IXM;
+  NG := NINT(8*SIGMA);
+  GAUSS1_DA := 0*DD[1];
+  IXN := NINT(1 + CONS(X)/DX);
+  IF (IXN-NG < 1) OR (IXN+NG > NX);
+    ERR := 1;
+    LOOP IX IXN-NG IXN+NG;
+      IXM := IX;
+      IF IX < 1; IXM := 1;
+      ELSEIF IX > NX; IXM := NX;
+      ENDIF;
+      GAUSS1_DA := GAUSS1_DA + MFD_[IP, IXM]*EXP(-SQR((IX-1-X/DX)/SIGMA));
+    ENDLOOP;
+  ELSE;
+    ERR := 0;
+    LOOP IX IXN-NG IXN+NG;
+      GAUSS1_DA := GAUSS1_DA + MFD_[IP, IX]*EXP(-SQR((IX-1-X/DX)/SIGMA));
+    ENDLOOP;
+  ENDIF;
+  GAUSS1_DA := GAUSS1_DA/(SQRT(PI)*SIGMA);
+ENDFUNCTION;
+
+{ ----- 2D Gaussian interpolation ---------------------- }
+FUNCTION (RE) GAUSS X (RE) Z (RE) NX (RE) NZ (RE) DX (RE) DZ (RE) SIGMA (RE) MFD_ (RE 700 30) ERR (RE);
+  VARIABLE (RE) NG;
+  VARIABLE (RE) IXN; VARIABLE (RE) IZN;
+  VARIABLE (RE) SUMZ;
+  VARIABLE (RE) IX; VARIABLE (RE) IZ;
+  VARIABLE (RE) IXM; VARIABLE (RE) IZM;
+  NG := NINT(8*SIGMA);
+  GAUSS := 0;
+  IXN := NINT(1 + CONS(X)/DX);
+  IZN := NINT(1 + CONS(Z)/DZ);
+  IF (IXN-NG < 1) OR (IXN+NG > NX) OR (IZN-NG < 1) OR (IZN+NG > NZ);
+    ERR := 1;
+    LOOP IX IXN-NG IXN+NG;
+      SUMZ := 0;
+      IXM := IX;
+      IF IX < 1; IXM := 1;
+      ELSEIF IX > NX; IXM := NX;
+      ENDIF;
+      LOOP IZ IZN-NG IZN+NG;
+        IZM := IZ;
+        IF IZ < 1; IZM := 1;
+        ELSEIF IZ > NZ; IZM := NZ;
+        ENDIF;
+        SUMZ := SUMZ + MFD_[IXM, IZM]*EXP(-SQR((IZ-1-Z/DZ)/SIGMA));
+      ENDLOOP;
+      GAUSS := GAUSS + SUMZ*EXP(-SQR((IX-1-X/DX)/SIGMA));
+    ENDLOOP;
+  ELSE;
+    ERR := 0;
+    LOOP IX IXN-NG IXN+NG;
+      SUMZ := 0;
+      LOOP IZ IZN-NG IZN+NG;
+        SUMZ := SUMZ + MFD_[IX, IZ]*EXP(-SQR((IZ-1-Z/DZ)/SIGMA));
+      ENDLOOP;
+      GAUSS := GAUSS + SUMZ*EXP(-SQR((IX-1-X/DX)/SIGMA));
+    ENDLOOP;
+  ENDIF;
+  GAUSS := GAUSS/(PI*SIGMA*SIGMA);
+ENDFUNCTION;
+
+{ ----- Complex polynomial evaluation ------------------
+  CPOLVAL is a transpiler intrinsic in ROSY (see
+  rosy/src/program/statements/math/cpolval/) — no libcosy proxy needed.
+  The  version manually splits CD coefficients into interleaved
+  real/imag pairs for the RE-only POLVAL; ROSY's CPOLVAL operates on CD
+  arrays directly and is wired to rosy_polval_da via the CD-array
+  dispatch path. Call sites: normal_form.rosy (DANF), spin_su2.rosy
+  (TSS, TSP, NORMSU2), and map_ops.rosy (COCR / CRCO).                    }
+
+END;

@@ -91,6 +91,7 @@ pub use math::linv::LinvStatement;
 pub use math::lsline::LslineStatement;
 pub use math::mblock::MblockStatement;
 pub use math::polval::PolvalStatement;
+pub use math::cpolval::CpolvalStatement;
 pub use math::rkco::RkcoStatement;
 
 pub use core::quit::QuitStatement;
@@ -595,6 +596,15 @@ impl FromRule for Statement {
                 }),
             Rule::polval => PolvalStatement::from_rule(pair)
                 .context("...while building POLVAL statement!")
+                .with_location(&loc)
+                .map(|opt| {
+                    opt.map(|stmt| Statement {
+                        inner: Box::new(stmt),
+                        source_location: loc.clone(),
+                    })
+                }),
+            Rule::cpolval => CpolvalStatement::from_rule(pair)
+                .context("...while building CPOLVAL statement!")
                 .with_location(&loc)
                 .map(|opt| {
                     opt.map(|stmt| Statement {

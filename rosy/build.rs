@@ -447,7 +447,11 @@ fn generate_hover_file(
          \"Includes another ROSY source file at this point in the program. \
          The included file must be a complete BEGIN/END program. \
          Its statements are spliced into the including program at the INCLUDE site.\\n\\n\
-         ```\\nINCLUDE 'helpers.rosy';\\n```\", \
+         The path resolves relative to the directory of the including file. \
+         If the path names a directory, INCLUDE looks for `mod.rosy` inside it \
+         (Rust-style modules), letting you organize libraries as directory trees:\\n\\n\
+         ```\\nINCLUDE 'helpers.rosy';            {{ single file }}\\n\
+         INCLUDE 'libcosy';                  {{ directory -> libcosy/mod.rosy }}\\n```\", \
          \"\", true),"
     )
     .unwrap();

@@ -1,0 +1,1619 @@
+{ Map save / apply / compose / print primitives. Holds the savers
+  (SM / SNM / SSM / SSNM), matrix-element extractors (ME / MEP / MA),
+  Poisson bracket and Lie exponential (PB / LEXP), printers and writers
+  (PM / PSM / WM / PNM / WNM / DMAP / DSMAP), composition helpers (ANM,
+  AM, UPDATEMAP, UPDATE), TRANSPORT / canonical conversions (CATR,
+  TRCA, COCR, CRCO), the closed-orbit + map-around-closed-orbit pair
+  (FM, MR), partial / dependence-flag setters (BDEP, EDEP, MCM, ECM,
+  BM), recursive trajectory reconstruction (RR), and the local-frame
+  axis primitives (LOCSET, LOCTRA). UPDATE centralizes SPOS / LTRA /
+  GTRA advance for every element. }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- Save the momentary MAP into M ------------------
+  Copies the active map's first TWOND DA components into M. M is an
+  untyped DA-array param; ROSY's inference picks up the dimension from
+  the call site (typically `(DA 8)` to match the global MAP).           }
+PROCEDURE SM M (DA 8);
+  VARIABLE (RE) I;
+  LOOP I 1 TWOND;
+    M[I] := MAP[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- Save the map N into M -------------------------- }
+PROCEDURE SNM N (DA 8) M (DA 8);
+  VARIABLE (RE) I;
+  LOOP I 1 TWOND;
+    M[I] := N[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- Save the momentary spin map (SPNR 3x3) into M -- }
+PROCEDURE SSM M (DA 3 3);
+  VARIABLE (RE) I; VARIABLE (RE) J;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      M[I, J] := SPNR[I, J];
+    ENDLOOP;
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- Save the spin map N into M --------------------- }
+PROCEDURE SSNM N (DA 3 3) M (DA 3 3);
+  VARIABLE (RE) I; VARIABLE (RE) J;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      M[I, J] := N[I, J];
+    ENDLOOP;
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- Matrix-element extraction --------------------------
+  ME(M, I) returns the I-th monomial coefficient of MAP[M]. Like COEF,
+  the input is a single DA pulled from a DA-array slot; ROSY's DAPEE
+  expects a `Vec<DA>` so we wrap into a one-element scratch.            }
+FUNCTION (RE) ME M (RE) I (RE);
+  VARIABLE (DA 1) XS;
+  XS[1] := MAP[M];
+  DAPEE XS I ME;
+ENDFUNCTION;
+
+{ ----- Matrix-element with parameter ----------------------
+  MEP(M, I) returns the parameter-dependent component of MAP[M] keyed by
+  exponent ID I, where the first TWOND variables are dynamic and the
+  rest are parameters. The result is a DA polynomial in the parameter
+  variables — physically, the parameter-derivative of the I-th matrix
+  element. ROSY's DAPEP fills a DA vector slot, so we unwrap [1].      }
+FUNCTION (DA) MEP M (RE) I (RE);
+  VARIABLE (DA 1) XS;
+  VARIABLE (DA 1) RES;
+  XS[1] := MAP[M];
+  DAPEP XS I TWOND RES;
+  MEP := RES[1];
+ENDFUNCTION;
+
+{ ----- Aberration extraction --------------------------
+  MA(M, II) returns the aberration coefficient of MAP[M] indexed by II
+  in BCD digit-encoding: each decimal digit of II names a phase-space
+  variable index (1..TWOND) or parameter index (TWOND+1..NV). The
+  result is the bare DA coefficient (DAPEE) multiplied by per-variable
+  scaling factors — PHSP[k] for dynamic vars, PARS[k-TWOND] for params.
+  This produces dimensionally meaningful aberration values for users
+  who care about cm/mrad-scaled output.
+
+  The digit-extraction loop:
+    K_curr = I/10        (real-valued, e.g. 123 → 12.3)
+    I_next = INT(K_curr) (12 — quotient)
+    digit  = NINT(10*(K_curr - I_next)) = 3 (last digit)                  }
+FUNCTION (RE) MA M (RE) II (RE);
+  VARIABLE (DA 1) XS;
+  VARIABLE (RE) I;
+  VARIABLE (RE) K;
+  VARIABLE (RE) DIG;
+  XS[1] := MAP[M];
+  DAPEE XS II MA;
+  I := II;
+  WHILE I # 0;
+    K := I/10;
+    I := INT(K + 0.01);
+    DIG := NINT(10*(K - I));
+    IF DIG > TWOND;
+      MA := MA*PARS[DIG - TWOND];
+    ELSE;
+      MA := MA*PHSP[DIG];
+    ENDIF;
+  ENDWHILE;
+ENDFUNCTION;
+
+{ ----- Print map to unit ------------------------------
+  Pretty-prints the first 5 DA components of MAP via DAPRV. The
+  `+ 0*DD[1]` idiom forces M slots to be DA-typed even if MAP[I] is
+  a constant (e.g. just-initialized identity map).                       }
+PROCEDURE PM IU (RE);
+  VARIABLE (DA 5) M;
+  VARIABLE (RE) I;
+  LOOP I 1 5;
+    M[I] := MAP[I] + 0*DD[1];
+  ENDLOOP;
+  DAPRV M 5 6 TWOND IU;
+ENDPROCEDURE;
+
+{ ----- Print spin map to unit -------------------------
+  Prints SPNR row by row (3 rows × 3 columns of DAs). Mirrors PM but
+  iterates the outer dim and prints each row as a 3-component DA group. }
+PROCEDURE PSM IU (RE);
+  VARIABLE (DA 3) M;
+  VARIABLE (RE) I; VARIABLE (RE) J;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      M[J] := SPNR[I, J] + 0*DD[1];
+    ENDLOOP;
+    DAPRV M 3 6 TWOND IU;
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- WM: write the active MAP to unit IU ------------
+  WM(IU) writes the global MAP to file unit IU in the standard COSY
+  transfer-map format: an "L SPOS" header (arc-length), "P (X,0,Z)"
+  position, "A (PLOC,0,0)" axis, then MAP[1..8] with E24.16 precision.
+
+   uses a single I variable both as the format-string holder
+  and the loop counter (loose typing). ROSY needs separate variables —
+  FORM (ST) holds the format spec, I (RE) is the loop counter.        }
+PROCEDURE WM IU (RE);
+  VARIABLE (ST) FORM;
+  VARIABLE (RE) I;
+  FORM := '(E24.16)';
+  WRITE IU ' L  ' & SF(SPOS, FORM);
+  WRITE IU ' P (' & SF(XLOC, FORM) & ',' & SF(0, FORM) & ',' & SF(ZLOC, FORM) & ')';
+  WRITE IU ' A (' & SF(PLOC, FORM) & ',' & SF(0, FORM) & ',' & SF(0, FORM) & ')';
+  LOOP I 1 8;
+    WRITE IU MAP[I] + 0*DD[1];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- WNM: write a saved map NAP to unit IU ----------
+  Like WM but for an arbitrary map NAP (8 components written, no axis info).
+  Always writes the full NAP[1..8] even if TWOND < 8 — RNM expects 8. }
+PROCEDURE WNM IU (RE) NAP (DA 8);
+  VARIABLE (ST) FORM;
+  VARIABLE (RE) I;
+  FORM := '(E24.16)';
+  WRITE IU ' L  ' & SF(0, FORM);
+  WRITE IU ' P (' & SF(0, FORM) & ',' & SF(0, FORM) & ',' & SF(0, FORM) & ')';
+  WRITE IU ' A (' & SF(0, FORM) & ',' & SF(0, FORM) & ',' & SF(0, FORM) & ')';
+  LOOP I 1 8;
+    WRITE IU NAP[I] + 0*DD[1];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- Print map N to unit ----------------------------
+  Same as PM but for an arbitrary parameter map N rather than the global
+  active MAP. Used to inspect saved or computed maps without making them
+  the active state.                                                       }
+PROCEDURE PNM N (DA 8) IU (RE);
+  VARIABLE (DA 5) M;
+  VARIABLE (RE) I;
+  LOOP I 1 5;
+    M[I] := N[I] + 0*DD[1];
+  ENDLOOP;
+  DAPRV M 5 6 TWOND IU;
+ENDPROCEDURE;
+
+{ ----- Difference of two maps to unit -----------------
+  DMAP(M, N, IU) prints D[I] = M[I] - N[I] for I = 1..TWOND. Useful for
+  validating that two maps represent the same transformation up to the
+  computational order.                                                    }
+PROCEDURE DMAP M (DA 8) N (DA 8) IU (RE);
+  VARIABLE (DA 8) D;
+  VARIABLE (RE) I;
+  LOOP I 1 TWOND;
+    D[I] := M[I] - N[I];
+  ENDLOOP;
+  DAPRV D TWOND 6 TWOND IU;
+ENDPROCEDURE;
+
+{ ----- Difference of two spin maps to unit ----------- }
+PROCEDURE DSMAP M (DA 3 3) N (DA 3 3) IU (RE);
+  VARIABLE (DA 3) D;
+  VARIABLE (RE) I; VARIABLE (RE) J;
+  LOOP I 1 3;
+    LOOP J 1 3;
+      D[J] := M[I, J] - N[I, J];
+    ENDLOOP;
+    DAPRV D 3 6 TWOND IU;
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- Apply a map to a saved map ---------------------
+  ANM(N, M, O) computes the polynomial composition O = N ∘ M, treating M as
+  the substitution argument for the canonical phase-space variables in N.
+
+  Algorithm: build a working buffer MM of size NV where MM[1..TWOND] = M
+  and MM[TWOND+1..NV] = DD[i] (the identity DAs for the non-dynamical
+  variables — energy, mass, time, etc.). Then call POLVAL 1 N TWOND MM NV
+  O TWOND to substitute. The DD-padding is what lets the composition leave
+  parameter-style variables alone while still producing TWOND outputs.
+
+  POLVAL routes to rosy_polval_da once the dispatch sees DA-typed args —
+  see rosy/src/program/statements/math/polval/mod.rs.
+
+  In COSY, MM is `VARIABLE MM NM1 NV` (size-NV at runtime). ROSY needs
+  compile-time dims for arrays, so MM is declared (DA 20) — the same upper
+  bound DD uses in libcosy/globals.rosy. POLVAL only reads the first NV
+  elements anyway.                                                          }
+PROCEDURE ANM N (DA 8) M (DA 8) O (DA 8);
+  VARIABLE (DA 20) MM;
+  VARIABLE (RE) I;
+  LOOP I 1 TWOND;
+    MM[I] := M[I];
+  ENDLOOP;
+  LOOP I TWOND+1 NV;
+    MM[I] := DD[I];
+  ENDLOOP;
+  POLVAL 1 N TWOND MM NV O TWOND;
+ENDPROCEDURE;
+
+{ ----- Set local-Cartesian axis coordinates -----------
+  LOCSET stashes 6 angles/positions into globals XLOC/ZLOC/PLOC/SLOC/
+  VLOC/TLOC. Element procedures call this to declare the local-frame
+  delta before invoking UPDATE, which then composes the delta onto
+  the global GTRA / SPOS state.                                         }
+PROCEDURE LOCSET X (RE) Z (RE) P (RE) S (RE) V (RE) T (RE);
+  XLOC := X; ZLOC := Z; PLOC := P;
+  SLOC := S; VLOC := V; TLOC := T;
+ENDPROCEDURE;
+
+{ ----- Final-to-initial Cartesian transformation -------
+  LOCTRA(X, Y, Z, T, P, A, NAP) builds a 3-row map NAP describing the
+  position-vector transformation from the final reference frame back to
+  the initial frame, parameterized by translation (X, Y, Z) and Euler-
+  like rotation angles (T = θ, P = φ, A = α).
+
+  The math is a standard 3-2-1 Euler rotation composed with a translation:
+  CT/ST = cos/sin(θ), CP/SP = cos/sin(φ), CA/SA = cos/sin(α). The
+  IF/ELSEIF on `ABS(ST*SP)=1` handles the gimbal-lock degenerate case.
+  Final NAP[1..3] are DA polynomials in DD[1..3] (the canonical position
+  variables x, y, z).                                                    }
+PROCEDURE LOCTRA X (RE) Y (RE) Z (RE) T (RE) P (RE) A (RE) NAP;
+  VARIABLE (RE) CT; VARIABLE (RE) ST;
+  VARIABLE (RE) CP; VARIABLE (RE) SP;
+  VARIABLE (RE) CA; VARIABLE (RE) SA;
+  VARIABLE (RE) CB; VARIABLE (RE) SB;
+  VARIABLE (RE) CM; VARIABLE (RE) SM;
+  VARIABLE (RE) N;
+
+  CT := COS(T); ST := SIN(T);
+  CP := COS(P); SP := SIN(P);
+  CA := COS(A); SA := SIN(A);
+
+  IF ABS(ST*SP) = 1;
+    CB := 0; SB := 1;
+  ELSE;
+    N := SQRT(1 - SQR(ST)*SQR(SP));
+    CB := CP/N;
+    SB := CT*SP/N;
+  ENDIF;
+
+  CM := CA*CB + SA*SB;
+  SM := SA*CB - CA*SB;
+
+  NAP[1] := X + (CM*CT*CP - SM*SP)*DD[1] - (CM*SP + SM*CT*CP)*DD[2] + (ST*CP)*DD[3];
+  NAP[2] := Y + (CM*CT*SP + SM*CP)*DD[1] + (CM*CP - SM*CT*SP)*DD[2] + (ST*SP)*DD[3];
+  NAP[3] := Z - (CM*ST)*DD[1]            + (SM*ST)*DD[2]            + (CT)*DD[3];
+ENDPROCEDURE;
+
+{ ----- UPDATEMAP: compose two maps + spin update -------
+  UPDATEMAP(MAPT, MAPO, MAPU, SPNT, SPNO, SPNU): apply (MAPT, SPNT) onto
+  the previous state (MAPO, SPNO), producing the updated state
+  (MAPU, SPNU). Used by UPDATE and ring-element procedures to chain
+  per-element maps together.
+
+  Algorithm:
+    1. Build MS as MAPO padded with DD basis beyond TWOND.
+    2. POLVAL: MAPU = MAPT ∘ MS — pure map composition.
+    3. If LSPN = 1, fold SPNT (the local-element spin matrix) onto SPNO
+       through SPNMUL:
+         a. Flatten SPNT into a 9-vector SVO row-major.
+         b. POLVAL 2 — substitute MS into SVO so SV is the map-pulled-back
+            local spin matrix (each entry now lives in the orbital DA
+            algebra of MAPO, not MAPT).
+         c. Multiply SV (reshaped 3×3) into SM := SPNO from the left:
+              SPNU[I, J] = Σ_K SV[3(I-1)+K] · SPNO[K, J]
+         The result is the proper composition of two SO(3) rotations
+         expressed as DA-valued matrices.                                 }
+PROCEDURE UPDATEMAP MAPT (DA 8) MAPO (DA 8) MAPU (DA 8)
+                    SPNT (DA 3 3) SPNO (DA 3 3) SPNU (DA 3 3);
+  VARIABLE (DA 20) MS;
+  VARIABLE (RE) I;
+
+  LOOP I 1 TWOND;
+    MS[I] := MAPO[I];
+  ENDLOOP;
+  LOOP I TWOND+1 NV;
+    MS[I] := DD[I];
+  ENDLOOP;
+  POLVAL 1 MAPT TWOND MS NV MAPU TWOND;
+
+  IF LSPN = 1;
+    VARIABLE (DA 9) SVO;
+    VARIABLE (DA 9) SV;
+    VARIABLE (RE)   J;
+    VARIABLE (RE)   K;
+
+    { Flatten SPNT row-major into SVO ( uses 3*(I-1)+J indexing). }
+    LOOP I 1 3;
+      LOOP J 1 3;
+        SVO[3*(I - 1) + J] := SPNT[I, J];
+      ENDLOOP;
+    ENDLOOP;
+
+    { Pull SVO back through MS — SV[k] now lives in MAPO's DA algebra. }
+    POLVAL 2 SVO 9 MS NV SV 9;
+
+    { 3×3 matrix product SPNU = SV (reshaped) · SPNO.  writes
+      directly to SPNU; we write 0 first since accumulation is += DA. }
+    LOOP I 1 3;
+      LOOP J 1 3;
+        SPNU[I, J] := 0*DD[1];
+        LOOP K 1 3;
+          SPNU[I, J] := SPNU[I, J] + SV[3*(I - 1) + K]*SPNO[K, J];
+        ENDLOOP;
+      ENDLOOP;
+    ENDLOOP;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- UPDATE: standard step-update for ring tracking -
+  UPDATE(IM, IR): the per-element finalizer that composes MSC into MAP
+  (when IM≠0), pushes ray bundles through MSC (when IR≠0 and NRAY≠0),
+  refreshes the envelope ERAY (when LENV=1), and advances the local-
+  frame transform onto the global one.
+
+  * IR + NRAY ≠ 0 path: calls POLVAL 1 MSC TWOND RAY 8 RAY TWOND.
+    Because RAY is stored as `(VE 8)` (each RAY[k] is a VE of all
+    particles' k-th coordinate), POLVAL routes through the batched
+    per-particle dispatch and evaluates MSC at all particles
+    simultaneously. The same path TR uses for tracking. SPNVEC fires
+    when LSPN=1 and NSPN>0 to refresh per-ray spin via SSCR.
+
+  * LENV=1 path:
+    Calls the inlined NEWENV — propagates the 1σ phase-space envelope
+    ERAY[I, I+1] for each canonical pair (I = 1, 3 for ND=2) through
+    the linear part of MSC, using the  closed-form combining
+    PHSP (axis variances) and PHSR (correlation factors). Matrix
+    elements ME(I, J) are extracted via `CONS(DER(J, MSC[I]))` — the
+    ROSY-canonical pattern documented at normal_form.rosy:1564 (cosy
+    fox's ME intrinsic isn't in ROSY because ROSY's TRANSPORT id
+    encoding is left-to-right, so DER+CONS is the equivalent).
+
+  Local-frame transform & SPOS advance: centralized
+  here. Element procedures call LOCSET to populate the
+  local-frame deltas (XLOC, ZLOC, PLOC, SLOC, VLOC, TLOC) then route
+  through UPDATE to compose them onto the global state. SPOS
+  accumulates by SLOC each call; LTRA + GTRA propagate the running
+  reference-axis transform via LOCTRA + POLVAL composition.
+
+  Skipped (graphics-only, libcosy plan): LPI ≠ 0 element-box draw,
+  LSYS / LCE flags, RSC / ERSC graphics-snapshot writes.              }
+PROCEDURE UPDATE IM (RE) IR (RE);
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+
+  IF IM # 0;
+    UPDATEMAP MSC MAP MAP SSCR SPNR SPNR;
+  ENDIF;
+
+  { Ray bundle push through the local element map. }
+  IF (IR # 0) AND (NRAY # 0);
+    { SPNVEC: per-ray spin-vector rotation.
+      Pulls SSCR (3×3 DA local rotation) back through RAY's particle
+      coordinates via POLVAL 2, then matrix-multiplies the result
+      into SPI[1..3] per ray, normalizing each output. }
+    IF (LSPN = 1) AND (NSPN > 0);
+      VARIABLE (DA 9) SVO_UV;
+      VARIABLE (VE 9) SSCM_UV;
+      VARIABLE (VE 3) SCRV_UV;
+      VARIABLE (VE)   SCR_UV;
+      VARIABLE (RE)   IR_;
+      VARIABLE (RE)   JR_;
+
+      { Initial sanity-check: any ray with |SPI| ≈ 0 means the user
+        forgot to seed spin via SSPI. Done once when LCR=1 latches. }
+      IF LCR = 1;
+        LCR := 0;
+        SCR_UV := 0*SPI[1];
+        LOOP IR_ 1 3;
+          SCR_UV := SCR_UV + (SPI[IR_])*(SPI[IR_]);
+        ENDLOOP;
+        VELSET SCR_UV 1 1;
+        IF VMIN(SCR_UV) < 1E-3;
+          WRITE 6 ' *** ERROR in UPDATE, there is a zero spin vector';
+          QUIT 0;
+        ENDIF;
+      ENDIF;
+
+      { Flatten SSCR into a 9-poly SVO_UV (row-major 3*(I-1)+J). }
+      LOOP IR_ 1 3;
+        LOOP JR_ 1 3;
+          SVO_UV[3*(IR_ - 1) + JR_] := SSCR[IR_, JR_];
+        ENDLOOP;
+      ENDLOOP;
+
+      { Per-particle batch: substitute RAY's (VE 8) into SVO_UV.
+        SSCM_UV[k] now holds the k-th flattened-matrix entry for
+        every ray ( uses POLVAL 2; libcosy's POLVAL routes
+        to rosy_polval_ve via the (VE 8) layout). }
+      POLVAL 2 SVO_UV 9 RAY 8 SSCM_UV 9;
+
+      { Apply 3×3 matrix to SPI per ray into SCRV_UV, build squared
+        norm in SCR_UV. The reshape SSCM_UV[3(I-1)+J] is the (I, J)
+        entry of the per-ray rotation. }
+      SCR_UV := 0*SPI[1];
+      LOOP IR_ 1 3;
+        SCRV_UV[IR_] := 0*SPI[1];
+        LOOP JR_ 1 3;
+          SCRV_UV[IR_] := SCRV_UV[IR_] + SSCM_UV[3*(IR_ - 1) + JR_]*SPI[JR_];
+        ENDLOOP;
+        SCR_UV := SCR_UV + (SCRV_UV[IR_])*(SCRV_UV[IR_]);
+      ENDLOOP;
+
+      { Normalize: SQRT element-wise, anchor index-1 to 1 (the
+        reserved slot, matches 's VELSET trick). }
+      SCR_UV := SQRT(SCR_UV);
+      VELSET SCR_UV 1 1;
+      LOOP IR_ 1 3;
+        SPI[IR_] := SCRV_UV[IR_]/SCR_UV;
+      ENDLOOP;
+    ENDIF;
+
+    POLVAL 1 MSC TWOND RAY 8 RAY TWOND;
+  ENDIF;
+
+  { Envelope update — closed-form 1σ propagation through the linear
+    part of MSC.                                   }
+  IF LENV = 1;
+    LOOP I 1 MIN(TWOND, 4) 2;
+      J := (I + 1)/2;
+      ERAY[I] := SQRT(SQR(PHSP[I]*CONS(DER(I, MSC[I])))
+                     + SQR(PHSP[I+1]*CONS(DER(I+1, MSC[I])))
+                     + 2*PHSP[I]*PHSP[I+1]*PHSR[J]
+                       *CONS(DER(I, MSC[I]))*CONS(DER(I+1, MSC[I])));
+      ERAY[I+1] := SQR(PHSP[I])*CONS(DER(I, MSC[I]))*CONS(DER(I, MSC[I+1]))
+                  + SQR(PHSP[I+1])*CONS(DER(I+1, MSC[I]))*CONS(DER(I+1, MSC[I+1]));
+      ERAY[I+1] := (PHSP[I]*PHSP[I+1]*PHSR[J]
+                    *(CONS(DER(I, MSC[I]))*CONS(DER(I+1, MSC[I+1]))
+                     + CONS(DER(I+1, MSC[I]))*CONS(DER(I, MSC[I+1])))
+                   + ERAY[I+1]) / ERAY[I];
+      EMAX[J] := MAX(EMAX[J], ERAY[I]);
+    ENDLOOP;
+  ENDIF;
+
+  { Local-frame transform advance. LCB is the
+    bend-direction sign flag — XLOC and PLOC double-tap by it (once
+    pre-LOCTRA, once post-) so coordinate flips through CB stay
+    consistent. GPLOC accumulates the global-azimuth angle. LTRA
+    holds the local axis offset / rotation; POLVAL composes it onto
+    the running global GTRA. SPOS finally advances by SLOC. }
+  VARIABLE (RE) NEG_PLOC_UV;
+  XLOC := XLOC*LCB;
+  PLOC := PLOC*LCB;
+  GPLOC := GPLOC + PLOC;
+  NEG_PLOC_UV := -PLOC;
+  LOCTRA XLOC 0 ZLOC NEG_PLOC_UV 0 0 LTRA;
+  POLVAL 1 GTRA 3 LTRA 3 GTRA 3;
+  SPOS := SPOS + SLOC;
+  XLOC := XLOC*LCB;
+  PLOC := PLOC*LCB;
+ENDPROCEDURE;
+
+{ ----- Apply a map to the momentary MAP --------------
+  AM(M) composes M onto the active map and propagates the action to ray
+  bundles.  semantics:
+        MSC := M (copy)
+        LOCSET 0 0 0 0 0 0          { zero local-frame transform }
+        UPDATE 1 1                  { apply MSC to MAP and rays }
+
+  With UPDATE-with-rays now landed (M16), AM follows  literally —
+  no NRAY=0 fast-path needed. The only behavioral difference from a bare
+  ANM is that AM also stamps zero local-frame deltas via LOCSET, so the
+  caller's coordinate-frame state stays consistent.                       }
+PROCEDURE AM M (DA 8);
+  VARIABLE (RE) I;
+  LOOP I 1 TWOND;
+    MSC[I] := M[I];
+  ENDLOOP;
+  LOCSET 0 0 0 0 0 0;
+  UPDATE 1 1;
+ENDPROCEDURE;
+
+{ ----- Fixed point + map-around-fixed-point -----------
+  FM(M, XF, MF, IER) finds the closed-orbit fixed point XF of map M (where
+  M(XF) = XF) and the local map MF around it.
+
+  Algorithm:
+    1. Probe the constant-term displacement of each component (DAPEP at
+       exponent 0). If all are zero, M is already at-origin → XF = 0 and
+       MF = M trivially.
+    2. Otherwise, build N = M - DD (the displacement field) and invert via
+       MI to get NI. Apply NI to C (the constant-only DA) to find the
+       fixed-point offset XF.
+    3. Substitute XF back into M (POLVAL with mode 1) to compute MF, the
+       map seen from the fixed point.
+    4. Subtract C and DD adjustments to leave XF and MF in the COSY-
+       conventional "small displacement" coordinates.
+    5. Special-case TWOND=5: copy DD[5] / DD[6] handling for the time +
+       energy slots that aren't part of the fixed-point search.
+
+  Requires MI (linear_algebra.rosy). Self-contained otherwise.            }
+PROCEDURE FM M (DA 8) XF (DA 8) MF (DA 8) IER (RE);
+  VARIABLE (DA 20) N;
+  VARIABLE (DA 20) NI;
+  VARIABLE (DA 20) C;
+  VARIABLE (RE) I;
+  VARIABLE (DA 1) M_BUF;
+  VARIABLE (DA 1) PEP_BUF;
+  VARIABLE (RE) COR;
+  VARIABLE (RE) P;
+
+  P := 0;
+  IF TWOND = 5;
+    COR := 4;
+  ELSE;
+    COR := TWOND;
+  ENDIF;
+
+  LOOP I 1 COR;
+    M_BUF[1] := M[I];
+    DAPEP M_BUF 0 COR PEP_BUF;
+    P := P + ABS(PEP_BUF[1]);
+  ENDLOOP;
+
+  IF P = 0;
+    LOOP I 1 TWOND;
+      MF[I] := M[I];
+      XF[I] := 0*DD[1];
+    ENDLOOP;
+    IER := 0;
+  ELSE;
+    LOOP I 1 COR;
+      C[I] := 0*DD[1];
+      N[I] := M[I] - DD[I];
+    ENDLOOP;
+    LOOP I COR+1 NV;
+      C[I] := DD[I];
+      N[I] := DD[I];
+    ENDLOOP;
+    MI N NI NV IER NOC NV NM1;
+    IF IER # 0;
+      WRITE 6 ' --- WARNING in FM, no fixed point';
+    ENDIF;
+    POLVAL 1 NI NV C NV XF NV;
+    POLVAL 1 M TWOND XF NV C TWOND;
+    LOOP I 1 COR;
+      XF[I] := XF[I] + DD[I];
+    ENDLOOP;
+    POLVAL 0 M TWOND XF NV MF TWOND;
+    LOOP I 1 COR;
+      MF[I] := MF[I] - C[I];
+      XF[I] := XF[I] - DD[I];
+    ENDLOOP;
+    IF TWOND = 5;
+      XF[5] := C[5];
+      MF[5] := MF[5] - C[5] + DD[5];
+      MF[6] := DD[6];
+    ENDIF;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- Map reverse — beam time-reversal ---------------
+  MR(NAP, LAP) computes the time-reversed map LAP from the forward map NAP.
+  Time reversal inverts the map and flips the sign of all momenta and
+  (in 3D) the time variable, since classical mechanics is reversible up
+  to those parities.
+
+  Algorithm:
+    1. Pad NAP with DD's identity slots beyond TWOND → MM (full NV-length).
+    2. Invert MM in-place via MI.
+    3. Build COD: even-indexed slots negate (the momenta and t-of-flight),
+       odd-indexed slots stay as DD; ND=3 also negates DD[5].
+    4. POLVAL: substitute COD into the inverted MM → LAP.
+
+  Requires MI from helpers/linear_algebra.rosy and exercises the dup-arg
+  writeback (MI MM MM NV I NOC NV NM1 aliases positions 0 and 1).      }
+PROCEDURE MR NAP (DA 8) LAP (DA 8);
+  VARIABLE (DA 20) COD;
+  VARIABLE (RE) NUM;
+  VARIABLE (RE) I;
+  VARIABLE (DA 20) MM;
+
+  NUM := MIN(TWOND, 4);
+  LOOP I 1 TWOND;
+    MM[I] := NAP[I];
+  ENDLOOP;
+  LOOP I TWOND+1 NV;
+    MM[I] := DD[I];
+  ENDLOOP;
+  MI MM MM NV I NOC NV NM1;
+  IF I # 0;
+    WRITE 6 ' *** ERROR in REV, no inverse';
+    QUIT 0;
+  ENDIF;
+  LOOP I 2 NUM 2;
+    COD[I-1] := DD[I-1];
+    COD[I] := -DD[I];
+    MM[I] := -MM[I];
+  ENDLOOP;
+  LOOP I NUM+1 NV;
+    COD[I] := DD[I];
+  ENDLOOP;
+  IF ND > 2;
+    COD[5] := -DD[5];
+    MM[5] := -MM[5];
+  ENDIF;
+  POLVAL 1 MM TWOND COD NV LAP TWOND;
+ENDPROCEDURE;
+
+{ ----- COSY → exponential-theory variable reorder ----
+  RCT(X) reorders the array X from COSY's canonical pairing (q1 p1 q2 p2 ...)
+  to exponential-theory's grouped pairing (q1 q2 ... qN p1 p2 ... pN).
+  Uses a POLVAL substitution: build TMP with the reordered components,
+  build RCE as the basis-DA mapping for the reorder, then evaluate.
+
+  TMP holds the *reordered* version of X under the new layout; RCE holds
+  the substitution polynomial that maps a canonical-input to a reordered
+  position. POLVAL applies the reorder via Horner. The result is written
+  back into X — same dup-arg-writeback pattern as ANM.                  }
+PROCEDURE RCT X (DA 8);
+  VARIABLE (RE) I;
+  VARIABLE (DA 8) RCE;
+  VARIABLE (DA 8) TMP;
+
+  LOOP I 1 ND;
+    TMP[I] := X[2*I-1];
+    TMP[ND+I] := X[2*I];
+  ENDLOOP;
+  LOOP I 1 ND;
+    RCE[2*I-1] := DA(I);
+    RCE[2*I] := DA(ND+I);
+  ENDLOOP;
+  POLVAL 2 TMP TWOND RCE TWOND X TWOND;
+ENDPROCEDURE;
+
+{ ----- Exponential-theory → COSY variable reorder ----
+  RET(X): inverse of RCT. Reorders from grouped (q...p...) back to
+  canonical (q1 p1 q2 p2 ...). The pair-then-substitute mechanic mirrors
+  RCT exactly with the indices swapped.                                  }
+PROCEDURE RET X (DA 8);
+  VARIABLE (RE) I;
+  VARIABLE (DA 8) REC;
+  VARIABLE (DA 8) TMP;
+
+  LOOP I 1 ND;
+    TMP[2*I-1] := X[I];
+    TMP[2*I] := X[ND+I];
+  ENDLOOP;
+  LOOP I 1 ND;
+    REC[I] := DA(2*I-1);
+    REC[ND+I] := DA(2*I);
+  ENDLOOP;
+  POLVAL 2 TMP TWOND REC TWOND X TWOND;
+ENDPROCEDURE;
+
+{ ----- Reorder a single function from exp-theory to COSY (L1886-1889) ----
+  RETF reorders the variables inside a single DA function F (rather than
+  an array of DAs), via a 1-element POLVAL with the same basis-DA
+  reorder used by RET.                                                    }
+PROCEDURE RETF F (DA);
+  VARIABLE (RE) I;
+  VARIABLE (DA 8) REC;
+  VARIABLE (DA 1) X;
+
+  LOOP I 1 ND;
+    REC[I] := DA(2*I-1);
+    REC[ND+I] := DA(2*I);
+  ENDLOOP;
+  X[1] := F;
+  POLVAL 2 X 1 REC TWOND X 1;
+  F := X[1];
+ENDPROCEDURE;
+
+{ ----- Canonical → TRANSPORT-standard map --------------
+  CATR(IAP, NAP, LGH) converts the canonical map IAP into TRANSPORT's
+  small-angle-approximation representation NAP, with LGH the element's
+  arc length. The conversion folds in kinematic factors so positions and
+  momenta scale to TRANSPORT's conventions:
+    * GM, MG: dimensionless mass/momentum factors built from DD (the
+      canonical reference) and IAP (the actual map's momentum slots).
+    * VN, LT: time-of-flight scaling factors active only at ND=3.
+  COP and DOP are the canonical-and-deflected substitution buffers; the
+  final ANM DOP COP NAP applies the conversion via map composition.
+
+  The nested IF(ND>0)/IF(ND>1)/IF(ND>2) skeleton (not ELSEIF) means each
+  outer branch *adds* terms to COP/DOP — ND=1 only writes positions 1,2;
+  ND=2 also writes 3,4; ND=3 also writes 5,6 (time-of-flight). DD is
+  size-20 so out-of-range references like DD[4] at ND=1 silently read
+  zero DAs without crashing, matching 's loose array semantics. }
+PROCEDURE CATR IAP (DA 8) NAP (DA 8) LGH (RE);
+  VARIABLE (RE) NC;
+  VARIABLE (RE) PC;
+  VARIABLE (DA) VN; VARIABLE (DA) LT;
+  VARIABLE (DA) GM; VARIABLE (DA) MG;
+  VARIABLE (DA 20) COP;
+  VARIABLE (DA 20) DOP;
+
+  IF LUM # 1;
+    WRITE 6 ' *** ERROR, call UM before CATR';
+    QUIT 0;
+  ENDIF;
+
+  PC := CONS(P0);
+  IF ND > 2;
+    GM := SQRT(1 + SQR(DD[2]) + SQR(DD[4]))/(1 + DD[6]);
+  ELSEIF ND > 0;
+    GM := SQRT(1 + SQR(DD[2]) + SQR(DD[4]))*PC/P0;
+  ENDIF;
+  IF ND > 1;
+    MG := SQRT(SQR(P0/PC) - SQR(IAP[2]) - SQR(IAP[4]));
+  ELSEIF ND > 0;
+    MG := SQRT(SQR(P0/PC) - SQR(IAP[2]));
+  ENDIF;
+  IF ND > 0;
+    COP[1] := DD[1]; COP[2] := DD[2]/GM;
+    DOP[1] := IAP[1]; DOP[2] := IAP[2]/MG;
+    IF ND > 1;
+      COP[3] := DD[3]; COP[4] := DD[4]/GM;
+      DOP[3] := IAP[3]; DOP[4] := IAP[4]/MG;
+      IF ND > 2;
+        COP[5] := DD[5];
+        NC := CONS(ETA);
+        VN := V0/CONS(V0);
+        LT := -(1+NC)/(2+NC)/VN;
+        COP[6] := (SQRT(SQR(PC*(1+DD[6])/M0/AMUMEV)+1)-1)*M0*AMUMEV/CONS(E0)-1;
+        DOP[5] := DD[5] - (IAP[5]-DD[5])/LT - (VN-1)*LGH;
+        DOP[6] := P0/PC - 1;
+      ENDIF;
+    ENDIF;
+  ENDIF;
+  ANM DOP COP NAP;
+ENDPROCEDURE;
+
+{ LOCSET / LOCTRA — moved up before UPDATEMAP / UPDATE
+  so UPDATE's local-frame block can call LOCTRA without forward-
+  reference issues. See top of file for the original definitions. }
+
+{ ----- Map of rotated element -------------------------
+  MT(IAP, NAP, PHI) rotates the input map IAP by PHI degrees about the
+  beam axis, producing NAP. Used to construct skew variants of upright
+  elements (skew quad / sextupole) — the rotation acts on (x, y) and
+  (p_x, p_y) jointly.
+
+  Algorithm:
+    1. Build the 4×4 block-diagonal rotation matrix R = diag(R_2, R_2)
+       where R_2 = [[cos PHI, sin PHI], [−sin PHI, cos PHI]].
+    2. COD := R · DD — rotated canonical variables (positions + momenta).
+    3. POLVAL: NAP := IAP ∘ COD — substitute rotated variables into IAP.
+    4. NAP[1..4] := R^T · NAP[1..4] — undo the variable rotation in the
+       output dimensions, leaving a map that's PHI-rotated about the axis.
+
+  PHI is given in degrees; common multiples of 90 take exact-cosine
+  shortcuts to avoid floating-point drift. ND>1 is required; the
+  ND=1 path with non-zero PHI errors out (no y-axis to rotate into). }
+PROCEDURE MT IAP (DA 8) NAP (DA 8) PHI (RE);
+  VARIABLE (RE 4 4) R;
+  VARIABLE (DA 20) COD;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) S;
+  VARIABLE (RE) C;
+
+  IF PHI = 0;
+    C := 1; S := 0;
+  ELSEIF ABS(PHI+90) = 180;
+    C := 0; S := 1;
+  ELSEIF ABS(PHI) = 180;
+    C := -1; S := 0;
+  ELSEIF ABS(PHI-90) = 180;
+    C := 0; S := -1;
+  ELSE;
+    C := COS(PHI*DEGRAD);
+    S := SIN(PHI*DEGRAD);
+  ENDIF;
+
+  IF (TWOND = 1) AND (S # 0);
+    WRITE 6 ' *** ERROR in MT, ND too low';
+    QUIT 0;
+  ENDIF;
+
+  LOOP I 1 4;
+    LOOP J 1 4;
+      R[I, J] := 0;
+    ENDLOOP;
+    R[I, I] := C;
+  ENDLOOP;
+  LOOP I 1 2;
+    R[I, I+2] := S;
+    R[I+2, I] := -S;
+  ENDLOOP;
+
+  LOOP I 1 4;
+    COD[I] := 0*DD[1];
+    LOOP J 1 4;
+      COD[I] := COD[I] + R[I, J]*DD[J];
+    ENDLOOP;
+  ENDLOOP;
+  LOOP I 5 NV;
+    COD[I] := DD[I];
+  ENDLOOP;
+
+  POLVAL 1 IAP TWOND COD NV NAP TWOND;
+
+  LOOP I 1 4;
+    COD[I] := 0*DD[1];
+    LOOP J 1 4;
+      COD[I] := COD[I] + R[J, I]*NAP[J];
+    ENDLOOP;
+  ENDLOOP;
+  LOOP I 1 4;
+    NAP[I] := COD[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- TRANSPORT-standard → canonical map --------------
+  TRCA is the inverse of CATR: convert NAP-as-TRANSPORT into NAP-as-canonical.
+  The kinematic factors GM and MG swap roles (GM now divides DOP, MG divides
+  COP), and the time-of-flight LT branch reads from IAP rather than DD for
+  the VN factor. Same nested-IF skeleton as CATR.                            }
+PROCEDURE TRCA IAP (DA 8) NAP (DA 8) LGH (RE);
+  VARIABLE (RE) NC;
+  VARIABLE (RE) PC;
+  VARIABLE (DA) VN; VARIABLE (DA) LT;
+  VARIABLE (DA) GM; VARIABLE (DA) MG;
+  VARIABLE (DA 20) COP;
+  VARIABLE (DA 20) DOP;
+  VARIABLE (RE) I;
+
+  IF LUM # 1;
+    WRITE 6 ' *** ERROR, call UM before TRCA';
+    QUIT 0;
+  ENDIF;
+
+  PC := CONS(P0);
+  IF ND > 2;
+    GM := SQRT(1 + SQR(IAP[2]) + SQR(IAP[4]))/(1 + DD[6]);
+  ELSEIF ND > 1;
+    GM := SQRT(1 + SQR(IAP[2]) + SQR(IAP[4]))*PC/P0;
+  ELSEIF ND > 0;
+    GM := SQRT(1 + SQR(IAP[2]))*PC/P0;
+  ENDIF;
+  MG := SQRT(SQR(P0/PC) - SQR(DD[2]) - SQR(DD[4]));
+  IF ND > 0;
+    COP[1] := DD[1]; COP[2] := DD[2]/MG;
+    DOP[1] := IAP[1]; DOP[2] := IAP[2]/GM;
+    IF ND > 1;
+      COP[3] := DD[3]; COP[4] := DD[4]/MG;
+      DOP[3] := IAP[3]; DOP[4] := IAP[4]/GM;
+      IF ND > 2;
+        COP[5] := DD[5]; COP[6] := P0/PC - 1;
+        NC := CONS(ETA);
+        VN := PC/M0/AMUMEV*(1 + DD[6]);
+        VN := VN/SQRT(1 + SQR(VN));
+        VN := VN/CONS(VN);
+        LT := -(1+NC)/(2+NC)/VN;
+        DOP[6] := (SQRT(SQR(PC*(1+IAP[6])/M0/AMUMEV)+1)-1)*M0*AMUMEV/CONS(E0)-1;
+        DOP[5] := DD[5] - (IAP[5]-DD[5]+(VN-1)*LGH)*LT;
+      ENDIF;
+    ENDIF;
+  ENDIF;
+  ANM DOP COP NAP;
+ENDPROCEDURE;
+
+{ ----- Poisson bracket --------------------------------
+  PB(X, Y) = Σ_{i=1,3,5,...} ∂X/∂q_i · ∂Y/∂p_i − ∂X/∂p_i · ∂Y/∂q_i
+  where (q_i, p_i) are the canonical phase-space pairs and the sum runs
+  over the ND pairs (TWOND = 2*ND, step 2).
+  The `0*X + 0*Y` initializer keeps PB DA-typed even before the first
+  loop iteration writes — bare RE 0 would mismatch the DA return slot. }
+FUNCTION (DA) PB X (DA) Y (DA);
+  VARIABLE (RE) I;
+  PB := 0*X + 0*Y;
+  LOOP I 1 TWOND 2;
+    PB := PB + DER(I, X)*DER(I+1, Y) - DER(I+1, X)*DER(I, Y);
+  ENDLOOP;
+ENDFUNCTION;
+
+{ ----- Print active MAP in TRANSPORT representation ---
+  PT(IU) prints the active MAP's TRANSPORT-standard form to unit IU. The
+  TRANSPORT convention scales positions to cm (×100) and angles to mrad
+  (×1000), making the matrix elements dimensionally interpretable for
+  physicists used to the standard beam-optics literature.
+
+  Algorithm:
+    1. CATR converts MAP (canonical) to M (TRANSPORT).
+    2. Build MM as DD scaled into TRANSPORT units (×.01 for positions,
+       ×.001 for angles, ×.01 for time-of-flight at ND=3).
+    3. POLVAL substitutes MM into M to compute the scaled output.
+    4. Re-scale MM back to TRANSPORT print units (×100, ×1000, ×.1).
+    5. Pad with zero DAs through slot 5; DAPRV prints.                    }
+PROCEDURE PT IU (RE);
+  VARIABLE (DA 8) M;
+  VARIABLE (RE) I;
+  VARIABLE (DA 20) MM;
+
+  CATR MAP M SPOS;
+  LOOP I TWOND NV;
+    MM[I] := DD[I];
+  ENDLOOP;
+  LOOP I 1 TWOND 2;
+    MM[I] := 0.01*DD[I];
+    MM[I+1] := 0.001*DD[I+1];
+  ENDLOOP;
+  IF ND > 2;
+    MM[6] := 0.01*DD[6];
+  ENDIF;
+  POLVAL 1 M TWOND MM NV MM TWOND;
+  LOOP I 1 TWOND 2;
+    MM[I] := 100*MM[I];
+    MM[I+1] := 1000*MM[I+1];
+  ENDLOOP;
+  IF ND > 2;
+    MM[6] := 0.1*MM[6];
+  ENDIF;
+  LOOP I 1 5;
+    MM[I] := MM[I] + 0*DD[1];
+  ENDLOOP;
+  DAPRV MM 5 6 TWOND IU;
+ENDPROCEDURE;
+
+{ ----- COSY-to-TRANSPORT coordinate conversion ------
+  COSY2TR(MC) writes the active phase-space basis XX into MC, scaling the
+  momenta and time-of-flight slots so that MC ends up in TRANSPORT-like
+  coordinates (relative slopes for momenta, normalized time-of-flight).
+
+  Algorithm:
+    1. SCR = inverse-sqrt of the on-momentum momentum factor 1 - p_x^2 - p_y^2.
+    2. Copy XX into MC for all TWOND slots.
+    3. Scale momenta (slots 2, 4) by SCR.
+    4. Time-of-flight slot 5 gets the relativistic conversion -P0/E0.
+
+  Used by users converting symbolic COSY maps to TRANSPORT-readable form. }
+PROCEDURE COSY2TR MC (DA 8);
+  VARIABLE (RE) I;
+  VARIABLE (DA) SCR;
+  SCR := ISRT(SQR(P0/CONS(P0)) - SQR(XX[2]) - SQR(XX[4]));
+  LOOP I 1 TWOND;
+    MC[I] := XX[I];
+  ENDLOOP;
+  LOOP I 2 4 2;
+    MC[I] := MC[I]*SCR;
+  ENDLOOP;
+  MC[5] := -CONS(P0)/CONS(E0)*MC[5];
+ENDPROCEDURE;
+
+{ ----- Print aberrations of the active MAP -----------
+  PA(IU) prints aberration coefficients of the active MAP to unit IU,
+  scaled by per-coordinate phase-space factors (PHSP) and parameter-
+  space factors (PARS). The scaling makes higher-order coefficients
+  dimensionally meaningful as percentage / mrad / etc.
+
+  Algorithm:
+    1. Build MM with PHSP-scaled DD basis for the dynamical TWOND
+       slots, and PARS-scaled DD for the NV-TWOND parameter slots.
+    2. POLVAL substitutes MM into MAP — output has aberrations
+       expressed in the user's chosen scaled units.
+    3. Pad MM[TWOND+1..5] with zero DAs and DAPRV-print 5 components. }
+PROCEDURE PA IU (RE);
+  VARIABLE (RE) I;
+  VARIABLE (DA 20) MM;
+
+  LOOP I 1 TWOND;
+    MM[I] := PHSP[I]*DD[I];
+  ENDLOOP;
+  LOOP I TWOND+1 NV;
+    MM[I] := PARS[I-TWOND]*DD[I];
+  ENDLOOP;
+  POLVAL 1 MAP TWOND MM NV MM TWOND;
+  LOOP I TWOND+1 5;
+    MM[I] := 0*DD[1];
+  ENDLOOP;
+  DAPRV MM 5 6 TWOND IU;
+ENDPROCEDURE;
+
+{ ----- Block-diagonalize a linear map ---------------
+  BM(M, MB, A, IER) writes M as A^{-1} · MB · A where MB has decoupled
+  planes (the linear part is block-diagonal). Used by DANF as the first
+  step of normal-form analysis: linearize, decouple planes, then run
+  per-plane normal form on each.
+
+  Algorithm:
+    1. Extract the linear matrix MM from M via DAPEE per slot.
+    2. MBLOCK splits MM into the forward (MA) and inverse (MI) similarity
+       transformations that decouple it.
+    3. Build A from MI·DD (the inverse-transform map basis).
+    4. Build SCR from MA·DD (the forward-transform map basis).
+    5. Apply M to SCR via ANM, then re-multiply by MI to extract MB.
+
+  MBLOCK is provided as a ROSY statement (rosy/src/program/statements/math/
+  mblock/). Output A is a DA-array map; MB is the decoupled image. }
+PROCEDURE BM M (DA 8) MB (DA 8) A (DA 8) IER (RE);
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE 20 20) MM;
+  VARIABLE (RE 20 20) MA;
+  VARIABLE (RE 20 20) MI;
+  VARIABLE (DA 20) SCR;
+
+  { Linear matrix extraction via DER+CONS: ∂M[I]/∂x_J at origin = m_IJ.
+     uses `DAPEE M(I) J K` with J as the id, but ROSY's TRANSPORT
+    id is left-to-right (id=10 → x_1 not x_2), so single-digit J only
+    works for J=1. The DER route is encoding-agnostic. }
+  LOOP I 1 TWOND;
+    LOOP J 1 TWOND;
+      MM[I, J] := CONS(DER(J, M[I]));
+    ENDLOOP;
+  ENDLOOP;
+
+  MBLOCK MM MA MI NV TWOND;
+
+  LOOP I 1 TWOND;
+    A[I]   := 0*DD[1];
+    SCR[I] := 0*DD[1];
+    LOOP J 1 TWOND;
+      A[I]   := A[I]   + MI[I, J]*DD[J];
+      SCR[I] := SCR[I] + MA[I, J]*DD[J];
+    ENDLOOP;
+  ENDLOOP;
+
+  ANM M SCR SCR;
+
+  LOOP I 1 TWOND;
+    MB[I] := 0*DD[1];
+    LOOP J 1 TWOND;
+      MB[I] := MB[I] + MI[I, J]*SCR[J];
+    ENDLOOP;
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- Twiss / tune extraction for block-diagonal maps
+  GT(MM, F, MU, ALPHA, BETA, GAMMA, R) computes the tune (MU), the three
+  Twiss parameters (ALPHA, BETA, GAMMA) and the contraction factor (R) from
+  a one-turn map MM. F is the fixed point (output of FM).
+
+  Algorithm (per phase-space pair J = 1..ND):
+    1. FM extracts the linear part M of MM around its fixed point F.
+    2. DAPEP at the (K, TWOND) and (L, TWOND) exponents pulls out the
+       2x2 stability sub-matrix [[A, B], [C, D]].
+    3. DET = CONS(A·D - B·C) classifies the tune:
+        DET > 0  → stable (real tune from cos(MU) = (A+D)/2/R)
+        DET = 0  → degenerate (parabolic — tune frozen at 0)
+        DET < 0  → unstable (imaginary tune)
+    4. The OUT helper (inlined here) folds R·SIN(MU) into the Twiss values:
+        ALPHA = (A-D)/(2·DUM), BETA = B/DUM, GAMMA = -C/DUM
+       where DUM = R·SIN(MU).
+
+  Per-call CO NOC-1 / CO NOC+1 brackets keep the linear-part extraction at
+  the right truncation order.
+
+  This port handles only the stable real-tune case (the DET>0 / |cos(MU)|<1
+  branch). Hyperbolic / parabolic / instability branches need CD-arithmetic
+  helpers (ACOS on CD, LOG on CD) that aren't yet wired through ROSY's
+  intrinsic surface — they error out with a clear message.
+
+  Variables renamed: 's nested OUT helper closes over A/B/C/D in
+  the enclosing scope, but inlining it sidesteps the closure entirely.
+  CC stands in for 's C (avoiding the C / C_2 / C_3 namespace
+  pollution from libcosy global declarations).                            }
+PROCEDURE GT MM (DA 8) F (DA 8) MU (DA 4) ALPHA (DA 4) BETA (DA 4) GAMMA (DA 4) R (DA 4);
+  VARIABLE (RE) A;
+  VARIABLE (RE) B;
+  VARIABLE (RE) CC;
+  VARIABLE (RE) D;
+  VARIABLE (RE) DET;
+  VARIABLE (RE) COSMU;
+  VARIABLE (RE) SINMU;
+  VARIABLE (RE) DEN;
+  VARIABLE (RE) MU_J;
+  VARIABLE (DA 8) M;
+  VARIABLE (RE) IER;
+  VARIABLE (RE) J;
+  VARIABLE (RE) K;
+  VARIABLE (RE) L;
+
+  FM MM F M IER;
+
+  LOOP J 1 ND;
+    K := 2*J - 1;
+    L := K + 1;
+    { Extract the 2x2 stability sub-matrix [[A, B], [CC, D]] via partial-
+      derivative-then-CONS. ROSY's DAPEP uses left-to-right TRANSPORT id
+      encoding (id=10 → x_1 not x_2), so 's `DAPEP M(K) K TWOND`
+      doesn't extract the K-th-variable coefficient when K>1. The DER
+      route is encoding-agnostic: ∂M[K]/∂x_K at origin = linear
+      coefficient m_KK.                                                   }
+    A  := CONS(DER(K, M[K]));
+    B  := CONS(DER(L, M[K]));
+    CC := CONS(DER(K, M[L]));
+    D  := CONS(DER(L, M[L]));
+    DET := A*D - B*CC;
+    IF DET > 0;
+      VARIABLE (RE) ABS_COSMU;
+      COSMU := (A + D)/2/SQRT(DET);
+      ABS_COSMU := ABS(COSMU);
+      IF ABS(ABS_COSMU - 1) < DEPS;
+        { Parabolic boundary: COSMU ≈ ±1 means
+          the map is on the stability border — typical for pure drifts
+          and straight sections with no focusing.  accepts only
+          the b=0, c=0 case; otherwise the map can't be represented in
+          Twiss form (would need a Jordan block).                       }
+        IF (ABS(B) = 0) AND (ABS(CC) = 0);
+          R[J]     := SQRT(DET) + 0*DD[1];
+          ALPHA[J] := 0*DD[1];
+          BETA[J]  := 1 + 0*DD[1];
+          GAMMA[J] := 1 + 0*DD[1];
+          IF COSMU < 0;
+            MU[J] := 0.5 + 0*DD[1];
+          ELSE;
+            MU[J] := 0*DD[1];
+          ENDIF;
+        ELSE;
+          WRITE 6 ' *** ERROR in GT, unrepresentable parabolic map';
+          WRITE 6 '     (COSMU ≈ ±1 but B / CC nonzero — would need Jordan form)';
+          QUIT 0;
+        ENDIF;
+      ELSEIF ABS_COSMU < 1;
+        { Stable rotation: the bread-and-butter
+          ring case. COSMU is the rotation cosine, MU is the tune. }
+        R[J] := SQRT(DET) + 0*DD[1];
+        MU_J := ACOS(COSMU);
+        IF B < 0;
+          MU_J := 2*PI - MU_J;
+        ENDIF;
+        SINMU := SIN(MU_J);
+        DEN := CONS(R[J])*SINMU;
+        MU[J]    := MU_J/(2*PI) + 0*DD[1];
+        ALPHA[J] := (A - D)/(2*DEN) + 0*DD[1];
+        BETA[J]  := B/DEN + 0*DD[1];
+        GAMMA[J] := -CC/DEN + 0*DD[1];
+      ELSE;
+        { Hyperbolic (DET > 0, |COSMU| > 1). MU = DEN + i·LOG(COSMU+SINMU)
+          per ; the real part is DEN ∈ {0, π} depending on sign
+          of COSMU. ALPHA / BETA / GAMMA are purely imaginary and so
+          collapse to 0 under the DA-typed real-cast that libcosy's
+          GT signature requires. Callers needing the imaginary tune
+          residue (the actual hyperbolic growth rate) should call TS
+          directly with a CD output buffer. R is set to √DET as a
+          best-effort real magnitude. }
+        VARIABLE (RE) DEN_HYP;
+        VARIABLE (RE) SINMU_HYP;
+        VARIABLE (RE) IMAG_RES_HYP;
+        IF COSMU < 0;
+          DEN_HYP := PI;
+          SINMU_HYP := SQRT(SQR(-COSMU) - 1);
+        ELSE;
+          DEN_HYP := 0;
+          SINMU_HYP := SQRT(SQR(COSMU) - 1);
+        ENDIF;
+        IMAG_RES_HYP := LOG(ABS(COSMU) + SINMU_HYP);
+        R[J]     := SQRT(DET) + 0*DD[1];
+        MU[J]    := DEN_HYP/(2*PI) + 0*DD[1];
+        ALPHA[J] := 0*DD[1];
+        BETA[J]  := 0*DD[1];
+        GAMMA[J] := 0*DD[1];
+        WRITE 6 ' --- WARNING in GT, hyperbolic plane J =';
+        WRITE 6 J;
+        WRITE 6 '     real-cast loses imag tune residue =';
+        WRITE 6 IMAG_RES_HYP;
+        WRITE 6 '     ALPHA / BETA / GAMMA pinned to 0; call TS for full info.';
+      ENDIF;
+    ELSEIF DET = 0;
+      IF (ABS(A) = 0) AND (ABS(B) = 0) AND (ABS(CC) = 0) AND (ABS(D) = 0);
+        R[J]     := 0*DD[1];
+        MU[J]    := 0*DD[1];
+        ALPHA[J] := 0*DD[1];
+        BETA[J]  := 1 + 0*DD[1];
+        GAMMA[J] := 1 + 0*DD[1];
+      ELSE;
+        WRITE 6 ' *** ERROR in GT, DET=0';
+        QUIT 0;
+      ENDIF;
+    ELSE;
+      { DET < 0: instability. R = i·√(-DET) is purely imag, MU = π/2
+        + K·i·LOG(SINMU+COSMU) per . Real-cast extracts only
+        the π/2 tune component; the K·LOG growth-rate residue is
+        reported as a diagnostic. ALPHA / BETA / GAMMA collapse to 0
+        for the same reason as hyperbolic. }
+      VARIABLE (RE) DEN_INS;
+      VARIABLE (RE) COSMU_INS;
+      VARIABLE (RE) SINMU_INS;
+      VARIABLE (RE) IMAG_RES_INS;
+      DEN_INS := SQRT(-DET);
+      COSMU_INS := (A + D)/2/DEN_INS;
+      IF COSMU_INS < 0;
+        SINMU_INS := SQRT(SQR(-COSMU_INS) + 1);
+      ELSE;
+        SINMU_INS := SQRT(SQR(COSMU_INS) + 1);
+      ENDIF;
+      IMAG_RES_INS := LOG(ABS(COSMU_INS) + SINMU_INS);
+      R[J]     := DEN_INS + 0*DD[1];
+      MU[J]    := 0.25 + 0*DD[1];
+      ALPHA[J] := 0*DD[1];
+      BETA[J]  := 0*DD[1];
+      GAMMA[J] := 0*DD[1];
+      WRITE 6 ' --- WARNING in GT, unstable plane J =';
+      WRITE 6 J;
+      WRITE 6 '     real-cast pins MU to π/2 (= 0.25 turn); imag growth residue =';
+      WRITE 6 IMAG_RES_INS;
+      WRITE 6 '     ALPHA / BETA / GAMMA pinned to 0; call TS for full info.';
+    ENDIF;
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- Momentum compaction dL(dP)/L -----------------
+  MCM(IAP, LGH, ALPHA) computes the momentum-compaction factor αp from a
+  ring map IAP. αp = dL/L per dP — fractional path-length change per
+  fractional momentum offset, the foundational figure of merit for
+  storage-ring optics.
+
+  Algorithm: convert IAP to TRANSPORT representation (CATR), then use
+  FM under TWOND=5 (treating the time slot as parameter, not phase-space)
+  to extract the path-length-vs-momentum derivative XF[5]. ALPHA = (XF[5]
+  - DD[5]) / LGH normalizes to the COSY convention.                      }
+PROCEDURE MCM IAP (DA 8) LGH (RE) ALPHA (DA);
+  VARIABLE (DA 20) XF;
+  VARIABLE (DA 20) MF;
+  VARIABLE (RE) IER;
+
+  IF ND # 3;
+    WRITE 6 ' *** ERROR in MCM, dimension # 3';
+  ENDIF;
+  CATR IAP IAP LGH;
+  TWOND := 5;
+  FM IAP XF MF IER;
+  TWOND := 6;
+  ALPHA := (XF[5] - DD[5])/LGH;
+ENDPROCEDURE;
+
+{ ----- Energy compaction dT(dE) ---------------------
+  ECM(IAP, LGH, ALPHA): the relativistic-energy analogue of MCM. Returns
+  the time-of-flight derivative with respect to energy offset.           }
+PROCEDURE ECM IAP (DA 8) LGH (RE) ALPHA (DA);
+  VARIABLE (DA 20) XF;
+  VARIABLE (DA 20) MF;
+  VARIABLE (RE) IER;
+
+  IF ND # 3;
+    WRITE 6 ' *** ERROR in ECM, dimension # 3';
+  ENDIF;
+  TWOND := 5;
+  FM IAP XF MF IER;
+  TWOND := 6;
+  ALPHA := XF[5] - DD[5];
+ENDPROCEDURE;
+
+{ DANF (full normal-form analysis) lives in normal_form.rosy. It
+  block-diagonalizes a one-turn map, computes resonant terms, and
+  extracts the symplectic normal form via Cj operator iteration. The
+  bottom-up shortcuts FM (fixed point), BM (block-diagonal form), and
+  GT (Twiss / tune) live here as building blocks DANF stacks on. }
+
+{ ----- RM: read transfer map from unit IU -------------
+  Inverse of WM. Two file formats are supported:
+
+    1. Modern (WM-format): first line begins with " L ". Header parses
+       arc-length / position / axis state into SLOC/XLOC/ZLOC/PLOC,
+       then 8 DA components are read via DAREA into MSC[1..8].
+    2. Legacy: no " L " marker. BACKF rewinds, DAREV reads 5 DA
+       components into MSC[1..5] in one shot, MSC[6] := DD[6] sets
+       time-of-flight to identity, axis state cleared via LOCSET.
+
+  After loading MSC, UPDATE 1 1 commits the map (MSC -> MAP path).
+  The format-detect sentinel " L " is the same string WM writes.
+  R(LIN, I1, I2) is the libcosy substring-to-real helper.
+
+  Placed at the end of map_ops.rosy because LOCSET (defined later in
+  the file) and UPDATE both need to be in scope when RM is parsed —
+  ROSY's resolver requires forward declarations within a single file. }
+PROCEDURE RM IU (RE);
+  VARIABLE (ST) LIN;
+  VARIABLE (DA 1) DUM;
+  VARIABLE (RE) I;
+  VARIABLE (RE) DUM_RE;
+  VARIABLE (RE) X_TMP;
+  VARIABLE (RE) Z_TMP;
+  VARIABLE (RE) P_TMP;
+  VARIABLE (RE) S_TMP;
+  READ IU LIN;
+  IF SS(LIN, 1, 3) = ' L ';
+    S_TMP := R(LIN, 5, 28);
+    READ IU LIN;
+    X_TMP := R(LIN, 5, 28);
+    DUM_RE := R(LIN, 30, 53);
+    Z_TMP := R(LIN, 55, 78);
+    READ IU LIN;
+    P_TMP := R(LIN, 5, 28);
+    DUM_RE := R(LIN, 30, 53);
+    DUM_RE := R(LIN, 55, 78);
+    LOCSET X_TMP Z_TMP P_TMP S_TMP 0 0;
+    LOOP I 1 8;
+      DAREA IU DUM NV;
+      MSC[I] := DUM[1];
+    ENDLOOP;
+  ELSE;
+    BACKF IU;
+    DAREV MSC 5 6 TWOND IU;
+    MSC[6] := DD[6];
+    LOCSET 0 0 0 0 0 0;
+  ENDIF;
+  UPDATE 1 1;
+ENDPROCEDURE;
+
+{ ----- RNM: read NAP from unit IU ---------------------
+  Inverse of WNM. Same dual-format scheme as RM but writes into the
+  caller's NAP[8] argument instead of MSC. Skips the LOCSET / UPDATE
+  side effects since NAP is a local variable to the caller, not the
+  active beamline state.
+
+  Modern format: skip 3 header lines, read 8 DAs into IAP[1..8].
+  Legacy format: BACKF, DAREV 5 components, set IAP[6] := DD[6].
+  Final loop copies IAP[1..TWOND] into NAP. Note that the legacy
+  branch leaves IAP[7], IAP[8] uninitialized — but NAP only
+  receives the first TWOND elements.                                  }
+PROCEDURE RNM IU (RE) NAP (DA 8);
+  VARIABLE (ST) LIN;
+  VARIABLE (DA 1) DUM;
+  VARIABLE (RE) I;
+  VARIABLE (DA 8) IAP;
+  READ IU LIN;
+  IF SS(LIN, 1, 3) = ' L ';
+    READ IU LIN;
+    READ IU LIN;
+    LOOP I 1 8;
+      DAREA IU DUM NV;
+      IAP[I] := DUM[1];
+    ENDLOOP;
+  ELSE;
+    BACKF IU;
+    DAREV IAP 5 6 TWOND IU;
+    IAP[6] := DD[6];
+  ENDIF;
+  LOOP I 1 TWOND;
+    NAP[I] := IAP[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- COCR: COSY → circular representation ----------
+  Builds the circular-coordinate substitution
+        z₊ = x + i·a,   z₋ = x - i·a   (for each (x,a) plane)
+  and applies it to the input map IAP via CPOLVAL.
+
+  The COSY canonical pairs are (1,2)=(x,px) and (3,4)=(y,py). Circular
+  representation diagonalizes the linear rotation: a stable plane with
+  tune μ becomes a phase-multiply z₊ ↦ e^(iμ)z₊, z₋ ↦ e^(-iμ)z₋.
+
+  In  the local `I` is reused first as IMUNIT then as a loop
+  counter — ROSY strict typing splits these into `IM` (CM) and `I` (RE).
+  All DA-valued globals (DD) lift to CD via `+ 0*IM` since LAP/COD live
+  in CD-arithmetic for the CPOLVAL substitution.                          }
+PROCEDURE COCR IAP (CD 8) NAP (CD 8);
+  VARIABLE (CD 8)  LAP;
+  VARIABLE (CD 20) COD;
+  VARIABLE (CM)    IM;
+  VARIABLE (RE)    I;
+  IMUNIT IM;
+  IF ND < 2;
+    WRITE 6 ' *** ERROR in COCR, ND too small';
+    QUIT 0;
+  ENDIF;
+  COD[1] := (DD[1] + DD[2])/2 + 0*IM;
+  COD[3] := (DD[1] - DD[2])/(2*IM);
+  COD[2] := (DD[3] + DD[4])/2 + 0*IM;
+  COD[4] := (DD[3] - DD[4])/(2*IM);
+  LAP[1] := IAP[1] + IM*IAP[3];
+  LAP[2] := IAP[1] - IM*IAP[3];
+  LAP[3] := IAP[2] + IM*IAP[4];
+  LAP[4] := IAP[2] - IM*IAP[4];
+  LOOP I 5 TWOND;
+    COD[I] := DD[I] + 0*IM;
+    LAP[I] := IAP[I];
+  ENDLOOP;
+  LOOP I TWOND+1 NV;
+    COD[I] := DD[I] + 0*IM;
+  ENDLOOP;
+  CPOLVAL 1 LAP TWOND COD NV NAP TWOND;
+ENDPROCEDURE;
+
+{ ----- CRCO: circular representation → COSY ----------
+  Inverse of COCR. Builds
+        x = (z₊ + z₋)/2,   a = (z₊ - z₋)/(2i)
+  and applies via CPOLVAL. The result should be purely real (zero imag
+  part) up to numerical noise — we strip the imag part in-place and warn
+  if the residual exceeds 1e-12 (matches 's diagnostic).
+
+  Note the in-place `NAP[I] := REAL(NAP[I])` keeps NAP CD-typed (REAL of
+  a CM gives RE which auto-lifts back to CD with zero imag) — same effect
+  as 's loose-typed write-back, just written explicitly.          }
+PROCEDURE CRCO IAP (CD 8) NAP (CD 8);
+  VARIABLE (CD 8)  LAP;
+  VARIABLE (CD 20) COD;
+  VARIABLE (CM)    IM;
+  VARIABLE (RE)    I;
+  VARIABLE (RE)    DUM;
+  IMUNIT IM;
+  IF ND < 2;
+    WRITE 6 ' *** ERROR in CRCO, ND too small';
+    QUIT 0;
+  ENDIF;
+  COD[1] := DD[1] + IM*DD[3];
+  COD[2] := DD[1] - IM*DD[3];
+  COD[3] := DD[2] + IM*DD[4];
+  COD[4] := DD[2] - IM*DD[4];
+  LAP[1] := (IAP[1] + IAP[2])/2;
+  LAP[3] := (IAP[1] - IAP[2])/(2*IM);
+  LAP[2] := (IAP[3] + IAP[4])/2;
+  LAP[4] := (IAP[3] - IAP[4])/(2*IM);
+  LOOP I 5 TWOND;
+    COD[I] := DD[I] + 0*IM;
+    LAP[I] := IAP[I];
+  ENDLOOP;
+  LOOP I TWOND+1 NV;
+    COD[I] := DD[I] + 0*IM;
+  ENDLOOP;
+  CPOLVAL 1 LAP TWOND COD NV NAP TWOND;
+  DUM := 0;
+  LOOP I 1 TWOND;
+    DUM := DUM + ABS(IMAG(NAP[I]));
+    NAP[I] := REAL(NAP[I]) + 0*IM;
+  ENDLOOP;
+  IF DUM > 1E-12;
+    WRITE 6 ' --- WARNING in CRCO, map not in circular representation';
+  ENDIF;
+ENDPROCEDURE;
+
+{ Trajectory reconstruction for spectrograph error analysis.
+  Generates N stochastic samples drawn from input position / momentum
+  widths (X, A, Y, B, D), pushes them through the forward map M plus
+  a measurement-resolution kick (PR, AR), and reconstructs each input
+  via the inverse map MR (computed from M when OR_ARG > 0). RES[1..4]
+  receives the mean reciprocal-residual figures of merit per coordinate
+  — higher values mean the reconstruction is well-conditioned.
+
+  Uses an inline linear-congruential PRNG seeded at 0, advanced via
+  IRAN := 2·(98765·IRAN + 0.12345 − round(...)). IRAN cycles
+  deterministically per call so callers see reproducible runs. }
+PROCEDURE RR M (DA 8) X (RE) A (RE) Y (RE) B (RE) D (RE)
+            PR (RE) AR_ARG (RE) N (RE) OR_ARG (RE)
+            MR (DA 8) RES (RE 4);
+  VARIABLE (DA 4) M4;
+  VARIABLE (DA 6) CM;
+  VARIABLE (VE 6) RI;
+  VARIABLE (VE 4) RO;
+  VARIABLE (VE 4) RB;
+  VARIABLE (VE 4) RES_VEC;
+  VARIABLE (VE)   S_VE;
+  VARIABLE (DA 1) BUF_IN;
+  VARIABLE (DA 1) BUF_OUT;
+  VARIABLE (RE)   IRAN;
+  VARIABLE (RE)   NN;
+  VARIABLE (RE)   NOM;
+  VARIABLE (RE)   IER;
+  VARIABLE (RE)   I;
+  VARIABLE (RE)   J;
+  VARIABLE (RE)   S_VAL;
+
+  IRAN := 0;
+
+  IF OR_ARG > 0;
+    LOOP I 1 4;
+      BUF_IN[1] := M[I];
+      DAPLU BUF_IN 1 0 BUF_OUT;
+      M4[I] := BUF_OUT[1];
+      CM[I + 1] := DD[I];
+    ENDLOOP;
+    NOM := NOC;
+    CO OR_ARG;
+    CM[1] := 0*DD[1];
+    CM[6] := 0*DD[1];
+    IF ND = 3;
+      CM[6] := DD[4];
+      CM[5] := 0*DD[1];
+    ENDIF;
+    POLVAL 1 M4 4 CM 6 M4 4;
+    MI M4 MR 4 IER NOC NV NM1;
+    CO NOM;
+  ELSE;
+    IER := 0;
+  ENDIF;
+
+  S_VE := VE(0);
+  LOOP I 1 N - 1;
+    S_VE := S_VE & 0;
+  ENDLOOP;
+
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I X*IRAN;
+  ENDLOOP;
+  RI[1] := S_VE;
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I A*IRAN;
+  ENDLOOP;
+  RI[2] := S_VE;
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I Y*IRAN;
+  ENDLOOP;
+  RI[3] := S_VE;
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I B*IRAN;
+  ENDLOOP;
+  RI[4] := S_VE;
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I D*IRAN;
+  ENDLOOP;
+  RI[5] := S_VE;
+  RI[6] := S_VE;
+
+  POLVAL 1 M 4 RI 6 RO 4;
+
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I PR*IRAN;
+  ENDLOOP;
+  RES_VEC[1] := S_VE;
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I AR_ARG*IRAN;
+  ENDLOOP;
+  RES_VEC[2] := S_VE;
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I PR*IRAN;
+  ENDLOOP;
+  RES_VEC[3] := S_VE;
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I AR_ARG*IRAN;
+  ENDLOOP;
+  RES_VEC[4] := S_VE;
+
+  RO[1] := RO[1] + RES_VEC[1];
+  RO[2] := RO[2] + RES_VEC[2];
+  RO[3] := RO[3] + RES_VEC[3];
+  RO[4] := RO[4] + RES_VEC[4];
+
+  POLVAL 1 MR 4 RO 4 RB 4;
+
+  RES_VEC[1] := RI[2] - RB[1];
+  RES_VEC[2] := RI[3] - RB[2];
+  RES_VEC[3] := RI[4] - RB[3];
+  RES_VEC[4] := RI[6] - RB[4];
+
+  LOOP J 1 4;
+    RES[J] := 0;
+    NN := 0;
+    LOOP I 1 N;
+      S_VAL := RES_VEC[J]|I;
+      IF S_VAL # 0;
+        RES[J] := RES[J] + ABS(S_VAL);
+        NN := NN + 1;
+      ENDIF;
+    ENDLOOP;
+    RES[J] := NN/(RES[J] + 1E-20)/4;
+    IF IER # 0;
+      RES[J] := 0;
+    ENDIF;
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ Spectrograph resolution figure of merit. Builds an inverse map MR
+  internally then runs RR with the (X,A,Y,B,D, PR=PR, AR=PR·M(1,2))
+  spread, returning the angular-resolution figure of merit in RES. }
+PROCEDURE AR M (DA 8) X (RE) A (RE) Y (RE) B (RE) D (RE)
+            PR (RE) N (RE) RES (RE);
+  VARIABLE (DA 1) BUF_AR;
+  VARIABLE (DA 8) MR_AR;
+  VARIABLE (RE 4) RS;
+  VARIABLE (RE)   M12_COEF;
+  BUF_AR[1] := M[1];
+  DAPEE BUF_AR 2 M12_COEF;
+  RR M X A Y B D PR M12_COEF*A N 1 MR_AR RS;
+  RES := RS[4];
+ENDPROCEDURE;
+
+END;

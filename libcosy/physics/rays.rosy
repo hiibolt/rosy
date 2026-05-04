@@ -1,0 +1,792 @@
+{ Ray-subsystem primitives: ray-pool management, per-ray spin
+  initialization, printing / file I/O, set difference / append / merge,
+  and envelope / closed-orbit setup hooks consumed by tracking.
+
+  Pool layout: RAY / RSC / SPI / SSC / REMAIN / REMOVE / RCOL are
+  vec-of-vecs globals where RAY[k] is the per-particle VE for the k-th
+  phase-space coordinate. Pool growth happens via the `&` concat
+  operator inside SR, so adding a ray appends one element to each
+  RAY[k] in lockstep. NRAY counts the pool with the convention that
+  NRAY = 2 after the first SR (the slot-1 entry stays reserved). }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- CR: clear all rays
+  Resets the ray pool to a single zero ray (NRAY=2 because 's
+  ray-counter convention starts at 2 after the first SR — the SR loop
+  bumps NRAY by 1 with a special-case "if 1 → 2" boost). 's
+  loose-typed "RAY(I) := 0" zeros the I-th cell which is a VE; in
+  libcosy we replace each VE with a fresh 1-element [0] vector via the
+  `&` concat starting from an empty seed.                                 }
+PROCEDURE CR;
+  VARIABLE (RE) I;
+  VARIABLE (VE) ZERO1_VE;
+  VARIABLE (VE) ONE1_VE;
+  ZERO1_VE := VE(0);
+  ONE1_VE := VE(1);
+  LOOP I 1 8;
+    RAY[I] := ZERO1_VE;
+    RSC[I] := ZERO1_VE;
+  ENDLOOP;
+  NRAY := 0;
+  LOOP I 1 3;
+    SPI[I] := ZERO1_VE;
+    SSC[I] := ZERO1_VE;
+  ENDLOOP;
+  NSPN := 0;
+  LCR := 1;
+  RCOL := ONE1_VE;
+  REMAIN := ONE1_VE;
+  REMOVE := ZERO1_VE;
+  LENV := 0;
+ENDPROCEDURE;
+
+{ ----- SR: set / append a single ray
+  Args: X A Y B T D G Z COL — the 8-component ray (x, p_x, y, p_y, t,
+  dE, dM, z) plus a color tag. Appends to RAY[1..8] via VE-concat,
+  syncs RSC, and grows REMAIN/REMOVE markers.
+
+  `IF NRAY=1; NRAY := 2; ENDIF` boost is a quirk: the
+  initial CR-state has NRAY=0 and a placeholder zero ray. The first
+  SR call bumps NRAY 0→1; the special-case bumps it to 2 so that
+  RAY[I] now has 2 actual entries (the placeholder plus the new one).
+  Subsequent SRs increment NRAY normally.
+
+  Pre-conditions: OV must precede (LOV=1); LPI=1 means BP graphics
+  was already called and SR is too late (libcosy has no graphics
+  so LPI is always 0, but the check is preserved).                       }
+PROCEDURE SR X (RE) A (RE) Y (RE) B (RE) T (RE)
+            D (RE) G (RE) Z (RE) COL (RE);
+  VARIABLE (RE) I;
+  IF LOV = 0;
+    WRITE 6 ' *** ERROR, call OV before SR';
+    QUIT 0;
+  ENDIF;
+  IF LPI = 1;
+    WRITE 6 ' *** ERROR, call SR before BP';
+    QUIT 0;
+  ENDIF;
+  NRAY := NRAY + 1;
+  IF NRAY = 1;
+    NRAY := 2;
+  ENDIF;
+  RAY[1] := RAY[1] & X;
+  RAY[2] := RAY[2] & A;
+  RAY[3] := RAY[3] & Y;
+  RAY[4] := RAY[4] & B;
+  RAY[5] := RAY[5] & T;
+  RAY[6] := RAY[6] & D;
+  RAY[7] := RAY[7] & G;
+  RAY[8] := RAY[8] & Z;
+  RCOL := RCOL & COL;
+  LOOP I 1 8;
+    RSC[I] := RAY[I];
+  ENDLOOP;
+  REMAIN := REMAIN & 1;
+  REMOVE := REMOVE & 0;
+ENDPROCEDURE;
+
+{ ----- SSR: set spin for the most-recent ray
+  Validates LOV/LPI, bumps NSPN with the 0→2 boost, builds the (X,Y,Z)
+  triple as a temp VE, validates non-zero + matching ray-count, then
+  VEUNIT-normalizes and appends each component to SPI[1..3].
+
+  Pre-condition: NSPN must equal NRAY after the bump — i.e., user
+  called SSR exactly once per SR.  aborts on mismatch.           }
+PROCEDURE SSR X (RE) Y (RE) Z (RE);
+  VARIABLE (RE) I;
+  VARIABLE (VE) SCR;
+  IF LOV = 0;
+    WRITE 6 ' *** ERROR, call OV before SSR';
+    QUIT 0;
+  ENDIF;
+  IF LPI = 1;
+    WRITE 6 ' *** ERROR, call SSR before BP';
+    QUIT 0;
+  ENDIF;
+  NSPN := NSPN + 1;
+  IF NSPN = 1;
+    NSPN := 2;
+  ENDIF;
+  SCR := X & Y & Z;
+  IF NSPN # NRAY;
+    WRITE 6 ' *** ERROR, call SSR after each matching SR';
+    QUIT 0;
+  ENDIF;
+  IF (SCR[1] = 0) AND (SCR[2] = 0) AND (SCR[3] = 0);
+    WRITE 6 ' *** ERROR in SSR, give non zero spin vector.';
+    QUIT 0;
+  ENDIF;
+  VEUNIT SCR SCR;
+  LOOP I 1 3;
+    SPI[I] := SPI[I] & SCR[I];
+    SSC[I] := SPI[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- ENVEL — set the beam envelope ray
+  Adds a single placeholder ray via SR (8-zero with COL=1), then
+  populates ERAY[1..4] / EMAX[1..2] from the PHSP / PHSR globals (set
+  by a prior SB call). LENV=1 marks the envelope as active for
+  later TR / tracking output.                                             }
+PROCEDURE ENVEL;
+  VARIABLE (RE) I;
+  SR 0 0 0 0 0 0 0 0 1;
+  IF LOV = 0;
+    WRITE 6 ' *** ERROR, call OV before ENVEL';
+    QUIT 0;
+  ENDIF;
+  ERAY[1] := PHSP[1];
+  EMAX[1] := PHSP[1];
+  ERAY[2] := PHSR[1]*PHSP[2];
+  ERAY[3] := PHSP[3];
+  EMAX[2] := PHSP[3];
+  ERAY[4] := PHSR[2]*PHSP[4];
+  LOOP I 1 4;
+    ERSC[I] := ERAY[I];
+  ENDLOOP;
+  LENV := 1;
+ENDPROCEDURE;
+
+{ ----- ENCL — set energy-dependent closed orbit
+  Computes the fixed point of the active MAP at ND=2 (TWOND=5 mode),
+  shifts by the user-supplied energy DISP, and adds two rays:
+  one zero (placeholder) and one at the dispersion-shifted closed orbit.
+
+  TWOND swap dance: FM expects TWOND=5 internally; we swap it before
+  the call and restore after. POLVAL substitutes MF (the energy
+  perturbation vector) into XF (the fixed-point map) to produce the
+  shifted orbit coordinates.                                              }
+PROCEDURE ENCL DISP (RE);
+  VARIABLE (RE) I;
+  VARIABLE (DA 8) MF;
+  VARIABLE (DA 8) XF;
+  VARIABLE (RE) IER;
+  TWOND := 5;
+  FM MAP XF MF IER;
+  TWOND := 2*ND;
+  LOOP I 1 NV;
+    MF[I] := 0*DD[1];
+  ENDLOOP;
+  MF[6] := DISP + 0*DD[1];
+  POLVAL 1 XF NV MF NV MF NV;
+  SR 0 0 0 0 0 0 0 0 1;
+  SR CONS(MF[1]) CONS(MF[2]) CONS(MF[3]) CONS(MF[4])
+     CONS(MF[5]) CONS(MF[6]) 0 0 1;
+ENDPROCEDURE;
+
+{ ----- SCDE — set sin/cos/dispersion/envelope rays
+  Builds the four sin/cos phase-space rays plus a dispersion ray from
+  the PHSP / PHSR globals. Each ray uses the SQRT(1 - PHSR²) factor to
+  pre-compensate Twiss correlation. Then populates ERAY/EMAX/ERSC like
+  ENVEL and marks LENV=1.
+
+  Emittances per axis: π·PHSP[1]·PHSP[2]·√(1-PHSR[1]²) (X), and
+  π·PHSP[3]·PHSP[4]·√(1-PHSR[2]²) (Y).  comment line.            }
+{ ----- PR — print RAY columns to a unit
+  Trivial: writes each RAY[I] as a vector, one component per line block.
+   uses the VE->stream auto-formatting; ROSY's WRITE on VE
+  emits the same column-per-element layout.                              }
+PROCEDURE PR IU (RE);
+  VARIABLE (RE) I;
+  LOOP I 1 8;
+    WRITE IU RAY[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- PRAY — print rays in single-line-per-ray format
+  One ray per line with all 8 components + REMAIN + REMOVE columns.
+  The first ray is the reference; subsequent rays are user-added via SR.
+
+  NR = LENGTH(RAY[1]); after CR + N SR calls, RAY[1] holds N+1 elements
+  (placeholder + N actual). The IF NR=1 special-case treats "only the
+  placeholder" as zero rays — matches 's CR-NRAY=0 invariant.
+
+  Header line ' #   X    A    Y    B    T    D    G    Z    REMAIN    REMOVE'
+  is written once; data rows follow with E15.7 formatting for components
+  and I10 for the integer remain/remove flags.                           }
+PROCEDURE PRAY IU (RE);
+  VARIABLE (RE) NR;
+  VARIABLE (ST) STR;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  NR := LENGTH(RAY[1]);
+  IF NR = 1;
+    NR := 0;
+  ENDIF;
+  WRITE IU '# number of rays:' & SF(NR, '(I8)') & '  (including the reference)';
+  IF NR > 0;
+    WRITE IU '#   X              A              Y              B              T              D              G              Z              REMAIN    REMOVE';
+    LOOP J 1 NR;
+      STR := SF(RAY[1][J], '(E15.7)');
+      LOOP I 2 8;
+        STR := STR & SF(RAY[I][J], '(E15.7)');
+      ENDLOOP;
+      STR := STR & SF(REMAIN[J], '(I10)') & SF(REMOVE[J], '(I10)');
+      WRITE IU STR;
+    ENDLOOP;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- WRAY — print rays in column-per-component format
+  Alternative output: one section per phase-space component (X, A, Y, B,
+  T, D, G, Z), each with NR values one-per-line. Then a REMAIN/REMOVE
+  section with I10-formatted integer flags.
+
+  Useful when post-processing wants to consume one component at a time
+  (e.g., plot all X values across rays).                                  }
+PROCEDURE WRAY IU (RE);
+  VARIABLE (RE) NR;
+  VARIABLE (ST 8) LABL;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  LABL[1] := 'X';
+  LABL[2] := 'A';
+  LABL[3] := 'Y';
+  LABL[4] := 'B';
+  LABL[5] := 'T';
+  LABL[6] := 'D';
+  LABL[7] := 'G';
+  LABL[8] := 'Z';
+  NR := LENGTH(RAY[1]);
+  IF NR = 1;
+    NR := 0;
+  ENDIF;
+  WRITE IU '# number of rays:' & SF(NR, '(I8)') & '  (including the reference)';
+  IF NR > 0;
+    LOOP I 1 8;
+      WRITE IU '# ' & LABL[I];
+      LOOP J 1 NR;
+        WRITE IU RAY[I][J];
+      ENDLOOP;
+      WRITE IU '';
+    ENDLOOP;
+    WRITE IU '#   REMAIN    REMOVE';
+    LOOP J 1 NR;
+      WRITE IU SF(REMAIN[J], '(I10)') & SF(REMOVE[J], '(I10)');
+    ENDLOOP;
+    WRITE IU '';
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- RRAY — read rays from unit
+  Reads files produced by PRAY (single-line-per-ray) OR WRAY (column-
+  per-component). Format detected by inspecting the second line: if it
+  starts with '#   X' (PRAY header), parse fixed-width columns; if it
+  starts with '# X' (WRAY label), parse one-value-per-line sections.
+
+  Pre-condition: caller must have called CR; RRAY overwrites NRAY,
+  RAY, RSC, RCOL, REMAIN, REMOVE.
+
+  PRAY-format reads use R(STR, start, end) substring-as-RE per the 15-
+  wide column layout. WRAY-format reads use RE-typed READ directly to
+  pull one number per line.
+
+  The LRR (read-remain-remove) flag detects whether the source file has
+  REMAIN/REMOVE columns (PRAY ending in 'MOVE' or WRAY's terminal section);
+  if not, defaults are REMAIN := 1+0*VE, REMOVE := 0*VE.                  }
+PROCEDURE RRAY IU (RE);
+  VARIABLE (ST) STR;
+  VARIABLE (ST 8) LABL;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) LHEAD;
+  VARIABLE (RE) LRR;
+  VARIABLE (RE) X_TMP;
+  READ IU STR;
+  NRAY := R(STR, 18, 25);
+  LRR := 0;
+  IF NRAY > 0;
+    READS IU STR;
+    LHEAD := LENGTH(STR);
+    IF LHEAD > 3;
+      { PRAY format: header is "#   X  A  Y  B ..." ending in REMOVE if LRR }
+      IF SS(STR, LHEAD-3, LHEAD) = 'MOVE';
+        LRR := 1;
+      ENDIF;
+      READ IU STR;
+      LOOP I 1 8;
+        RAY[I] := VE(R(STR, 15*(I-1)+1, 15*I));
+      ENDLOOP;
+      IF LRR = 1;
+        REMAIN := VE(R(STR, 121, 130));
+        REMOVE := VE(R(STR, 131, 140));
+      ENDIF;
+      LOOP J 2 NRAY;
+        READ IU STR;
+        LOOP I 1 8;
+          RAY[I] := RAY[I] & R(STR, 15*(I-1)+1, 15*I);
+        ENDLOOP;
+        IF LRR = 1;
+          REMAIN := REMAIN & R(STR, 121, 130);
+          REMOVE := REMOVE & R(STR, 131, 140);
+        ENDIF;
+      ENDLOOP;
+    ELSE;
+      { WRAY format: 8 column-per-component sections + optional REMAIN/REMOVE. }
+      LABL[1] := 'X'; LABL[2] := 'A'; LABL[3] := 'Y'; LABL[4] := 'B';
+      LABL[5] := 'T'; LABL[6] := 'D'; LABL[7] := 'G'; LABL[8] := 'Z';
+      IF STR # ('# ' & LABL[1]);
+        WRITE 6 ' *** ERROR in RRAY, the wrong line is input:' STR;
+        QUIT 0;
+      ENDIF;
+      LOOP I 1 8;
+        IF I > 1;
+          READS IU STR;
+          IF STR # ('# ' & LABL[I]);
+            WRITE 6 ' *** ERROR in RRAY, the wrong line is input:' STR;
+            QUIT 0;
+          ENDIF;
+        ENDIF;
+        READ IU X_TMP;
+        RAY[I] := VE(X_TMP);
+        LOOP J 2 NRAY;
+          READ IU X_TMP;
+          RAY[I] := RAY[I] & X_TMP;
+        ENDLOOP;
+        READS IU STR;
+      ENDLOOP;
+      READS IU STR;
+      IF STR = '#   REMAIN    REMOVE';
+        LRR := 1;
+        READS IU STR;
+        REMAIN := VE(R(STR, 1, 10));
+        REMOVE := VE(R(STR, 11, 20));
+        LOOP J 2 NRAY;
+          READS IU STR;
+          REMAIN := REMAIN & R(STR, 1, 10);
+          REMOVE := REMOVE & R(STR, 11, 20);
+        ENDLOOP;
+      ENDIF;
+    ENDIF;
+  ENDIF;
+  IF LRR = 0;
+    REMOVE := 0*RAY[1];
+    REMAIN := 1 + REMOVE;
+  ENDIF;
+  LOOP I 1 8;
+    RSC[I] := RAY[I];
+  ENDLOOP;
+  RCOL := 1 + 0*RAY[1];
+ENDPROCEDURE;
+
+{ ----- SRAY — save active ray pool to a user-supplied (VE 8)
+  Trivial 8-element copy of RAY into the caller's R buffer. Useful for
+  snapshotting ray state before a destructive transform (TR / cuts).   }
+PROCEDURE SRAY R_OUT (VE 8);
+  VARIABLE (RE) I;
+  LOOP I 1 8;
+    R_OUT[I] := RAY[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- LRAY — load rays from a (VE 8) snapshot
+  Inverse of SRAY: copies R_IN[1..8] into RAY/RSC and resets NRAY,
+  RCOL, REMAIN, REMOVE from the loaded length. Caller should call CR
+  before to ensure the ray pool starts clean.
+
+  REMOVE := 0*RAY[1] is  shorthand for "VE of zeros sized
+  like RAY[1]"; REMAIN := 1+REMOVE then turns it into ones-like.       }
+PROCEDURE LRAY R_IN (VE 8);
+  VARIABLE (RE) I;
+  NRAY := LENGTH(R_IN[1]);
+  IF NRAY = 1;
+    NRAY := 0;
+  ENDIF;
+  LOOP I 1 8;
+    RAY[I] := R_IN[I];
+    RSC[I] := R_IN[I];
+  ENDLOOP;
+  REMOVE := 0*RAY[1];
+  REMAIN := 1 + REMOVE;
+  RCOL := REMAIN;
+ENDPROCEDURE;
+
+{ ----- DRAY — output difference of two ray sets
+  For each phase-space component I = 1..TWOND, computes RAYA[I]-RAYB[I]
+  and writes either the diff (if abs > AC) or '    ---' (else). Useful
+  for "did this lattice change anything?" diagnostics.
+
+  ABS on VE in libcosy returns sum-of-abs-values (per rosy_lib
+  intrinsics/abs.rs).  semantics are identical for the
+  threshold test: any non-trivial diff makes ABS exceed AC.            }
+PROCEDURE DRAY IU (RE) RAYA (VE 8) RAYB (VE 8) AC (RE);
+  VARIABLE (RE) I;
+  VARIABLE (VE) SCR;
+  LOOP I 1 TWOND;
+    SCR := RAYA[I] - RAYB[I];
+    IF ABS(SCR) > AC;
+      WRITE IU SCR;
+    ELSE;
+      WRITE IU '    ---';
+    ENDIF;
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- ARAY — append rays from unit IU to existing pool
+  Snapshot the current state (RAY0/RSC0/RCOL0/REMAIN0/REMOVE0), call
+  RRAY which overwrites the live state with the file's rays, then
+  concatenate the snapshot's rays 2..NRAY0 (skipping its placeholder)
+  back onto the now-live state.
+
+   uses range-slice `RAY0(I)|RANGE` where RANGE = 2&NRAY0;
+  libcosy doesn't have a sub-vector slice operator, so we manually
+  loop K = 2..NRAY0 and concat element-by-element. Hoist the VE temp
+  outside each inner loop to avoid re-reading the global per iter.    }
+PROCEDURE ARAY IU (RE);
+  VARIABLE (RE) NRAY0;
+  VARIABLE (RE) I;
+  VARIABLE (RE) K;
+  VARIABLE (VE 8) RAY0;
+  VARIABLE (VE 8) RSC0;
+  VARIABLE (VE) RCOL0;
+  VARIABLE (VE) REMAIN0;
+  VARIABLE (VE) REMOVE0;
+  NRAY0 := NRAY;
+  RCOL0 := RCOL;
+  REMAIN0 := REMAIN;
+  REMOVE0 := REMOVE;
+  LOOP I 1 8;
+    RAY0[I] := RAY[I];
+    RSC0[I] := RSC[I];
+  ENDLOOP;
+  RRAY IU;
+  IF NRAY = 0;
+    { File had no rays; restore snapshot. }
+    NRAY := NRAY0;
+    LOOP I 1 8;
+      RAY[I] := RAY0[I];
+      RSC[I] := RSC0[I];
+    ENDLOOP;
+    RCOL := RCOL0;
+    REMAIN := REMAIN0;
+    REMOVE := REMOVE0;
+  ELSE;
+    IF NRAY0 > 0;
+      NRAY := NRAY + NRAY0 - 1;
+      LOOP I 1 8;
+        LOOP K 2 NRAY0;
+          RAY[I] := RAY[I] & RAY0[I][K];
+          RSC[I] := RSC[I] & RSC0[I][K];
+        ENDLOOP;
+      ENDLOOP;
+      LOOP K 2 NRAY0;
+        RCOL := RCOL & RCOL0[K];
+        REMAIN := REMAIN & REMAIN0[K];
+        REMOVE := REMOVE & REMOVE0[K];
+      ENDLOOP;
+    ENDIF;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- ADDRAYS — concatenate two ray files into a third
+  Convenience wrapper: clear the pool, read FN2, append FN1 (which
+  inverts the perceived order — FN1's reference becomes the master),
+  then write the merged pool to FN.  order matches.            }
+PROCEDURE ADDRAYS FN1 (ST) FN2 (ST) FN (ST);
+  CR;
+  OPENF 77 FN2 'OLD';
+  RRAY 77;
+  CLOSEF 77;
+  OPENF 77 FN1 'OLD';
+  ARAY 77;
+  CLOSEF 77;
+  OPENF 77 FN 'UNKNOWN';
+  PRAY 77;
+  CLOSEF 77;
+ENDPROCEDURE;
+
+{ ----- PSPI — print spin vectors single-line-per-spin
+  3-component analog of PRAY. NS = LENGTH(SPI[1]) - placeholder
+  adjustment. Each spin row formats as 3×E15.7 fields. The first
+  spin vector is the (zero) reference per  SSR convention. }
+PROCEDURE PSPI IU (RE);
+  VARIABLE (RE) NS;
+  VARIABLE (ST) STR;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  NS := LENGTH(SPI[1]);
+  IF NS = 1;
+    NS := 0;
+  ENDIF;
+  WRITE IU '# number of spin vectors:' & SF(NS, '(I8)') & '  (including the reference)';
+  IF NS > 0;
+    WRITE IU '# S_X            S_Y            S_Z';
+    LOOP J 1 NS;
+      STR := SF(SPI[1][J], '(E15.7)');
+      LOOP I 2 3;
+        STR := STR & SF(SPI[I][J], '(E15.7)');
+      ENDLOOP;
+      WRITE IU STR;
+    ENDLOOP;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- WSPI — print spin vectors column-per-component
+  3-component analog of WRAY. Three sections labeled '# S_X', '# S_Y',
+  '# S_Z', each with NS values one-per-line.                            }
+PROCEDURE WSPI IU (RE);
+  VARIABLE (RE) NS;
+  VARIABLE (ST 3) LABL;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  LABL[1] := 'X';
+  LABL[2] := 'Y';
+  LABL[3] := 'Z';
+  NS := LENGTH(SPI[1]);
+  IF NS = 1;
+    NS := 0;
+  ENDIF;
+  WRITE IU '# number of spin vectors:' & SF(NS, '(I8)') & '  (including the reference)';
+  IF NS > 0;
+    LOOP I 1 3;
+      WRITE IU '# S_' & LABL[I];
+      LOOP J 1 NS;
+        WRITE IU SPI[I][J];
+      ENDLOOP;
+      WRITE IU '';
+    ENDLOOP;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- RSPI — read spin vectors from unit
+  Reads files produced by PSPI (single-line-per-spin) or WSPI (column-
+  per-component). Format detected by whether the second line is short
+  (PSPI's data row, length ≤ 5 means a numeric line) or long (WSPI's
+  '# S_X' label).
+
+  Pre-condition: caller must call CR first; RSPI overwrites NSPN, SPI,
+  SSC.                                                                   }
+PROCEDURE RSPI IU (RE);
+  VARIABLE (ST) STR;
+  VARIABLE (ST 3) LABL;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) X_TMP;
+  READ IU STR;
+  NSPN := R(STR, 26, 33);
+  IF NSPN > 0;
+    READ IU STR;
+    IF LENGTH(STR) > 5;
+      { PSPI format: data line follows. }
+      READ IU STR;
+      LOOP I 1 3;
+        SPI[I] := VE(R(STR, 15*(I-1)+1, 15*I));
+      ENDLOOP;
+      LOOP J 2 NSPN;
+        READ IU STR;
+        LOOP I 1 3;
+          SPI[I] := SPI[I] & R(STR, 15*(I-1)+1, 15*I);
+        ENDLOOP;
+      ENDLOOP;
+    ELSE;
+      { WSPI format: column sections. }
+      LABL[1] := 'X'; LABL[2] := 'Y'; LABL[3] := 'Z';
+      IF STR # ('# S_' & LABL[1]);
+        WRITE 6 ' *** ERROR in RSPI, the wrong line is input:' STR;
+        QUIT 0;
+      ENDIF;
+      LOOP I 1 3;
+        IF I > 1;
+          READ IU STR;
+          IF STR # ('# S_' & LABL[I]);
+            WRITE 6 ' *** ERROR in RSPI, the wrong line is input:' STR;
+            QUIT 0;
+          ENDIF;
+        ENDIF;
+        READ IU X_TMP;
+        SPI[I] := VE(X_TMP);
+        LOOP J 2 NSPN;
+          READ IU X_TMP;
+          SPI[I] := SPI[I] & X_TMP;
+        ENDLOOP;
+        IF I < 3;
+          READ IU STR;
+        ENDIF;
+      ENDLOOP;
+    ENDIF;
+  ENDIF;
+  LOOP I 1 3;
+    SSC[I] := SPI[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- SSPI — save spin vectors to a (VE 3) }
+PROCEDURE SSPI S_OUT (VE 3);
+  VARIABLE (RE) I;
+  LOOP I 1 3;
+    S_OUT[I] := SPI[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- LSPI — load spin vectors from a (VE 3) }
+PROCEDURE LSPI S_IN (VE 3);
+  VARIABLE (RE) I;
+  NSPN := LENGTH(S_IN[1]);
+  IF NSPN = 1;
+    NSPN := 0;
+  ENDIF;
+  LOOP I 1 3;
+    SPI[I] := S_IN[I];
+    SSC[I] := S_IN[I];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- DSPI — output difference of two spin sets }
+PROCEDURE DSPI IU (RE) SA (VE 3) SB (VE 3) AC (RE);
+  VARIABLE (RE) I;
+  VARIABLE (VE) SCR;
+  LOOP I 1 3;
+    SCR := SA[I] - SB[I];
+    IF ABS(SCR) > AC;
+      WRITE IU SCR;
+    ELSE;
+      WRITE IU '    ---';
+    ENDIF;
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- ASPI — append spin vectors from unit
+  3-component analog of ARAY. Snapshot SPI/SSC into local SPI0/SSC0,
+  call RSPI to overwrite, then concat snapshot's 2..NSPN0 entries
+  back via the same range-slice unrolling pattern.                      }
+PROCEDURE ASPI IU (RE);
+  VARIABLE (RE) NSPN0;
+  VARIABLE (RE) I;
+  VARIABLE (RE) K;
+  VARIABLE (VE 3) SPI0;
+  VARIABLE (VE 3) SSC0;
+  NSPN0 := NSPN;
+  LOOP I 1 3;
+    SPI0[I] := SPI[I];
+    SSC0[I] := SSC[I];
+  ENDLOOP;
+  RSPI IU;
+  IF NSPN = 0;
+    NSPN := NSPN0;
+    LOOP I 1 3;
+      SPI[I] := SPI0[I];
+      SSC[I] := SSC0[I];
+    ENDLOOP;
+  ELSE;
+    IF NSPN0 > 0;
+      NSPN := NSPN + NSPN0 - 1;
+      LOOP I 1 3;
+        LOOP K 2 NSPN0;
+          SPI[I] := SPI[I] & SPI0[I][K];
+          SSC[I] := SSC[I] & SSC0[I][K];
+        ENDLOOP;
+      ENDLOOP;
+    ENDIF;
+  ENDIF;
+ENDPROCEDURE;
+
+{ ----- ADDSPIS — concatenate two spin files into a third }
+PROCEDURE ADDSPIS FN1 (ST) FN2 (ST) FN (ST);
+  CR;
+  OPENF 77 FN2 'OLD';
+  RSPI 77;
+  CLOSEF 77;
+  OPENF 77 FN1 'OLD';
+  ASPI 77;
+  CLOSEF 77;
+  OPENF 77 FN 'UNKNOWN';
+  PSPI 77;
+  CLOSEF 77;
+ENDPROCEDURE;
+
+PROCEDURE SCDE;
+  VARIABLE (RE) I;
+  VARIABLE (RE) FAC;
+  IF LOV = 0;
+    WRITE 6 ' *** ERROR, call OV before SCDE';
+    QUIT 0;
+  ENDIF;
+  FAC := SQRT(1 - SQR(PHSR[1]));
+  SR PHSP[1]*FAC 0 0 0 0 0 0 0 1;
+  SR 0 PHSP[2]*FAC 0 0 0 0 0 0 1;
+  FAC := SQRT(1 - SQR(PHSR[2]));
+  SR 0 0 PHSP[3]*FAC 0 0 0 0 0 1;
+  SR 0 0 0 PHSP[4]*FAC 0 0 0 0 1;
+  SR 0 0 0 0 0 PHSP[6] 0 0 2;
+  ERAY[1] := PHSP[1];
+  EMAX[1] := PHSP[1];
+  ERAY[2] := PHSR[1]*PHSP[2];
+  ERAY[3] := PHSP[3];
+  EMAX[2] := PHSP[3];
+  ERAY[4] := PHSR[2]*PHSP[4];
+  LOOP I 1 4;
+    ERSC[I] := ERAY[I];
+  ENDLOOP;
+  LENV := 1;
+ENDPROCEDURE;
+
+{ Sets an ensemble of rays on a uniform grid in 8-D phase space.
+  NX / NA / NY / NB / NT / ND_ARG / NG / NZ are the per-axis grid
+  counts; total ray count is the product. Each ray's coords are
+  sampled from PHSP (declared via SB) as
+        v_k := PHSP[k] · (2·I_k − N_k − 1) / max(1, N_k − 1)
+  i.e. linearly spaced in [−PHSP[k], +PHSP[k]] (or pinned to 0 when
+  N_k = 1). COL is the per-axis colour-tag fallback. Requires OV +
+  SB to have been called. Calling ER after BP (graphics) is an error. }
+PROCEDURE ER NX (RE) NA (RE) NY (RE) NB (RE)
+            NT (RE) ND_ARG (RE) NG (RE) NZ (RE);
+  VARIABLE (RE) IX; VARIABLE (RE) IA; VARIABLE (RE) IY; VARIABLE (RE) IB;
+  VARIABLE (RE) IT; VARIABLE (RE) ID; VARIABLE (RE) IG; VARIABLE (RE) IZ;
+  VARIABLE (RE) VX; VARIABLE (RE) VA; VARIABLE (RE) VY; VARIABLE (RE) VB;
+  VARIABLE (RE) VT; VARIABLE (RE) VD; VARIABLE (RE) VG; VARIABLE (RE) VZ;
+  VARIABLE (RE) I;
+  VARIABLE (RE) NEG_ONE;
+  VARIABLE (RE 8) COL;
+  IF LOV = 0;
+    WRITE 6 ' *** ERROR, call OV before ER';
+    QUIT 0;
+  ENDIF;
+  IF LPI = 1;
+    WRITE 6 ' *** ERROR, call ER before BP';
+    QUIT 0;
+  ENDIF;
+  IF LPS = 0;
+    WRITE 6 ' *** ERROR, call SB before ER';
+    QUIT 0;
+  ENDIF;
+  NEG_ONE := -1;
+  IF INT(ND_ARG/2) # ND_ARG/2;
+    COL[(ND_ARG + 1)/2] := 5;
+  ENDIF;
+  LOOP I 1 ND_ARG/2;
+    COL[I] := 3;
+  ENDLOOP;
+  LOOP I ND_ARG ND_ARG/2 + 1 NEG_ONE;
+    COL[I] := 2;
+  ENDLOOP;
+  LOOP IX 1 NX;
+    LOOP IA 1 NA;
+      LOOP IY 1 NY;
+        LOOP IB 1 NB;
+          LOOP IT 1 NT;
+            LOOP ID 1 ND_ARG;
+              LOOP IG 1 NG;
+                LOOP IZ 1 NZ;
+                  VX := PHSP[1]*(2*IX - NX - 1)/MAX(1, NX - 1);
+                  VA := PHSP[2]*(2*IA - NA - 1)/MAX(1, NA - 1);
+                  VY := PHSP[3]*(2*IY - NY - 1)/MAX(1, NY - 1);
+                  VB := PHSP[4]*(2*IB - NB - 1)/MAX(1, NB - 1);
+                  VT := PHSP[5]*(2*IT - NT - 1)/MAX(1, NT - 1);
+                  VD := PHSP[6]*(2*ID - ND_ARG - 1)/MAX(1, ND_ARG - 1);
+                  VG := PHSP[7]*(2*IG - NG - 1)/MAX(1, NG - 1);
+                  VZ := PHSP[8]*(2*IZ - NZ - 1)/MAX(1, NZ - 1);
+                  SR VX VA VY VB VT VD VG VZ COL[ID];
+                ENDLOOP;
+              ENDLOOP;
+            ENDLOOP;
+          ENDLOOP;
+        ENDLOOP;
+      ENDLOOP;
+    ENDLOOP;
+  ENDLOOP;
+ENDPROCEDURE;
+
+END;

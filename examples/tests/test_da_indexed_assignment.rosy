@@ -1,0 +1,30 @@
+{ ============================================================================
+  Regression / status test for FEEDBACK Issue 6.
+
+  cosy.fox-style multi-element DA array build:
+       MAP1(1) := DA(1);
+       MAP1(2) := DA(2);
+  used to fail with "(DA 1D) vs (DA)" elision conflict before the
+  WithDimensions wrap at assign/mod.rs:268-273. Verifies it works now
+  when the caller declares the array type explicitly (the practical
+  workaround used throughout libcosy).
+  ============================================================================ }
+
+BEGIN;
+
+VARIABLE (DA 8) MAP1;     { explicit type — libcosy/globals.rosy uses this same form for MAP }
+
+DAINI 3 2 0 0;             { order 3, 2 vars, no inv, no expand }
+
+MAP1(1) := DA(1);
+MAP1(2) := DA(2);
+MAP1(3) := DA(1) + DA(2);  { mix to ensure each slot is fully expressed }
+
+WRITE 6 'MAP1(1) = ';
+WRITE 6 MAP1(1);
+WRITE 6 'MAP1(2) = ';
+WRITE 6 MAP1(2);
+WRITE 6 'MAP1(3) = ';
+WRITE 6 MAP1(3);
+
+END;

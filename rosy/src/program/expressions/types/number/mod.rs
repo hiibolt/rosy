@@ -51,7 +51,16 @@ impl FromRule for f64 {
             "Expected number rule, got {:?}",
             pair.as_rule()
         );
-        let n = pair.as_str().parse::<f64>()?;
+        // Accept Fortran-style `D/d` exponents (e.g. `1.66053873D-27`)
+        // alongside `E/e`. Rust's `f64::from_str` only knows about the
+        // latter, so normalize before parsing.
+        let raw = pair.as_str();
+        let normalized = if raw.contains(|c: char| c == 'd' || c == 'D') {
+            raw.replace('D', "E").replace('d', "e")
+        } else {
+            raw.to_string()
+        };
+        let n = normalized.parse::<f64>()?;
         Ok(Some(n))
     }
 }
@@ -85,5 +94,62 @@ impl Transpile for f64 {
             requested_variables: BTreeSet::new(),
             value_kind: ValueKind::Owned,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ast::{CosyParser, Rule};
+    use pest::Parser;
+
+    /// Parse a numeric literal source through the grammar and assert that the
+    /// rule matches the entire input — i.e. nothing was left unconsumed.
+    fn must_parse_as_number(src: &str) {
+        let mut pairs = CosyParser::parse(Rule::number, src)
+            .unwrap_or_else(|e| panic!("grammar rejected '{src}': {e}"));
+        let pair = pairs.next().expect("no pair");
+        assert_eq!(
+            pair.as_str(),
+            src,
+            "rule consumed only '{}' of '{}' (expected full match)",
+            pair.as_str(),
+            src
+        );
+    }
+
+    #[test]
+    fn number_parses_integer_and_decimal() {
+        must_parse_as_number("0");
+        must_parse_as_number("42");
+        must_parse_as_number("-7");
+        must_parse_as_number("3.14");
+        must_parse_as_number("-2.71828");
+    }
+
+    /// Scientific notation must match in ONE rule application, otherwise
+    /// `1.66E-7` decays to `1.66` followed by an unbound `E-7` expression
+    /// (the latter being treated as an undeclared variable). Checks both
+    /// uppercase / lowercase E and explicit / implicit exponent sign.
+    #[test]
+    fn number_parses_scientific_notation() {
+        must_parse_as_number("1e5");
+        must_parse_as_number("1E5");
+        must_parse_as_number("1.5e10");
+        must_parse_as_number("1.66E-7");
+        must_parse_as_number("-2.5e+10");
+        must_parse_as_number("6.022E+23");
+    }
+
+    /// cosy.fox uses Fortran's `D/d` exponent convention to mark
+    /// double-precision literals (e.g. `1.66053873D-27` for the AMU).
+    /// The parser accepts this form too, normalizing to `E/e` before
+    /// the actual `f64::from_str`.
+    #[test]
+    fn number_parses_fortran_d_exponent() {
+        must_parse_as_number("1.66053873D-27");
+        must_parse_as_number("1.602176462D-19");
+        must_parse_as_number("2.99792458D8");
+        must_parse_as_number("5.485799110d-4");
+        must_parse_as_number("1D-6");
     }
 }

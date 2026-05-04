@@ -139,29 +139,31 @@ impl TranspileableExpr for VariableIdentifier {
         let num_indices = self.num_index_dimensions();
         let mut var_type = var_data.data.r#type.clone();
 
-        // VE (Vec<f64>) has dimensions=0 but can be indexed with (i) to get RE.
-        // This supports COSY's LIST(I) := expr pattern for VE element assignment.
-        if num_indices > 0
-            && var_type.dimensions == 0
-            && var_type.base_type == crate::rosy_lib::RosyBaseType::VE
-        {
-            if num_indices == 1 {
-                return Ok(RosyType::RE());
-            } else {
-                return Err(anyhow::anyhow!(
-                    "VE variable '{}' can only be indexed with 1 index, but {} were provided!",
-                    self.name,
-                    num_indices
-                ));
-            }
-        }
+        // Apply indices in cascade: each index peels one declared dimension
+        // first, then if any indices remain and the base type is VE with
+        // dimensions=0, one final index extracts the VE element to RE.
+        // This supports both `M[i, j]` (multi-dim array indexing) and
+        // `M[i][j]` (chained access on (VE n) where M[i] is VE then [j] is RE).
+        let mut remaining = num_indices;
+        let dim_peel = remaining.min(var_type.dimensions);
+        var_type.dimensions -= dim_peel;
+        remaining -= dim_peel;
 
-        var_type.dimensions = var_type.dimensions
-            .checked_sub(num_indices)
-            .ok_or(anyhow::anyhow!(
-                "Variable '{}' does not have enough dimensions to index into it (tried to index {} times, but it only has {} dimensions)!",
-                self.name, num_indices, var_type.dimensions
-            ))?;
+        if remaining > 0 {
+            if var_type.base_type == crate::rosy_lib::RosyBaseType::VE
+                && var_type.dimensions == 0
+                && remaining == 1
+            {
+                return Ok(RosyType::RE());
+            }
+            return Err(anyhow::anyhow!(
+                "Variable '{}' does not have enough dimensions to index into it (tried to index {} times, but it only has {} dimensions{})!",
+                self.name,
+                num_indices,
+                var_data.data.r#type.dimensions,
+                if var_data.data.r#type.base_type == crate::rosy_lib::RosyBaseType::VE { " (+1 implicit VE element)" } else { "" }
+            ));
+        }
 
         Ok(var_type)
     }

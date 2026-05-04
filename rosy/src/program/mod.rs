@@ -27,6 +27,30 @@ use pest::Parser;
 pub mod expressions;
 pub mod statements;
 
+/// Tracks INCLUDE resolution across one compilation unit.
+///
+/// Two distinct concerns share this struct because they share lookup paths:
+///
+/// * `in_progress` — files currently being parsed up the recursion stack.
+///   A repeated INCLUDE of an in-progress file is a true cycle (A→B→A) and
+///   surfaces as a `Circular INCLUDE detected` error.
+///
+/// * `completed` — files that have been fully resolved at least once. A
+///   repeated INCLUDE of a completed file is silently skipped (no-op),
+///   which mirrors Rust's `mod foo;` and Python's `import foo` semantics:
+///   declarations inside the included file enter the program exactly once,
+///   even when several leaf files all `INCLUDE` the same library.
+///
+/// Without `completed`, a library file that shares a header (e.g.
+/// `libcosy/helpers/math.rosy` declaring `INCLUDE '../globals.rosy';` so
+/// it stands alone for LSP analysis) would re-emit every VARIABLE in
+/// globals when transitively pulled through `INCLUDE 'libcosy';`.
+#[derive(Debug, Default)]
+pub struct IncludeTracker {
+    in_progress: HashSet<PathBuf>,
+    completed: HashSet<PathBuf>,
+}
+
 #[derive(Debug)]
 pub struct Program {
     pub statements: Vec<Statement>,
@@ -58,7 +82,7 @@ impl TranspileableStatement for Program {
 }
 impl FromRule for Program {
     fn from_rule(pair: pest::iterators::Pair<Rule>) -> Result<Option<Program>> {
-        Program::from_rule_with_includes(pair, None, &mut HashSet::new())
+        Program::from_rule_with_includes(pair, None, &mut IncludeTracker::default())
     }
 }
 
@@ -67,10 +91,12 @@ impl Program {
     ///
     /// Each included file must be a complete `BEGIN; ... END;` program.
     /// Its statements are spliced into the parent at the INCLUDE site.
+    /// Repeated INCLUDEs of the same file (across different parents) are
+    /// idempotent — declarations enter the program exactly once.
     pub fn from_rule_with_includes(
         pair: pest::iterators::Pair<Rule>,
         source_path: Option<&Path>,
-        visited: &mut HashSet<PathBuf>,
+        tracker: &mut IncludeTracker,
     ) -> Result<Option<Program>> {
         let mut statements = Vec::new();
 
@@ -94,13 +120,60 @@ impl Program {
                     base.join(&include_path)
                 };
 
-                let canonical = std::fs::canonicalize(&resolved).with_context(|| {
-                    format!("Failed to resolve INCLUDE path '{}'", include_path)
-                })?;
+                // Resolve to a concrete `mod.rosy` file:
+                //   (1) `resolved` is a regular file        → use it (current behavior)
+                //   (2) `resolved` is a directory           → look for `<dir>/mod.rosy`
+                //   (3) `resolved` doesn't exist            → still try `<resolved>/mod.rosy`
+                //                                             (so `INCLUDE 'libcosy';` works
+                //                                              before any `libcosy.rosy` exists)
+                let canonical = match std::fs::canonicalize(&resolved) {
+                    Ok(p) if p.is_file() => p,
+                    Ok(p) if p.is_dir() => {
+                        let mod_path = p.join("mod.rosy");
+                        std::fs::canonicalize(&mod_path).with_context(|| {
+                            format!(
+                                "INCLUDE '{}' resolved to directory '{}' but no 'mod.rosy' was found inside.\n\
+                                 Hint: create '{}/mod.rosy' or include a specific .rosy file.",
+                                include_path,
+                                p.display(),
+                                p.display(),
+                            )
+                        })?
+                    }
+                    Ok(p) => bail!(
+                        "INCLUDE '{}' resolved to '{}' which is neither a regular file nor a directory",
+                        include_path,
+                        p.display(),
+                    ),
+                    Err(_) => {
+                        let mod_path = resolved.join("mod.rosy");
+                        std::fs::canonicalize(&mod_path).with_context(|| {
+                            format!(
+                                "Failed to resolve INCLUDE path '{}' — tried '{}' (file) and '{}/mod.rosy' (directory module)",
+                                include_path,
+                                resolved.display(),
+                                resolved.display(),
+                            )
+                        })?
+                    }
+                };
 
-                // Circular include detection
-                if visited.contains(&canonical) {
-                    let chain: Vec<String> = visited.iter().map(|p| p.display().to_string()).collect();
+                // Idempotency: a file that has already been fully parsed once
+                // contributes its declarations exactly once. Subsequent INCLUDEs
+                // are silent no-ops, so library files can safely INCLUDE their
+                // own dependencies without producing duplicate VARIABLEs when
+                // the program also INCLUDEs those dependencies via another path.
+                if tracker.completed.contains(&canonical) {
+                    continue;
+                }
+
+                // True cycle detection: only the active recursion stack counts.
+                if tracker.in_progress.contains(&canonical) {
+                    let chain: Vec<String> = tracker
+                        .in_progress
+                        .iter()
+                        .map(|p| p.display().to_string())
+                        .collect();
                     bail!(
                         "Circular INCLUDE detected: {} → {}",
                         chain.join(" → "),
@@ -120,13 +193,14 @@ impl Program {
                     .ok_or_else(|| anyhow::anyhow!("Empty parse result for '{}'", canonical.display()))?;
 
                 // Recurse
-                visited.insert(canonical.clone());
+                tracker.in_progress.insert(canonical.clone());
                 let included_program = Program::from_rule_with_includes(
                     program_pair,
                     Some(&canonical),
-                    visited,
+                    tracker,
                 )?;
-                visited.remove(&canonical);
+                tracker.in_progress.remove(&canonical);
+                tracker.completed.insert(canonical.clone());
 
                 // Splice the included statements, stamping file origin
                 if let Some(prog) = included_program {
@@ -177,6 +251,161 @@ impl Program {
         Ok(path)
     }
 }
+#[cfg(test)]
+mod include_resolution_tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn parse_and_resolve(source: &str, source_path: &Path) -> Result<Program> {
+        let mut pairs = CosyParser::parse(Rule::program, source)
+            .map_err(|e| anyhow::anyhow!("parse error: {e}"))?;
+        let pair = pairs
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("empty parse"))?;
+        Program::from_rule_with_includes(pair, Some(source_path), &mut IncludeTracker::default())?
+            .ok_or_else(|| anyhow::anyhow!("from_rule_with_includes returned None"))
+    }
+
+    fn write(dir: &Path, name: &str, contents: &str) -> PathBuf {
+        let path = dir.join(name);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(&path, contents).unwrap();
+        path
+    }
+
+    /// Baseline: existing behavior — INCLUDE points at a literal `.rosy` file.
+    #[test]
+    fn include_resolves_literal_file() {
+        let tmp = TempDir::new().unwrap();
+        write(tmp.path(), "helper.rosy", "BEGIN;\nEND;\n");
+        let main = write(tmp.path(), "main.rosy", "BEGIN;\nINCLUDE 'helper.rosy';\nEND;\n");
+        let src = fs::read_to_string(&main).unwrap();
+        parse_and_resolve(&src, &main).expect("literal-file include should succeed");
+    }
+
+    /// New behavior: INCLUDE points at a directory; we look for `<dir>/mod.rosy`.
+    #[test]
+    fn include_resolves_directory_with_modrosy() {
+        let tmp = TempDir::new().unwrap();
+        write(tmp.path(), "libcosy/mod.rosy", "BEGIN;\nEND;\n");
+        let main = write(tmp.path(), "main.rosy", "BEGIN;\nINCLUDE 'libcosy';\nEND;\n");
+        let src = fs::read_to_string(&main).unwrap();
+        parse_and_resolve(&src, &main).expect("directory include should resolve to mod.rosy");
+    }
+
+    /// Directory exists but has no `mod.rosy` — the error must mention both attempts.
+    #[test]
+    fn include_directory_without_modrosy_errors() {
+        let tmp = TempDir::new().unwrap();
+        fs::create_dir_all(tmp.path().join("libcosy")).unwrap();
+        let main = write(tmp.path(), "main.rosy", "BEGIN;\nINCLUDE 'libcosy';\nEND;\n");
+        let src = fs::read_to_string(&main).unwrap();
+        let err = parse_and_resolve(&src, &main).unwrap_err();
+        let chain: Vec<String> = err.chain().map(|e| e.to_string()).collect();
+        let joined = chain.join(" :: ");
+        assert!(
+            joined.contains("mod.rosy"),
+            "error chain should mention 'mod.rosy': {joined}"
+        );
+    }
+
+    /// Neither a file nor a directory at the path — error names both attempted paths.
+    #[test]
+    fn include_nonexistent_errors() {
+        let tmp = TempDir::new().unwrap();
+        let main = write(tmp.path(), "main.rosy", "BEGIN;\nINCLUDE 'nope';\nEND;\n");
+        let src = fs::read_to_string(&main).unwrap();
+        let err = parse_and_resolve(&src, &main).unwrap_err();
+        let joined: String = err.chain().map(|e| e.to_string()).collect::<Vec<_>>().join(" :: ");
+        assert!(
+            joined.contains("nope"),
+            "error should mention the missing 'nope': {joined}"
+        );
+        assert!(
+            joined.contains("mod.rosy") || joined.contains("directory module"),
+            "error should mention the directory-fallback attempt: {joined}"
+        );
+    }
+
+    /// Relative paths inside a directory's `mod.rosy` resolve relative to that file's dir,
+    /// so a parent `mod.rosy` can `INCLUDE 'sibling';` to load `sibling/mod.rosy`.
+    #[test]
+    fn include_relative_path_through_directory() {
+        let tmp = TempDir::new().unwrap();
+        write(tmp.path(), "libcosy/physics/mod.rosy", "BEGIN;\nEND;\n");
+        write(
+            tmp.path(),
+            "libcosy/mod.rosy",
+            "BEGIN;\nINCLUDE 'physics';\nEND;\n",
+        );
+        let main = write(tmp.path(), "main.rosy", "BEGIN;\nINCLUDE 'libcosy';\nEND;\n");
+        let src = fs::read_to_string(&main).unwrap();
+        parse_and_resolve(&src, &main)
+            .expect("nested directory include should resolve transitively");
+    }
+
+    /// Including the same file twice (via different INCLUDE chains) is a
+    /// silent no-op the second time — declarations enter the program once.
+    /// This protects libraries that INCLUDE their own dependencies for
+    /// standalone analysis.
+    #[test]
+    fn include_idempotent_double_include() {
+        let tmp = TempDir::new().unwrap();
+        // header.rosy declares a single global; it must NOT be redeclared
+        // when reached via two different INCLUDE chains.
+        write(tmp.path(), "header.rosy", "BEGIN;\nVARIABLE (RE) SHARED;\nEND;\n");
+        // a.rosy and b.rosy both include header.rosy …
+        write(tmp.path(), "a.rosy", "BEGIN;\nINCLUDE 'header.rosy';\nEND;\n");
+        write(tmp.path(), "b.rosy", "BEGIN;\nINCLUDE 'header.rosy';\nEND;\n");
+        // … and main.rosy includes both, so header.rosy would otherwise be
+        // spliced twice → "VARIABLE 'SHARED' already defined".
+        let main = write(
+            tmp.path(),
+            "main.rosy",
+            "BEGIN;\nINCLUDE 'a.rosy';\nINCLUDE 'b.rosy';\nEND;\n",
+        );
+        let src = fs::read_to_string(&main).unwrap();
+        let prog = parse_and_resolve(&src, &main)
+            .expect("idempotent INCLUDE should silently skip the second visit");
+        // header.rosy contributes exactly one statement (`VARIABLE SHARED`).
+        // a.rosy and b.rosy each contribute zero of their own. Without
+        // idempotency the count would be 2 (one per chain).
+        assert_eq!(
+            prog.statements.len(),
+            1,
+            "expected exactly one statement after idempotent INCLUDE, got {}",
+            prog.statements.len()
+        );
+    }
+
+    /// Circular detection still fires when the cycle goes through directory modules.
+    #[test]
+    fn include_circular_through_directories() {
+        let tmp = TempDir::new().unwrap();
+        write(
+            tmp.path(),
+            "a/mod.rosy",
+            "BEGIN;\nINCLUDE '../b';\nEND;\n",
+        );
+        write(
+            tmp.path(),
+            "b/mod.rosy",
+            "BEGIN;\nINCLUDE '../a';\nEND;\n",
+        );
+        let main = write(tmp.path(), "main.rosy", "BEGIN;\nINCLUDE 'a';\nEND;\n");
+        let src = fs::read_to_string(&main).unwrap();
+        let err = parse_and_resolve(&src, &main).unwrap_err();
+        let joined: String = err.chain().map(|e| e.to_string()).collect::<Vec<_>>().join(" :: ");
+        assert!(
+            joined.contains("Circular INCLUDE"),
+            "error chain should report circular INCLUDE: {joined}"
+        );
+    }
+}
+
 impl Transpile for Program {
     fn transpile(
         &self,

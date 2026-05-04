@@ -1,0 +1,31 @@
+{ ============================================================================
+  libcosy/physics — beam-physics primitives
+
+  Filled in incrementally; M1 is intentionally an empty stub so the libcosy
+  skeleton parses.
+  ============================================================================ }
+
+BEGIN;
+
+INCLUDE 'fringe_field.rosy';        
+INCLUDE 'reference_particle.rosy';  
+INCLUDE 'map_ops.rosy';             
+INCLUDE 'elements_basic.rosy';      
+INCLUDE 'field_potential.rosy';     
+INCLUDE 'elements_magnetic.rosy';   
+INCLUDE 'normal_form.rosy';         
+INCLUDE 'sym_scaling.rosy';         
+INCLUDE 'twiss_tune.rosy';          
+INCLUDE 'bend.rosy';                
+INCLUDE 'spin_su2.rosy';            
+INCLUDE 'elements_electric.rosy';   
+INCLUDE 'elements_glass.rosy';      
+INCLUDE 'rays.rosy';                { v2 M11.0 (CR / SR / SSR ray-pool setters) }
+INCLUDE 'tracking.rosy';            
+
+{ Future: M6 will expand POTFLD with more NSDP modes (ENGE fringe,
+  Wiggler, Solenoid, measured-data) and add the SDELE/RK chain to
+  unblock LFR≠0 fringe-field paths in FFELE.
+  M7-M9 will land the main TR procedure in tracking.rosy. }
+
+END;

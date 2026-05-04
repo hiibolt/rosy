@@ -1,0 +1,271 @@
+{ Enge fringe-field machinery. The Enge function is the standard model
+  for the longitudinal profile of a magnet's or electrostatic element's
+  fringe field:
+
+      F(s) = 1 / (1 + exp(c_1 + c_2 s + c_3 s^2 + ... + c_6 s^5))
+
+  The coefficients {c_1..c_6} live in the global ENGEC table, indexed by
+  multipole order, entry/exit, and magnetic / electric kind. F transitions
+  from ~1 (deep inside the magnet) to ~0 (deep outside) over a normalized
+  arclength s ∈ [-3, 5]. EDGE / ENGEP are derivative variants used by the
+  bend / wiggler off-plane field models. FC / FD / FC2 / FD2 / SYSCFL
+  populate ENGEC and the symplectic-scaling reference tables. }
+
+BEGIN;
+
+INCLUDE '../globals.rosy';
+
+{ ----- Enge function ----------------------------------
+  Returns DA in the production case where S is a Taylor series in the
+  path coordinate. The CONS(S) guards short-circuit when the constant
+  part is well outside the transition window — a constant DA result is
+  a tight Rust optimization.                                              }
+FUNCTION (DA) ENGE IMP (RE) IEE (RE) IEM (RE) S (DA);
+  IF CONS(S) < -3;
+    ENGE := 1 + 0*S;                  { fully inside  → F ≡ 1 }
+  ELSEIF CONS(S) > 5;
+    ENGE := 0*S;                       { fully outside → F ≡ 0 }
+  ELSE;                                { in the transition window — evaluate }
+    ENGE :=        ENGEC[IMP, IEE, IEM, 1]
+            + S * (ENGEC[IMP, IEE, IEM, 2]
+            + S * (ENGEC[IMP, IEE, IEM, 3]
+            + S * (ENGEC[IMP, IEE, IEM, 4]
+            + S * (ENGEC[IMP, IEE, IEM, 5]
+            + S *  ENGEC[IMP, IEE, IEM, 6]))));
+    { Clamp the polynomial argument so EXP doesn't underflow / overflow.
+      The `0*S +` keeps the assignment in DA-space — assigning a bare RE
+      to the DA-typed return slot would be flagged as a type mismatch. }
+    IF     CONS(ENGE) < -60; ENGE := 0*S + (-60);
+    ELSEIF CONS(ENGE) >  30; ENGE := 0*S +   30;
+    ENDIF;
+    ENGE := EXP(ENGE);
+    ENGE := 1/(1 + ENGE);
+  ENDIF;
+ENDFUNCTION;
+
+{ ----- Set the six Enge coefficients ------------------
+  Writes the six fringe-field expansion coefficients into the global
+  ENGEC table at slot (IMP, IEE, IEM). IMP is the multipole order,
+  IEE the entry/exit selector (1 / 2), IEM the magnetic/electric
+  selector (1 / 2). }
+PROCEDURE FC IMP (RE) IEE (RE) IEM (RE) C1 (RE) C2 (RE) C3 (RE) C4 (RE) C5 (RE) C6 (RE);
+  ENGEC[IMP, IEE, IEM, 1] := C1;
+  ENGEC[IMP, IEE, IEM, 2] := C2;
+  ENGEC[IMP, IEE, IEM, 3] := C3;
+  ENGEC[IMP, IEE, IEM, 4] := C4;
+  ENGEC[IMP, IEE, IEM, 5] := C5;
+  ENGEC[IMP, IEE, IEM, 6] := C6;
+ENDPROCEDURE;
+
+{ ----- Default Enge coefficients ----------------------
+  Measured at SLAC PEP, fitted to dipole / quadrupole / hexapole / higher
+  multipoles up to 30-pole. Reference: K.L. Brown and J.E. Spencer,
+  IEEE Trans. Nucl. Sci. NS-28 No. 3, June 1981.                          }
+PROCEDURE FD;
+  { Negative coefficients are wrapped in parens because ROSY's procedure-
+    call argument parser would otherwise consume `<prev> -<next>` as the
+    binary subtraction `<prev> - <next>` (collapsing two args into one).
+  whitespace-only separation works in COSY but not in ROSY. }
+  VARIABLE (RE) I; VARIABLE (RE) J; VARIABLE (RE) K;
+  LOOP J 1 2;
+    LOOP K 1 2;
+      FC 1 J K 0.478959 1.911289 (-1.185953) 1.630554 (-1.082657) 0.318111;
+      FC 2 J K 0.296471 4.533219 (-2.270982) 1.068627 (-0.036391) 0.022261;
+      LOOP I 3 15;
+        FC I J K 0.176659 7.153079 (-3.113116) 3.444311 (-1.976740) 0.540068;
+      ENDLOOP;
+    ENDLOOP;
+  ENDLOOP;
+  LE := 1;
+ENDPROCEDURE;
+
+{ ----- EDGE: wiggler edge function ------------------
+  Sigmoid F = 1/(1 + exp(p)) where p is a 9-degree polynomial in -X
+  with coefficients PPOL[7..16]. Used by POTXZ NSDP=-3 (wiggler) for
+  the longitudinal end-field profile. Same shape as ENGE but with
+  user-supplied coefficients (ENGE is global ENGEC table, EDGE pulls
+  from PPOL).                                                            }
+FUNCTION (DA) EDGE X (DA);
+  VARIABLE (RE) I;
+  EDGE := 0*X;
+  LOOP I 16 8 -1;
+    EDGE := (EDGE + PPOL[I])*(-X);
+  ENDLOOP;
+  EDGE := EDGE + PPOL[7];
+  IF CONS(EDGE) < -60;
+    EDGE := -60 + 0*DD[1];
+  ELSEIF CONS(EDGE) > 30;
+    EDGE := 30 + 0*DD[1];
+  ENDIF;
+  EDGE := 1/(1 + EXP(EDGE));
+ENDFUNCTION;
+
+{ ----- ENGEP: derivative of the Enge function -------
+  Returns the derivative of ENGE wrt its s argument. Used by POTXZ
+  NSDP=-1/-2 (bend-element fringe fields) for computing E_z component
+  from the curl-free constraint on the electric potential.
+
+  ENGEPP is the derivative of the Enge polynomial; the actual
+  derivative of F = 1/(1+exp(p)) is -dp/ds · exp(p) / (1+exp(p))²
+  = -ENGEPP · exp(ENGE_poly) / (1+exp)² , which simplifies to
+  -ENGEPP/(2 + exp(p) + 1/exp(p)) — what  computes.
+
+  Clamps |ENGEP polynomial| ≤ 30 to prevent EXP overflow.               }
+FUNCTION (DA) ENGEP IMP (RE) IEE (RE) IEM (RE) S (DA);
+  VARIABLE (DA) ENGE_POLY;
+  VARIABLE (DA) ENGE_PRIME_POLY;
+  ENGE_POLY :=    ENGEC[IMP, IEE, IEM, 1]
+           + S * (ENGEC[IMP, IEE, IEM, 2]
+           + S * (ENGEC[IMP, IEE, IEM, 3]
+           + S * (ENGEC[IMP, IEE, IEM, 4]
+           + S * (ENGEC[IMP, IEE, IEM, 5]
+           + S *  ENGEC[IMP, IEE, IEM, 6]))));
+  ENGE_PRIME_POLY :=    ENGEC[IMP, IEE, IEM, 2]
+                 + S * (2*ENGEC[IMP, IEE, IEM, 3]
+                 + S * (3*ENGEC[IMP, IEE, IEM, 4]
+                 + S * (4*ENGEC[IMP, IEE, IEM, 5]
+                 + S *  5*ENGEC[IMP, IEE, IEM, 6])));
+  IF ABS(CONS(ENGE_POLY)) > 30;
+    ENGEP := 0*S;
+  ELSE;
+    ENGE_POLY := EXP(ENGE_POLY);
+    ENGEP := -ENGE_PRIME_POLY/(2 + ENGE_POLY + 1/ENGE_POLY);
+  ENDIF;
+ENDFUNCTION;
+
+{ ----- SYSCFL: read symplectic-scaling representation
+  Parses a SYSCA-format data file into:
+    AA(10) — 10 reference parameters: 1=L, 2=B, 3=D, 4=E, 5=M, 6=Z,
+             7=type-of-GF, 8=order, 9/10=padding.
+    FF(10) — generating-function expansion DA terms (one per order)
+    LL(10) — Lie generators (one per order)
+    INOR   — caller's order request (negative = "use file's order")
+
+  File format:
+    line 1: header containing order at chars 8..10
+    line 2: AA[4..6] (E, M, Z) at chars 8..30, 31..53, 54..76
+    line 3: header with GF-type sign at chars 13..15
+    line 4: AA[1..3] (L, B, D)
+    lines 5-6: skipped headers
+    line 7: AA[7] (GF type) at chars 35..36
+    line 8: skipped header
+    body:   2*(NOR+1) DA blocks alternating FF[i] / LL[i] via DAREA
+
+  Used by FC2 (per-element fringe-field reader) and FD2 (default
+  symplectic-scaling arrays).                                        }
+PROCEDURE SYSCFL IU (RE) AA (RE 10) FF (DA 10) LL (DA 10) INOR (RE);
+  VARIABLE (DA 1) MIS;
+  VARIABLE (RE) NOR_LOCAL;
+  VARIABLE (RE) J;
+  VARIABLE (ST) LIN;
+  READ IU LIN;
+  J := R(LIN, 8, 10);
+  READ IU LIN;
+  AA[4] := R(LIN, 8, 30);
+  AA[5] := R(LIN, 31, 53);
+  AA[6] := R(LIN, 54, 76);
+  IF INOR < 0;
+    NOR_LOCAL := J + 1;
+  ELSE;
+    NOR_LOCAL := INOR;
+  ENDIF;
+  IF J + 1 < NOR_LOCAL;
+    WRITE 6 ' --- WARNING in SYSCFL, order not saved';
+    NOR_LOCAL := J + 1;
+  ENDIF;
+  AA[8] := NOR_LOCAL;
+  READ IU LIN;
+  J := R(LIN, 13, 15);
+  READ IU LIN;
+  AA[1] := R(LIN, 8, 30);
+  AA[2] := R(LIN, 31, 53);
+  AA[3] := R(LIN, 54, 76);
+  IF J < 0;
+    AA[1] := 0;
+  ENDIF;
+  READ IU LIN;
+  READ IU LIN;
+  AA[7] := R(LIN, 35, 36);
+  READ IU LIN;
+  { Inline CO NOC+1 / CO NOC-1 — SYSCFL lives in fringe_field.rosy
+    which is INCLUDEd before reference_particle.rosy where CO is defined.
+    `NOC := NOC+1; DANOT NOC` is the literal expansion of CO NOC+1.    }
+  NOC := NOC + 1;
+  DANOT NOC;
+  LOOP J 0 NOR_LOCAL;
+    DAREA IU MIS TWOND;
+    FF[J+1] := MIS[1];
+    DAREA IU MIS TWOND;
+    LL[J+1] := MIS[1];
+  ENDLOOP;
+  NOC := NOC - 1;
+  DANOT NOC;
+  AA[9] := 0;
+  AA[10] := 0;
+  LOOP J NOR_LOCAL+2 10;
+    LL[J] := 0*DD[1];
+    FF[J] := 0*DD[1];
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ ----- FC2: per-element symplectic-scaling reader -----
+  FC2(POL, IEE, FILENAME) reads a SYSCA-format file and copies into
+  GFF2[IEE, POL, J] / LFF2[IEE, POL, J] / DATFF2[IEE, POL, J] for J=1..10.
+  POL = multipole order (1..6 typically), IEE = entrance/exit (1/2),
+  FILENAME = path to SYSCA-format data.                              }
+PROCEDURE FC2 POL (RE) IEE (RE) FILENAME (ST);
+  VARIABLE (RE) J;
+  VARIABLE (RE 10) AA;
+  VARIABLE (DA 10) FF;
+  VARIABLE (DA 10) LL;
+  VARIABLE (RE) NEG_ONE_FC2;
+  NEG_ONE_FC2 := -1;
+  OPENF 99 FILENAME 'OLD';
+  SYSCFL 99 AA FF LL NEG_ONE_FC2;
+  CLOSEF 99;
+  NOC := NOC + 1;
+  DANOT NOC;
+  LOOP J 1 10;
+    GFF2[IEE, POL, J] := FF[J];
+    LFF2[IEE, POL, J] := LL[J];
+    DATFF2[IEE, POL, J] := AA[J];
+  ENDLOOP;
+  NOC := NOC - 1;
+  DANOT NOC;
+ENDPROCEDURE;
+
+{ ----- FD2: load default symplectic-scaling arrays ----
+  Reads SYSCA.DAT — a 12-block file containing the default symplectic-
+  scaling fringe-field representations for 6 multipole orders × 2
+  edges. Each block follows the SYSCFL format. Result goes into
+  GFF2/LFF2/DATFF2 globals at all (J, I, K) for J=1..2, I=1..6, K=1..10.
+
+  Pre-condition: SYSCA.DAT must exist in the working directory.       }
+PROCEDURE FD2;
+  VARIABLE (RE) I;
+  VARIABLE (RE) J;
+  VARIABLE (RE) K;
+  VARIABLE (RE 10) AA;
+  VARIABLE (DA 10) FF;
+  VARIABLE (DA 10) LL;
+  VARIABLE (RE) NEG_ONE_FD2;
+  NEG_ONE_FD2 := -1;
+  NOC := NOC + 1;
+  DANOT NOC;
+  OPENF 99 'SYSCA.DAT' 'OLD';
+  LOOP I 1 6;
+    LOOP J 1 2;
+      SYSCFL 99 AA FF LL NEG_ONE_FD2;
+      LOOP K 1 10;
+        GFF2[J, I, K] := FF[K];
+        LFF2[J, I, K] := LL[K];
+        DATFF2[J, I, K] := AA[K];
+      ENDLOOP;
+    ENDLOOP;
+  ENDLOOP;
+  CLOSEF 99;
+  NOC := NOC - 1;
+  DANOT NOC;
+ENDPROCEDURE;
+
+END;

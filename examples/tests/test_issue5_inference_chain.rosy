@@ -1,0 +1,22 @@
+{ Issue 5: inference chain through untyped variables.
+  All four are untyped — gamma0 is the leaf with literal value;
+  V0, P0, K0 should infer through. }
+
+BEGIN;
+
+VARIABLE P0;
+VARIABLE GAMMA0;
+VARIABLE V0;
+VARIABLE K0;
+
+PROCEDURE RUN;
+  GAMMA0 := 2.065789024930937;
+  V0 := 0.8750256596748323;
+  P0 := GAMMA0*V0;
+  K0 := GAMMA0 - 1;
+  WRITE 6 P0;
+  WRITE 6 K0;
+ENDPROCEDURE;
+
+RUN;
+END;

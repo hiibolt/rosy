@@ -358,18 +358,24 @@ impl Transpile for FunctionStatement {
                 VariableScope::Higher => VariableScope::Higher,
             }
         }
+        // Function arguments may shadow parent-scope (Higher) variables —
+        // see the matching comment in procedure/mod.rs. Same-scope duplicates
+        // (two args with the same name) are still rejected.
         for arg_data in &resolved_arg_data {
-            if matches!(
-                inner_context.variables.insert(
-                    arg_data.name.clone(),
-                    ScopedVariableData {
-                        scope: VariableScope::Arg,
-                        data: arg_data.clone()
-                    }
-                ),
-                Some(_)
-            ) {
-                errors.push(anyhow!("Argument '{}' is already defined!", arg_data.name));
+            let previous = inner_context.variables.insert(
+                arg_data.name.clone(),
+                ScopedVariableData {
+                    scope: VariableScope::Arg,
+                    data: arg_data.clone(),
+                },
+            );
+            if let Some(prev) = previous {
+                if prev.scope != VariableScope::Higher {
+                    errors.push(anyhow!(
+                        "Argument '{}' is already defined in this scope!",
+                        arg_data.name
+                    ));
+                }
             }
         }
 

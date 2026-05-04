@@ -267,18 +267,29 @@ impl Transpile for ProcedureStatement {
                 VariableScope::Higher => VariableScope::Higher,
             }
         }
+        // A procedure argument is allowed to shadow a parent-scope (Higher)
+        // variable — including any global. The previous logic erroneously
+        // rejected `PROCEDURE WSET W ;` because `W` is a global VARIABLE,
+        // even though shadowing is well-defined in lexically scoped languages
+        // (and was already permitted for VARIABLE declarations by the var_decl
+        // shadowing fix). A genuine duplicate — two args with the same name —
+        // is still a real conflict because the second insert finds an `Arg`
+        // (not `Higher`) entry already in the local scope.
         for arg_data in &resolved_arg_data {
-            if matches!(
-                inner_context.variables.insert(
-                    arg_data.name.clone(),
-                    ScopedVariableData {
-                        scope: VariableScope::Arg,
-                        data: arg_data.clone()
-                    }
-                ),
-                Some(_)
-            ) {
-                errors.push(anyhow!("Argument '{}' is already defined!", arg_data.name));
+            let previous = inner_context.variables.insert(
+                arg_data.name.clone(),
+                ScopedVariableData {
+                    scope: VariableScope::Arg,
+                    data: arg_data.clone(),
+                },
+            );
+            if let Some(prev) = previous {
+                if prev.scope != VariableScope::Higher {
+                    errors.push(anyhow!(
+                        "Argument '{}' is already defined in this scope!",
+                        arg_data.name
+                    ));
+                }
             }
         }
 
