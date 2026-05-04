@@ -1,3 +1,0 @@
-[submodule ".dacelib_comp/dace"]
-    path = .dacelib_comp/dace
-    url = https://github.com/hiibolt/dace.git
