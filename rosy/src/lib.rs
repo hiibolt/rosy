@@ -1,7 +1,7 @@
 #![cfg_attr(feature = "nightly-simd", feature(portable_simd))]
 //! # Rosy
 //!
-#![doc = concat!("**Version:** `v", env!("CARGO_PKG_VERSION"), "` — Built `", env!("BUILD_TIMESTAMP"), "` — [Changelog](https://github.com/hiibolt/rosy/releases)")]
+#![doc = concat!("**Version:** `v", env!("CARGO_PKG_VERSION"), "` — Built `", env!("BUILD_TIMESTAMP"), "` — [Changelog](https://github.com/rosy-team/rosy/releases)")]
 //!
 //! A modern transpiler for the Rosy scientific programming language,
 //! designed for beam physics and differential algebra applications.
@@ -11,8 +11,8 @@
 //! The official Rosy language reference begins in the [`program`] module.
 //!
 //! ## More Resources
-//! - **[Example programs](https://github.com/hiibolt/rosy/tree/master/examples)** on GitHub
-//! - **[Installation & usage](https://github.com/hiibolt/rosy)** in the README
+//! - **[Example programs](https://github.com/rosy-team/rosy/tree/master/examples)** on GitHub
+//! - **[Installation & usage](https://github.com/rosy-team/rosy)** in the README
 
 pub mod ast;
 pub mod embedded;

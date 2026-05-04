@@ -8,7 +8,7 @@ use crate::{
     errors::RosyError,
     program::Program,
     resolve::{GraphNode, TypeResolver, TypeSlot},
-    transpile::{Transpile, TranspilationInputContext},
+    transpile::{TranspilationInputContext, Transpile},
 };
 use pest::Parser;
 use tower_lsp::lsp_types::*;
@@ -198,10 +198,12 @@ pub fn analyze(source: &str, source_path: Option<&std::path::Path>) -> AnalysisR
                 let position = w
                     .location
                     .as_ref()
-                    .map(|loc| Position::new(
-                        loc.line.saturating_sub(1) as u32,
-                        loc.col.saturating_sub(1) as u32,
-                    ))
+                    .map(|loc| {
+                        Position::new(
+                            loc.line.saturating_sub(1) as u32,
+                            loc.col.saturating_sub(1) as u32,
+                        )
+                    })
                     .unwrap_or(Position::new(0, 0));
                 result.diagnostics.push(Diagnostic {
                     range: Range::new(position, position),
@@ -239,8 +241,7 @@ pub fn analyze(source: &str, source_path: Option<&std::path::Path>) -> AnalysisR
         Ok(_) => {}
         Err(errors) => {
             for err in &errors {
-                let position =
-                    extract_location_from_anyhow(err).unwrap_or(Position::new(0, 0));
+                let position = extract_location_from_anyhow(err).unwrap_or(Position::new(0, 0));
                 // Extract the clean message from the innermost RosyError,
                 // falling back to root_cause Display if no RosyError found.
                 let message = extract_message_from_anyhow(err);
@@ -305,15 +306,18 @@ fn extract_inlay_hint(node: &GraphNode, hints: &mut Vec<InlayHintData>) {
     // exactly where the type was determined.
     let (reason, loc) = match &node.rule {
         crate::resolve::ResolutionRule::Explicit(_) => (None, None),
-        crate::resolve::ResolutionRule::InferredFrom { reason, .. } => {
-            (Some(reason.clone()), node.assigned_at.as_ref().or(node.declared_at.as_ref()))
-        }
-        crate::resolve::ResolutionRule::Mirror { reason, .. } => {
-            (Some(reason.clone()), node.assigned_at.as_ref().or(node.declared_at.as_ref()))
-        }
-        crate::resolve::ResolutionRule::Unresolved => {
-            (Some("could not be inferred".to_string()), node.declared_at.as_ref())
-        }
+        crate::resolve::ResolutionRule::InferredFrom { reason, .. } => (
+            Some(reason.clone()),
+            node.assigned_at.as_ref().or(node.declared_at.as_ref()),
+        ),
+        crate::resolve::ResolutionRule::Mirror { reason, .. } => (
+            Some(reason.clone()),
+            node.assigned_at.as_ref().or(node.declared_at.as_ref()),
+        ),
+        crate::resolve::ResolutionRule::Unresolved => (
+            Some("could not be inferred".to_string()),
+            node.declared_at.as_ref(),
+        ),
     };
 
     let inferred_from = match (reason, loc) {
@@ -522,19 +526,17 @@ include!(concat!(env!("OUT_DIR"), "/hover_generated.rs"));
 /// Intrinsic functions — these get `FUNC($0)` snippet insertion.
 /// Everything else in the keyword list gets plain keyword completion.
 const INTRINSIC_FUNCTIONS: &[&str] = &[
-    "ABS", "ACOS", "ASIN", "ATAN", "CD", "CM", "CMPLX", "CONJ", "CONS",
-    "COS", "COSH", "DA", "ERF", "EXP", "IMAG", "INT", "ISRT", "ISRT3",
-    "LCD", "LCM", "LDA", "LENGTH", "LLO", "LO", "LOG", "LRE", "LST",
-    "LTRIM", "LVE", "NINT", "NORM", "RE", "REAL", "SIN", "SINH", "SQR",
-    "SQRT", "ST", "TAN", "TANH", "TRIM", "TYPE", "VARMEM", "VARPOI",
-    "VE", "VMAX", "VMIN", "WERF",
+    "ABS", "ACOS", "ASIN", "ATAN", "CD", "CM", "CMPLX", "CONJ", "CONS", "COS", "COSH", "DA", "ERF",
+    "EXP", "IMAG", "INT", "ISRT", "ISRT3", "LCD", "LCM", "LDA", "LENGTH", "LLO", "LO", "LOG",
+    "LRE", "LST", "LTRIM", "LVE", "NINT", "NORM", "RE", "REAL", "SIN", "SINH", "SQR", "SQRT", "ST",
+    "TAN", "TANH", "TRIM", "TYPE", "VARMEM", "VARPOI", "VE", "VMAX", "VMIN", "WERF",
 ];
 
 /// Build completion items from the auto-generated keyword list.
 /// Keywords are extracted from `keyword_raw` in rosy.pest at compile time,
 /// so adding a new construct to the grammar automatically updates completions.
 pub fn rosy_keywords() -> Vec<CompletionItem> {
-    let base_url = "https://hiibolt.github.com/rosy/rosy";
+    let base_url = "https://rosy-team.github.com/rosy/rosy";
 
     let mut items: Vec<CompletionItem> = ROSY_KEYWORD_LIST
         .iter()
@@ -591,13 +593,25 @@ mod tests {
         let result = analyze(source, None);
         eprintln!("Hints:");
         for h in &result.variable_types {
-            eprintln!("  line={} col={} label={:?}", h.position.line, h.position.character, h.label);
+            eprintln!(
+                "  line={} col={} label={:?}",
+                h.position.line, h.position.character, h.label
+            );
         }
-        let labels: Vec<&str> = result.variable_types.iter().map(|h| h.label.as_str()).collect();
+        let labels: Vec<&str> = result
+            .variable_types
+            .iter()
+            .map(|h| h.label.as_str())
+            .collect();
         // temp (inferred RE) and is_true (inferred LO) should have hints
         assert!(labels.contains(&"(RE)"), "temp should get an (RE) hint");
         assert!(labels.contains(&"(LO)"), "is_true should get an (LO) hint");
         // Explicitly typed variables should NOT have hints
-        assert_eq!(result.variable_types.len(), 2, "Only inferred types should produce hints, got: {:?}", labels);
+        assert_eq!(
+            result.variable_types.len(),
+            2,
+            "Only inferred types should produce hints, got: {:?}",
+            labels
+        );
     }
 }

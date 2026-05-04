@@ -456,8 +456,13 @@ lt          = { "<" }
 gt          = { ">" }
 lte         = { "<=" }
 gte         = { ">=" }
-and_op      = { ^"AND" ~ !(ASCII_ALPHANUMERIC | "_") }
-or_op       = { ^"OR"  ~ !(ASCII_ALPHANUMERIC | "_") }
+// Atomic so pest does not insert WHITESPACE between the literal and the
+// negative-lookahead boundary check — without `@`, the lookahead would
+// match the char *after* the trailing space instead of the immediate next
+// char, which previously caused `TRUE AND TRUE` to fail to parse because
+// the lookahead saw the leading T of the right-hand TRUE and rejected it.
+and_op      = @{ ^"AND" ~ !(ASCII_ALPHANUMERIC | "_") }
+or_op       = @{ ^"OR"  ~ !(ASCII_ALPHANUMERIC | "_") }
 
 variable_identifier = { variable_name ~ paren_group* ~ bracket_index* }
 paren_group = { "(" ~ expr ~ ("," ~ expr)* ~ ")" }
