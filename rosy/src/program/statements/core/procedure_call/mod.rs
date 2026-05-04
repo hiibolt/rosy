@@ -137,6 +137,16 @@ impl Transpile for ProcedureCallStatement {
         let mut serialized_args = Vec::new();
         // Serialize the requested variables from the procedure context
         for var in &proc_context.requested_variables {
+            // rosy_mpi_context is the same `&mut RosyMPIContext` shape at
+            // top-level (via the template's indirection) and inside procedure
+            // bodies (as a parameter). Pass the binding bare and let Rust
+            // auto-reborrow; the surrounding scope's request propagation
+            // happens via line 281's `requested_variables.extend(...)`.
+            if var == "rosy_mpi_context" {
+                serialized_args.push("rosy_mpi_context".to_string());
+                continue;
+            }
+
             let var_data = context.variables.get(var).ok_or(vec![anyhow!(
                 "Could not find variable '{}' requested by procedure '{}'",
                 var,

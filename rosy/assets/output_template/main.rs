@@ -13,8 +13,9 @@ use num_complex::Complex64;
 fn main_wrapper() -> Result<()> {
 	let start = std::time::Instant::now();
 	// <MPI_START>
-	let rosy_mpi_context = RosyMPIContext::new()
+	let mut rosy_mpi_context_inner = RosyMPIContext::new()
 		.context("Failed to initialize Rosy MPI context")?;
+	let rosy_mpi_context: &mut RosyMPIContext = &mut rosy_mpi_context_inner;
 	let group_num = rosy_mpi_context.get_group_num(&mut  &mut 1.0f64)
 		.context("Failed to get group number")? + 1.0f64;
 	// <MPI_END>
