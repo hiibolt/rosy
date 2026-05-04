@@ -2,7 +2,7 @@
   test_libcosy_smoke.rosy -- Smoke test for libcosy
 
   Confirms that:
-   * `MODULE GITHUB "rosy-team/libcosy" "v1.0.0";` fetches the tagged source
+   * `MODULE GITHUB "rosy-team/libcosy" "v1.0.1";` fetches the tagged source
      tarball, validates the Rosy.toml manifest, and splices libcosy/mod.rosy.
    * libcosy/globals.rosy parses and its declarations (PI, NRAY, ...) are
      visible at the top level after splicing.
@@ -17,7 +17,7 @@
 
 BEGIN;
 
-MODULE GITHUB "rosy-team/libcosy" "v1.0.0";
+MODULE GITHUB "rosy-team/libcosy" "v1.0.1";
 
 VARIABLE (RE) RESULT;
 
