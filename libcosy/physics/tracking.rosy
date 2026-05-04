@@ -330,30 +330,13 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   VARIABLE (RE) TSSC_2;
   VARIABLE (RE) TSSC_3;
   VARIABLE (RE) DUM_J;
-  IF TY = -21;
-    { TY=-21 selects "no Newton" symplectification — used for combined
-      magnets with E-multipoles in g-2 storage rings (cosy.fox L2123,
-      paired with NSDP=-21). The fixed-point + linear-symp + spin path
-      around it works in libcosy, but the no-Newton branch isn't wired.
-      Specialized enough that it's deferred until a real g-2 caller
-      shows up. }
-    WRITE 6 ' *** ERROR in TR, TY = -21 (no-Newton g-2 symp) is deferred';
-    WRITE 6 '     Use TY > 0 (fixed-point) or TY < -1 (full Newton) instead.';
-    QUIT 0;
-  ENDIF;
-  IF NF # 0;
-    { NF=1 transforms the initial condition through DANF's normal-form
-      map before tracking — useful for studying motion in normalized
-      action-angle coordinates. cosy.fox L2095-2099 does:
-        DANF MAP TMAP NN 1 DUM 1E-12;
-        PART(ID1) := D1; PART(ID2) := D2;
-        POLVAL 2 NN TWOND PART TWOND PARI TWOND;
-      libcosy's TR uses PART differently (per-particle VE, not initial-
-      condition vector), so wiring NF=1 needs a careful TR refactor.
-      DANF itself works (smoke exercises it via TS). }
-    WRITE 6 ' *** ERROR in TR, NF = 1 (normal-form coordinates) is deferred';
-    WRITE 6 '     Use NF = 0 (default phase-space coordinates) instead.';
-    WRITE 6 '     For normal-form analysis without tracking, call DANF directly.';
+  { TY = -21 is the no-symplectification path (raw POLVAL push, no
+    Newton refinement) — used for combined magnets with E-multipoles
+    in g-2 storage rings. Below, the TY < -1 setup and in-loop SYMP
+    blocks both exclude TY = -21 explicitly, so this code path skips
+    straight to the per-iteration POLVAL with no symp correction.    }
+  IF NF > 1;
+    WRITE 6 ' *** ERROR in TR, NF must be 0 (phase-space) or 1 (normal-form)';
     QUIT 0;
   ENDIF;
   { Spin tracking is enabled when IID1 or IID2 < 0 (the negative index
@@ -444,8 +427,9 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
   { Newton symplectification setup: compute the generating function F
     and its Hessian decomposition (G, H) once before the iteration
     starts. Per-iteration we'll call SYMP with these to refine each
-    ray's coordinates. Skipped for TY = 0 (no symp).                  }
-  IF TY < -1;
+    ray's coordinates. Skipped for TY = 0 (no symp) and TY = -21
+    (raw push, no symp). }
+  IF (TY < -1) AND (TY # -21);
     ABS_TY := ABS(TYS_LOC);
     MGF TMAP F_GF ABS_TY IE_NEWTON;
     IF IE_NEWTON # 0;
@@ -454,10 +438,24 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
     ENDIF;
     SYMP0 F_GF G_NEWTON H_NEWTON;
   ENDIF;
-  { Snapshot RAY into PART. }
-  LOOP I 1 8;
-    PART[I] := RAY[I];
-  ENDLOOP;
+  { Snapshot RAY into PART. With NF=1, the snapshot is taken in
+    normal-form coordinates: build NN_NF via DANF, then POLVAL each
+    ray's RAY through NN_NF to land in NF basis. The remaining
+    tracking loop then operates on PART = NN(RAY) per particle. }
+  IF NF = 1;
+    VARIABLE (DA 8) NN_NF;
+    VARIABLE (DA 8) DUM_NF_ARR;
+    VARIABLE (CD)   DUM_NF_RS;
+    DANF MAP NN_NF DUM_NF_ARR 0 DUM_NF_RS 1E-12;
+    POLVAL 1 NN_NF TWOND RAY 8 PART TWOND;
+    LOOP I TWOND+1 8;
+      PART[I] := RAY[I];
+    ENDLOOP;
+  ELSE;
+    LOOP I 1 8;
+      PART[I] := RAY[I];
+    ENDLOOP;
+  ENDIF;
   { Initial cut: if LCUT > 0 (positive) AND NCT = 0, cut even the
     starting particles. Negative LCUT skips this and only cuts
     particles that drift outside the aperture during tracking.   }
@@ -556,12 +554,14 @@ PROCEDURE TR N (RE) NP_RAY (RE) IID1 (RE) IID2 (RE)
           PART[I] := PART_I_TMP;
         ENDLOOP;
       ENDIF;
-      { Newton symplectification step (TY < -1): refines the just-
-        pushed coords using the precomputed G/H Hessian decomposition.
-        SYMP iterates until the implicit GF equations are satisfied to
-        the requested order. IE != 0 means non-convergence — skip the
-        write-back for that ray and bump LWNTR diagnostic.            }
-      IF TY < -1;
+      { Newton symplectification step (TY < -1, except TY = -21):
+        refines the just-pushed coords using the precomputed G/H
+        Hessian decomposition. SYMP iterates until the implicit GF
+        equations are satisfied to the requested order. IE != 0 means
+        non-convergence — skip the write-back for that ray and bump
+        LWNTR diagnostic. TY = -21 deliberately skips this step
+        (raw POLVAL push only). }
+      IF (TY < -1) AND (TY # -21);
         LOOP I 1 TWOND;
           AM_NEWTON[I] := PART[I][J] + 0*DD[1];
           AN_NEWTON[I] := AM_NEWTON[I];
