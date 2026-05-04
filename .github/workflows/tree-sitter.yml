@@ -4,8 +4,8 @@ on:
   push:
     branches: [master]
     paths:
-      - 'rosy/assets/rosy.pest'
-      - 'rosy/build.rs'
+      - "rosy/assets/rosy.pest"
+      - "rosy/build.rs"
 
 permissions:
   contents: write
@@ -35,7 +35,7 @@ jobs:
       - name: Checkout rosy-tree-sitter
         uses: actions/checkout@v5
         with:
-          repository: hiibolt/rosy-tree-sitter
+          repository: rosy-team/rosy-tree-sitter
           token: ${{ secrets.TREE_SITTER_PAT }}
           path: rosy-tree-sitter
 
@@ -56,7 +56,7 @@ jobs:
             echo "No changes to commit"
             exit 0
           fi
-          git commit -m "chore: sync grammar from hiibolt/rosy@${GITHUB_SHA::8}
+          git commit -m "chore: sync grammar from rosy-team/rosy@${GITHUB_SHA::8}
 
           Auto-generated from rosy.pest by CI."
           git push

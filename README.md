@@ -6,7 +6,7 @@ Rosy transpiles source code into self-contained, native Rust executables — opt
 
 ## Language Documentation
 
-The complete Rosy language reference — every operator, function, statement, and type — is in the **[Rustdoc documentation](https://hiibolt.github.io/rosy/)**.
+The complete Rosy language reference — every operator, function, statement, and type — is in the **[Rustdoc documentation](https://rosy-team.github.io/rosy/)**.
 
 ## Example
 
@@ -39,7 +39,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 rustup default nightly
 
 # Build and install Rosy
-git clone https://github.com/hiibolt/rosy.git
+git clone https://github.com/rosy-team/rosy.git
 cd rosy
 cargo install --path rosy
 ```
@@ -70,7 +70,7 @@ cargo install --path rosy --force
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source ~/.cargo/env
 rustup default nightly
-git clone https://github.com/hiibolt/rosy.git
+git clone https://github.com/rosy-team/rosy.git
 cd rosy && cargo install --path rosy
 
 # For MPI programs (PLOOP)
@@ -91,7 +91,7 @@ cargo install --path rosy --force
 
 ### From GitHub Releases
 
-Prebuilt binaries for Linux (x86_64) and macOS (x86_64, aarch64) are available on the [Releases page](https://github.com/hiibolt/rosy/releases/latest).
+Prebuilt binaries for Linux (x86_64) and macOS (x86_64, aarch64) are available on the [Releases page](https://github.com/rosy-team/rosy/releases/latest).
 
 ### Using Nix Flakes
 

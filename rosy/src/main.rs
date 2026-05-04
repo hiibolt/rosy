@@ -1,9 +1,9 @@
 mod update_check;
 
-use rosy::{ast, embedded, program::Program, resolve, syntax_config, transpile::*};
 use anyhow::{Context, Result, anyhow, ensure};
 use clap::{Parser as ClapParser, Subcommand};
 use pest::Parser;
+use rosy::{ast, embedded, program::Program, resolve, syntax_config, transpile::*};
 use std::{fs, fs::write, path::PathBuf, process::Command, time::Instant};
 use tracing::info;
 use tracing_subscriber;
@@ -175,14 +175,15 @@ fn rosy(
         Some(script_path),
         &mut rosy::program::IncludeTracker::default(),
     )
-        .context("Failed to build AST!")?
-        .context("Expected a program")?;
+    .context("Failed to build AST!")?
+    .context("Expected a program")?;
     step_done(t);
 
     // --- Step 3: Type Resolution ---
     step(4, 6, "Resolving types");
     let t = Instant::now();
-    let (_resolver, warnings) = resolve::TypeResolver::resolve(&mut ast).context("Failed to resolve types!")?;
+    let (_resolver, warnings) =
+        resolve::TypeResolver::resolve(&mut ast).context("Failed to resolve types!")?;
     step_done(t);
     for w in &warnings {
         eprintln!("{BOLD}{YELLOW}    warning{RESET}: {}", w.message);
@@ -253,7 +254,7 @@ fn rosy(
         eprintln!("{BOLD}{RED}  error:{RESET} The generated Rust code failed to compile.");
         eprintln!();
         eprintln!("  This is a bug in the Rosy transpiler, not in your code.");
-        eprintln!("  Please report it at: {BOLD}https://github.com/hiibolt/rosy/issues{RESET}");
+        eprintln!("  Please report it at: {BOLD}https://github.com/rosy-team/rosy/issues{RESET}");
         eprintln!("  Include your {BOLD}.rosy{RESET} file and the error output above.");
         anyhow::bail!(
             "Internal transpiler error: generated code failed to compile (exit code {:?})",
@@ -262,7 +263,11 @@ fn rosy(
     }
 
     let build_profile = if release { "release" } else { "debug" };
-    let binary_name = if cfg!(windows) { "rosy_output.exe" } else { "rosy_output" };
+    let binary_name = if cfg!(windows) {
+        "rosy_output.exe"
+    } else {
+        "rosy_output"
+    };
     let binary_path = rosy_output_path.join(format!("target/{}/{}", build_profile, binary_name));
 
     let total_ms = total_start.elapsed().as_millis();
@@ -478,7 +483,7 @@ fn run_construct_tests(filter: Option<&str>, release: bool, parallel: usize) -> 
         eprintln!("    Parallel: {parallel} workers");
     }
 
-    let cosy_bin = workspace_root.join("cosy");
+    let cosy_bin = workspace_root.join("assets").join("cosy");
     let has_cosy = cosy_bin.exists() && cosy_bin.is_file();
     if has_cosy {
         eprintln!("        COSY: {GREEN}found{RESET}");
@@ -619,9 +624,13 @@ fn run_construct_tests(filter: Option<&str>, release: bool, parallel: usize) -> 
 // static (embedded from editors/vscode/). The language config is generated
 // from the grammar at build time so folding/indent keywords stay in sync.
 const VSCODE_PACKAGE_JSON: &str = include_str!("../assets/editors/vscode/package.json");
-const VSCODE_LANG_CONFIG: &str = include_str!(concat!(env!("OUT_DIR"), "/vscode_language_configuration.json"));
+const VSCODE_LANG_CONFIG: &str = include_str!(concat!(
+    env!("OUT_DIR"),
+    "/vscode_language_configuration.json"
+));
 const VSCODE_EXTENSION_JS: &str = include_str!("../assets/editors/vscode/extension.js");
-const VSCODE_TM_GRAMMAR: &str = include_str!("../assets/editors/vscode/syntaxes/rosy.tmLanguage.json");
+const VSCODE_TM_GRAMMAR: &str =
+    include_str!("../assets/editors/vscode/syntaxes/rosy.tmLanguage.json");
 
 // Zed extension files — embedded at build time.
 // Unlike VS Code, Zed extensions need a WASM component, so we write the
@@ -647,36 +656,45 @@ fn install_vscode_extension() -> Result<()> {
     let extensions_dir = PathBuf::from(&home).join(".vscode/extensions");
 
     // Clean up old extension directories from before the naming fix
-    for old_name in ["rosy-language-support", "hiibolt.rosy-language-support"] {
+    for old_name in ["rosy-language-support", "rosy-team.rosy-language-support"] {
         let old_ext_dir = extensions_dir.join(old_name);
         if old_ext_dir.exists() {
-            eprintln!("{DIM}  Removing old extension at {}{RESET}", old_ext_dir.display());
+            eprintln!(
+                "{DIM}  Removing old extension at {}{RESET}",
+                old_ext_dir.display()
+            );
             let _ = fs::remove_dir_all(&old_ext_dir);
         }
     }
 
-    // Also clean up any previous versioned installs (hiibolt.rosy-language-support-*)
+    // Also clean up any previous versioned installs (rosy-team.rosy-language-support-*)
     if let Ok(entries) = fs::read_dir(&extensions_dir) {
         for entry in entries.flatten() {
             let name = entry.file_name();
             let name = name.to_string_lossy();
-            if name.starts_with("hiibolt.rosy-language-support-") {
-                eprintln!("{DIM}  Removing old extension at {}{RESET}", entry.path().display());
+            if name.starts_with("rosy-team.rosy-language-support-") {
+                eprintln!(
+                    "{DIM}  Removing old extension at {}{RESET}",
+                    entry.path().display()
+                );
                 let _ = fs::remove_dir_all(entry.path());
             }
         }
     }
 
     let ext_version = env!("CARGO_PKG_VERSION");
-    let ext_dir = extensions_dir.join(format!("hiibolt.rosy-language-support-{ext_version}"));
+    let ext_dir = extensions_dir.join(format!("rosy-team.rosy-language-support-{ext_version}"));
     let syntaxes_dir = ext_dir.join("syntaxes");
 
-    let action = if ext_dir.exists() { "Updating" } else { "Installing" };
+    let action = if ext_dir.exists() {
+        "Updating"
+    } else {
+        "Installing"
+    };
     eprintln!("{BOLD}  {action}{RESET} VS Code extension");
     eprintln!("         to: {}", ext_dir.display());
 
-    fs::create_dir_all(&syntaxes_dir)
-        .context("Failed to create extension directory")?;
+    fs::create_dir_all(&syntaxes_dir).context("Failed to create extension directory")?;
 
     // Inject the transpiler version into package.json so it matches the folder name
     let package_json = VSCODE_PACKAGE_JSON.replace(
@@ -684,15 +702,18 @@ fn install_vscode_extension() -> Result<()> {
         &format!("\"version\": \"{}\"", ext_version),
     );
     write(ext_dir.join("package.json"), package_json)?;
-    write(ext_dir.join("language-configuration.json"), VSCODE_LANG_CONFIG)?;
+    write(
+        ext_dir.join("language-configuration.json"),
+        VSCODE_LANG_CONFIG,
+    )?;
     write(ext_dir.join("extension.js"), VSCODE_EXTENSION_JS)?;
     write(syntaxes_dir.join("rosy.tmLanguage.json"), VSCODE_TM_GRAMMAR)?;
 
     // Register the extension in VS Code's extensions.json registry
     let registry_path = extensions_dir.join("extensions.json");
     let mut registry: Vec<serde_json::Value> = if registry_path.exists() {
-        let contents = fs::read_to_string(&registry_path)
-            .context("Failed to read extensions.json")?;
+        let contents =
+            fs::read_to_string(&registry_path).context("Failed to read extensions.json")?;
         serde_json::from_str(&contents).unwrap_or_default()
     } else {
         Vec::new()
@@ -700,15 +721,16 @@ fn install_vscode_extension() -> Result<()> {
 
     // Remove any existing rosy entries
     registry.retain(|entry| {
-        entry.get("identifier")
+        entry
+            .get("identifier")
             .and_then(|id| id.get("id"))
             .and_then(|id| id.as_str())
-            != Some("hiibolt.rosy-language-support")
+            != Some("rosy-team.rosy-language-support")
     });
 
-    let relative_location = format!("hiibolt.rosy-language-support-{ext_version}");
+    let relative_location = format!("rosy-team.rosy-language-support-{ext_version}");
     registry.push(serde_json::json!({
-        "identifier": { "id": "hiibolt.rosy-language-support" },
+        "identifier": { "id": "rosy-team.rosy-language-support" },
         "version": ext_version,
         "location": {
             "$mid": 1,
@@ -725,11 +747,15 @@ fn install_vscode_extension() -> Result<()> {
         }
     }));
 
-    let registry_json = serde_json::to_string_pretty(&registry)
-        .context("Failed to serialize extensions.json")?;
+    let registry_json =
+        serde_json::to_string_pretty(&registry).context("Failed to serialize extensions.json")?;
     write(&registry_path, registry_json)?;
 
-    let done_verb = if action == "Updating" { "Updated" } else { "Installed" };
+    let done_verb = if action == "Updating" {
+        "Updated"
+    } else {
+        "Installed"
+    };
     eprintln!("{BOLD}{GREEN}    {done_verb}{RESET} Rosy Language Support for VS Code");
     eprintln!();
     eprintln!("  Reload VS Code to activate. Open any {BOLD}.rosy{RESET} file to see");
@@ -755,14 +781,16 @@ fn install_zed_extension() -> Result<()> {
     let src_dir = ext_dir.join("src");
     let languages_dir = ext_dir.join("languages/rosy");
 
-    let action = if ext_dir.exists() { "Updating" } else { "Writing" };
+    let action = if ext_dir.exists() {
+        "Updating"
+    } else {
+        "Writing"
+    };
     eprintln!("{BOLD}  {action}{RESET} Zed extension source");
     eprintln!("         to: {}", ext_dir.display());
 
-    fs::create_dir_all(&src_dir)
-        .context("Failed to create extension source directory")?;
-    fs::create_dir_all(&languages_dir)
-        .context("Failed to create languages directory")?;
+    fs::create_dir_all(&src_dir).context("Failed to create extension source directory")?;
+    fs::create_dir_all(&languages_dir).context("Failed to create languages directory")?;
 
     write(ext_dir.join("extension.toml"), ZED_EXTENSION_TOML)?;
     write(ext_dir.join("Cargo.toml"), ZED_CARGO_TOML)?;
@@ -770,7 +798,11 @@ fn install_zed_extension() -> Result<()> {
     write(languages_dir.join("config.toml"), ZED_CONFIG_TOML)?;
     write(languages_dir.join("highlights.scm"), ZED_HIGHLIGHTS_SCM)?;
 
-    let done_verb = if action == "Updating" { "Updated" } else { "Wrote" };
+    let done_verb = if action == "Updating" {
+        "Updated"
+    } else {
+        "Wrote"
+    };
     eprintln!("{BOLD}{GREEN}    {done_verb}{RESET} Rosy extension for Zed");
     eprintln!();
     eprintln!("  {BOLD}Prerequisites:{RESET}");
