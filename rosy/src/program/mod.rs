@@ -17,12 +17,39 @@ use std::path::{Path, PathBuf};
 
 use crate::{
     ast::{CosyParser, FromRule, Rule},
+    manifest::RosyToml,
     program::statements::{SourceLocation, Statement},
     resolve::*,
     transpile::*,
 };
 use anyhow::{Context, Error, Result, bail};
 use pest::Parser;
+
+/// Discriminator for the `MODULE` statement's source-type literal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModuleSourceType {
+    /// `MODULE PATH "<dir>" [<version>];` — local directory.
+    Path,
+    /// `MODULE GITHUB "<owner>/<repo>" [<version>];` — git-cloned package.
+    Github,
+}
+
+impl ModuleSourceType {
+    fn label(self) -> &'static str {
+        match self {
+            ModuleSourceType::Path => "PATH",
+            ModuleSourceType::Github => "GITHUB",
+        }
+    }
+}
+
+/// Parsed `MODULE` statement: source-type literal + path string + optional version pin.
+#[derive(Debug)]
+struct ModuleInfo {
+    source_type: ModuleSourceType,
+    path: String,
+    version: Option<String>,
+}
 
 pub mod expressions;
 pub mod statements;
@@ -158,59 +185,9 @@ impl Program {
                     }
                 };
 
-                // Idempotency: a file that has already been fully parsed once
-                // contributes its declarations exactly once. Subsequent INCLUDEs
-                // are silent no-ops, so library files can safely INCLUDE their
-                // own dependencies without producing duplicate VARIABLEs when
-                // the program also INCLUDEs those dependencies via another path.
-                if tracker.completed.contains(&canonical) {
-                    continue;
-                }
-
-                // True cycle detection: only the active recursion stack counts.
-                if tracker.in_progress.contains(&canonical) {
-                    let chain: Vec<String> = tracker
-                        .in_progress
-                        .iter()
-                        .map(|p| p.display().to_string())
-                        .collect();
-                    bail!(
-                        "Circular INCLUDE detected: {} → {}",
-                        chain.join(" → "),
-                        canonical.display()
-                    );
-                }
-
-                // Read and parse the included file as a full program
-                let included_source = std::fs::read_to_string(&canonical).with_context(|| {
-                    format!("Failed to read INCLUDE file '{}'", resolved.display())
-                })?;
-
-                let mut pairs = CosyParser::parse(Rule::program, &included_source)
-                    .with_context(|| format!("Failed to parse INCLUDE file '{}'", canonical.display()))?;
-
-                let program_pair = pairs.next()
-                    .ok_or_else(|| anyhow::anyhow!("Empty parse result for '{}'", canonical.display()))?;
-
-                // Recurse
-                tracker.in_progress.insert(canonical.clone());
-                let included_program = Program::from_rule_with_includes(
-                    program_pair,
-                    Some(&canonical),
-                    tracker,
-                )?;
-                tracker.in_progress.remove(&canonical);
-                tracker.completed.insert(canonical.clone());
-
-                // Splice the included statements, stamping file origin
-                if let Some(prog) = included_program {
-                    for mut s in prog.statements {
-                        if s.source_location.file.is_none() {
-                            s.source_location.file = Some(canonical.clone());
-                        }
-                        statements.push(s);
-                    }
-                }
+                Self::splice_resolved_file(canonical, &mut statements, tracker)?;
+            } else if stmt.as_rule() == Rule::module_stmt {
+                Self::process_module_stmt(&stmt, source_path, &mut statements, tracker)?;
             } else {
                 let pair_input = stmt.as_str();
                 if let Some(statement) = Statement::from_rule(stmt)
@@ -222,6 +199,313 @@ impl Program {
         }
 
         Ok(Some(Program { statements }))
+    }
+
+    /// Read, parse, and splice a resolved canonical file into `statements`,
+    /// updating `tracker`. Shared by INCLUDE and MODULE since both ultimately
+    /// reduce to "treat the file's `BEGIN; ... END;` body as inlined here".
+    fn splice_resolved_file(
+        canonical: PathBuf,
+        statements: &mut Vec<Statement>,
+        tracker: &mut IncludeTracker,
+    ) -> Result<()> {
+        // Idempotency: a file that has already been fully parsed once
+        // contributes its declarations exactly once. Subsequent INCLUDEs
+        // are silent no-ops, so library files can safely INCLUDE their
+        // own dependencies without producing duplicate VARIABLEs when
+        // the program also INCLUDEs those dependencies via another path.
+        if tracker.completed.contains(&canonical) {
+            return Ok(());
+        }
+
+        // True cycle detection: only the active recursion stack counts.
+        if tracker.in_progress.contains(&canonical) {
+            let chain: Vec<String> = tracker
+                .in_progress
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect();
+            bail!(
+                "Circular INCLUDE detected: {} → {}",
+                chain.join(" → "),
+                canonical.display()
+            );
+        }
+
+        let included_source = std::fs::read_to_string(&canonical).with_context(|| {
+            format!("Failed to read included file '{}'", canonical.display())
+        })?;
+
+        let mut pairs = CosyParser::parse(Rule::program, &included_source)
+            .with_context(|| format!("Failed to parse included file '{}'", canonical.display()))?;
+
+        let program_pair = pairs
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Empty parse result for '{}'", canonical.display()))?;
+
+        tracker.in_progress.insert(canonical.clone());
+        let included_program =
+            Program::from_rule_with_includes(program_pair, Some(&canonical), tracker)?;
+        tracker.in_progress.remove(&canonical);
+        tracker.completed.insert(canonical.clone());
+
+        if let Some(prog) = included_program {
+            for mut s in prog.statements {
+                if s.source_location.file.is_none() {
+                    s.source_location.file = Some(canonical.clone());
+                }
+                statements.push(s);
+            }
+        }
+        Ok(())
+    }
+
+    /// Resolve a `MODULE` statement to a package directory, validate its
+    /// manifest, then splice the package's `mod.rosy` like an INCLUDE.
+    fn process_module_stmt(
+        stmt: &pest::iterators::Pair<Rule>,
+        source_path: Option<&Path>,
+        statements: &mut Vec<Statement>,
+        tracker: &mut IncludeTracker,
+    ) -> Result<()> {
+        let info = Self::extract_module_info(stmt)?;
+
+        // Step 1: locate the package directory (resolution rules differ per source type).
+        let package_dir = match info.source_type {
+            ModuleSourceType::Path => {
+                let resolved = if Path::new(&info.path).is_absolute() {
+                    PathBuf::from(&info.path)
+                } else {
+                    let base = source_path.and_then(|p| p.parent()).ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "Cannot resolve relative MODULE PATH '{}' — source file path is unknown \
+                             (hint: save the file to disk first)",
+                            info.path,
+                        )
+                    })?;
+                    base.join(&info.path)
+                };
+                std::fs::canonicalize(&resolved).with_context(|| {
+                    format!(
+                        "MODULE PATH '{}' could not be resolved (looked at '{}')",
+                        info.path,
+                        resolved.display(),
+                    )
+                })?
+            }
+            ModuleSourceType::Github => {
+                // Version is required for GITHUB — it pins the tagged Release we grab.
+                let version = info.version.as_deref().ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "MODULE GITHUB '{}' requires a version (the tag of the Release to download)",
+                        info.path,
+                    )
+                })?;
+
+                // Cache key = "<repo>-<version>" so different versions coexist.
+                let repo_name = info
+                    .path
+                    .rsplit('/')
+                    .next()
+                    .filter(|s| !s.is_empty())
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "MODULE GITHUB '{}' is not a valid 'owner/repo' identifier",
+                            info.path
+                        )
+                    })?;
+                let cache_dir = PathBuf::from(".rosy_output")
+                    .join("packages")
+                    .join(format!("{repo_name}-{version}"));
+
+                if !cache_dir.exists() {
+                    Self::fetch_github_release(&info.path, version, &cache_dir)?;
+                }
+
+                std::fs::canonicalize(&cache_dir).with_context(|| {
+                    format!(
+                        "Failed to canonicalize package cache directory '{}'",
+                        cache_dir.display()
+                    )
+                })?
+            }
+        };
+
+        // Step 2: read the package manifest.
+        let manifest = RosyToml::read_from(&package_dir)?;
+
+        // Step 3: announce what we're pulling in.
+        // Cargo-style action line: bold-green "Grabbing" right-aligned
+        // around column 12 to sit flush with main.rs's "Compiling" / "Finished".
+        // Bold = \x1b[1m, bright green = \x1b[92m, reset = \x1b[0m.
+        eprintln!(
+            "\n\x1b[1m\x1b[92m    Grabbing\x1b[0m \x1b[1m{}\x1b[0m v{} from \x1b[36m{}\x1b[0m '{}'",
+            manifest.package.name,
+            manifest.package.version,
+            info.source_type.label(),
+            info.path,
+        );
+
+        // Step 4: enforce the package's `rosy_version` semver requirement.
+        manifest.check_rosy_version_compat(env!("CARGO_PKG_VERSION"))?;
+
+        // Step 5: for PATH, an explicit version on the MODULE statement must
+        // match the manifest's `version` exactly. (GITHUB uses the version as
+        // a git ref, so the match is the clone itself.)
+        if matches!(info.source_type, ModuleSourceType::Path)
+            && let Some(requested) = &info.version
+            && requested != &manifest.package.version
+        {
+            bail!(
+                "MODULE PATH '{}' requested version '{}' but package '{}' is at version '{}'",
+                info.path,
+                requested,
+                manifest.package.name,
+                manifest.package.version,
+            );
+        }
+
+        // Step 6: behave like INCLUDE on the package's mod.rosy entry point.
+        let mod_path = package_dir.join("mod.rosy");
+        let canonical = std::fs::canonicalize(&mod_path).with_context(|| {
+            format!(
+                "Package '{}' is missing 'mod.rosy' at '{}'",
+                manifest.package.name,
+                mod_path.display(),
+            )
+        })?;
+        Self::splice_resolved_file(canonical, statements, tracker)
+    }
+
+    /// Download and extract a GitHub Release source tarball into `dest`.
+    ///
+    /// Uses the public archive URL `https://github.com/<owner_repo>/archive/refs/tags/<version>.tar.gz`,
+    /// which works for any tagged commit (whether or not a formal Release was
+    /// created). The tarball's leading `<repo>-<verstrip>/` directory is
+    /// stripped on the fly so files land directly inside `dest`.
+    fn fetch_github_release(owner_repo: &str, version: &str, dest: &Path) -> Result<()> {
+        use std::io::Read;
+
+        let url = format!(
+            "https://github.com/{owner_repo}/archive/refs/tags/{version}.tar.gz"
+        );
+
+        eprintln!(
+            "\x1b[1m\x1b[92m  Downloading\x1b[0m {url}"
+        );
+
+        let agent = ureq::Agent::new_with_config(
+            ureq::config::Config::builder()
+                .timeout_global(Some(std::time::Duration::from_secs(60)))
+                .build(),
+        );
+        let mut response = agent
+            .get(&url)
+            .header("User-Agent", "rosy-transpiler")
+            .call()
+            .with_context(|| format!("Failed to fetch GitHub release tarball '{url}'"))?;
+
+        let status = response.status();
+        if status != 200 {
+            bail!(
+                "GitHub returned HTTP {status} for '{url}' \
+                 — check that '{owner_repo}' exists and tag '{version}' is published"
+            );
+        }
+
+        let mut bytes = Vec::new();
+        response
+            .body_mut()
+            .as_reader()
+            .read_to_end(&mut bytes)
+            .with_context(|| format!("Failed to read tarball body from '{url}'"))?;
+
+        // Decompress + extract, stripping the GitHub-auto-added top-level dir.
+        let gz = flate2::read::GzDecoder::new(bytes.as_slice());
+        let mut archive = tar::Archive::new(gz);
+
+        std::fs::create_dir_all(dest).with_context(|| {
+            format!("Failed to create extraction directory '{}'", dest.display())
+        })?;
+
+        for entry in archive.entries().with_context(|| {
+            format!("Failed to read entries from tarball '{url}'")
+        })? {
+            let mut entry = entry.with_context(|| {
+                format!("Corrupt tar entry in tarball '{url}'")
+            })?;
+            let entry_path = entry.path().with_context(|| {
+                format!("Tar entry has invalid path in '{url}'")
+            })?.into_owned();
+
+            // Strip the leading dir component (e.g. "repo-1.0.0/").
+            let stripped: PathBuf = entry_path.components().skip(1).collect();
+            if stripped.as_os_str().is_empty() {
+                continue;
+            }
+            let target = dest.join(stripped);
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent).with_context(|| {
+                    format!("Failed to create '{}'", parent.display())
+                })?;
+            }
+            entry.unpack(&target).with_context(|| {
+                format!("Failed to write '{}'", target.display())
+            })?;
+        }
+
+        Ok(())
+    }
+
+    /// Extract the source-type literal, path string, and optional version
+    /// string from a `module_stmt` pest pair.
+    fn extract_module_info(pair: &pest::iterators::Pair<Rule>) -> Result<ModuleInfo> {
+        // module_stmt = { ^"MODULE" ~ module_source_type ~ string ~ string? ~ semicolon }
+        let mut inner = pair.clone().into_inner();
+
+        let source_type_pair = inner
+            .next()
+            .filter(|p| p.as_rule() == Rule::module_source_type)
+            .ok_or_else(|| anyhow::anyhow!("MODULE statement missing source type"))?;
+        let source_type = match source_type_pair.as_str().to_uppercase().as_str() {
+            "PATH" => ModuleSourceType::Path,
+            "GITHUB" => ModuleSourceType::Github,
+            other => bail!("Unknown MODULE source type '{}'", other),
+        };
+
+        let path = Self::string_pair_to_owned(
+            inner
+                .next()
+                .filter(|p| p.as_rule() == Rule::string)
+                .ok_or_else(|| anyhow::anyhow!("MODULE statement missing path string"))?,
+        )?;
+
+        let version = match inner.next() {
+            Some(p) if p.as_rule() == Rule::string => Some(Self::string_pair_to_owned(p)?),
+            _ => None,
+        };
+
+        Ok(ModuleInfo {
+            source_type,
+            path,
+            version,
+        })
+    }
+
+    /// Strip the surrounding quotes from a `string` rule pair (handling both
+    /// `"..."` and `'...'` forms, with the standard `''` → `'` unescape).
+    fn string_pair_to_owned(string_pair: pest::iterators::Pair<Rule>) -> Result<String> {
+        let inner = string_pair
+            .into_inner()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Empty string literal"))?;
+        let raw = inner.as_str();
+        let body = &raw[1..raw.len() - 1];
+        Ok(if inner.as_rule() == Rule::old_string {
+            body.replace("''", "'")
+        } else {
+            body.to_string()
+        })
     }
 
     /// Extract the file path string from an `include_stmt` pair.

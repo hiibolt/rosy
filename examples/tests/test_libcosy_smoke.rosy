@@ -1,24 +1,23 @@
 { ============================================================================
-  test_libcosy_smoke.rosy --Smoke test for libcosy/
+  test_libcosy_smoke.rosy -- Smoke test for libcosy
 
   Confirms that:
-   * `INCLUDE 'libcosy';` resolves through the directory fallback to
-     libcosy/mod.rosy (added in v0.36.0).
+   * `MODULE GITHUB "rosy-team/libcosy" "v1.0.0";` fetches the tagged source
+     tarball, validates the Rosy.toml manifest, and splices libcosy/mod.rosy.
    * libcosy/globals.rosy parses and its declarations (PI, NRAY, ...) are
      visible at the top level after splicing.
-   * Empty libcosy/{helpers,physics}/mod.rosy stubs INCLUDE cleanly.
 
   Run with:
     cargo run --bin rosy -- run examples/tests/test_libcosy_smoke.rosy
 
   Note: globals are uninitialized in M1, so reads return type-default values
-  (PI -> 0.0). This test only verifies that the INCLUDE chain succeeds and
+  (PI -> 0.0). This test only verifies that the MODULE pipeline succeeds and
   globals are addressable.
   ============================================================================ }
 
 BEGIN;
 
-INCLUDE '../../libcosy';     { resolves to libcosy/mod.rosy }
+MODULE GITHUB "rosy-team/libcosy" "v1.0.0";
 
 VARIABLE (RE) RESULT;
 

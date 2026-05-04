@@ -10,7 +10,7 @@
 
 BEGIN;
 
-INCLUDE '../../libcosy';
+MODULE GITHUB "rosy-team/libcosy" "v1.0.0";
 
 VARIABLE (CD 8) IAP;
 VARIABLE (CD 8) MID;
