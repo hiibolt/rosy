@@ -10,7 +10,7 @@
 
 BEGIN;
 
-MODULE GITHUB "rosy-team/libcosy" "v1.0.0";
+MODULE GITHUB "rosy-team/libcosy" "v1.0.1";
 
 VARIABLE (DA 8) F_GT;
 VARIABLE (DA 4) MU_GT;
