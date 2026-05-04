@@ -765,11 +765,11 @@ ENDPROCEDURE;
     MPOL[NPOL+1]    = NM (count of magnetic multipoles)
     MPOL[NPOL+2]    = 1 (electric fringe flag)
 
-  libcosy supports LFR=0 (no fringe, SIELE-based) and LFR=3/2.5
-  (high-precision NSDP=-21 with bend geometry). LFR=0 with electric
-  multipoles falls back to SIELE — the magnetic part is faithful but
-  the electric part contributes constant-field rather than true
-  fringe-modulated.                                                    }
+  Supported LFR modes:
+    * 0       SIELE-based, no fringe (electric multipoles contribute
+              constant-field rather than fringe-modulated).
+    * 3 / 2.5 high-precision NSDP=-21 with bend geometry.
+    * 1, -1, -2, -10  delegate to FFELE for SDELE-driven fringe paths. }
 PROCEDURE MSEM R (RE) PHI (RE) DM (RE) NB (RE 16) DE (RE) EV (RE 16) N (RE) CI (ST);
   VARIABLE (RE) I;
   VARIABLE (RE) NM_LOCAL;
@@ -858,8 +858,15 @@ PROCEDURE MSEM R (RE) PHI (RE) DM (RE) NB (RE 16) DE (RE) EV (RE 16) N (RE) CI (
     SLOC := R*PHI;
     UPDATE 1 1;
   ELSE;
-    WRITE 6 ' *** ERROR in MSEM, only LFR=0 / 3 / 2.5 supported in libcosy';
-    QUIT 0;
+    { Other LFR modes (1, -1, -2, -10) delegate to FFELE — the
+      magnetic / electric multipole stack stays in PPOL/MPOL above
+      and FFELE picks up the SDELE-driven fringe-field path. }
+    VARIABLE (RE) NEG1_MS;
+    VARIABLE (RE) NEG2_MS;
+    NEG1_MS := -1;
+    NEG2_MS := -2;
+    LOFF := 2;
+    FFELE R*PHI DE 1/R NEG1_MS NEG2_MS CI;
   ENDIF;
 ENDPROCEDURE;
 

@@ -131,7 +131,9 @@ PROCEDURE EDGESEC X (DA) Z (DA) IB (RE) IE (RE)
       NORMAL_DA X Z X0 Z0 X1 Z1 DIS XS ZS;
     ENDIF;
   ELSE;
-    WRITE 6 ' *** ERROR in EDGESEC, N#1 -- not supported.';
+    { cosy.fox itself errors on N#1 — the curved-edge case is undefined
+      in the upstream library too. Box edges must be straight segments. }
+    WRITE 6 ' *** ERROR in EDGESEC, N#1 (curved edges) not supported';
     QUIT 0;
   ENDIF;
 ENDPROCEDURE;

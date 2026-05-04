@@ -169,20 +169,24 @@ ENDPROCEDURE;
   N is an array of higher-multipole strengths, NT is the count, CI is
   the element-name string.
 
-  libcosy supports LFR=0 (no fringe field) only. 's LFR=2.5/3
-  paths (high-precision soft-edge fringe) need NSDP=-11..-13 (electric
-  bend Cartesian field modes) which are deferred.
+  Supports LFR ∈ {0, 1, -1, -2, -10, 2.5, 3}. LFR=0 uses SIELE
+  directly. LFR=2.5/3 uses the high-precision NSDP=-11 + BENDIST
+  path. Other modes delegate to FFELE.
 
   Algorithm (LFR=0):
-    1. Build PPOL[1] = CHIE/R/1000 (dipole electric, kV/m → MeV scaling).
-    2. Build PPOL[I+1] = -PPOL[1] · N[I] / R^I / (I+1) for I=1..NT
+    1. PPOL[1] = CHIE/R/1000 (dipole electric, kV/m → MeV scaling).
+    2. PPOL[I+1] = -PPOL[1] · N[I] / R^I / (I+1) for I=1..NT
        (multipole components, scaled by the radius geometry).
-    3. Set MPOL[I] = -I (electric labels).
+    3. MPOL[I] = -I (electric labels).
     4. SIELE R*PHI D — integrate across arc length R·PHI.
-    5. LOCSET with curved-axis update.                                 }
+    5. LOCSET with curved-axis update. }
 PROCEDURE EBEND R (RE) PHI (RE) D (RE) N_ARR (RE 16) NT (RE) CI (ST);
   VARIABLE (RE) RPP;
   VARIABLE (RE) I;
+  VARIABLE (RE) NEG1;
+  VARIABLE (RE) NEG2;
+  NEG1 := -1;
+  NEG2 := -2;
   CE := CI;
   DR := D;
   LOFF := 2;
@@ -270,8 +274,22 @@ PROCEDURE EBEND R (RE) PHI (RE) D (RE) N_ARR (RE 16) NT (RE) CI (ST);
     ZLOC := ZLOC - LDL_LOCAL*COS(PLOC);
     UPDATE 1 1;
   ELSE;
-    WRITE 6 ' *** ERROR in EBEND, only LFR=0 / 3 / 2.5 supported in libcosy';
-    QUIT 0;
+    { Other LFR modes (1, -1, -2, -10) delegate to FFELE, which
+      handles SDELE-driven entrance / exit fringes via NSDP=-11
+      (electrostatic deflector). FFELE expects the dipole/multipole
+      content already laid out in PPOL/MPOL — done above. }
+    NPOL := NT + 1;
+    PPOL[1] := CONS(CHIE)/R/1000 + 0*DD[1];
+    RPP := 1;
+    LOOP I 1 NT;
+      RPP := RPP*R;
+      PPOL[I+1] := -CONS(CHIE)/R/1000*N_ARR[I]/RPP/(I+1) + 0*DD[1];
+    ENDLOOP;
+    LOOP I 1 NPOL;
+      MPOL[I] := -I;
+    ENDLOOP;
+    LOFF := 2;
+    FFELE R*PHI D 1/R NEG1 NEG2 CI;
   ENDIF;
 ENDPROCEDURE;
 
@@ -403,8 +421,8 @@ ENDPROCEDURE;
 
   H_LOCAL = 1/RM - 1/RE  is the net curvature for the LOCSET.
 
-  libcosy: only LFR=0 path works (LFR≠0 would need POTXZ NSDP=-1/-2
-  for bend-element Cartesian fringe fields, deferred).               }
+  WC delegates to FFELE which dispatches on the current LFR setting
+  (0, 1, -1, -2, -10 are all supported via the FFELE dispatch hub). }
 PROCEDURE WC RE_RAD (RE) RM_RAD (RE) L (RE) D_AP (RE)
             NE_ARR (RE 16) NM_ARR (RE 16) NT (RE);
   VARIABLE (RE) I;
