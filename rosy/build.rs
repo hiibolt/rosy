@@ -135,7 +135,7 @@ fn collect_files(root: &Path, current: &Path) -> Vec<PathBuf> {
 
 // ─── LSP: Keyword & Hover Doc Generation ───────────────────────────────────
 
-const BASE_DOC_URL: &str = "https://hiibolt.github.io/rosy/rosy";
+const BASE_DOC_URL: &str = "https://rosy-team.github.io/rosy/rosy";
 
 fn extract_keywords(source: &str) -> Vec<String> {
     let mut keywords = Vec::new();
@@ -679,7 +679,11 @@ fn generate_tree_sitter_grammar(
         .collect();
     grammar.push_str("    _builtin: _ => choice(\n");
     for (i, func) in filtered_intrinsics.iter().enumerate() {
-        let comma = if i < filtered_intrinsics.len() - 1 { "," } else { "" };
+        let comma = if i < filtered_intrinsics.len() - 1 {
+            ","
+        } else {
+            ""
+        };
         grammar.push_str(&format!(
             "      '{}', '{}'{}\n",
             func.to_uppercase(),
@@ -725,7 +729,6 @@ fn generate_tree_sitter_grammar(
 
     fs::write(Path::new(out_dir).join("grammar.js"), &grammar).unwrap();
 }
-
 
 /// Generate highlights.scm for Zed/Tree-sitter.
 ///
@@ -786,10 +789,7 @@ fn generate_tree_sitter_highlights(
     // Statement keywords (excluding intrinsics, types, booleans)
     scm.push_str("; Keywords\n");
     for kw in keywords {
-        if intrinsics.contains(kw)
-            || types.contains(&kw.as_str())
-            || kw == "TRUE"
-            || kw == "FALSE"
+        if intrinsics.contains(kw) || types.contains(&kw.as_str()) || kw == "TRUE" || kw == "FALSE"
         {
             continue;
         }

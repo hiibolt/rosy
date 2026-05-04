@@ -1018,7 +1018,7 @@ dependencies = [
 
 [[package]]
 name = "rosy"
-version = "0.42.30"
+version = "1.0.0-alpha.0"
 dependencies = [
  "anyhow",
  "clap",

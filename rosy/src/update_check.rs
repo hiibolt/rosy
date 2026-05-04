@@ -3,8 +3,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-const GITHUB_API_URL: &str =
-    "https://api.github.com/repos/hiibolt/rosy/releases/latest";
+const GITHUB_API_URL: &str = "https://api.github.com/repos/rosy-team/rosy/releases/latest";
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -56,15 +55,17 @@ fn check_latest_version() -> Option<String> {
         .read_json()
         .ok()?;
 
-    let remote_tag = response.tag_name.strip_prefix('v').unwrap_or(&response.tag_name);
+    let remote_tag = response
+        .tag_name
+        .strip_prefix('v')
+        .unwrap_or(&response.tag_name);
     let remote_version = Version::parse(remote_tag).ok()?;
     let local_version = Version::parse(CURRENT_VERSION).ok()?;
 
     if remote_version > local_version {
-        let release_url = format!("https://github.com/hiibolt/rosy/releases/tag/v{remote_version}");
-        let changelog_link = format!(
-            "\x1b]8;;{release_url}\x1b\\changelog\x1b]8;;\x1b\\"
-        );
+        let release_url =
+            format!("https://github.com/rosy-team/rosy/releases/tag/v{remote_version}");
+        let changelog_link = format!("\x1b]8;;{release_url}\x1b\\changelog\x1b]8;;\x1b\\");
         Some(format!(
             "\n\x1b[33mA newer version of Rosy is available: v{remote_version} (current: v{local_version}) — {changelog_link}\n\
              \n\
