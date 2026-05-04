@@ -42,4 +42,16 @@ WRITE 6 BETA_GT[1];
 WRITE 6 'MU[2] (y unchanged → 0):';
 WRITE 6 MU_GT[2];
 
+{ A focusing quad has stable x but hyperbolic y. Reset MAP via UM
+  then apply MQ; the y-plane (J=2) hits GT's hyperbolic branch. }
+UM;
+MQ 0.1 0.5 0.05;
+GT MAP F_GT MU_GT ALPHA_GT BETA_GT GAMMA_GT R_GT;
+WRITE 6 '----';
+WRITE 6 'After MQ (y-plane unstable), GT hyperbolic results:';
+WRITE 6 'MU[1] (x stable, fractional tune):';
+WRITE 6 MU_GT[1];
+WRITE 6 'MU[2] (y unstable, real-cast tune is 0):';
+WRITE 6 MU_GT[2];
+
 END;

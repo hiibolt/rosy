@@ -1171,15 +1171,35 @@ PROCEDURE GT MM (DA 8) F (DA 8) MU (DA 4) ALPHA (DA 4) BETA (DA 4) GAMMA (DA 4) 
         BETA[J]  := B/DEN + 0*DD[1];
         GAMMA[J] := -CC/DEN + 0*DD[1];
       ELSE;
-        { Hyperbolic (DET>0, |COSMU|>1) needs CD-typed MU output (cosy.fox
-          L1527-1530 produces MU = π·k + i·LOG(COSMU + √(COSMU² - 1))).
-          libcosy's GT signature is DA-typed throughout; the CD route
-          lives in TS / DANF. Callers wanting the unstable case should
-          go via TS (which then does TS → DAPLU strip in TP's LC=1
-          fallback at normal_form.rosy:1592).                            }
-        WRITE 6 ' *** ERROR in GT, hyperbolic branch (|COSMU|>1) needs CD-typed MU';
-        WRITE 6 '     route via TS instead — see TP for the LC=1 fallback pattern';
-        QUIT 0;
+        { Hyperbolic (DET > 0, |COSMU| > 1). MU = DEN + i·LOG(COSMU+SINMU)
+          per cosy.fox; the real part is DEN ∈ {0, π} depending on sign
+          of COSMU. ALPHA / BETA / GAMMA are purely imaginary and so
+          collapse to 0 under the DA-typed real-cast that libcosy's
+          GT signature requires. Callers needing the imaginary tune
+          residue (the actual hyperbolic growth rate) should call TS
+          directly with a CD output buffer. R is set to √DET as a
+          best-effort real magnitude. }
+        VARIABLE (RE) DEN_HYP;
+        VARIABLE (RE) SINMU_HYP;
+        VARIABLE (RE) IMAG_RES_HYP;
+        IF COSMU < 0;
+          DEN_HYP := PI;
+          SINMU_HYP := SQRT(SQR(-COSMU) - 1);
+        ELSE;
+          DEN_HYP := 0;
+          SINMU_HYP := SQRT(SQR(COSMU) - 1);
+        ENDIF;
+        IMAG_RES_HYP := LOG(ABS(COSMU) + SINMU_HYP);
+        R[J]     := SQRT(DET) + 0*DD[1];
+        MU[J]    := DEN_HYP/(2*PI) + 0*DD[1];
+        ALPHA[J] := 0*DD[1];
+        BETA[J]  := 0*DD[1];
+        GAMMA[J] := 0*DD[1];
+        WRITE 6 ' --- WARNING in GT, hyperbolic plane J =';
+        WRITE 6 J;
+        WRITE 6 '     real-cast loses imag tune residue =';
+        WRITE 6 IMAG_RES_HYP;
+        WRITE 6 '     ALPHA / BETA / GAMMA pinned to 0; call TS for full info.';
       ENDIF;
     ELSEIF DET = 0;
       IF (ABS(A) = 0) AND (ABS(B) = 0) AND (ABS(CC) = 0) AND (ABS(D) = 0);
@@ -1193,12 +1213,33 @@ PROCEDURE GT MM (DA 8) F (DA 8) MU (DA 4) ALPHA (DA 4) BETA (DA 4) GAMMA (DA 4) 
         QUIT 0;
       ENDIF;
     ELSE;
-      { DET<0: imaginary R, MU=π/2 + K·i·LOG(...) (cosy.fox L1538-1542).
-        Same CD-output requirement as the hyperbolic case above —
-        callers should route through TS for full information. }
-      WRITE 6 ' *** ERROR in GT, instability branch (DET<0) needs CD-typed MU';
-      WRITE 6 '     route via TS instead — see TP for the LC=1 fallback pattern';
-      QUIT 0;
+      { DET < 0: instability. R = i·√(-DET) is purely imag, MU = π/2
+        + K·i·LOG(SINMU+COSMU) per cosy.fox. Real-cast extracts only
+        the π/2 tune component; the K·LOG growth-rate residue is
+        reported as a diagnostic. ALPHA / BETA / GAMMA collapse to 0
+        for the same reason as hyperbolic. }
+      VARIABLE (RE) DEN_INS;
+      VARIABLE (RE) COSMU_INS;
+      VARIABLE (RE) SINMU_INS;
+      VARIABLE (RE) IMAG_RES_INS;
+      DEN_INS := SQRT(-DET);
+      COSMU_INS := (A + D)/2/DEN_INS;
+      IF COSMU_INS < 0;
+        SINMU_INS := SQRT(SQR(-COSMU_INS) + 1);
+      ELSE;
+        SINMU_INS := SQRT(SQR(COSMU_INS) + 1);
+      ENDIF;
+      IMAG_RES_INS := LOG(ABS(COSMU_INS) + SINMU_INS);
+      R[J]     := DEN_INS + 0*DD[1];
+      MU[J]    := 0.25 + 0*DD[1];
+      ALPHA[J] := 0*DD[1];
+      BETA[J]  := 0*DD[1];
+      GAMMA[J] := 0*DD[1];
+      WRITE 6 ' --- WARNING in GT, unstable plane J =';
+      WRITE 6 J;
+      WRITE 6 '     real-cast pins MU to π/2 (= 0.25 turn); imag growth residue =';
+      WRITE 6 IMAG_RES_INS;
+      WRITE 6 '     ALPHA / BETA / GAMMA pinned to 0; call TS for full info.';
     ENDIF;
   ENDLOOP;
 ENDPROCEDURE;
