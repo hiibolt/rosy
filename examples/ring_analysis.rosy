@@ -43,7 +43,7 @@
 
 BEGIN;
 
-INCLUDE '../../libcosy';
+MODULE GITHUB "rosy-team/libcosy" "v1.0.0";
 
 VARIABLE (RE) RESULT;
 VARIABLE (DA 8) M_TURN;

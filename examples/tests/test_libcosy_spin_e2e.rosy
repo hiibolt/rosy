@@ -11,7 +11,7 @@
 
 BEGIN;
 
-INCLUDE '../../libcosy';
+MODULE GITHUB "rosy-team/libcosy" "v1.0.0";
 
 VARIABLE (RE) I;
 VARIABLE (RE) J;

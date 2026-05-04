@@ -10,7 +10,7 @@
 
 BEGIN;
 
-INCLUDE '../../libcosy';
+MODULE GITHUB "rosy-team/libcosy" "v1.0.0";
 
 VARIABLE (ST) LIN;
 VARIABLE (VE 64) WORD;
