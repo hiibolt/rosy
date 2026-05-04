@@ -44,12 +44,10 @@ FUNCTION (DA) ENGE IMP (RE) IEE (RE) IEM (RE) S (DA);
 ENDFUNCTION;
 
 { ----- Set the six Enge coefficients ------------------
-   additionally validates that the resulting Enge profile is
-  monotonic and asymptotes to {0, 1}. The validation loop calls ENGE
-  with RE arguments (LOOP S 4 -3 -1; F := ENGE(...,S)), which would
-  require an RE↔DA bridge that's out of scope here. The setter portion
-  is identical and lossless; validation is deferred until the elements
-  consuming FC drive it.                                                  }
+  Writes the six fringe-field expansion coefficients into the global
+  ENGEC table at slot (IMP, IEE, IEM). IMP is the multipole order,
+  IEE the entry/exit selector (1 / 2), IEM the magnetic/electric
+  selector (1 / 2). }
 PROCEDURE FC IMP (RE) IEE (RE) IEM (RE) C1 (RE) C2 (RE) C3 (RE) C4 (RE) C5 (RE) C6 (RE);
   ENGEC[IMP, IEE, IEM, 1] := C1;
   ENGEC[IMP, IEE, IEM, 2] := C2;

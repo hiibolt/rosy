@@ -131,10 +131,11 @@ PROCEDURE WAS I (RE);
 ENDPROCEDURE;
 
 { ----- Fringe-field mode ----------------------------
-  The conditional FD2 bootstrap is suppressed here because FD2 lives in
-  the deferred symplectic-scaling block (FC2/FD2/SYSCFL). When FD2 lands,
-  the inner branch becomes `IF (I < 3) AND (I > 0) AND (LFR2 = 0); FD2;
-  LFR2 := 1; ENDIF;`.                                                     }
+  Sets the global fringe-field flag LFR. The LFR2 sentinel is set
+  for modes 1 / 2 so callers can detect that they should provide
+  symplectic-scaling reference tables (via an explicit FD2 call
+  reading SYSCA.DAT) before any element actually fires. LFR2
+  starts at 0 and latches on first FR call. }
 PROCEDURE FR I (RE);
   IF LOV = 0;
     WRITE 6 ' *** ERROR, call OV before FR';
@@ -142,7 +143,7 @@ PROCEDURE FR I (RE);
   ENDIF;
   LFR := I;
   IF (I < 3) AND (I > 0) AND (LFR2 = 0);
-    LFR2 := 1;     { FD2 placeholder — will call FD2 once that ports }
+    LFR2 := 1;
   ENDIF;
 ENDPROCEDURE;
 
@@ -351,10 +352,9 @@ PROCEDURE RPR CHI (RE) M (RE) Z (RE);
   CO NO+1;
   PHI_L := CHI/(AMU*CLIGHT/EZERO)/M*Z + 0*DA(1);
   ETA_L := SQRT(1 + PHI_L*PHI_L) - 1;
-  { ETA_L is DA but RP's E parameter is RE — extract the constant part.
-    The DA-bound parameter dependence (when ND=3 and CHI is itself DA)
-    is recovered later by the ND=3 branch of RP, which is currently
-    deferred; 's loose typing does this transparently.       }
+  { ETA_L is DA but RP's E parameter is RE — extract the constant
+    part. Any DA-bound parameter dependence is preserved by RP's
+    own DA promotion of E0. }
   RP CONS(ETA_L)*M*AMUMEV M Z;
   CO NOM;
 ENDPROCEDURE;

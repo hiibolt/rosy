@@ -354,20 +354,12 @@ ENDPROCEDURE;
   refreshes the envelope ERAY (when LENV=1), and advances the local-
   frame transform onto the global one.
 
-  deferred IR + LENV branches:
-
-  * IR + NRAY ≠ 0 path:
-    Calls POLVAL 1 MSC TWOND RAY 8 RAY TWOND. Because libcosy stores
-    RAY as `(VE 8)` (each RAY[k] is a VE of all particles' k-th
-    coordinate), POLVAL routes via `rosy_polval_ve` (polval.rs:70)
-    and batch-evaluates MSC at all particles simultaneously. This
-    is the same dispatch path TR uses for tracking; UPDATE re-uses
-    it for the ring-step ray push.
-
-    SPNVEC (, spin-vector update gated by LSPN=1
-    and NSPN>0) remains deferred — it needs SSCR/SPI scoping that
-    interacts with the partial-index spin path in reference_particle.
-    Diagnostic warns when triggered.
+  * IR + NRAY ≠ 0 path: calls POLVAL 1 MSC TWOND RAY 8 RAY TWOND.
+    Because RAY is stored as `(VE 8)` (each RAY[k] is a VE of all
+    particles' k-th coordinate), POLVAL routes through the batched
+    per-particle dispatch and evaluates MSC at all particles
+    simultaneously. The same path TR uses for tracking. SPNVEC fires
+    when LSPN=1 and NSPN>0 to refresh per-ray spin via SSCR.
 
   * LENV=1 path:
     Calls the inlined NEWENV — propagates the 1σ phase-space envelope
@@ -1282,29 +1274,11 @@ PROCEDURE ECM IAP (DA 8) LGH (RE) ALPHA (DA);
   ALPHA := XF[5] - DD[5];
 ENDPROCEDURE;
 
-{ ----- DANF (full normal-form analysis) — DEFERRED ------------------------
-  DANF is a 60-line procedure that block-diagonalizes a one-turn
-  map, computes resonant terms, and extracts the symplectic normal form
-  via Cj operator iteration. It heavily mixes DA and CD arithmetic
-  (variables typed differently mid-procedure depending on which step is
-  active), which COSY's loose typing absorbs but ROSY's strict typing
-  requires careful staging:
-    * FM and BM are written for DA inputs (real coefficients).
-    * After GT, the procedure starts CD-arithmetic with `M2(K) := (I*B*DD(K)
-      + I*B*DD(L))/SQRT(2*I*B)` etc.
-    * MN's type implicitly transitions from DA to CD at the `ANM MN M2 MN`
-      line — a transition ROSY can't represent directly.
-
-  The path forward is a DANF_CD-typed port that uses DA scratch internally
-  for FM/BM/GT and then explicitly lifts to CD via DA + 0*IM_unit. The
-  port is staged for a follow-up milestone.
-
-  For users who need:
-    - Just the fixed point: use FM directly.
-    - Just the block-diagonal form: use BM directly.
-    - Just the tunes / Twiss: use GT directly (no DANF needed).
-  These three cover the typical "ring analysis" workflow in libcosy
-  even without DANF.                                                        }
+{ DANF (full normal-form analysis) lives in normal_form.rosy. It
+  block-diagonalizes a one-turn map, computes resonant terms, and
+  extracts the symplectic normal form via Cj operator iteration. The
+  bottom-up shortcuts FM (fixed point), BM (block-diagonal form), and
+  GT (Twiss / tune) live here as building blocks DANF stacks on. }
 
 { ----- RM: read transfer map from unit IU -------------
   Inverse of WM. Two file formats are supported:
