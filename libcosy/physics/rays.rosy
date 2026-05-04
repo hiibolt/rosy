@@ -723,4 +723,70 @@ PROCEDURE SCDE;
   LENV := 1;
 ENDPROCEDURE;
 
+{ Sets an ensemble of rays on a uniform grid in 8-D phase space.
+  NX / NA / NY / NB / NT / ND_ARG / NG / NZ are the per-axis grid
+  counts; total ray count is the product. Each ray's coords are
+  sampled from PHSP (declared via SB) as
+        v_k := PHSP[k] · (2·I_k − N_k − 1) / max(1, N_k − 1)
+  i.e. linearly spaced in [−PHSP[k], +PHSP[k]] (or pinned to 0 when
+  N_k = 1). COL is the per-axis colour-tag fallback. Requires OV +
+  SB to have been called. Calling ER after BP (graphics) is an error. }
+PROCEDURE ER NX (RE) NA (RE) NY (RE) NB (RE)
+            NT (RE) ND_ARG (RE) NG (RE) NZ (RE);
+  VARIABLE (RE) IX; VARIABLE (RE) IA; VARIABLE (RE) IY; VARIABLE (RE) IB;
+  VARIABLE (RE) IT; VARIABLE (RE) ID; VARIABLE (RE) IG; VARIABLE (RE) IZ;
+  VARIABLE (RE) VX; VARIABLE (RE) VA; VARIABLE (RE) VY; VARIABLE (RE) VB;
+  VARIABLE (RE) VT; VARIABLE (RE) VD; VARIABLE (RE) VG; VARIABLE (RE) VZ;
+  VARIABLE (RE) I;
+  VARIABLE (RE) NEG_ONE;
+  VARIABLE (RE 8) COL;
+  IF LOV = 0;
+    WRITE 6 ' *** ERROR, call OV before ER';
+    QUIT 0;
+  ENDIF;
+  IF LPI = 1;
+    WRITE 6 ' *** ERROR, call ER before BP';
+    QUIT 0;
+  ENDIF;
+  IF LPS = 0;
+    WRITE 6 ' *** ERROR, call SB before ER';
+    QUIT 0;
+  ENDIF;
+  NEG_ONE := -1;
+  IF INT(ND_ARG/2) # ND_ARG/2;
+    COL[(ND_ARG + 1)/2] := 5;
+  ENDIF;
+  LOOP I 1 ND_ARG/2;
+    COL[I] := 3;
+  ENDLOOP;
+  LOOP I ND_ARG ND_ARG/2 + 1 NEG_ONE;
+    COL[I] := 2;
+  ENDLOOP;
+  LOOP IX 1 NX;
+    LOOP IA 1 NA;
+      LOOP IY 1 NY;
+        LOOP IB 1 NB;
+          LOOP IT 1 NT;
+            LOOP ID 1 ND_ARG;
+              LOOP IG 1 NG;
+                LOOP IZ 1 NZ;
+                  VX := PHSP[1]*(2*IX - NX - 1)/MAX(1, NX - 1);
+                  VA := PHSP[2]*(2*IA - NA - 1)/MAX(1, NA - 1);
+                  VY := PHSP[3]*(2*IY - NY - 1)/MAX(1, NY - 1);
+                  VB := PHSP[4]*(2*IB - NB - 1)/MAX(1, NB - 1);
+                  VT := PHSP[5]*(2*IT - NT - 1)/MAX(1, NT - 1);
+                  VD := PHSP[6]*(2*ID - ND_ARG - 1)/MAX(1, ND_ARG - 1);
+                  VG := PHSP[7]*(2*IG - NG - 1)/MAX(1, NG - 1);
+                  VZ := PHSP[8]*(2*IZ - NZ - 1)/MAX(1, NZ - 1);
+                  SR VX VA VY VB VT VD VG VZ COL[ID];
+                ENDLOOP;
+              ENDLOOP;
+            ENDLOOP;
+          ENDLOOP;
+        ENDLOOP;
+      ENDLOOP;
+    ENDLOOP;
+  ENDLOOP;
+ENDPROCEDURE;
+
 END;

@@ -1453,4 +1453,167 @@ PROCEDURE CRCO IAP (CD 8) NAP (CD 8);
   ENDIF;
 ENDPROCEDURE;
 
+{ Trajectory reconstruction for spectrograph error analysis.
+  Generates N stochastic samples drawn from input position / momentum
+  widths (X, A, Y, B, D), pushes them through the forward map M plus
+  a measurement-resolution kick (PR, AR), and reconstructs each input
+  via the inverse map MR (computed from M when OR_ARG > 0). RES[1..4]
+  receives the mean reciprocal-residual figures of merit per coordinate
+  — higher values mean the reconstruction is well-conditioned.
+
+  Uses an inline linear-congruential PRNG seeded at 0, advanced via
+  IRAN := 2·(98765·IRAN + 0.12345 − round(...)). IRAN cycles
+  deterministically per call so callers see reproducible runs. }
+PROCEDURE RR M (DA 8) X (RE) A (RE) Y (RE) B (RE) D (RE)
+            PR (RE) AR_ARG (RE) N (RE) OR_ARG (RE)
+            MR (DA 8) RES (RE 4);
+  VARIABLE (DA 4) M4;
+  VARIABLE (DA 6) CM;
+  VARIABLE (VE 6) RI;
+  VARIABLE (VE 4) RO;
+  VARIABLE (VE 4) RB;
+  VARIABLE (VE 4) RES_VEC;
+  VARIABLE (VE)   S_VE;
+  VARIABLE (DA 1) BUF_IN;
+  VARIABLE (DA 1) BUF_OUT;
+  VARIABLE (RE)   IRAN;
+  VARIABLE (RE)   NN;
+  VARIABLE (RE)   NOM;
+  VARIABLE (RE)   IER;
+  VARIABLE (RE)   I;
+  VARIABLE (RE)   J;
+  VARIABLE (RE)   S_VAL;
+
+  IRAN := 0;
+
+  IF OR_ARG > 0;
+    LOOP I 1 4;
+      BUF_IN[1] := M[I];
+      DAPLU BUF_IN 1 0 BUF_OUT;
+      M4[I] := BUF_OUT[1];
+      CM[I + 1] := DD[I];
+    ENDLOOP;
+    NOM := NOC;
+    CO OR_ARG;
+    CM[1] := 0*DD[1];
+    CM[6] := 0*DD[1];
+    IF ND = 3;
+      CM[6] := DD[4];
+      CM[5] := 0*DD[1];
+    ENDIF;
+    POLVAL 1 M4 4 CM 6 M4 4;
+    MI M4 MR 4 IER NOC NV NM1;
+    CO NOM;
+  ELSE;
+    IER := 0;
+  ENDIF;
+
+  S_VE := VE(0);
+  LOOP I 1 N - 1;
+    S_VE := S_VE & 0;
+  ENDLOOP;
+
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I X*IRAN;
+  ENDLOOP;
+  RI[1] := S_VE;
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I A*IRAN;
+  ENDLOOP;
+  RI[2] := S_VE;
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I Y*IRAN;
+  ENDLOOP;
+  RI[3] := S_VE;
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I B*IRAN;
+  ENDLOOP;
+  RI[4] := S_VE;
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I D*IRAN;
+  ENDLOOP;
+  RI[5] := S_VE;
+  RI[6] := S_VE;
+
+  POLVAL 1 M 4 RI 6 RO 4;
+
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I PR*IRAN;
+  ENDLOOP;
+  RES_VEC[1] := S_VE;
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I AR_ARG*IRAN;
+  ENDLOOP;
+  RES_VEC[2] := S_VE;
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I PR*IRAN;
+  ENDLOOP;
+  RES_VEC[3] := S_VE;
+  LOOP I 1 N;
+    IRAN := 98765*IRAN + 0.12345;
+    IRAN := 2*(IRAN - NINT(IRAN));
+    VELSET S_VE I AR_ARG*IRAN;
+  ENDLOOP;
+  RES_VEC[4] := S_VE;
+
+  RO[1] := RO[1] + RES_VEC[1];
+  RO[2] := RO[2] + RES_VEC[2];
+  RO[3] := RO[3] + RES_VEC[3];
+  RO[4] := RO[4] + RES_VEC[4];
+
+  POLVAL 1 MR 4 RO 4 RB 4;
+
+  RES_VEC[1] := RI[2] - RB[1];
+  RES_VEC[2] := RI[3] - RB[2];
+  RES_VEC[3] := RI[4] - RB[3];
+  RES_VEC[4] := RI[6] - RB[4];
+
+  LOOP J 1 4;
+    RES[J] := 0;
+    NN := 0;
+    LOOP I 1 N;
+      S_VAL := RES_VEC[J]|I;
+      IF S_VAL # 0;
+        RES[J] := RES[J] + ABS(S_VAL);
+        NN := NN + 1;
+      ENDIF;
+    ENDLOOP;
+    RES[J] := NN/(RES[J] + 1E-20)/4;
+    IF IER # 0;
+      RES[J] := 0;
+    ENDIF;
+  ENDLOOP;
+ENDPROCEDURE;
+
+{ Spectrograph resolution figure of merit. Builds an inverse map MR
+  internally then runs RR with the (X,A,Y,B,D, PR=PR, AR=PR·M(1,2))
+  spread, returning the angular-resolution figure of merit in RES. }
+PROCEDURE AR M (DA 8) X (RE) A (RE) Y (RE) B (RE) D (RE)
+            PR (RE) N (RE) RES (RE);
+  VARIABLE (DA 1) BUF_AR;
+  VARIABLE (DA 8) MR_AR;
+  VARIABLE (RE 4) RS;
+  VARIABLE (RE)   M12_COEF;
+  BUF_AR[1] := M[1];
+  DAPEE BUF_AR 2 M12_COEF;
+  RR M X A Y B D PR M12_COEF*A N 1 MR_AR RS;
+  RES := RS[4];
+ENDPROCEDURE;
+
 END;
