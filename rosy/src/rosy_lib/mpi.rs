@@ -27,16 +27,16 @@ impl RosyMPIContext {
     }
     // Coordinates a value array between all different processes
     //  according to the specified communication standard.
-    pub fn coordinate<T: Encode + Decode<()> + std::fmt::Debug> (
+    pub fn coordinate<T: Encode + Decode<()> + std::fmt::Debug + Default> (
         &self,
 
         value: &mut Vec<T>,
         communication_standard: u8,
-        num_groups: &mut RE 
+        num_groups: &mut RE
     ) -> Result<()> {
         match communication_standard {
             1 => {
-                // In this standard, each process sends to all other processes 
+                // In this standard, each process sends to all other processes
                 //  in its group.
                 //
                 // For example, for 6 processes and 3 groups,
@@ -51,6 +51,14 @@ impl RosyMPIContext {
                 let num_groups = *num_groups as i32;
                 let processes_per_group = self.size / num_groups;
                 let group_id = self.rank % processes_per_group;
+
+                // The output array must have at least `num_groups` slots —
+                // one per group's contribution. The user's array may have
+                // been sized from a variable (e.g. `(RE NP) X`) before
+                // `PNPRO NP` ran, in which case it's still empty here.
+                if value.len() < num_groups as usize {
+                    value.resize_with(num_groups as usize, T::default);
+                }
 
                 let other_nodes: Vec<i32> = (0..self.size)
                     .filter(|r| (r % processes_per_group) == group_id && *r != self.rank)

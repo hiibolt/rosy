@@ -1,0 +1,25 @@
+BEGIN;
+
+PROCEDURE RUN;
+    VARIABLE NP ;
+    VARIABLE IP ;
+    VARIABLE I ;
+    VARIABLE IPR;
+
+    PROCEDURE GET_MPI_INFO NP IP IPR;
+        VARIABLE I ;
+        VARIABLE (RE NP) X;
+        PNPRO NP;
+        PLOOP I 1 NP;
+            IP := I;
+        ENDPLOOP X;
+        {PROOT IPR;}
+        WRITE 6 ST(NP);
+    ENDPROCEDURE; { GET_MPI_INFO }
+
+
+    GET_MPI_INFO NP IP IPR;
+
+ENDPROCEDURE;
+RUN;
+END;

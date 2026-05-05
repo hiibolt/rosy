@@ -116,9 +116,13 @@ impl Transpile for PnproStatement {
             }
         };
 
-        // Always returns 1.0 in serial mode.
-        // In MPI mode, the PLOOP infrastructure handles parallelism externally.
-        let serialization = format!("{}{} = 1.0;", dereference, output.serialization);
+        // Returns the total number of MPI processes. In serial mode (no
+        // `mpirun`), MPI initializes with size = 1, so this still yields 1.0.
+        requested_variables.insert("rosy_mpi_context".to_string());
+        let serialization = format!(
+            "{}{} = rosy_mpi_context.size as f64;",
+            dereference, output.serialization
+        );
 
         Ok(TranspilationOutput {
             serialization,
