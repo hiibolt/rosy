@@ -132,7 +132,7 @@ impl RosyDisplay for &CM {
 impl RosyDisplay for &VE {
     fn rosy_display(self) -> String {
         let elements: Vec<String> = self.iter()
-            .map(|x| format!(" {}", x.rosy_display().chars().take(9).collect::<String>()))
+            .map(|x| format!(" {}", display_re(*x, 9, 4, 5)))
             .collect();
         format!("{}", elements.join("     ") )
     }
@@ -267,5 +267,19 @@ impl RosyDisplay for &usize {
 impl RosyDisplay for &str {
     fn rosy_display(self) -> String {
         self.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RosyDisplay;
+
+    #[test]
+    fn vector_display_keeps_small_value_exponents() {
+        let values = vec![0.546920369e-2, 0.937875496e-10];
+        let displayed = values.rosy_display();
+
+        assert!(displayed.contains("0.546920369E-002"));
+        assert!(displayed.contains("0.937875496E-010"));
     }
 }
