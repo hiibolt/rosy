@@ -72,8 +72,12 @@ impl VariableIdentifier {
     }
 
     /// Total number of indexing dimensions (only valid for variable indexing, not function calls).
+    ///
+    /// Counts every expression across all paren groups plus every bracket index.
+    /// Supports both chained `X(I)(J)` (groups of one) and COSY-style `X(I, J)`
+    /// (a single group of many).
     pub fn num_index_dimensions(&self) -> usize {
-        self.paren_groups.len() + self.bracket_indices.len()
+        self.paren_groups.iter().map(|g| g.len()).sum::<usize>() + self.bracket_indices.len()
     }
 }
 
