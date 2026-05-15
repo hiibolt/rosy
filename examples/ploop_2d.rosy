@@ -1,0 +1,20 @@
+BEGIN;
+    {COSY-style 2D PLOOP: parallel iterator is the LAST index.
+     X has shape (4 rows × NP cols); each rank fills its own column.}
+    VARIABLE (RE) NP;
+    NP := 3;
+    VARIABLE (RE 4 NP) X;
+
+    PLOOP P 1 NP;
+        LOOP J 1 4;
+            X(J, P) := 100*P + J;
+        ENDLOOP;
+    ENDPLOOP X;
+
+    WRITE 6 "X laid out as 4 rows × NP cols:";
+    LOOP J 1 4;
+        LOOP P 1 NP;
+            WRITE 6 "  X(" ST(J) "," ST(P) ") = " ST(X(J, P));
+        ENDLOOP;
+    ENDLOOP;
+END;
