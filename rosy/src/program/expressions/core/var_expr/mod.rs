@@ -11,7 +11,7 @@
 //! | Paren Groups | Args per Group | Bracket Indices | Result |
 //! |-------------|----------------|-----------------|--------|
 //! | 0 | — | any | Variable |
-//! | 1 | multiple | — | Function call |
+//! | 1 | multiple | — | Context-dependent: function call vs COSY-style multi-dim index |
 //! | 1 | 1 | — | Context-dependent (see below) |
 //! | ≥2 | 1 each | — | Multi-dim index (Variable) |
 //!
@@ -106,15 +106,39 @@ impl VarExpr {
             1 => {
                 let num_args = ident.paren_groups[0].len();
                 if num_args > 1 {
-                    // Multiple args in one paren group → function call
-                    // But must not also have bracket indices
-                    if has_brackets {
-                        return Err(vec![anyhow::anyhow!(
-                            "'{}': function call with bracket indexing is not valid",
-                            ident.name
-                        )]);
+                    // Multiple args in one paren group — could be either a
+                    // function call `FUNC(a, b)` or COSY-style multi-dim
+                    // indexing `X(I, J)`. Disambiguate via the symbol table.
+                    let is_var = context.variables.contains_key(&ident.name);
+                    let is_func = context.functions.contains_key(&ident.name);
+
+                    let func_accepts = is_func
+                        && context.functions.get(&ident.name).unwrap().args.len() == num_args;
+                    let var_accepts = is_var && {
+                        let v = context.variables.get(&ident.name).unwrap();
+                        // VE only accepts a single index, so it can never satisfy
+                        // a multi-arg group; fall through to function-call routing.
+                        v.data.r#type.base_type != crate::rosy_lib::RosyBaseType::VE
+                            && num_args <= v.data.r#type.dimensions
+                    };
+
+                    let route_as_call = match (func_accepts, var_accepts) {
+                        (true, _) => true,           // function arity matches — prefer call
+                        (false, true) => false,      // only variable fits — multi-dim index
+                        (false, false) => is_func || !is_var, // surface the more informative error downstream
+                    };
+
+                    if route_as_call {
+                        if has_brackets {
+                            return Err(vec![anyhow::anyhow!(
+                                "'{}': function call with bracket indexing is not valid",
+                                ident.name
+                            )]);
+                        }
+                        Ok(VarExprKind::FunctionCall)
+                    } else {
+                        Ok(VarExprKind::Variable)
                     }
-                    Ok(VarExprKind::FunctionCall)
                 } else {
                     // Single paren group, single arg → check context
                     let is_var = context.variables.contains_key(&ident.name);
@@ -159,18 +183,10 @@ impl VarExpr {
                 }
             }
             _ => {
-                // Multiple paren groups → multi-dimensional indexing
-                // Validate: each group must have exactly one arg
-                for (i, group) in ident.paren_groups.iter().enumerate() {
-                    if group.len() != 1 {
-                        return Err(vec![anyhow::anyhow!(
-                            "'{}': paren group {} has {} args — multi-dimensional indexing requires exactly 1 arg per group",
-                            ident.name,
-                            i + 1,
-                            group.len()
-                        )]);
-                    }
-                }
+                // Multiple paren groups → multi-dimensional indexing.
+                // Any mix of group sizes is allowed (e.g. `X(1, 2)(3)` is the
+                // same as `X(1)(2)(3)`); total index count is validated against
+                // the variable's dimensions during type_of().
                 Ok(VarExprKind::Variable)
             }
         }
@@ -228,7 +244,20 @@ impl TranspileableExpr for VarExpr {
             1 => {
                 let num_args = ident.paren_groups[0].len();
                 if num_args > 1 {
-                    true
+                    // Mirror classify(): prefer function only when its arity
+                    // matches; otherwise treat as multi-dim variable indexing
+                    // when the variable can absorb that many indices.
+                    let func_accepts = is_func
+                        && ctx.functions.get(&ident.name)
+                            .map(|(_, args)| args.len() == num_args)
+                            .unwrap_or(false);
+                    if func_accepts {
+                        true
+                    } else if is_var {
+                        false
+                    } else {
+                        is_func
+                    }
                 } else {
                     !is_var && is_func
                 }

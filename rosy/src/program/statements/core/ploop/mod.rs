@@ -11,13 +11,32 @@
 //! ENDPLOOP output;
 //! ```
 //!
-//! ## Example
+//! ## Partitioning convention (COSY INFINITY compatible)
+//!
+//! The PLOOP iterator partitions the **last (innermost)** dimension of the
+//! output array. Each rank `g` writes into `output[...][g]` and the gather
+//! broadcasts each inner Vec independently. For 1D outputs (or `VE`) this is
+//! a no-op wrapper — `coordinate()` runs directly on the value.
+//!
+//! ## Example (1D — most common)
 //!
 //! ```text
 //! VARIABLE (VE) results;
 //! PLOOP I 1 100;
 //!     results := results & (I * 2);
 //! ENDPLOOP results;
+//! ```
+//!
+//! ## Example (2D — per-rank column)
+//!
+//! ```text
+//! { Each rank fills its column of a 4-row × NP-col matrix. }
+//! VARIABLE (RE 4 NP) X;
+//! PLOOP P 1 NP;
+//!     LOOP J 1 4;
+//!         X(J, P) := 100*P + J;
+//!     ENDLOOP;
+//! ENDPLOOP X;
 //! ```
 
 use anyhow::{Context, Error, Result, anyhow, bail, ensure};
@@ -305,11 +324,43 @@ impl Transpile for PLoopStatement {
                 self.iterator,
             )
         };
-        let coordination_serialization = format!(
-            "rosy_mpi_context.coordinate(&mut {}, {}u8, &mut __ploop_end)?;",
-            output_serialization,
-            self.commutivityfrom_rule.unwrap_or(1),
-        );
+        // Partition the OUTPUT array's last (innermost) dimension across MPI
+        // ranks, matching COSY INFINITY's convention. For a 2D output declared
+        // `(RE D1 NP) X`, each rank g writes into `X[i][g]` for every `i`, and
+        // the gather broadcasts every inner Vec independently.
+        //
+        // For 1D arrays / VE, no outer loops are emitted — `coordinate()` runs
+        // directly on the value, identical to the pre-1.2 behavior.
+        let coordination_serialization = {
+            let rank = if output_type == RosyType::VE() {
+                1
+            } else {
+                output_type.dimensions
+            };
+            let outer_loop_count = rank.saturating_sub(1);
+            let commut = self.commutivityfrom_rule.unwrap_or(1);
+
+            let mut accessor = output_serialization.clone();
+            let mut opens = String::new();
+            for i in 0..outer_loop_count {
+                let idx = format!("__ploop_dim_{}", i);
+                opens.push_str(&format!(
+                    "for {} in 0..{}.len() {{\n\t",
+                    idx, accessor
+                ));
+                accessor = format!("{}[{}]", accessor, idx);
+            }
+            let inner_call = format!(
+                "rosy_mpi_context.coordinate(&mut {}, {}u8, &mut __ploop_end)?;",
+                accessor, commut,
+            );
+            let closes = "}".repeat(outer_loop_count);
+            if outer_loop_count == 0 {
+                inner_call
+            } else {
+                format!("{}{}\n\t{}", opens, inner_call, closes)
+            }
+        };
         let serialization = format!(
             "{{\n\t{}\n\n{}\n\n\t{}\n}}",
             iterator_declaration_serialization,
